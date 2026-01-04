@@ -1,16 +1,34 @@
 'use client'
 
+/**
+ * ========================================
+ * OEM PRODUKTIONSPROGRAMM
+ * ========================================
+ * 
+ * Tagesgenaue Produktionsplanung mit:
+ * - 365 Tage Planung für alle 8 MTB-Varianten
+ * - Saisonale Verteilung (April-Peak)
+ * - Error-Management für Rundungsfehler
+ * - Stücklisten-Übersicht
+ */
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { CheckCircle2, Calendar, TrendingUp, AlertCircle } from 'lucide-react'
+import { CheckCircle2, Calendar, TrendingUp, AlertCircle, Download } from 'lucide-react'
 import { formatNumber, formatDate } from '@/lib/utils'
 import { generiereAlleProduktionsplaene, berechneProduktionsstatistik } from '@/lib/calculations/oem-programm'
 import { kalenderStatistik } from '@/lib/kalender'
+import { exportToCSV, exportToJSON } from '@/lib/export'
 import stammdatenData from '@/data/stammdaten.json'
+import stuecklisteData from '@/data/stueckliste.json'
 import { useState, useEffect } from 'react'
 
+/**
+ * OEM Programm Hauptseite
+ * Zeigt Produktionsplanung und Stücklisten
+ */
 export default function OEMProgrammPage() {
   const [produktionsplaene, setProduktionsplaene] = useState<any>(null)
   const [selectedVariante, setSelectedVariante] = useState('MTBAllrounder')
@@ -23,14 +41,59 @@ export default function OEMProgrammPage() {
 
   const kalenderStats = kalenderStatistik(2027)
   
+  /**
+   * Exportiert Produktionsplan als CSV
+   */
+  const handleExportCSV = () => {
+    if (!produktionsplaene || !produktionsplaene[selectedVariante]) {
+      alert('Keine Daten zum Exportieren verfügbar')
+      return
+    }
+    
+    const data = produktionsplaene[selectedVariante]
+      .filter((t: any) => t.istMenge > 0)
+      .map((tag: any) => ({
+        Datum: formatDate(new Date(tag.datum)),
+        'Soll-Menge': formatNumber(tag.sollMenge, 2),
+        'Ist-Menge': tag.istMenge,
+        'Kumulierter Error': formatNumber(tag.kumulierterError, 3)
+      }))
+    
+    exportToCSV(data, `produktionsplan_${selectedVariante}_2027`)
+  }
+  
+  /**
+   * Exportiert alle Daten als JSON
+   */
+  const handleExportJSON = () => {
+    if (!produktionsplaene) {
+      alert('Keine Daten zum Exportieren verfügbar')
+      return
+    }
+    
+    exportToJSON(produktionsplaene, 'alle_produktionsplaene_2027')
+  }
+  
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">OEM Produktionsprogrammplanung</h1>
-        <p className="text-muted-foreground mt-1">
-          Tagesgenaue Planung für 365 Tage × 8 Varianten mit Error-Management
-        </p>
+      {/* Header mit Export-Buttons */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">OEM Produktionsprogrammplanung</h1>
+          <p className="text-muted-foreground mt-1">
+            Tagesgenaue Planung für 365 Tage × 8 Varianten mit Error-Management
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            CSV Export
+          </Button>
+          <Button variant="outline" onClick={handleExportJSON}>
+            <Download className="h-4 w-4 mr-2" />
+            JSON Export
+          </Button>
+        </div>
       </div>
 
       {/* Übersicht Cards */}
@@ -84,6 +147,7 @@ export default function OEMProgrammPage() {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Übersicht</TabsTrigger>
+          <TabsTrigger value="stueckliste">Stückliste</TabsTrigger>
           <TabsTrigger value="details">Tagesplanung</TabsTrigger>
           <TabsTrigger value="error">Error-Management</TabsTrigger>
         </TabsList>
@@ -162,6 +226,84 @@ export default function OEMProgrammPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Stückliste Tab */}
+        <TabsContent value="stueckliste" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Stückliste - Mountain Bikes</CardTitle>
+              <CardDescription>
+                Komponenten pro Fahrrad: 1x Rahmen + 1x Gabel + 1x Sattel = 1 Fahrrad
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Rahmen */}
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-lg mb-3 text-green-700">Rahmen</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Variante</TableHead>
+                        <TableHead className="text-xs">Rahmentyp</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stuecklisteData.varianten.map((v: any) => (
+                        <TableRow key={v.id}>
+                          <TableCell className="text-sm">{v.name}</TableCell>
+                          <TableCell className="text-sm">{v.rahmen}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Gabeln */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-lg mb-3 text-blue-700">Gabeln</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Variante</TableHead>
+                        <TableHead className="text-xs">Gabeltyp</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stuecklisteData.varianten.map((v: any) => (
+                        <TableRow key={v.id}>
+                          <TableCell className="text-sm">{v.name}</TableCell>
+                          <TableCell className="text-sm">{v.gabel}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Sättel */}
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-lg mb-3 text-orange-700">Sättel</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Variante</TableHead>
+                        <TableHead className="text-xs">Satteltyp</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stuecklisteData.varianten.map((v: any) => (
+                        <TableRow key={v.id}>
+                          <TableCell className="text-sm">{v.name}</TableCell>
+                          <TableCell className="text-sm">{v.sattel}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
