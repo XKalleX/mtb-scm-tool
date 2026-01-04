@@ -18,16 +18,37 @@ import { Button } from '@/components/ui/button'
 import { CheckCircle2, Ship, AlertTriangle, Package, Download } from 'lucide-react'
 import { formatNumber } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
+import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import lieferantData from '@/data/lieferant-china.json'
 import feiertagsData from '@/data/feiertage-china.json'
 
 /**
  * Inbound Logistik Hauptseite
- * Zeigt Lieferanteninformationen und Logistikdetails
+ * Zeigt Lieferanteninformationen und Logistikdetails mit Excel-Tabellen
  */
 export default function InboundPage() {
   const lieferant = lieferantData.lieferant
   const springFestival = feiertagsData.feiertage2027.filter(f => f.name.includes('Spring Festival'))
+  
+  // Beispiel Lieferplan-Daten für Excel-Tabelle
+  const lieferplanDaten = Array.from({ length: 12 }, (_, i) => {
+    const monat = i + 1
+    const bestelldatum = new Date(2027, monat - 1, 5).toISOString().split('T')[0]
+    const lieferdatum = new Date(2027, monat - 1, 5 + 56).toISOString().split('T')[0] // 56 Tage später
+    const menge = 30000 + Math.floor(Math.random() * 20000)
+    const status = monat <= 3 ? 'Geliefert' : monat <= 6 ? 'Unterwegs' : 'Geplant'
+    
+    return {
+      monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
+      bestelldatum,
+      lieferdatum,
+      vorlaufzeit: 56,
+      menge,
+      losgroesse: lieferant.losgroesse,
+      anzahlLose: Math.ceil(menge / lieferant.losgroesse),
+      status
+    }
+  })
   
   /**
    * Exportiert Lieferanten-Daten als JSON
@@ -232,6 +253,107 @@ export default function InboundPage() {
               Beispiel: Bedarf 3.500 Stück → Bestellung <strong>4.000 Stück</strong> (2x Losgröße)
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Lieferplan mit Excel-Tabelle */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Lieferplan 2027 - China Komponenten</CardTitle>
+          <CardDescription>
+            Monatlicher Lieferplan mit Vorlaufzeiten und Losgrößen (Excel-Darstellung)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Formel-Karten */}
+          <div className="grid gap-4 md:grid-cols-2 mb-6">
+            <FormulaCard
+              title="Vorlaufzeit Berechnung"
+              formula="Vorlaufzeit = 21 AT (Produktion) + 35 KT (Transport) + 2 AT (Puffer) ≈ 56 Tage"
+              description="Gesamte Durchlaufzeit von Bestellung bis Ankunft in Deutschland"
+              example="Bestellung 05.01. → Lieferung ~02.03. (56 Tage später)"
+            />
+            <FormulaCard
+              title="Losgrößen-Aufrundung"
+              formula="Anzahl Lose = AUFRUNDEN(Bestellmenge / Losgröße)"
+              description="Jede Bestellung wird auf Vielfache der Losgröße aufgerundet"
+              example="Bedarf 35.000 → 18 Lose × 2.000 = 36.000 Stück"
+            />
+          </div>
+
+          {/* Excel-ähnliche Tabelle */}
+          <ExcelTable
+            columns={[
+              {
+                key: 'monat',
+                label: 'Monat',
+                width: '80px',
+                align: 'center'
+              },
+              {
+                key: 'bestelldatum',
+                label: 'Bestelldatum',
+                width: '120px',
+                align: 'center',
+                format: (val) => new Date(val).toLocaleDateString('de-DE')
+              },
+              {
+                key: 'vorlaufzeit',
+                label: 'Vorlaufzeit',
+                width: '100px',
+                align: 'center',
+                formula: '21 AT + 35 KT',
+                format: (val) => `${val} Tage`
+              },
+              {
+                key: 'lieferdatum',
+                label: 'Lieferdatum',
+                width: '120px',
+                align: 'center',
+                formula: 'Bestelldatum + Vorlaufzeit',
+                format: (val) => new Date(val).toLocaleDateString('de-DE')
+              },
+              {
+                key: 'menge',
+                label: 'Bestellmenge',
+                width: '120px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0) + ' Stk'
+              },
+              {
+                key: 'losgroesse',
+                label: 'Losgröße',
+                width: '100px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0)
+              },
+              {
+                key: 'anzahlLose',
+                label: 'Anzahl Lose',
+                width: '110px',
+                align: 'center',
+                formula: 'AUFRUNDEN(Menge / Losgröße)',
+                format: (val) => `${val} Lose`
+              },
+              {
+                key: 'status',
+                label: 'Status',
+                width: '100px',
+                align: 'center',
+                format: (val) => {
+                  const colors: Record<string, string> = {
+                    'Geliefert': '✓ Geliefert',
+                    'Unterwegs': '🚢 Unterwegs',
+                    'Geplant': '📅 Geplant'
+                  }
+                  return colors[val] || val
+                }
+              }
+            ]}
+            data={lieferplanDaten}
+            maxHeight="500px"
+            showFormulas={true}
+          />
         </CardContent>
       </Card>
 

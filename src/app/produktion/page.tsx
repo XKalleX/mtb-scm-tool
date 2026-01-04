@@ -22,7 +22,7 @@ import ExcelTable, { FormulaCard } from '@/components/excel-table'
 
 /**
  * Produktion Hauptseite
- * Zeigt Produktionsstatus und Lagerbestände
+ * Zeigt Produktionsstatus und Lagerbestände mit Excel-Tabellen
  */
 export default function ProduktionPage() {
   // Beispiel-Daten (später aus State/Context)
@@ -35,12 +35,31 @@ export default function ProduktionPage() {
   }
 
   const lagerbestaende = [
-    { komponente: 'Gabel_Fox32F100', bestand: 5200, sicherheit: 1000, status: 'ok' },
-    { komponente: 'Rahmen_Carbon', bestand: 3800, sicherheit: 1000, status: 'ok' },
-    { komponente: 'Reifen_Standard', bestand: 750, sicherheit: 1000, status: 'kritisch' },
-    { komponente: 'Schaltung_Shimano', bestand: 4100, sicherheit: 1000, status: 'ok' },
-    { komponente: 'Bremsen_Premium', bestand: 850, sicherheit: 1000, status: 'kritisch' },
+    { komponente: 'Rahmen_Allrounder', bestand: 5200, sicherheit: 1000, bedarf: 4500, status: 'ok' },
+    { komponente: 'Rahmen_Competition', bestand: 3800, sicherheit: 1000, bedarf: 3200, status: 'ok' },
+    { komponente: 'Gabel_Fox32', bestand: 4500, sicherheit: 1000, bedarf: 3800, status: 'ok' },
+    { komponente: 'Gabel_RockShox', bestand: 750, sicherheit: 1000, bedarf: 1200, status: 'kritisch' },
+    { komponente: 'Sattel_Standard', bestand: 6100, sicherheit: 1000, bedarf: 5000, status: 'ok' },
+    { komponente: 'Sattel_Premium', bestand: 850, sicherheit: 1000, bedarf: 900, status: 'kritisch' },
   ]
+  
+  // Wöchentliche Produktionsdaten für Excel-Tabelle
+  const wochenProduktion = Array.from({ length: 12 }, (_, i) => {
+    const kw = i + 1
+    const planMenge = 7000 + Math.floor(Math.random() * 2000)
+    const istMenge = planMenge - Math.floor(Math.random() * 200)
+    const materialVerfuegbar = istMenge === planMenge
+    const auslastung = (istMenge / planMenge) * 100
+    
+    return {
+      kw,
+      planMenge,
+      istMenge,
+      abweichung: istMenge - planMenge,
+      materialVerfuegbar,
+      auslastung: Math.round(auslastung * 10) / 10
+    }
+  })
   
   /**
    * Exportiert Lagerbestände als CSV
@@ -186,6 +205,83 @@ export default function ProduktionPage() {
         </CardContent>
       </Card>
 
+      {/* Wöchentliche Produktionsplanung mit Excel-Tabelle */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Wöchentliche Produktionsplanung (Beispiel Q1)</CardTitle>
+          <CardDescription>
+            Detaillierte Produktionsplanung mit ATP-Check und Auslastung
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Formel-Karte */}
+          <div className="mb-6">
+            <FormulaCard
+              title="Produktionsauslastung"
+              formula="Auslastung (%) = (Ist-Menge / Plan-Menge) × 100"
+              description="Zeigt die tatsächliche Produktionsleistung im Verhältnis zur Planung"
+              example="KW 1: 7.100 / 7.200 = 98,6% Auslastung"
+            />
+          </div>
+
+          {/* Excel-Tabelle */}
+          <ExcelTable
+            columns={[
+              {
+                key: 'kw',
+                label: 'KW',
+                width: '60px',
+                align: 'center'
+              },
+              {
+                key: 'planMenge',
+                label: 'Plan-Menge',
+                width: '120px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0) + ' Bikes'
+              },
+              {
+                key: 'istMenge',
+                label: 'Ist-Menge',
+                width: '120px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0) + ' Bikes'
+              },
+              {
+                key: 'abweichung',
+                label: 'Abweichung',
+                width: '110px',
+                align: 'right',
+                formula: 'Ist - Plan',
+                format: (val) => {
+                  const sign = val >= 0 ? '+' : ''
+                  return sign + formatNumber(val, 0)
+                }
+              },
+              {
+                key: 'materialVerfuegbar',
+                label: 'Material OK',
+                width: '110px',
+                align: 'center',
+                formula: 'ATP-Check',
+                format: (val) => val ? '✓ Ja' : '✗ Nein'
+              },
+              {
+                key: 'auslastung',
+                label: 'Auslastung',
+                width: '110px',
+                align: 'right',
+                formula: '(Ist / Plan) × 100',
+                format: (val) => formatNumber(val, 1) + ' %'
+              }
+            ]}
+            data={wochenProduktion}
+            maxHeight="400px"
+            showFormulas={true}
+          />
+        </CardContent>
+      </Card>
+
       {/* Lagerbestand */}
       <Card>
         <CardHeader>
@@ -229,12 +325,27 @@ export default function ProduktionPage() {
                 format: (val) => formatNumber(val, 0)
               },
               {
+                key: 'bedarf',
+                label: 'Wochenbedarf',
+                width: '130px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0)
+              },
+              {
                 key: 'verfuegbar',
-                label: 'Verfügbar',
-                width: '120px',
+                label: 'Verfügbar (ATP)',
+                width: '140px',
                 align: 'right',
                 formula: 'Bestand - Sicherheitsbestand',
                 format: (val) => formatNumber(val, 0)
+              },
+              {
+                key: 'reichweite',
+                label: 'Reichweite',
+                width: '110px',
+                align: 'right',
+                formula: 'Verfügbar / Wochenbedarf',
+                format: (val) => formatNumber(val, 1) + ' Wo.'
               },
               {
                 key: 'status',
@@ -250,7 +361,9 @@ export default function ProduktionPage() {
               komponente: l.komponente,
               bestand: l.bestand,
               sicherheit: l.sicherheit,
+              bedarf: l.bedarf,
               verfuegbar: l.bestand - l.sicherheit,
+              reichweite: (l.bestand - l.sicherheit) / l.bedarf,
               status: l.status
             }))}
             maxHeight="400px"

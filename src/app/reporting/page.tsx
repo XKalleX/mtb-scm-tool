@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { TrendingUp, TrendingDown, Minus, BarChart3, Download, Filter, Maximize2 } from 'lucide-react'
 import { formatNumber, formatPercent } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
+import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import {
   LineChart,
   Line,
@@ -388,6 +389,135 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
               <div className="text-xs text-muted-foreground mt-1">Kapazität genutzt</div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* SCOR Metriken Excel-Tabelle */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Alle SCOR-Metriken im Überblick</CardTitle>
+          <CardDescription>
+            Vollständige Übersicht aller KPIs mit Zielwerten und Status (Excel-Darstellung)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ExcelTable
+            columns={[
+              {
+                key: 'kategorie',
+                label: 'SCOR Kategorie',
+                width: '150px',
+                align: 'left'
+              },
+              {
+                key: 'metrik',
+                label: 'Metrik',
+                width: '200px',
+                align: 'left'
+              },
+              {
+                key: 'istwert',
+                label: 'Ist-Wert',
+                width: '120px',
+                align: 'right',
+                format: (val) => val
+              },
+              {
+                key: 'zielwert',
+                label: 'Ziel-Wert',
+                width: '120px',
+                align: 'right',
+                format: (val) => val
+              },
+              {
+                key: 'zielerreichung',
+                label: 'Zielerreichung',
+                width: '130px',
+                align: 'right',
+                formula: '(Ist / Ziel) × 100',
+                format: (val) => formatPercent(val, 1)
+              },
+              {
+                key: 'status',
+                label: 'Status',
+                width: '100px',
+                align: 'center',
+                format: (val) => {
+                  if (val === 'good') return '✓ Gut'
+                  if (val === 'medium') return '◐ Mittel'
+                  return '✗ Schwach'
+                }
+              }
+            ]}
+            data={[
+              {
+                kategorie: 'Reliability',
+                metrik: 'Planerfüllungsgrad',
+                istwert: formatPercent(metriken.planerfuellungsgrad, 2),
+                zielwert: '95,0 %',
+                zielerreichung: (metriken.planerfuellungsgrad / 95) * 100,
+                status: metriken.planerfuellungsgrad >= 95 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Reliability',
+                metrik: 'Liefertreue China',
+                istwert: formatPercent(metriken.liefertreueChina, 1),
+                zielwert: '95,0 %',
+                zielerreichung: (metriken.liefertreueChina / 95) * 100,
+                status: metriken.liefertreueChina >= 95 ? 'good' : metriken.liefertreueChina >= 85 ? 'medium' : 'bad'
+              },
+              {
+                kategorie: 'Responsiveness',
+                metrik: 'Durchlaufzeit',
+                istwert: `${metriken.durchlaufzeitProduktion} Tage`,
+                zielwert: '60 Tage',
+                zielerreichung: (60 / metriken.durchlaufzeitProduktion) * 100,
+                status: metriken.durchlaufzeitProduktion <= 60 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Responsiveness',
+                metrik: 'Lagerumschlag',
+                istwert: `${formatNumber(metriken.lagerumschlag, 1)}x`,
+                zielwert: '4,0x',
+                zielerreichung: (metriken.lagerumschlag / 4) * 100,
+                status: metriken.lagerumschlag >= 4 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Agility',
+                metrik: 'Produktionsflexibilität',
+                istwert: formatPercent(metriken.produktionsflexibilitaet, 2),
+                zielwert: '95,0 %',
+                zielerreichung: (metriken.produktionsflexibilitaet / 95) * 100,
+                status: metriken.produktionsflexibilitaet >= 95 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Agility',
+                metrik: 'Materialverfügbarkeit',
+                istwert: formatPercent(metriken.materialverfuegbarkeit, 1),
+                zielwert: '95,0 %',
+                zielerreichung: (metriken.materialverfuegbarkeit / 95) * 100,
+                status: metriken.materialverfuegbarkeit >= 95 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Costs',
+                metrik: 'Gesamtkosten',
+                istwert: formatNumber(metriken.gesamtkosten, 0) + ' €',
+                zielwert: '≤ 190M €',
+                zielerreichung: (190000000 / metriken.gesamtkosten) * 100,
+                status: metriken.gesamtkosten <= 190000000 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Assets',
+                metrik: 'Kapitalbindung',
+                istwert: `${formatNumber(metriken.kapitalbindung, 1)} Tage`,
+                zielwert: '≤ 30 Tage',
+                zielerreichung: (30 / metriken.kapitalbindung) * 100,
+                status: metriken.kapitalbindung <= 30 ? 'good' : 'medium'
+              }
+            ]}
+            maxHeight="500px"
+            showFormulas={true}
+          />
         </CardContent>
       </Card>
     </>
