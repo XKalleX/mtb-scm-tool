@@ -197,15 +197,15 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
           <div className="space-y-4">
             <MetricRow
               label="Planerfüllungsgrad"
-              value={formatPercent(scorMetriken.planerfuellungsgrad, 2)}
+              value={formatPercent(metriken.planerfuellungsgrad, 2)}
               description="% der geplanten Produktion erreicht"
-              status={getStatus(scorMetriken.planerfuellungsgrad, 95, 85)}
+              status={getStatus(metriken.planerfuellungsgrad, 95, 85)}
             />
             <MetricRow
               label="Liefertreue China"
-              value={formatPercent(scorMetriken.liefertreueChina, 1)}
+              value={formatPercent(metriken.liefertreueChina, 1)}
               description="% pünktliche Lieferungen vom Lieferanten"
-              status={getStatus(scorMetriken.liefertreueChina, 95, 85)}
+              status={getStatus(metriken.liefertreueChina, 95, 85)}
             />
           </div>
         </CardContent>
@@ -223,15 +223,15 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
           <div className="space-y-4">
             <MetricRow
               label="Durchlaufzeit Produktion"
-              value={`${scorMetriken.durchlaufzeitProduktion} Tage`}
+              value={`${metriken.durchlaufzeitProduktion} Tage`}
               description="Bestellung China → Fertige Produktion"
               status="neutral"
             />
             <MetricRow
               label="Lagerumschlag"
-              value={`${formatNumber(scorMetriken.lagerumschlag, 1)}x pro Jahr`}
+              value={`${formatNumber(metriken.lagerumschlag, 1)}x pro Jahr`}
               description="Wie oft wird Lager umgeschlagen"
-              status={getStatus(scorMetriken.lagerumschlag, 4, 2)}
+              status={getStatus(metriken.lagerumschlag, 4, 2)}
             />
           </div>
         </CardContent>
@@ -249,15 +249,15 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
           <div className="space-y-4">
             <MetricRow
               label="Produktionsflexibilität"
-              value={formatPercent(scorMetriken.produktionsflexibilitaet, 2)}
+              value={formatPercent(metriken.produktionsflexibilitaet, 2)}
               description="% Aufträge vollständig produziert"
-              status={getStatus(scorMetriken.produktionsflexibilitaet, 95, 85)}
+              status={getStatus(metriken.produktionsflexibilitaet, 95, 85)}
             />
             <MetricRow
               label="Materialverfügbarkeit"
-              value={formatPercent(scorMetriken.materialverfuegbarkeit, 1)}
+              value={formatPercent(metriken.materialverfuegbarkeit, 1)}
               description="% der Zeit genug Material vorhanden"
-              status={getStatus(scorMetriken.materialverfuegbarkeit, 95, 85)}
+              status={getStatus(metriken.materialverfuegbarkeit, 95, 85)}
             />
           </div>
         </CardContent>
@@ -284,34 +284,34 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
               <TableRow>
                 <TableCell className="font-medium">Herstellkosten</TableCell>
                 <TableCell className="text-right">
-                  {formatNumber(scorMetriken.herstellkosten, 0)} €
+                  {formatNumber(metriken.herstellkosten, 0)} €
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatPercent((scorMetriken.herstellkosten / scorMetriken.gesamtkosten) * 100, 1)}
+                  {formatPercent((metriken.herstellkosten / metriken.gesamtkosten) * 100, 1)}
                 </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">Beschaffungskosten</TableCell>
                 <TableCell className="text-right">
-                  {formatNumber(scorMetriken.beschaffungskosten, 0)} €
+                  {formatNumber(metriken.beschaffungskosten, 0)} €
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatPercent((scorMetriken.beschaffungskosten / scorMetriken.gesamtkosten) * 100, 1)}
+                  {formatPercent((metriken.beschaffungskosten / metriken.gesamtkosten) * 100, 1)}
                 </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">Lagerkosten</TableCell>
                 <TableCell className="text-right">
-                  {formatNumber(scorMetriken.lagerkosten, 0)} €
+                  {formatNumber(metriken.lagerkosten, 0)} €
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatPercent((scorMetriken.lagerkosten / scorMetriken.gesamtkosten) * 100, 1)}
+                  {formatPercent((metriken.lagerkosten / metriken.gesamtkosten) * 100, 1)}
                 </TableCell>
               </TableRow>
               <TableRow className="font-bold bg-slate-50">
                 <TableCell>GESAMT</TableCell>
                 <TableCell className="text-right">
-                  {formatNumber(scorMetriken.gesamtkosten, 0)} €
+                  {formatNumber(metriken.gesamtkosten, 0)} €
                 </TableCell>
                 <TableCell className="text-right">100,0 %</TableCell>
               </TableRow>
@@ -332,15 +332,15 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
           <div className="space-y-4">
             <MetricRow
               label="Lagerbestandswert"
-              value={`${formatNumber(scorMetriken.lagerbestandswert, 0)} €`}
+              value={`${formatNumber(metriken.lagerbestandswert, 0)} €`}
               description="Wert der gebundenen Komponenten"
               status="neutral"
             />
             <MetricRow
               label="Kapitalbindung"
-              value={`${formatNumber(scorMetriken.kapitalbindung, 1)} Tage`}
+              value={`${formatNumber(metriken.kapitalbindung, 1)} Tage`}
               description="Durchschnittliche Lagerdauer"
-              status={getStatusInverted(scorMetriken.kapitalbindung, 30, 45)}
+              status={getStatusInverted(metriken.kapitalbindung, 30, 45)}
             />
           </div>
         </CardContent>
@@ -359,7 +359,7 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
             <div className="bg-slate-50 rounded-lg p-4">
               <div className="text-sm text-muted-foreground">Gesamtproduktion</div>
               <div className="text-2xl font-bold mt-1">
-                {formatNumber(scorMetriken.gesamtproduktion, 0)}
+                {formatNumber(metriken.gesamtproduktion, 0)}
               </div>
               <div className="text-xs text-muted-foreground mt-1">MTBs</div>
             </div>
@@ -367,7 +367,7 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
             <div className="bg-slate-50 rounded-lg p-4">
               <div className="text-sm text-muted-foreground">Produktionstage</div>
               <div className="text-2xl font-bold mt-1">
-                {scorMetriken.produktionstage}
+                {metriken.produktionstage}
               </div>
               <div className="text-xs text-muted-foreground mt-1">von 365 Tagen</div>
             </div>
@@ -375,7 +375,7 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
             <div className="bg-slate-50 rounded-lg p-4">
               <div className="text-sm text-muted-foreground">Durchschnitt pro Tag</div>
               <div className="text-2xl font-bold mt-1">
-                {formatNumber(scorMetriken.durchschnittProTag, 0)}
+                {formatNumber(metriken.durchschnittProTag, 0)}
               </div>
               <div className="text-xs text-muted-foreground mt-1">Bikes/Tag</div>
             </div>
@@ -383,14 +383,14 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
             <div className="bg-slate-50 rounded-lg p-4">
               <div className="text-sm text-muted-foreground">Auslastung</div>
               <div className="text-2xl font-bold mt-1">
-                {formatPercent(scorMetriken.auslastung, 2)}
+                {formatPercent(metriken.auslastung, 2)}
               </div>
               <div className="text-xs text-muted-foreground mt-1">Kapazität genutzt</div>
             </div>
           </div>
         </CardContent>
       </Card>
-    </div>
+    </>
   )
 }
 

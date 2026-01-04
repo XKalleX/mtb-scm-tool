@@ -241,70 +241,46 @@ export default function OEMProgrammPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Rahmen */}
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-lg mb-3 text-green-700">Rahmen</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Variante</TableHead>
-                        <TableHead className="text-xs">Rahmentyp</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {stuecklisteData.varianten.map((v: any) => (
-                        <TableRow key={v.id}>
-                          <TableCell className="text-sm">{v.name}</TableCell>
-                          <TableCell className="text-sm">{v.rahmen}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {/* Gabeln */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-lg mb-3 text-blue-700">Gabeln</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Variante</TableHead>
-                        <TableHead className="text-xs">Gabeltyp</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {stuecklisteData.varianten.map((v: any) => (
-                        <TableRow key={v.id}>
-                          <TableCell className="text-sm">{v.name}</TableCell>
-                          <TableCell className="text-sm">{v.gabel}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {/* Sättel */}
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-lg mb-3 text-orange-700">Sättel</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Variante</TableHead>
-                        <TableHead className="text-xs">Satteltyp</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {stuecklisteData.varianten.map((v: any) => (
-                        <TableRow key={v.id}>
-                          <TableCell className="text-sm">{v.name}</TableCell>
-                          <TableCell className="text-sm">{v.sattel}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-blue-800">
+                  <strong>Hinweis:</strong> {stuecklisteData.hinweis}
+                </p>
               </div>
+              
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Variante</TableHead>
+                    <TableHead>Rahmen</TableHead>
+                    <TableHead>Gabel</TableHead>
+                    <TableHead>Sattel</TableHead>
+                    <TableHead className="text-right">Komponenten</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stammdatenData.varianten.map((v) => {
+                    const stl = stuecklisteData.stuecklisten[v.id as keyof typeof stuecklisteData.stuecklisten]
+                    if (!stl) return null
+                    const komponenten = Object.keys(stl.komponenten).length
+                    
+                    return (
+                      <TableRow key={v.id}>
+                        <TableCell className="font-medium">{v.name}</TableCell>
+                        <TableCell className="text-sm">
+                          {Object.values(stl.komponenten).find((k: any) => k.name.includes('Rahmen'))?.name || 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {Object.values(stl.komponenten).find((k: any) => k.name.includes('Gabel'))?.name || 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {Object.values(stl.komponenten).find((k: any) => k.name.includes('Sattel'))?.name || 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-right">{komponenten}</TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
