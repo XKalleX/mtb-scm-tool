@@ -379,14 +379,23 @@ export default function OEMProgrammPage() {
                   ]}
                   data={produktionsplaene[selectedVariante]
                     ?.filter((t: any) => t.istMenge > 0)
-                    .map((tag: any) => ({
-                      datum: tag.datum,
-                      wochentag: tag.datum,
-                      kw: Math.ceil((new Date(tag.datum).getDate() + new Date(new Date(tag.datum).getFullYear(), 0, 1).getDay()) / 7),
-                      sollMenge: tag.sollMenge,
-                      istMenge: tag.istMenge,
-                      kumulierterError: tag.kumulierterError
-                    })) || []
+                    .map((tag: any) => {
+                      const date = new Date(tag.datum)
+                      // ISO week calculation: get the Thursday of the week
+                      const thursday = new Date(date.getTime())
+                      thursday.setDate(thursday.getDate() - (date.getDay() + 6) % 7 + 3)
+                      const firstThursday = new Date(thursday.getFullYear(), 0, 4)
+                      const weekNumber = Math.ceil(((thursday.getTime() - firstThursday.getTime()) / 86400000 + 1) / 7)
+                      
+                      return {
+                        datum: tag.datum,
+                        wochentag: tag.datum,
+                        kw: weekNumber,
+                        sollMenge: tag.sollMenge,
+                        istMenge: tag.istMenge,
+                        kumulierterError: tag.kumulierterError
+                      }
+                    }) || []
                   }
                   maxHeight="500px"
                   showFormulas={true}

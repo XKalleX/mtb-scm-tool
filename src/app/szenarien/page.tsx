@@ -116,7 +116,7 @@ export default function SzenarienPage() {
       switch (szenario.typ) {
         case 'marketingaktion':
           const erhoehung = szenario.parameter.erhoehungProzent || 20
-          produktionFaktor += erhoehung / 100
+          produktionFaktor *= (1 + erhoehung / 100) // Multiply by 1.2 for 20% increase
           materialFaktor -= 0.05
           auswirkungen.push(`📈 Nachfrage +${erhoehung}% für ${szenario.parameter.dauerWochen} Wochen`)
           auswirkungen.push(`⚠️ Erhöhte Materialanforderungen führen zu Engpässen`)
@@ -722,8 +722,10 @@ function SimulationErgebnisse({ ergebnis }: { ergebnis: SimulationResult }) {
               <XAxis dataKey="metrik" stroke="#666" />
               <YAxis stroke="#666" />
               <Tooltip 
-                formatter={(value: any, name: string) => {
-                  const item = vergleichsDaten.find(d => d.metrik === name)
+                formatter={(value: any, name: string, props: any) => {
+                  // Get the actual data key from the payload
+                  const dataKey = props.dataKey
+                  const item = vergleichsDaten.find(d => d.metrik === dataKey)
                   return `${formatNumber(value as number, 1)} ${item?.einheit || ''}`
                 }}
               />
