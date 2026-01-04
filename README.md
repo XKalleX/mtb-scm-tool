@@ -5,30 +5,32 @@
 
 Comprehensive Supply Chain Management System für Adventure Works AG - entwickelt als Lösung für die Wirtschaftsinformatik 3 Projektaufgabe an der HAW Hamburg.
 
+**Optimiert und Vereinfacht** - Fokus auf China als einzigen Lieferanten für maximale Klarheit.
+
 ### Projektziele
 
 * Erhöhung der Flexibilität in der Mountain Bike Produktion
-* Optimierung der Supply Chain mit Fokus auf China-Beschaffung
-* Operative Szenarioplanung und -simulation
-* SCOR-basiertes Performance Monitoring
+* Optimierung der Supply Chain mit **China-Beschaffung** (vereinfacht)
+* Operative Szenarioplanung mit **globalem State Management**
+* SCOR-basiertes Performance Monitoring mit Excel-ähnlichen Tabellen
 
 ### Kernfunktionen
 
-✅ **Programmplanung** - Wochenbasierte Produktionsplanung für 370.000 Bikes/Jahr
+✅ **Programmplanung** - Wochenbasierte Produktionsplanung für 370.000 Bikes/Jahr mit Excel-Tabellen
 
 ✅ **Stücklistenverwaltung** - Dynamische Konfiguration von 8 MTB-Varianten
 
-✅ **Inbound Logistik** - Supply Chain Simulation von China nach Dortmund
+✅ **Inbound Logistik** - **NUR CHINA** - Alle Komponenten von einem Lieferanten (vereinfacht)
 
-✅ **Produktionssteuerung** - Kapazitätsplanung mit variablen Schichten
+✅ **Produktionssteuerung** - Kapazitätsplanung mit ATP-Check und Excel-Tabellen
 
-✅ **Lagerbestandsmanagement** - Real-time Bestandsüberwachung
+✅ **Lagerbestandsmanagement** - Real-time Bestandsüberwachung mit Excel-Darstellung
 
-✅ **SCOR Metriken** - 10+ KPIs aus allen 5 SCOR-Kategorien
+✅ **SCOR Metriken** - 10+ KPIs aus allen 5 SCOR-Kategorien mit Excel-Tabelle
 
-✅ **Szenario-Simulation** - 4 operative Szenarien (Marketing, Ausfall, Sturm, Verspätung)
+✅ **Szenario-Simulation** - **Global wirksam** - Szenarien persistieren über Tab-Wechsel
 
-✅ **Interaktive Visualisierungen** - Power BI-Style Dashboards mit Recharts
+✅ **Interaktive Visualisierungen** - Erweiterte Dashboards mit mehr Charts
 
 ---
 
@@ -83,13 +85,13 @@ Comprehensive Supply Chain Management System für Adventure Works AG - entwickel
 }
 ```
 
-### Supply Chain Parameter
+### Supply Chain Parameter (Vereinfacht)
 
 | Zulieferer  | Standort  | Liefert | Vorlaufzeit         | Losgröße |
 | ----------- | --------- | ------- | ------------------- | ---------- |
-| China       | Dengwong  | Sättel | 5 AT + 30 KT + 2 AT | 500        |
-| Spanien     | Saragossa | Gabeln  | 5 AT + 9 KT         | 75         |
-| Deutschland | Heilbronn | Rahmen  | 2 AT + 2 AT         | 10         |
+| **China**       | Dengwong  | **ALLE Komponenten** | 21 AT + 35 KT ≈ 56 Tage | 2000        |
+
+**Hinweis:** Vereinfachte Lösung - nur China als Lieferant (keine Spanien/Heilbronn mehr)
 
 **Legende:** AT = Arbeitstage, KT = Kalendertage
 
@@ -132,14 +134,13 @@ Anwendung öffnet sich automatisch unter `http://localhost:3000`
 
 Das System verwendet eine  **Excel-ähnliche Tab-Navigation** :
 
-* **Programmplanung** - Wochenweise Produktionsplanung
-* **Stückliste** - Komponenten-Matrix (Rahmen, Gabeln, Sättel)
-* **Inbound China** - Supply Chain Tracking
-* **Produktion** - Fertigungssteuerung
-* **Lagerbestand** - Bestandsübersicht
-* **SCOR Metriken** - Performance KPIs
-* **Szenarien** - Operative Simulationen
-* **Visualisierungen** - Interaktive Dashboards
+* **Dashboard** - Übersicht mit aktiven Szenarien und Quick-Links
+* **Programmplanung** - Wochenweise Produktionsplanung mit Excel-Tabellen
+* **Stückliste** - Komponenten-Matrix (nur China-Komponenten)
+* **Inbound China** - Lieferplanung mit Excel-Darstellung
+* **Produktion** - Fertigungssteuerung mit ATP-Check und Excel-Tabellen
+* **Reporting** - SCOR Metriken mit Excel-Tabelle und erweiterten Charts
+* **Szenarien** - **Global wirksame** Simulationen (persistieren über Tabs)
 
 ### 2. Programmplanung
 
@@ -157,45 +158,49 @@ Das System verwendet eine  **Excel-ähnliche Tab-Navigation** :
 3. Manuelle Anpassungen möglich (+/- Mengen pro Woche)
 4. Änderungen propagieren automatisch zu Teilebedarf
 
-### 3. Szenarien-Manager
+### 3. Szenarien-Manager (Global Wirksam!)
 
-#### Verfügbare Szenarien:
+**Wichtig:** Szenarien persistieren jetzt über Tab-Wechsel und beeinflussen alle Berechnungen!
+
+#### Verfügbare Szenarien (Nur China-relevant):
 
 **📈 Marketingaktion**
 
-* **Trigger:** Kampagne in "Mountain Biker" Magazin
+* **Trigger:** Kampagne erhöht Nachfrage
 * **Auswirkung:** +15-30% Nachfrage für 2-6 Wochen
-* **Parameter:** Start-KW, Dauer, Erhöhung %, Varianten
-* **Beispiel:** KW 28, 4 Wochen, +20%, Alle Varianten
+* **Parameter:** Start-KW, Dauer, Erhöhung %
+* **Beispiel:** KW 28, 4 Wochen, +20% für alle Varianten
 
-**🔧 Maschinenausfall**
+**🔧 China Produktionsausfall**
 
-* **Trigger:** Produktionsausfall beim Zulieferer
-* **Auswirkung:** Reduzierte Liefermengen, Engpässe
-* **Parameter:** Zulieferer, Datum, Dauer, Reduktion %
-* **Beispiel:** Spanien (Gabeln), 7 Tage, -60%
+* **Trigger:** Produktionsausfall beim einzigen Lieferanten
+* **Auswirkung:** **ALLE Komponenten** betroffen (vereinfacht)
+* **Parameter:** Datum, Dauer, Reduktion %
+* **Beispiel:** 7 Tage, -60% Produktion in China
 
-**💧 Wasserschaden/Sturm**
+**💧 Transport-Schaden**
 
-* **Trigger:** Container-Verlust, Lagerschaden
+* **Trigger:** Container-Verlust auf Seefracht
 * **Auswirkung:** Sofortiger Bestandsverlust
-* **Parameter:** Ort, Datum, Menge, Teile
-* **Beispiel:** MSC Mara, 1000 Sättel verloren
+* **Parameter:** Datum, Menge
+* **Beispiel:** Container mit 1000 Teilen verloren
 
 **🚢 Schiffsverspätung**
 
 * **Trigger:** Wetterverhältnisse auf See
 * **Auswirkung:** Verlängerte Durchlaufzeit
-* **Parameter:** Schiff, geplante/neue Ankunft
-* **Beispiel:** MSC Mara, +4 Tage Verspätung
+* **Parameter:** Geplante/neue Ankunft
+* **Beispiel:** +4 Tage Verspätung China → Hamburg
 
-#### Szenario-Workflow:
+#### Szenario-Workflow (NEU):
 
 1. Szenario aus Liste auswählen
-2. Parameter konfigurieren
+2. Parameter konfigurieren  
 3. "Szenario hinzufügen" klicken
-4. Mehrere Szenarien kombinierbar
-5. "Simulation starten" → Impact-Analyse
+4. **Szenario bleibt aktiv über alle Tabs!**
+5. Mehrere Szenarien kombinierbar
+6. "Simulation starten" → Impact-Analyse
+7. Szenarien wirken sich auf **alle Module** aus
 
 ### 4. SCOR Metriken Dashboard
 

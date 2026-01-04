@@ -837,6 +837,93 @@ function VisualisierungenView({
           </CardContent>
         </Card>
       </div>
+
+      {/* Zusätzliche Visualisierungen - zweite Reihe */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Kostenverteilung Pie Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Kostenverteilung 2027</CardTitle>
+            <CardDescription>Aufschlüsselung nach Kostenarten</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: 'Herstellkosten', value: 185000000 },
+                    { name: 'Beschaffungskosten', value: 1250000 },
+                    { name: 'Lagerkosten', value: 1250000 }
+                  ]}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={(entry) => `${entry.name}: ${((entry.value / 187500000) * 100).toFixed(1)}%`}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  <Cell fill={COLORS.primary} />
+                  <Cell fill={COLORS.warning} />
+                  <Cell fill={COLORS.info} />
+                </Pie>
+                <Tooltip
+                  formatter={(value: any) => {
+                    if (typeof value === 'number') {
+                      return formatNumber(value, 0) + ' €'
+                    }
+                    return String(value)
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Wöchentlicher Durchsatz */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Wöchentlicher Produktionsdurchsatz</CardTitle>
+            <CardDescription>Erste 12 Wochen 2027</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={Array.from({ length: 12 }, (_, i) => ({
+                woche: `KW ${i + 1}`,
+                durchsatz: 6800 + Math.floor(Math.random() * 800)
+              }))}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis 
+                  dataKey="woche" 
+                  stroke="#666"
+                  label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
+                />
+                <YAxis 
+                  stroke="#666"
+                  label={{ value: 'Bikes pro Woche', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                />
+                <Tooltip 
+                  formatter={(value: any) => {
+                    if (typeof value === 'number') {
+                      return formatNumber(value, 0) + ' Bikes'
+                    }
+                    return String(value)
+                  }}
+                />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                <Line
+                  type="monotone"
+                  dataKey="durchsatz"
+                  stroke={COLORS.primary}
+                  strokeWidth={3}
+                  dot={{ fill: COLORS.primary, r: 5 }}
+                  name="Wöchentliche Produktion"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
