@@ -3,6 +3,7 @@ import './globals.css'
 import Link from 'next/link'
 import { Package, LineChart, Download, Factory, BarChart3, Zap } from 'lucide-react'
 import { SzenarienProvider } from '@/contexts/SzenarienContext'
+import { SzenarienFloatingButton } from '@/components/SzenarienSidebar'
 
 export const metadata: Metadata = {
   title: 'MTB SCM Tool 2027 - Adventure Works AG (Code-Lösung)',
@@ -72,6 +73,9 @@ export default function RootLayout({
               </div>
             </div>
           </footer>
+
+          {/* Floating Scenario Button - Available on all pages */}
+          <SzenarienFloatingButton />
         </div>
         </SzenarienProvider>
       </body>
