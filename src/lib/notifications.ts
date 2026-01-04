@@ -65,12 +65,16 @@ function showNotification(message: string, type: 'success' | 'error' | 'info' | 
   
   // Automatisch nach 3 Sekunden entfernen
   setTimeout(() => {
+    if (!document.body.contains(toast)) return // Safety check
+    
     toast.style.opacity = '0'
     toast.style.transform = 'translateY(20px)'
     toast.style.transition = 'all 0.3s ease-out'
     
     setTimeout(() => {
-      document.body.removeChild(toast)
+      if (document.body.contains(toast)) {
+        document.body.removeChild(toast)
+      }
     }, 300)
   }, 3000)
 }

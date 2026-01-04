@@ -84,6 +84,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     }
     
     // Fallback für ältere Browser oder unsichere Kontexte
+    // HINWEIS: document.execCommand('copy') ist deprecated, aber notwendig als Fallback
     const textArea = document.createElement('textarea')
     textArea.value = text
     textArea.style.position = 'fixed'
