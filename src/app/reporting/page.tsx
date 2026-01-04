@@ -1,12 +1,67 @@
 'use client'
 
+/**
+ * ========================================
+ * REPORTING & VISUALISIERUNGEN
+ * ========================================
+ * 
+ * Zentrale Seite für:
+ * - SCOR Metriken und KPIs
+ * - Interaktive Visualisierungen
+ * - Performance-Dashboards
+ * - Grafische Auswertungen
+ */
+
+import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { TrendingUp, TrendingDown, Minus, BarChart3 } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { TrendingUp, TrendingDown, Minus, BarChart3, Download, Filter, Maximize2 } from 'lucide-react'
 import { formatNumber, formatPercent } from '@/lib/utils'
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ComposedChart,
+} from 'recharts'
 
+// Farben für Visualisierungen
+const COLORS = {
+  primary: '#10b981',
+  secondary: '#3b82f6',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  info: '#8b5cf6',
+  success: '#22c55e'
+}
+
+const VARIANTEN_FARBEN = [
+  '#10b981', '#3b82f6', '#f59e0b', '#ef4444',
+  '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'
+]
+
+/**
+ * Reporting Hauptseite
+ * Kombiniert SCOR Metriken und Visualisierungen
+ */
 export default function ReportingPage() {
-  // Beispiel SCOR-Metriken (später aus Berechnungen)
+  const [selectedView, setSelectedView] = useState<'metrics' | 'charts'>('metrics')
+  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter' | 'year'>('month')
+  
+  // SCOR-Metriken Beispieldaten
   const scorMetriken = {
     // RELIABILITY
     planerfuellungsgrad: 99.86,
@@ -40,25 +95,65 @@ export default function ReportingPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">SCOR Metriken & Reporting</h1>
-        <p className="text-muted-foreground mt-1">
-          Key Performance Indicators - Reduziert ohne Outbound (Code-Lösung)
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Reporting & Visualisierungen</h1>
+          <p className="text-muted-foreground mt-1">
+            SCOR-Metriken, KPIs und interaktive Dashboards
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button variant="outline">
+            <Filter className="h-4 w-4 mr-2" />
+            Filter
+          </Button>
+          <Button variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+        </div>
       </div>
 
+      {/* Tabs für Metriken und Charts */}
+      <Tabs value={selectedView} onValueChange={(v: any) => setSelectedView(v)}>
+        <TabsList>
+          <TabsTrigger value="metrics">SCOR Metriken</TabsTrigger>
+          <TabsTrigger value="charts">Visualisierungen</TabsTrigger>
+        </TabsList>
+
+        {/* SCOR Metriken Tab */}
+        <TabsContent value="metrics" className="space-y-6">
+          <SCORMetrikenView metriken={scorMetriken} />
+        </TabsContent>
+
+        {/* Visualisierungen Tab */}
+        <TabsContent value="charts" className="space-y-6">
+          <VisualisierungenView timeRange={timeRange} setTimeRange={setTimeRange} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
+/**
+ * SCOR Metriken Ansicht
+ * Zeigt alle Performance-Kennzahlen nach SCOR-Modell
+ */
+function SCORMetrikenView({ metriken }: { metriken: any }) {
+  return (
+    <>
       {/* SCOR Übersicht */}
       <Card className="border-blue-200 bg-blue-50">
         <CardHeader>
-          <CardTitle className="text-blue-900">SCOR-Framework (reduziert)</CardTitle>
+          <CardTitle className="text-blue-900">SCOR-Framework</CardTitle>
           <CardDescription className="text-blue-700">
             Supply Chain Operations Reference Model - Fokus auf Produktions- und Lager-KPIs
           </CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-blue-800">
-            Da diese Code-Lösung <strong>kein Outbound</strong> hat, konzentrieren sich die SCOR-Metriken 
-            auf <strong>Reliability, Responsiveness, Agility, Costs und Assets</strong> innerhalb 
+            Konzentration auf <strong>Reliability, Responsiveness, Agility, Costs und Assets</strong> innerhalb 
             der Produktion und des Lagers.
           </p>
         </CardContent>
@@ -318,4 +413,235 @@ function getStatusInverted(value: number, goodThreshold: number, mediumThreshold
   if (value <= goodThreshold) return 'good'
   if (value <= mediumThreshold) return 'medium'
   return 'bad'
+}
+
+/**
+ * Visualisierungen Ansicht
+ * Interaktive Charts und Diagramme zur Datenanalyse
+ */
+function VisualisierungenView({ 
+  timeRange, 
+  setTimeRange 
+}: { 
+  timeRange: string
+  setTimeRange: (range: any) => void 
+}) {
+  // Produktionsdaten (monatlich)
+  const produktionsDaten = [
+    { monat: 'Jan', plan: 14800, ist: 14200, abweichung: -600 },
+    { monat: 'Feb', plan: 22200, ist: 21800, abweichung: -400 },
+    { monat: 'Mrz', plan: 37000, ist: 36500, abweichung: -500 },
+    { monat: 'Apr', plan: 59200, ist: 58100, abweichung: -1100 },
+    { monat: 'Mai', plan: 51800, ist: 51200, abweichung: -600 },
+    { monat: 'Jun', plan: 48100, ist: 47900, abweichung: -200 },
+    { monat: 'Jul', plan: 44400, ist: 44800, abweichung: 400 },
+    { monat: 'Aug', plan: 33300, ist: 33100, abweichung: -200 },
+    { monat: 'Sep', plan: 22200, ist: 22500, abweichung: 300 },
+    { monat: 'Okt', plan: 11100, ist: 11300, abweichung: 200 },
+    { monat: 'Nov', plan: 14800, ist: 14600, abweichung: -200 },
+    { monat: 'Dez', plan: 11100, ist: 11000, abweichung: -100 }
+  ]
+
+  // Variantenverteilung
+  const variantenDaten = [
+    { name: 'MTB Allrounder', wert: 111000, prozent: 30 },
+    { name: 'MTB Competition', wert: 55500, prozent: 15 },
+    { name: 'MTB Downhill', wert: 37000, prozent: 10 },
+    { name: 'MTB Extreme', wert: 25900, prozent: 7 },
+    { name: 'MTB Freeride', wert: 18500, prozent: 5 },
+    { name: 'MTB Marathon', wert: 29600, prozent: 8 },
+    { name: 'MTB Performance', wert: 44400, prozent: 12 },
+    { name: 'MTB Trail', wert: 48100, prozent: 13 }
+  ]
+
+  // Lagerbestandsverlauf
+  const lagerDaten = Array.from({ length: 12 }, (_, i) => ({
+    monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
+    rahmen: 1200 + Math.random() * 400,
+    gabeln: 2100 + Math.random() * 600,
+    saettel: 3800 + Math.random() * 800
+  }))
+
+  // Wöchentliche Auslastung
+  const woechentlicheDaten = Array.from({ length: 52 }, (_, i) => ({
+    woche: i + 1,
+    auslastung: 75 + Math.random() * 20,
+    produktion: 6000 + Math.random() * 2000
+  }))
+
+  return (
+    <div className="space-y-6">
+      {/* Zeitbereichs-Auswahl */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Interaktive Visualisierungen</h3>
+        <div className="flex items-center gap-1 bg-white border rounded-lg p-1">
+          {(['week', 'month', 'quarter', 'year'] as const).map((range) => (
+            <button
+              key={range}
+              onClick={() => setTimeRange(range)}
+              className={`px-3 py-1.5 text-sm rounded ${
+                timeRange === range 
+                  ? 'bg-green-600 text-white' 
+                  : 'hover:bg-gray-100'
+              }`}
+            >
+              {range === 'week' && 'Woche'}
+              {range === 'month' && 'Monat'}
+              {range === 'quarter' && 'Quartal'}
+              {range === 'year' && 'Jahr'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Charts Grid */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Produktionsverlauf */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Produktionsverlauf 2027</CardTitle>
+            <CardDescription>Plan vs. Ist mit Abweichungen</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={produktionsDaten}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="monat" stroke="#666" />
+                <YAxis stroke="#666" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px'
+                  }}
+                />
+                <Legend />
+                <Bar dataKey="plan" fill={COLORS.secondary} name="Plan" opacity={0.8} />
+                <Bar dataKey="ist" fill={COLORS.primary} name="Ist" />
+                <Line
+                  type="monotone"
+                  dataKey="abweichung"
+                  stroke={COLORS.danger}
+                  strokeWidth={2}
+                  name="Abweichung"
+                  dot={{ fill: COLORS.danger }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Variantenverteilung */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Produktvariantenverteilung</CardTitle>
+            <CardDescription>Jahresproduktion nach Varianten</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={variantenDaten}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={(entry) => `${entry.name.replace('MTB ', '')}: ${entry.prozent}%`}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="wert"
+                >
+                  {variantenDaten.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={VARIANTEN_FARBEN[index]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value) => {
+                    if (typeof value === 'number') {
+                      return value.toLocaleString('de-DE') + ' Bikes'
+                    }
+                    return '0 Bikes'
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Lagerbestandsentwicklung */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Lagerbestandsentwicklung 2027</CardTitle>
+            <CardDescription>Bestandsverläufe der Hauptkomponenten</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={lagerDaten}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="monat" stroke="#666" />
+                <YAxis stroke="#666" />
+                <Tooltip />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="rahmen"
+                  stroke={VARIANTEN_FARBEN[0]}
+                  strokeWidth={3}
+                  dot={{ r: 4 }}
+                  name="Rahmen"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="gabeln"
+                  stroke={VARIANTEN_FARBEN[1]}
+                  strokeWidth={3}
+                  dot={{ r: 4 }}
+                  name="Gabeln"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="saettel"
+                  stroke={VARIANTEN_FARBEN[3]}
+                  strokeWidth={3}
+                  dot={{ r: 4 }}
+                  name="Sättel"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Produktionsauslastung */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Produktionsauslastung 2027</CardTitle>
+            <CardDescription>Wöchentliche Auslastung in %</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={woechentlicheDaten}>
+                <defs>
+                  <linearGradient id="colorAuslastung" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0.1}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="woche" stroke="#666" />
+                <YAxis stroke="#666" domain={[0, 100]} />
+                <Tooltip />
+                <Area
+                  type="monotone"
+                  dataKey="auslastung"
+                  stroke={COLORS.primary}
+                  fillOpacity={1}
+                  fill="url(#colorAuslastung)"
+                  name="Auslastung %"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
 }
