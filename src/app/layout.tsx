@@ -1,10 +1,7 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
 import Link from 'next/link'
 import { Package, LineChart, Download, Factory, BarChart3 } from 'lucide-react'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'MTB SCM Tool 2027 - Adventure Works AG (Code-Lösung)',
@@ -18,7 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="de">
-      <body className={inter.className}>
+      <body className="font-sans antialiased">
         <div className="min-h-screen flex flex-col">
           {/* Header */}
           <header className="border-b bg-white shadow-sm">
