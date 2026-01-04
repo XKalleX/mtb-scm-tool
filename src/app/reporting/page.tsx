@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { TrendingUp, TrendingDown, Minus, BarChart3, Download, Filter, Maximize2 } from 'lucide-react'
 import { formatNumber, formatPercent } from '@/lib/utils'
+import { exportToCSV, exportToJSON } from '@/lib/export'
 import {
   LineChart,
   Line,
@@ -60,6 +61,27 @@ const VARIANTEN_FARBEN = [
 export default function ReportingPage() {
   const [selectedView, setSelectedView] = useState<'metrics' | 'charts'>('metrics')
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter' | 'year'>('month')
+  
+  /**
+   * Exportiert SCOR-Metriken als CSV
+   */
+  const handleExportMetrics = () => {
+    const metricsData = [
+      { Kategorie: 'Reliability', Metrik: 'Planerfüllungsgrad', Wert: scorMetriken.planerfuellungsgrad, Einheit: '%' },
+      { Kategorie: 'Reliability', Metrik: 'Liefertreue China', Wert: scorMetriken.liefertreueChina, Einheit: '%' },
+      { Kategorie: 'Responsiveness', Metrik: 'Durchlaufzeit Produktion', Wert: scorMetriken.durchlaufzeitProduktion, Einheit: 'Tage' },
+      { Kategorie: 'Responsiveness', Metrik: 'Lagerumschlag', Wert: scorMetriken.lagerumschlag, Einheit: 'x/Jahr' },
+      { Kategorie: 'Agility', Metrik: 'Produktionsflexibilität', Wert: scorMetriken.produktionsflexibilitaet, Einheit: '%' },
+      { Kategorie: 'Agility', Metrik: 'Materialverfügbarkeit', Wert: scorMetriken.materialverfuegbarkeit, Einheit: '%' },
+      { Kategorie: 'Costs', Metrik: 'Gesamtkosten', Wert: scorMetriken.gesamtkosten, Einheit: 'EUR' },
+      { Kategorie: 'Costs', Metrik: 'Herstellkosten', Wert: scorMetriken.herstellkosten, Einheit: 'EUR' },
+      { Kategorie: 'Assets', Metrik: 'Lagerbestandswert', Wert: scorMetriken.lagerbestandswert, Einheit: 'EUR' },
+      { Kategorie: 'Assets', Metrik: 'Kapitalbindung', Wert: scorMetriken.kapitalbindung, Einheit: 'Tage' }
+    ]
+    
+    exportToCSV(metricsData, 'scor_metriken_2027')
+  }
+
   
   // SCOR-Metriken Beispieldaten
   const scorMetriken = {
@@ -104,6 +126,10 @@ export default function ReportingPage() {
         </div>
         
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExportMetrics}>
+            <Download className="h-4 w-4 mr-2" />
+            Export Metriken
+          </Button>
           <Button variant="outline">
             <Filter className="h-4 w-4 mr-2" />
             Filter

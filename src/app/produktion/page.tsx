@@ -1,10 +1,28 @@
 'use client'
 
+/**
+ * ========================================
+ * PRODUKTION & WAREHOUSE
+ * ========================================
+ * 
+ * Produktionssteuerung mit:
+ * - ATP-Check (Available-to-Promise)
+ * - First-Come-First-Serve Regel
+ * - Lagerbestandsmanagement
+ * - Materialfluss-Visualisierung
+ */
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { CheckCircle2, Factory, AlertTriangle, TrendingUp, Package } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { CheckCircle2, Factory, AlertTriangle, TrendingUp, Package, Download } from 'lucide-react'
 import { formatNumber } from '@/lib/utils'
+import { exportToCSV, exportToJSON } from '@/lib/export'
 
+/**
+ * Produktion Hauptseite
+ * Zeigt Produktionsstatus und Lagerbestände
+ */
 export default function ProduktionPage() {
   // Beispiel-Daten (später aus State/Context)
   const produktionsStats = {
@@ -22,15 +40,49 @@ export default function ProduktionPage() {
     { komponente: 'Schaltung_Shimano', bestand: 4100, sicherheit: 1000, status: 'ok' },
     { komponente: 'Bremsen_Premium', bestand: 850, sicherheit: 1000, status: 'kritisch' },
   ]
+  
+  /**
+   * Exportiert Lagerbestände als CSV
+   */
+  const handleExportLager = () => {
+    const data = lagerbestaende.map(l => ({
+      Komponente: l.komponente.replace(/_/g, ' '),
+      Bestand: l.bestand,
+      Sicherheitsbestand: l.sicherheit,
+      Verfügbar: l.bestand - l.sicherheit,
+      Status: l.status
+    }))
+    
+    exportToCSV(data, 'lagerbestand_2027')
+  }
+  
+  /**
+   * Exportiert Produktionsstatistik als JSON
+   */
+  const handleExportProduktion = () => {
+    exportToJSON(produktionsStats, 'produktions_statistik_2027')
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Produktion & Warehouse</h1>
-        <p className="text-muted-foreground mt-1">
-          Produktionssteuerung ohne Solver - First-Come-First-Serve Regel
-        </p>
+      {/* Header mit Export */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Produktion & Warehouse</h1>
+          <p className="text-muted-foreground mt-1">
+            Produktionssteuerung ohne Solver - First-Come-First-Serve Regel
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportLager}>
+            <Download className="h-4 w-4 mr-2" />
+            Export Lager
+          </Button>
+          <Button variant="outline" onClick={handleExportProduktion}>
+            <Download className="h-4 w-4 mr-2" />
+            Export Produktion
+          </Button>
+        </div>
       </div>
 
       {/* Übersicht Cards */}

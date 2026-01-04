@@ -1,24 +1,68 @@
 'use client'
 
+/**
+ * ========================================
+ * INBOUND LOGISTIK - CHINA
+ * ========================================
+ * 
+ * Verwaltung des China-Lieferanten mit:
+ * - Vorlaufzeiten-Berechnung
+ * - Spring Festival Berücksichtigung
+ * - Losgrößen-Optimierung
+ * - Bestellplanung
+ */
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { CheckCircle2, Ship, AlertTriangle, Package } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { CheckCircle2, Ship, AlertTriangle, Package, Download } from 'lucide-react'
 import { formatNumber } from '@/lib/utils'
+import { exportToJSON } from '@/lib/export'
 import lieferantData from '@/data/lieferant-china.json'
 import feiertagsData from '@/data/feiertage-china.json'
 
+/**
+ * Inbound Logistik Hauptseite
+ * Zeigt Lieferanteninformationen und Logistikdetails
+ */
 export default function InboundPage() {
   const lieferant = lieferantData.lieferant
   const springFestival = feiertagsData.feiertage2027.filter(f => f.name.includes('Spring Festival'))
   
+  /**
+   * Exportiert Lieferanten-Daten als JSON
+   */
+  const handleExportLieferant = () => {
+    exportToJSON(lieferantData, 'lieferant_china_2027')
+  }
+  
+  /**
+   * Exportiert Feiertags-Daten als JSON
+   */
+  const handleExportFeiertage = () => {
+    exportToJSON(feiertagsData, 'feiertage_china_2027')
+  }
+  
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Inbound Logistik - China</h1>
-        <p className="text-muted-foreground mt-1">
-          Einziger Lieferant für ALLE Komponenten (Code-Lösung Ermäßigung)
-        </p>
+      {/* Header mit Export */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Inbound Logistik - China</h1>
+          <p className="text-muted-foreground mt-1">
+            Einziger Lieferant für ALLE Komponenten (Code-Lösung Ermäßigung)
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportLieferant}>
+            <Download className="h-4 w-4 mr-2" />
+            Export Lieferant
+          </Button>
+          <Button variant="outline" onClick={handleExportFeiertage}>
+            <Download className="h-4 w-4 mr-2" />
+            Export Feiertage
+          </Button>
+        </div>
       </div>
 
       {/* Übersicht Cards */}
