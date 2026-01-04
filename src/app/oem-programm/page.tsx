@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CheckCircle2, Calendar, TrendingUp, AlertCircle, Download } from 'lucide-react'
 import { formatNumber, formatDate } from '@/lib/utils'
+import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { generiereAlleProduktionsplaene, berechneProduktionsstatistik } from '@/lib/calculations/oem-programm'
 import { kalenderStatistik } from '@/lib/kalender'
 import { exportToCSV, exportToJSON } from '@/lib/export'
@@ -291,42 +292,114 @@ export default function OEMProgrammPage() {
         <TabsContent value="details" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Tagesplanung (Beispiel Januar)</CardTitle>
+              <CardTitle>Vollständige Tagesplanung 2027 - {stammdatenData.varianten.find(v => v.id === selectedVariante)?.name}</CardTitle>
               <CardDescription>
-                Erste 10 Produktionstage des Jahres für MTB Allrounder
+                Alle {produktionsplaene?.[selectedVariante]?.filter((t: any) => t.istMenge > 0).length} Produktionstage mit Error-Management (scrollbar nutzen)
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Varianten-Auswahl */}
+              <div className="mb-4 flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium">Variante wählen:</span>
+                {stammdatenData.varianten.map(v => (
+                  <Button
+                    key={v.id}
+                    variant={selectedVariante === v.id ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedVariante(v.id)}
+                  >
+                    {v.name}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Formel-Karten */}
+              <div className="grid gap-4 md:grid-cols-2 mb-6">
+                <FormulaCard
+                  title="Soll-Menge Berechnung"
+                  formula="Soll-Menge = (Jahresproduktion / Arbeitstage) × Saisonaler Faktor"
+                  description="Die tägliche Soll-Menge berücksichtigt die saisonale Verteilung (April-Peak 16%)."
+                  example="MTB Allrounder: 111.000 / 252 AT × 1,6 (April) = 704,76 Bikes/Tag"
+                />
+                <FormulaCard
+                  title="Error-Management Formel"
+                  formula="Kum. Error(t) = Kum. Error(t-1) + (Soll(t) - Ist(t))"
+                  description="Der kumulierte Fehler stellt sicher, dass Rundungsfehler nicht akkumulieren."
+                  example="Tag 1: Error = 0,61 → Tag 2: Error = 1,22 → Ist wird auf 72 aufgerundet"
+                />
+              </div>
+
+              {/* Excel-ähnliche Tabelle mit allen Tagen */}
               {produktionsplaene && (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Datum</TableHead>
-                      <TableHead>Wochentag</TableHead>
-                      <TableHead className="text-right">Soll-Menge</TableHead>
-                      <TableHead className="text-right">Ist-Menge</TableHead>
-                      <TableHead className="text-right">Kum. Error</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {produktionsplaene[selectedVariante]
-                      ?.filter((t: any) => t.istMenge > 0)
-                      .slice(0, 10)
-                      .map((tag: any, idx: number) => (
-                        <TableRow key={idx}>
-                          <TableCell>{formatDate(new Date(tag.datum))}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(tag.datum).getDay()]}
-                          </TableCell>
-                          <TableCell className="text-right">{formatNumber(tag.sollMenge, 2)}</TableCell>
-                          <TableCell className="text-right font-medium">{tag.istMenge}</TableCell>
-                          <TableCell className="text-right text-sm text-muted-foreground">
-                            {formatNumber(tag.kumulierterError, 3)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
+                <ExcelTable
+                  columns={[
+                    {
+                      key: 'datum',
+                      label: 'Datum',
+                      width: '120px',
+                      format: (val) => formatDate(new Date(val))
+                    },
+                    {
+                      key: 'wochentag',
+                      label: 'Tag',
+                      width: '80px',
+                      align: 'center',
+                      format: (val) => ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(val).getDay()]
+                    },
+                    {
+                      key: 'kw',
+                      label: 'KW',
+                      width: '70px',
+                      align: 'center'
+                    },
+                    {
+                      key: 'sollMenge',
+                      label: 'Soll-Menge',
+                      width: '120px',
+                      align: 'right',
+                      formula: '(Jahresproduktion / Arbeitstage) × Saisonaler Faktor',
+                      format: (val) => formatNumber(val, 2)
+                    },
+                    {
+                      key: 'istMenge',
+                      label: 'Ist-Menge',
+                      width: '120px',
+                      align: 'right',
+                      formula: 'RUNDEN(Soll-Menge + Kum. Error)',
+                      format: (val) => formatNumber(val, 0)
+                    },
+                    {
+                      key: 'kumulierterError',
+                      label: 'Kum. Error',
+                      width: '120px',
+                      align: 'right',
+                      formula: 'Kum. Error(t-1) + (Soll(t) - Ist(t))',
+                      format: (val) => formatNumber(val, 3)
+                    }
+                  ]}
+                  data={produktionsplaene[selectedVariante]
+                    ?.filter((t: any) => t.istMenge > 0)
+                    .map((tag: any) => {
+                      const date = new Date(tag.datum)
+                      // ISO week calculation: get the Thursday of the week
+                      const thursday = new Date(date.getTime())
+                      thursday.setDate(thursday.getDate() - (date.getDay() + 6) % 7 + 3)
+                      const firstThursday = new Date(thursday.getFullYear(), 0, 4)
+                      const weekNumber = Math.ceil(((thursday.getTime() - firstThursday.getTime()) / 86400000 + 1) / 7)
+                      
+                      return {
+                        datum: tag.datum,
+                        wochentag: tag.datum,
+                        kw: weekNumber,
+                        sollMenge: tag.sollMenge,
+                        istMenge: tag.istMenge,
+                        kumulierterError: tag.kumulierterError
+                      }
+                    }) || []
+                  }
+                  maxHeight="500px"
+                  showFormulas={true}
+                />
               )}
             </CardContent>
           </Card>

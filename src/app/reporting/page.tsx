@@ -532,16 +532,28 @@ function VisualisierungenView({
             <ResponsiveContainer width="100%" height={300}>
               <ComposedChart data={produktionsDaten}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="monat" stroke="#666" />
-                <YAxis stroke="#666" />
+                <XAxis 
+                  dataKey="monat" 
+                  stroke="#666"
+                  label={{ value: 'Monat', position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
+                />
+                <YAxis 
+                  stroke="#666"
+                  label={{ value: 'Produktion (Bikes)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'white',
                     border: '1px solid #e5e7eb',
                     borderRadius: '6px'
                   }}
+                  formatter={(value) => {
+                    if (value === undefined || value === null) return 'N/A'
+                    if (typeof value !== 'number') return String(value)
+                    return value.toLocaleString('de-DE') + ' Bikes'
+                  }}
                 />
-                <Legend />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
                 <Bar dataKey="plan" fill={COLORS.secondary} name="Plan" opacity={0.8} />
                 <Bar dataKey="ist" fill={COLORS.primary} name="Ist" />
                 <Line
@@ -602,10 +614,23 @@ function VisualisierungenView({
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={lagerDaten}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="monat" stroke="#666" />
-                <YAxis stroke="#666" />
-                <Tooltip />
-                <Legend />
+                <XAxis 
+                  dataKey="monat" 
+                  stroke="#666"
+                  label={{ value: 'Monat', position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
+                />
+                <YAxis 
+                  stroke="#666"
+                  label={{ value: 'Bestand (Stück)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                />
+                <Tooltip 
+                  formatter={(value) => {
+                    if (value === undefined || value === null) return 'N/A'
+                    if (typeof value !== 'number') return String(value)
+                    return Math.round(value).toLocaleString('de-DE') + ' Stück'
+                  }}
+                />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
                 <Line
                   type="monotone"
                   dataKey="rahmen"
@@ -651,9 +676,24 @@ function VisualisierungenView({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="woche" stroke="#666" />
-                <YAxis stroke="#666" domain={[0, 100]} />
-                <Tooltip />
+                <XAxis 
+                  dataKey="woche" 
+                  stroke="#666"
+                  label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
+                />
+                <YAxis 
+                  stroke="#666" 
+                  domain={[0, 100]}
+                  label={{ value: 'Auslastung (%)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                />
+                <Tooltip 
+                  formatter={(value) => {
+                    if (value === undefined || value === null) return 'N/A'
+                    if (typeof value !== 'number') return String(value)
+                    return value.toFixed(1) + '%'
+                  }}
+                />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
                 <Area
                   type="monotone"
                   dataKey="auslastung"
