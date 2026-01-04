@@ -30,12 +30,17 @@ export default function InboundPage() {
   const lieferant = lieferantData.lieferant
   const springFestival = feiertagsData.feiertage2027.filter(f => f.name.includes('Spring Festival'))
   
-  // Beispiel Lieferplan-Daten für Excel-Tabelle
+  // Lieferplan-Daten für Excel-Tabelle (deterministisch)
   const lieferplanDaten = Array.from({ length: 12 }, (_, i) => {
     const monat = i + 1
     const bestelldatum = new Date(2027, monat - 1, 5).toISOString().split('T')[0]
     const lieferdatum = new Date(2027, monat - 1, 5 + 56).toISOString().split('T')[0] // 56 Tage später
-    const menge = 30000 + Math.floor(Math.random() * 20000)
+    
+    // Deterministisches Muster basierend auf Saisonalität
+    const saisonalitaet = [0.04, 0.05, 0.10, 0.16, 0.14, 0.12, 0.10, 0.08, 0.09, 0.06, 0.03, 0.03]
+    const jahresproduktion = 370000
+    const menge = Math.round(jahresproduktion * saisonalitaet[i] * 1.1) // 10% Buffer
+    
     const status = monat <= 3 ? 'Geliefert' : monat <= 6 ? 'Unterwegs' : 'Geplant'
     
     return {

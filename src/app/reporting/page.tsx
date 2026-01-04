@@ -610,20 +610,34 @@ function VisualisierungenView({
     { name: 'MTB Trail', wert: 48100, prozent: 13 }
   ]
 
-  // Lagerbestandsverlauf
-  const lagerDaten = Array.from({ length: 12 }, (_, i) => ({
-    monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
-    rahmen: 1200 + Math.random() * 400,
-    gabeln: 2100 + Math.random() * 600,
-    saettel: 3800 + Math.random() * 800
-  }))
+  // Lagerbestandsverlauf (deterministisch)
+  const lagerDaten = Array.from({ length: 12 }, (_, i) => {
+    const baseRahmen = 1200
+    const baseGabeln = 2100
+    const baseSaettel = 3800
+    
+    // Sinuswelle für natürliche Schwankungen
+    const schwankung = Math.sin(i * 0.8) * 150
+    
+    return {
+      monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
+      rahmen: baseRahmen + schwankung,
+      gabeln: baseGabeln + schwankung * 1.5,
+      saettel: baseSaettel + schwankung * 2
+    }
+  })
 
-  // Wöchentliche Auslastung
-  const woechentlicheDaten = Array.from({ length: 52 }, (_, i) => ({
-    woche: i + 1,
-    auslastung: 75 + Math.random() * 20,
-    produktion: 6000 + Math.random() * 2000
-  }))
+  // Wöchentliche Auslastung (deterministisch)
+  const woechentlicheDaten = Array.from({ length: 52 }, (_, i) => {
+    const basisAuslastung = 85
+    const saisonaleFaktor = Math.sin((i / 52) * Math.PI * 2) * 10 // Jährliche Schwankung
+    
+    return {
+      woche: i + 1,
+      auslastung: basisAuslastung + saisonaleFaktor,
+      produktion: 6000 + saisonaleFaktor * 100
+    }
+  })
 
   return (
     <div className="space-y-6">
@@ -888,10 +902,15 @@ function VisualisierungenView({
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={Array.from({ length: 12 }, (_, i) => ({
-                woche: `KW ${i + 1}`,
-                durchsatz: 6800 + Math.floor(Math.random() * 800)
-              }))}>
+              <LineChart data={Array.from({ length: 12 }, (_, i) => {
+                const basisDurchsatz = 7000
+                const schwankung = Math.sin(i * 0.7) * 400
+                
+                return {
+                  woche: `KW ${i + 1}`,
+                  durchsatz: Math.round(basisDurchsatz + schwankung)
+                }
+              })}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis 
                   dataKey="woche" 

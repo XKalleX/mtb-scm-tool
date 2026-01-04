@@ -42,7 +42,7 @@ export function SzenarienProvider({ children }: { children: ReactNode }) {
 
   const hinzufuegen = (typ: SzenarioTyp, parameter: Record<string, any>) => {
     const neuesSzenario: SzenarioConfig = {
-      id: `${typ}-${Date.now()}`,
+      id: `${typ}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       typ,
       parameter,
       aktiv: true,

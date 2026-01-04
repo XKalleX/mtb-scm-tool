@@ -43,11 +43,16 @@ export default function ProduktionPage() {
     { komponente: 'Sattel_Premium', bestand: 850, sicherheit: 1000, bedarf: 900, status: 'kritisch' },
   ]
   
-  // Wöchentliche Produktionsdaten für Excel-Tabelle
+  // Wöchentliche Produktionsdaten für Excel-Tabelle (deterministisch)
   const wochenProduktion = Array.from({ length: 12 }, (_, i) => {
     const kw = i + 1
-    const planMenge = 7000 + Math.floor(Math.random() * 2000)
-    const istMenge = planMenge - Math.floor(Math.random() * 200)
+    // Deterministisches Muster basierend auf typischer Produktion
+    const baseMenge = 7000
+    const variation = Math.sin(kw * 0.5) * 500 // Sinuswelle für natürliche Variation
+    const planMenge = Math.round(baseMenge + variation)
+    
+    // Kleinere deterministische Abweichung
+    const istMenge = Math.round(planMenge * (0.98 + (kw % 3) * 0.01))
     const materialVerfuegbar = istMenge === planMenge
     const auslastung = (istMenge / planMenge) * 100
     

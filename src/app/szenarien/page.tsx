@@ -30,7 +30,7 @@ import {
   Info
 } from 'lucide-react'
 import { formatNumber, formatPercent } from '@/lib/utils'
-import { useSzenarien, SzenarioTyp, berechneGlobaleAuswirkungen } from '@/contexts/SzenarienContext'
+import { useSzenarien, SzenarioTyp, SzenarioConfig, berechneGlobaleAuswirkungen } from '@/contexts/SzenarienContext'
 import {
   BarChart,
   Bar,
@@ -98,7 +98,7 @@ export default function SzenarienPage() {
   /**
    * Generiert beschreibenden Text für Auswirkungen
    */
-  const generiereAuswirkungsText = (szenarien: any[]) => {
+  const generiereAuswirkungsText = (szenarien: SzenarioConfig[]) => {
     const texte: string[] = []
     
     szenarien.forEach(szenario => {
@@ -229,7 +229,7 @@ function SzenarioAuswahlListe({
 }: {
   selectedSzenario: SzenarioTyp | null
   onSelect: (typ: SzenarioTyp) => void
-  aktiveSzenarien: any[]
+  aktiveSzenarien: SzenarioConfig[]
   onEntfernen: (id: string) => void
 }) {
   // Nur China-relevante Szenarien
