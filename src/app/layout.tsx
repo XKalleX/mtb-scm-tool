@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Link from 'next/link'
-import { Package, LineChart, Download, Factory, BarChart3 } from 'lucide-react'
+import { Package, LineChart, Download, Factory, BarChart3, Zap } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'MTB SCM Tool 2027 - Adventure Works AG (Code-Lösung)',
@@ -49,6 +49,7 @@ export default function RootLayout({
                 <NavLink href="/inbound" icon={<Download />} label="Inbound China" />
                 <NavLink href="/produktion" icon={<Factory />} label="Produktion" />
                 <NavLink href="/reporting" icon={<BarChart3 />} label="Reporting" />
+                <NavLink href="/szenarien" icon={<Zap />} label="Szenarien" />
               </div>
             </div>
           </nav>
