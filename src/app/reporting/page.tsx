@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { TrendingUp, TrendingDown, Minus, BarChart3, Download, Filter, Maximize2 } from 'lucide-react'
 import { formatNumber, formatPercent } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
+import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import {
   LineChart,
   Line,
@@ -390,6 +391,135 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
           </div>
         </CardContent>
       </Card>
+
+      {/* SCOR Metriken Excel-Tabelle */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Alle SCOR-Metriken im Überblick</CardTitle>
+          <CardDescription>
+            Vollständige Übersicht aller KPIs mit Zielwerten und Status (Excel-Darstellung)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ExcelTable
+            columns={[
+              {
+                key: 'kategorie',
+                label: 'SCOR Kategorie',
+                width: '150px',
+                align: 'left'
+              },
+              {
+                key: 'metrik',
+                label: 'Metrik',
+                width: '200px',
+                align: 'left'
+              },
+              {
+                key: 'istwert',
+                label: 'Ist-Wert',
+                width: '120px',
+                align: 'right',
+                format: (val) => val
+              },
+              {
+                key: 'zielwert',
+                label: 'Ziel-Wert',
+                width: '120px',
+                align: 'right',
+                format: (val) => val
+              },
+              {
+                key: 'zielerreichung',
+                label: 'Zielerreichung',
+                width: '130px',
+                align: 'right',
+                formula: '(Ist / Ziel) × 100',
+                format: (val) => formatPercent(val, 1)
+              },
+              {
+                key: 'status',
+                label: 'Status',
+                width: '100px',
+                align: 'center',
+                format: (val) => {
+                  if (val === 'good') return '✓ Gut'
+                  if (val === 'medium') return '◐ Mittel'
+                  return '✗ Schwach'
+                }
+              }
+            ]}
+            data={[
+              {
+                kategorie: 'Reliability',
+                metrik: 'Planerfüllungsgrad',
+                istwert: formatPercent(metriken.planerfuellungsgrad, 2),
+                zielwert: '95,0 %',
+                zielerreichung: (metriken.planerfuellungsgrad / 95) * 100,
+                status: metriken.planerfuellungsgrad >= 95 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Reliability',
+                metrik: 'Liefertreue China',
+                istwert: formatPercent(metriken.liefertreueChina, 1),
+                zielwert: '95,0 %',
+                zielerreichung: (metriken.liefertreueChina / 95) * 100,
+                status: metriken.liefertreueChina >= 95 ? 'good' : metriken.liefertreueChina >= 85 ? 'medium' : 'bad'
+              },
+              {
+                kategorie: 'Responsiveness',
+                metrik: 'Durchlaufzeit',
+                istwert: `${metriken.durchlaufzeitProduktion} Tage`,
+                zielwert: '60 Tage',
+                zielerreichung: (60 / metriken.durchlaufzeitProduktion) * 100,
+                status: metriken.durchlaufzeitProduktion <= 60 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Responsiveness',
+                metrik: 'Lagerumschlag',
+                istwert: `${formatNumber(metriken.lagerumschlag, 1)}x`,
+                zielwert: '4,0x',
+                zielerreichung: (metriken.lagerumschlag / 4) * 100,
+                status: metriken.lagerumschlag >= 4 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Agility',
+                metrik: 'Produktionsflexibilität',
+                istwert: formatPercent(metriken.produktionsflexibilitaet, 2),
+                zielwert: '95,0 %',
+                zielerreichung: (metriken.produktionsflexibilitaet / 95) * 100,
+                status: metriken.produktionsflexibilitaet >= 95 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Agility',
+                metrik: 'Materialverfügbarkeit',
+                istwert: formatPercent(metriken.materialverfuegbarkeit, 1),
+                zielwert: '95,0 %',
+                zielerreichung: (metriken.materialverfuegbarkeit / 95) * 100,
+                status: metriken.materialverfuegbarkeit >= 95 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Costs',
+                metrik: 'Gesamtkosten',
+                istwert: formatNumber(metriken.gesamtkosten, 0) + ' €',
+                zielwert: '≤ 190M €',
+                zielerreichung: (190000000 / metriken.gesamtkosten) * 100,
+                status: metriken.gesamtkosten <= 190000000 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Assets',
+                metrik: 'Kapitalbindung',
+                istwert: `${formatNumber(metriken.kapitalbindung, 1)} Tage`,
+                zielwert: '≤ 30 Tage',
+                zielerreichung: (30 / metriken.kapitalbindung) * 100,
+                status: metriken.kapitalbindung <= 30 ? 'good' : 'medium'
+              }
+            ]}
+            maxHeight="500px"
+            showFormulas={true}
+          />
+        </CardContent>
+      </Card>
     </>
   )
 }
@@ -480,20 +610,34 @@ function VisualisierungenView({
     { name: 'MTB Trail', wert: 48100, prozent: 13 }
   ]
 
-  // Lagerbestandsverlauf
-  const lagerDaten = Array.from({ length: 12 }, (_, i) => ({
-    monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
-    rahmen: 1200 + Math.random() * 400,
-    gabeln: 2100 + Math.random() * 600,
-    saettel: 3800 + Math.random() * 800
-  }))
+  // Lagerbestandsverlauf (deterministisch)
+  const lagerDaten = Array.from({ length: 12 }, (_, i) => {
+    const baseRahmen = 1200
+    const baseGabeln = 2100
+    const baseSaettel = 3800
+    
+    // Sinuswelle für natürliche Schwankungen
+    const schwankung = Math.sin(i * 0.8) * 150
+    
+    return {
+      monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
+      rahmen: baseRahmen + schwankung,
+      gabeln: baseGabeln + schwankung * 1.5,
+      saettel: baseSaettel + schwankung * 2
+    }
+  })
 
-  // Wöchentliche Auslastung
-  const woechentlicheDaten = Array.from({ length: 52 }, (_, i) => ({
-    woche: i + 1,
-    auslastung: 75 + Math.random() * 20,
-    produktion: 6000 + Math.random() * 2000
-  }))
+  // Wöchentliche Auslastung (deterministisch)
+  const woechentlicheDaten = Array.from({ length: 52 }, (_, i) => {
+    const basisAuslastung = 85
+    const saisonaleFaktor = Math.sin((i / 52) * Math.PI * 2) * 10 // Jährliche Schwankung
+    
+    return {
+      woche: i + 1,
+      auslastung: basisAuslastung + saisonaleFaktor,
+      produktion: 6000 + saisonaleFaktor * 100
+    }
+  })
 
   return (
     <div className="space-y-6">
@@ -703,6 +847,98 @@ function VisualisierungenView({
                   name="Auslastung %"
                 />
               </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Zusätzliche Visualisierungen - zweite Reihe */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Kostenverteilung Pie Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Kostenverteilung 2027</CardTitle>
+            <CardDescription>Aufschlüsselung nach Kostenarten</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: 'Herstellkosten', value: 185000000 },
+                    { name: 'Beschaffungskosten', value: 1250000 },
+                    { name: 'Lagerkosten', value: 1250000 }
+                  ]}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={(entry) => `${entry.name}: ${((entry.value / 187500000) * 100).toFixed(1)}%`}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  <Cell fill={COLORS.primary} />
+                  <Cell fill={COLORS.warning} />
+                  <Cell fill={COLORS.info} />
+                </Pie>
+                <Tooltip
+                  formatter={(value: any) => {
+                    if (typeof value === 'number') {
+                      return formatNumber(value, 0) + ' €'
+                    }
+                    return String(value)
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Wöchentlicher Durchsatz */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Wöchentlicher Produktionsdurchsatz</CardTitle>
+            <CardDescription>Erste 12 Wochen 2027</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={Array.from({ length: 12 }, (_, i) => {
+                const basisDurchsatz = 7000
+                const schwankung = Math.sin(i * 0.7) * 400
+                
+                return {
+                  woche: `KW ${i + 1}`,
+                  durchsatz: Math.round(basisDurchsatz + schwankung)
+                }
+              })}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis 
+                  dataKey="woche" 
+                  stroke="#666"
+                  label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
+                />
+                <YAxis 
+                  stroke="#666"
+                  label={{ value: 'Bikes pro Woche', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                />
+                <Tooltip 
+                  formatter={(value: any) => {
+                    if (typeof value === 'number') {
+                      return formatNumber(value, 0) + ' Bikes'
+                    }
+                    return String(value)
+                  }}
+                />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                <Line
+                  type="monotone"
+                  dataKey="durchsatz"
+                  stroke={COLORS.primary}
+                  strokeWidth={3}
+                  dot={{ fill: COLORS.primary, r: 5 }}
+                  name="Wöchentliche Produktion"
+                />
+              </LineChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>

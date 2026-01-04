@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import Link from 'next/link'
 import { Package, LineChart, Download, Factory, BarChart3, Zap } from 'lucide-react'
+import { SzenarienProvider } from '@/contexts/SzenarienContext'
 
 export const metadata: Metadata = {
   title: 'MTB SCM Tool 2027 - Adventure Works AG (Code-Lösung)',
@@ -16,6 +17,7 @@ export default function RootLayout({
   return (
     <html lang="de">
       <body className="font-sans antialiased">
+        <SzenarienProvider>
         <div className="min-h-screen flex flex-col">
           {/* Header */}
           <header className="border-b bg-white shadow-sm">
@@ -71,6 +73,7 @@ export default function RootLayout({
             </div>
           </footer>
         </div>
+        </SzenarienProvider>
       </body>
     </html>
   )
