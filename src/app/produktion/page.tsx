@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { CheckCircle2, Factory, AlertTriangle, TrendingUp, Package, Download } from 'lucide-react'
 import { formatNumber } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
+import ExcelTable, { FormulaCard } from '@/components/excel-table'
 
 /**
  * Produktion Hauptseite
@@ -190,50 +191,71 @@ export default function ProduktionPage() {
         <CardHeader>
           <CardTitle>Aktueller Lagerbestand</CardTitle>
           <CardDescription>
-            Komponentenverfügbarkeit mit Sicherheitsbeständen
+            Komponentenverfügbarkeit mit Sicherheitsbeständen (Excel-ähnliche Darstellung)
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Komponente</TableHead>
-                <TableHead className="text-right">Bestand</TableHead>
-                <TableHead className="text-right">Sicherheitsbestand</TableHead>
-                <TableHead className="text-right">Verfügbar</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lagerbestaende.map(l => (
-                <TableRow key={l.komponente}>
-                  <TableCell className="font-medium">
-                    {l.komponente.replace(/_/g, ' ')}
-                  </TableCell>
-                  <TableCell className="text-right">{formatNumber(l.bestand, 0)}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {formatNumber(l.sicherheit, 0)}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {formatNumber(l.bestand - l.sicherheit, 0)}
-                  </TableCell>
-                  <TableCell>
-                    {l.status === 'ok' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        OK
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        Kritisch
-                      </span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          {/* Formel-Karte */}
+          <div className="mb-6">
+            <FormulaCard
+              title="ATP-Check Formel (Available-to-Promise)"
+              formula="ATP = Verfügbarer Bestand - Sicherheitsbestand ≥ Bedarf"
+              description="Vor jeder Produktion wird geprüft, ob genug Material verfügbar ist."
+              example="Gabel_Fox32F100: 5.200 - 1.000 = 4.200 verfügbar ✓"
+            />
+          </div>
+
+          {/* Excel-ähnliche Tabelle */}
+          <ExcelTable
+            columns={[
+              {
+                key: 'komponente',
+                label: 'Komponente',
+                width: '200px',
+                format: (val) => val.replace(/_/g, ' ')
+              },
+              {
+                key: 'bestand',
+                label: 'Bestand',
+                width: '120px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0)
+              },
+              {
+                key: 'sicherheit',
+                label: 'Sicherheitsbestand',
+                width: '150px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0)
+              },
+              {
+                key: 'verfuegbar',
+                label: 'Verfügbar',
+                width: '120px',
+                align: 'right',
+                formula: 'Bestand - Sicherheitsbestand',
+                format: (val) => formatNumber(val, 0)
+              },
+              {
+                key: 'status',
+                label: 'Status',
+                width: '100px',
+                align: 'center',
+                format: (val) => val === 'ok' 
+                  ? '✓ OK' 
+                  : '⚠ Kritisch'
+              }
+            ]}
+            data={lagerbestaende.map(l => ({
+              komponente: l.komponente,
+              bestand: l.bestand,
+              sicherheit: l.sicherheit,
+              verfuegbar: l.bestand - l.sicherheit,
+              status: l.status
+            }))}
+            maxHeight="400px"
+            showFormulas={true}
+          />
         </CardContent>
       </Card>
 
