@@ -1,16 +1,35 @@
 'use client'
 
+/**
+ * ========================================
+ * OEM PRODUKTIONSPROGRAMM
+ * ========================================
+ * 
+ * Tagesgenaue Produktionsplanung mit:
+ * - 365 Tage Planung für alle 8 MTB-Varianten
+ * - Saisonale Verteilung (April-Peak)
+ * - Error-Management für Rundungsfehler
+ * - Stücklisten-Übersicht
+ */
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { CheckCircle2, Calendar, TrendingUp, AlertCircle } from 'lucide-react'
+import { CheckCircle2, Calendar, TrendingUp, AlertCircle, Download } from 'lucide-react'
 import { formatNumber, formatDate } from '@/lib/utils'
 import { generiereAlleProduktionsplaene, berechneProduktionsstatistik } from '@/lib/calculations/oem-programm'
 import { kalenderStatistik } from '@/lib/kalender'
+import { exportToCSV, exportToJSON } from '@/lib/export'
+import { showError, showSuccess } from '@/lib/notifications'
 import stammdatenData from '@/data/stammdaten.json'
+import stuecklisteData from '@/data/stueckliste.json'
 import { useState, useEffect } from 'react'
 
+/**
+ * OEM Programm Hauptseite
+ * Zeigt Produktionsplanung und Stücklisten
+ */
 export default function OEMProgrammPage() {
   const [produktionsplaene, setProduktionsplaene] = useState<any>(null)
   const [selectedVariante, setSelectedVariante] = useState('MTBAllrounder')
@@ -23,14 +42,61 @@ export default function OEMProgrammPage() {
 
   const kalenderStats = kalenderStatistik(2027)
   
+  /**
+   * Exportiert Produktionsplan als CSV
+   */
+  const handleExportCSV = () => {
+    if (!produktionsplaene || !produktionsplaene[selectedVariante]) {
+      showError('Keine Daten zum Exportieren verfügbar')
+      return
+    }
+    
+    const data = produktionsplaene[selectedVariante]
+      .filter((t: any) => t.istMenge > 0)
+      .map((tag: any) => ({
+        Datum: formatDate(new Date(tag.datum)),
+        'Soll-Menge': formatNumber(tag.sollMenge, 2),
+        'Ist-Menge': tag.istMenge,
+        'Kumulierter Error': formatNumber(tag.kumulierterError, 3)
+      }))
+    
+    exportToCSV(data, `produktionsplan_${selectedVariante}_2027`)
+    showSuccess('Produktionsplan erfolgreich exportiert')
+  }
+  
+  /**
+   * Exportiert alle Daten als JSON
+   */
+  const handleExportJSON = () => {
+    if (!produktionsplaene) {
+      showError('Keine Daten zum Exportieren verfügbar')
+      return
+    }
+    
+    exportToJSON(produktionsplaene, 'alle_produktionsplaene_2027')
+    showSuccess('Daten erfolgreich als JSON exportiert')
+  }
+  
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">OEM Produktionsprogrammplanung</h1>
-        <p className="text-muted-foreground mt-1">
-          Tagesgenaue Planung für 365 Tage × 8 Varianten mit Error-Management
-        </p>
+      {/* Header mit Export-Buttons */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">OEM Produktionsprogrammplanung</h1>
+          <p className="text-muted-foreground mt-1">
+            Tagesgenaue Planung für 365 Tage × 8 Varianten mit Error-Management
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            CSV Export
+          </Button>
+          <Button variant="outline" onClick={handleExportJSON}>
+            <Download className="h-4 w-4 mr-2" />
+            JSON Export
+          </Button>
+        </div>
       </div>
 
       {/* Übersicht Cards */}
@@ -84,6 +150,7 @@ export default function OEMProgrammPage() {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Übersicht</TabsTrigger>
+          <TabsTrigger value="stueckliste">Stückliste</TabsTrigger>
           <TabsTrigger value="details">Tagesplanung</TabsTrigger>
           <TabsTrigger value="error">Error-Management</TabsTrigger>
         </TabsList>
@@ -163,6 +230,60 @@ export default function OEMProgrammPage() {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Stückliste Tab */}
+        <TabsContent value="stueckliste" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Stückliste - Mountain Bikes</CardTitle>
+              <CardDescription>
+                Komponenten pro Fahrrad: 1x Rahmen + 1x Gabel + 1x Sattel = 1 Fahrrad
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-blue-800">
+                  <strong>Hinweis:</strong> {stuecklisteData.hinweis}
+                </p>
+              </div>
+              
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Variante</TableHead>
+                    <TableHead>Rahmen</TableHead>
+                    <TableHead>Gabel</TableHead>
+                    <TableHead>Sattel</TableHead>
+                    <TableHead className="text-right">Komponenten</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stammdatenData.varianten.map((v) => {
+                    const stl = stuecklisteData.stuecklisten[v.id as keyof typeof stuecklisteData.stuecklisten]
+                    if (!stl) return null
+                    const komponenten = Object.keys(stl.komponenten).length
+                    
+                    return (
+                      <TableRow key={v.id}>
+                        <TableCell className="font-medium">{v.name}</TableCell>
+                        <TableCell className="text-sm">
+                          {Object.values(stl.komponenten).find((k: any) => k.name.includes('Rahmen'))?.name || 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {Object.values(stl.komponenten).find((k: any) => k.name.includes('Gabel'))?.name || 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {Object.values(stl.komponenten).find((k: any) => k.name.includes('Sattel'))?.name || 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-right">{komponenten}</TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
