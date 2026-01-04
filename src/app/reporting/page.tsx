@@ -582,10 +582,9 @@ function VisualisierungenView({
                 </Pie>
                 <Tooltip
                   formatter={(value) => {
-                    if (typeof value === 'number') {
-                      return value.toLocaleString('de-DE') + ' Bikes'
-                    }
-                    return '0 Bikes'
+                    if (value === undefined || value === null) return 'N/A'
+                    if (typeof value !== 'number') return String(value)
+                    return value.toLocaleString('de-DE') + ' Bikes'
                   }}
                 />
               </PieChart>

@@ -21,6 +21,7 @@ import { formatNumber, formatDate } from '@/lib/utils'
 import { generiereAlleProduktionsplaene, berechneProduktionsstatistik } from '@/lib/calculations/oem-programm'
 import { kalenderStatistik } from '@/lib/kalender'
 import { exportToCSV, exportToJSON } from '@/lib/export'
+import { showError, showSuccess } from '@/lib/notifications'
 import stammdatenData from '@/data/stammdaten.json'
 import stuecklisteData from '@/data/stueckliste.json'
 import { useState, useEffect } from 'react'
@@ -46,7 +47,7 @@ export default function OEMProgrammPage() {
    */
   const handleExportCSV = () => {
     if (!produktionsplaene || !produktionsplaene[selectedVariante]) {
-      alert('Keine Daten zum Exportieren verfügbar')
+      showError('Keine Daten zum Exportieren verfügbar')
       return
     }
     
@@ -60,6 +61,7 @@ export default function OEMProgrammPage() {
       }))
     
     exportToCSV(data, `produktionsplan_${selectedVariante}_2027`)
+    showSuccess('Produktionsplan erfolgreich exportiert')
   }
   
   /**
@@ -67,11 +69,12 @@ export default function OEMProgrammPage() {
    */
   const handleExportJSON = () => {
     if (!produktionsplaene) {
-      alert('Keine Daten zum Exportieren verfügbar')
+      showError('Keine Daten zum Exportieren verfügbar')
       return
     }
     
     exportToJSON(produktionsplaene, 'alle_produktionsplaene_2027')
+    showSuccess('Daten erfolgreich als JSON exportiert')
   }
   
   return (

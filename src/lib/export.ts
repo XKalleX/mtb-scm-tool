@@ -77,8 +77,31 @@ function downloadFile(content: string, filename: string, mimeType: string) {
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
   try {
-    await navigator.clipboard.writeText(text)
-    return true
+    // Moderne Clipboard API (bevorzugt)
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+    
+    // Fallback für ältere Browser oder unsichere Kontexte
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-999999px'
+    textArea.style.top = '-999999px'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    
+    try {
+      const successful = document.execCommand('copy')
+      document.body.removeChild(textArea)
+      return successful
+    } catch (err) {
+      document.body.removeChild(textArea)
+      console.error('Fallback: Fehler beim Kopieren:', err)
+      return false
+    }
   } catch (error) {
     console.error('Fehler beim Kopieren:', error)
     return false
