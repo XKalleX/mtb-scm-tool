@@ -1,0 +1,49 @@
+{
+  "lieferant": {
+    "id": "CHN",
+    "name": "China Manufacturing Ltd.",
+    "land": "China",
+    "vorlaufzeitKalendertage": 35,
+    "vorlaufzeitArbeitstage": 21,
+    "losgroesse": 2000,
+    "kapazitaet": 50000,
+    "lieferintervall": 14,
+    "besonderheiten": [
+      "Einziger Lieferant für ALLE Komponenten",
+      "Spring Festival: 28. Jan - 4. Feb 2027 (7 Tage Produktionsstopp)",
+      "Schiff-Transport: 35 Kalendertage (24/7 unterwegs)",
+      "Bearbeitung: 21 Arbeitstage (Mo-Fr ohne Feiertage)",
+      "Mindestbestellung: 2.000 Stück (Losgröße)",
+      "Lieferintervall: Alle 14 Tage"
+    ]
+  },
+  "komponenten": [
+    "Gabel_Fox32F100",
+    "Gabel_Fox32F80",
+    "Gabel_FoxTalas140",
+    "Gabel_RockShoxReba",
+    "Gabel_RockShoxRecon",
+    "Gabel_SRSuntour",
+    "Rahmen_Alu",
+    "Rahmen_AluReinforced",
+    "Rahmen_Carbon",
+    "Rahmen_CarbonPremium",
+    "Reifen_Standard",
+    "Reifen_Race",
+    "Reifen_Downhill",
+    "Reifen_Extreme",
+    "Reifen_Freeride",
+    "Reifen_Marathon",
+    "Reifen_Performance",
+    "Reifen_Trail",
+    "Schaltung_Shimano",
+    "Schaltung_ShimanoXT",
+    "Schaltung_ShimanoSLX",
+    "Schaltung_ShimanoXTR",
+    "Bremsen_Scheibe",
+    "Bremsen_Premium",
+    "Daempfer_RockShox",
+    "Daempfer_Premium"
+  ],
+  "hinweis": "Code-Lösung: Alle 26 Komponenten kommen von diesem einen Lieferanten"
+}

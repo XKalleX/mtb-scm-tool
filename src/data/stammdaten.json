@@ -1,0 +1,381 @@
+{
+  "projekt": {
+    "name": "Mountain Bike Supply Chain Management",
+    "kunde": "Adventure Works AG",
+    "standort": "Dortmund",
+    "planungsjahr": 2027,
+    "beschreibung": "Comprehensive Supply Chain Management System für Mountain Bike Produktion"
+  },
+  
+  "varianten": [
+    {
+      "id": "MTBAllrounder",
+      "name": "MTB Allrounder",
+      "kategorie": "Allrounder",
+      "verkaufspreis": 1299,
+      "herstellkosten": 750,
+      "gewicht": 13.5,
+      "farben": ["Schwarz", "Silber", "Blau"],
+      "anteilPrognose": 0.30,
+      "beschreibung": "Vielseitiges Mountainbike für alle Einsatzbereiche"
+    },
+    {
+      "id": "MTBCompetition",
+      "name": "MTB Competition",
+      "kategorie": "Competition",
+      "verkaufspreis": 2499,
+      "herstellkosten": 1450,
+      "gewicht": 11.2,
+      "farben": ["Rot", "Schwarz", "Weiß"],
+      "anteilPrognose": 0.15,
+      "beschreibung": "Wettkampforientiertes Racebike mit Carbonrahmen"
+    },
+    {
+      "id": "MTBDownhill",
+      "name": "MTB Downhill",
+      "kategorie": "Downhill",
+      "verkaufspreis": 3199,
+      "herstellkosten": 1850,
+      "gewicht": 15.8,
+      "farben": ["Orange", "Schwarz", "Grün"],
+      "anteilPrognose": 0.10,
+      "beschreibung": "Robustes Downhill-Bike für extreme Abfahrten"
+    },
+    {
+      "id": "MTBExtreme",
+      "name": "MTB Extreme",
+      "kategorie": "Extreme",
+      "verkaufspreis": 3799,
+      "herstellkosten": 2200,
+      "gewicht": 14.9,
+      "farben": ["Gelb", "Schwarz", "Grau"],
+      "anteilPrognose": 0.07,
+      "beschreibung": "Premium-Bike für extremste Anforderungen"
+    },
+    {
+      "id": "MTBFreeride",
+      "name": "MTB Freeride",
+      "kategorie": "Freeride",
+      "verkaufspreis": 2899,
+      "herstellkosten": 1680,
+      "gewicht": 14.3,
+      "farben": ["Grün", "Schwarz", "Blau"],
+      "anteilPrognose": 0.05,
+      "beschreibung": "Freestyle-orientiertes Mountainbike"
+    },
+    {
+      "id": "MTBMarathon",
+      "name": "MTB Marathon",
+      "kategorie": "Marathon",
+      "verkaufspreis": 2199,
+      "herstellkosten": 1270,
+      "gewicht": 10.8,
+      "farben": ["Blau", "Weiß", "Schwarz"],
+      "anteilPrognose": 0.08,
+      "beschreibung": "Leichtgewicht für Langstrecken-Rennen"
+    },
+    {
+      "id": "MTBPerformance",
+      "name": "MTB Performance",
+      "kategorie": "Performance",
+      "verkaufspreis": 1799,
+      "herstellkosten": 1040,
+      "gewicht": 12.4,
+      "farben": ["Schwarz", "Silber", "Rot"],
+      "anteilPrognose": 0.12,
+      "beschreibung": "Performance-orientiertes Allround-Bike"
+    },
+    {
+      "id": "MTBTrail",
+      "name": "MTB Trail",
+      "kategorie": "Trail",
+      "verkaufspreis": 1599,
+      "herstellkosten": 920,
+      "gewicht": 13.1,
+      "farben": ["Grau", "Schwarz", "Grün"],
+      "anteilPrognose": 0.13,
+      "beschreibung": "Trail-spezialisiertes Mountainbike"
+    }
+  ],
+  
+  "jahresproduktion": {
+    "gesamt": 370000,
+    "beschreibung": "Gesamtvolumen laut Aufgabenstellung",
+    "proVariante": {
+      "MTBAllrounder": 111000,
+      "MTBCompetition": 55500,
+      "MTBDownhill": 37000,
+      "MTBExtreme": 25900,
+      "MTBFreeride": 18500,
+      "MTBMarathon": 29600,
+      "MTBPerformance": 44400,
+      "MTBTrail": 48100
+    }
+  },
+  
+  "saisonalitaet": {
+    "beschreibung": "Saisonaler Verlauf der Produktion (nicht Absatz in den Märkten!)",
+    "monatlicheVerteilung": {
+      "januar": 0.04,
+      "februar": 0.06,
+      "maerz": 0.10,
+      "april": 0.16,
+      "mai": 0.14,
+      "juni": 0.13,
+      "juli": 0.12,
+      "august": 0.09,
+      "september": 0.06,
+      "oktober": 0.03,
+      "november": 0.04,
+      "dezember": 0.03
+    },
+    "peakMonth": "april",
+    "lowSeasonMonths": ["oktober", "dezember"]
+  },
+  
+  "produktion": {
+    "standort": "Dortmund",
+    "kapazitaet": {
+      "proStunde": 130,
+      "beschreibung": "130 Fahrräder pro Stunde Produktionskapazität"
+    },
+    "schichten": {
+      "variabel": true,
+      "beschreibung": "Anzahl Schichten wochenweise variabel",
+      "stundenProSchicht": 8
+    },
+    "durchlaufzeit": {
+      "montage": 325,
+      "einheit": "Minuten",
+      "beschreibung": "Maximale Durchlaufzeit für Montage"
+    }
+  },
+  
+  "zulieferer": {
+    "china": {
+      "name": "Dengwong Supplies Ltd.",
+      "standort": "Dengwong, China",
+      "liefert": ["Sättel"],
+      "vorlaufzeit": {
+        "tage": 5,
+        "typ": "Arbeitstage",
+        "beschreibung": "Zeit von Bestelleingang bis Ende der Produktion"
+      },
+      "transportwege": [
+        {
+          "typ": "LKW",
+          "von": "Dengwong",
+          "nach": "Hafen Shanghai",
+          "dauer": 2,
+          "einheit": "Arbeitstage"
+        },
+        {
+          "typ": "Schiff",
+          "von": "Hafen Shanghai",
+          "nach": "Hafen Hamburg",
+          "dauer": 30,
+          "einheit": "Kalendertage",
+          "fahrplan": "Mittwochs",
+          "frequenz": "1x pro Woche"
+        },
+        {
+          "typ": "LKW",
+          "von": "Hafen Hamburg",
+          "nach": "Dortmund",
+          "dauer": 2,
+          "einheit": "Arbeitstage"
+        }
+      ],
+      "losgroessen": {
+        "saettel": 500
+      },
+      "gesamtDurchlaufzeit": {
+        "minimum": 39,
+        "einheit": "Kalendertage",
+        "beschreibung": "Gesamte Durchlaufzeit von Bestellung bis Ankunft"
+      }
+    },
+    "spanien": {
+      "name": "Saragossa Components S.A.",
+      "standort": "Saragossa, Spanien",
+      "liefert": ["Gabeln"],
+      "vorlaufzeit": {
+        "tage": 5,
+        "typ": "Arbeitstage",
+        "beschreibung": "Zeit von Bestelleingang bis Ende der Produktion"
+      },
+      "transportwege": [
+        {
+          "typ": "Zug",
+          "von": "Saragossa",
+          "nach": "Dortmund",
+          "dauer": 9,
+          "einheit": "Kalendertage",
+          "fahrplan": "Montags und Donnerstags",
+          "frequenz": "2x pro Woche"
+        }
+      ],
+      "losgroessen": {
+        "gabeln": 75
+      },
+      "gesamtDurchlaufzeit": {
+        "minimum": 14,
+        "einheit": "Kalendertage",
+        "beschreibung": "Gesamte Durchlaufzeit von Bestellung bis Ankunft"
+      }
+    },
+    "deutschland": {
+      "name": "Heilbronn Rahmen GmbH",
+      "standort": "Heilbronn, Deutschland",
+      "liefert": ["Rahmen"],
+      "vorlaufzeit": {
+        "tage": 2,
+        "typ": "Arbeitstage",
+        "beschreibung": "Zeit von Bestelleingang bis Ende der Produktion"
+      },
+      "transportwege": [
+        {
+          "typ": "LKW",
+          "von": "Heilbronn",
+          "nach": "Dortmund",
+          "dauer": 2,
+          "einheit": "Arbeitstage"
+        }
+      ],
+      "losgroessen": {
+        "rahmen": 10
+      },
+      "gesamtDurchlaufzeit": {
+        "minimum": 4,
+        "einheit": "Arbeitstage",
+        "beschreibung": "Gesamte Durchlaufzeit von Bestellung bis Ankunft"
+      }
+    }
+  },
+  
+  "transportmittel": {
+    "lkw": {
+      "name": "LKW",
+      "betriebstage": "Montag-Freitag",
+      "ruhetage": ["Samstag", "Sonntag"],
+      "beschreibung": "LKWs fahren Sa und So nicht"
+    },
+    "zug": {
+      "name": "Güterzug",
+      "fahrplan": ["Montag", "Donnerstag"],
+      "beschreibung": "Züge fahren Montags und Donnerstags ab"
+    },
+    "schiff": {
+      "name": "Container-Schiff",
+      "fahrplan": ["Mittwoch"],
+      "frequenz": "wöchentlich",
+      "beschreibung": "Schiffe fahren einmal pro Woche Mittwochs"
+    }
+  },
+  
+  "feiertage": {
+    "china": {
+      "beschreibung": "Chinesische Feiertage, insbesondere Spring Festival (Chinesisches Neujahr)",
+      "wichtigeEreignisse": [
+        {
+          "name": "Spring Festival",
+          "beschreibung": "Chinesisches Neujahr - Produktionsstopp",
+          "dauer": "ca. 2 Wochen",
+          "auswirkung": "Keine Produktion, keine Lieferungen"
+        }
+      ]
+    },
+    "deutschland": {
+      "beschreibung": "Deutsche gesetzliche Feiertage",
+      "auswirkung": "Keine LKW-Transporte an Feiertagen"
+    }
+  },
+  
+  "szenarien": {
+    "beschreibung": "Mögliche operative Szenarien zur Simulation",
+    "verfuegbar": [
+      {
+        "id": "marketingaktion",
+        "name": "Marketingaktion",
+        "beschreibung": "Kurzfristige Nachfrageerhöhung durch erfolgreiche Marketing-Kampagne in Mountain Biker Zeitschrift",
+        "auswirkung": "Zusätzliche Nachfrage, Materialengpässe möglich",
+        "prioritaet": "Keine höhere Priorität für Zusatzmengen; Abarbeitung im Rahmen vorhandener Restkapazitäten"
+      },
+      {
+        "id": "maschinenausfall",
+        "name": "Maschinenausfall beim Zulieferer",
+        "beschreibung": "Zulieferer kann georderte Menge nicht rechtzeitig liefern",
+        "auswirkung": "Reduzierte Lagerbestände beim Zulieferer, Lieferverzögerungen",
+        "betroffen": "Beliebiger Zulieferer"
+      },
+      {
+        "id": "wasserschaden",
+        "name": "Wasserschaden im Lager / Sturm und Ladungsverlust",
+        "beschreibung": "Bestandsverlust durch Wasserschaden oder Container-Verlust auf See",
+        "auswirkung": "Plötzlicher Bestandsabbau, Materialengpässe",
+        "beispiel": "Container geht auf MSC Mara verloren"
+      },
+      {
+        "id": "schiffsverspaetung",
+        "name": "Verspätete Ankunft bei den Schiffen",
+        "beschreibung": "Lieferzeiten im maritimen Bereich werden durch Wetterverhältnisse beeinflusst",
+        "auswirkung": "Verlängerte Durchlaufzeiten, verzögerte Materialankunft",
+        "gegenmaßnahme": "Sondertransporte (z.B. Luftfracht)"
+      }
+    ]
+  },
+  
+  "scorMetrics": {
+    "beschreibung": "SCOR Metriken - Supply Chain Operations Reference Model",
+    "kategorien": [
+      {
+        "name": "Reliability (Zuverlässigkeit)",
+        "metriken": [
+          "RL.1.1 Perfect Order Fulfillment",
+          "RL.2.1 % Orders Delivered in Full"
+        ]
+      },
+      {
+        "name": "Responsiveness (Reaktionsfähigkeit)",
+        "metriken": [
+          "RS.1.1 Order Fulfillment Cycle Time",
+          "RS.2.2 Make Cycle Time"
+        ]
+      },
+      {
+        "name": "Agility (Anpassungsfähigkeit)",
+        "metriken": [
+          "AG.1.1 Upside Supply Chain Flexibility",
+          "AG.1.2 Supply Chain Upside Adaptability"
+        ]
+      },
+      {
+        "name": "Cost (Kosten)",
+        "metriken": [
+          "CO.1.1 Supply Chain Management Cost",
+          "CO.1.2 Cost of Goods Sold"
+        ]
+      },
+      {
+        "name": "Assets (Vermögenswerte)",
+        "metriken": [
+          "AM.1.1 Cash-to-Cash Cycle Time",
+          "AM.1.2 Return on Supply Chain Fixed Assets"
+        ]
+      }
+    ],
+    "mindestanzahl": 5,
+    "beschreibungBewertung": "Mind. 5 SCOR Metriken aus den 5 Leistungsmerkmalen implementieren"
+  },
+  
+  "hinweise": {
+    "codeLoesung": "Alle Komponenten kommen aus China (vereinfacht), kein Outbound zu internationalen Märkten erforderlich",
+    "excel LösungAlternative": "Bei Excel-Lösung: 3 Zulieferer (China, Spanien, Deutschland) + Outbound zu 6 Märkten",
+    "vereinfachungen": [
+      "Nur ein Zulieferer-Land (China) statt drei",
+      "Kein Outbound zu internationalen Märkten",
+      "Keine Solver-basierte Optimierung erforderlich (First-Come-First-Serve)",
+      "Reduzierung von ca. 18 Modulen auf 5 Kernmodule"
+    ]
+  }
+}

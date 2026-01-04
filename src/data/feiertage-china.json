@@ -1,0 +1,81 @@
+{
+  "feiertage2027": [
+    {
+      "datum": "2027-01-01",
+      "name": "New Year's Day",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-01-28",
+      "name": "Spring Festival (Tag 1) - Chinesisches Neujahr",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-01-29",
+      "name": "Spring Festival (Tag 2)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-01-30",
+      "name": "Spring Festival (Tag 3)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-01-31",
+      "name": "Spring Festival (Tag 4)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-02-01",
+      "name": "Spring Festival (Tag 5)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-02-02",
+      "name": "Spring Festival (Tag 6)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-02-03",
+      "name": "Spring Festival (Tag 7)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-04-04",
+      "name": "Qingming Festival (Tomb-Sweeping Day)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-05-01",
+      "name": "Labour Day",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-06-14",
+      "name": "Dragon Boat Festival",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-09-21",
+      "name": "Mid-Autumn Festival",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-10-01",
+      "name": "National Day (Tag 1)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-10-02",
+      "name": "National Day (Tag 2)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2027-10-03",
+      "name": "National Day (Tag 3)",
+      "typ": "gesetzlich"
+    }
+  ],
+  "hinweis": "Nur chinesische Feiertage relevant, da einziger Lieferant",
+  "wichtig": "Spring Festival (28.1.-4.2.2027) = 7 Tage Produktionsstopp!"
+}

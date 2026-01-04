@@ -1,0 +1,268 @@
+'use client'
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { CheckCircle2, Factory, AlertTriangle, TrendingUp, Package } from 'lucide-react'
+import { formatNumber } from '@/lib/utils'
+
+export default function ProduktionPage() {
+  // Beispiel-Daten (später aus State/Context)
+  const produktionsStats = {
+    geplant: 185000,
+    produziert: 184750,
+    planerfuellungsgrad: 99.86,
+    mitMaterialmangel: 12,
+    auslastung: 95.5
+  }
+
+  const lagerbestaende = [
+    { komponente: 'Gabel_Fox32F100', bestand: 5200, sicherheit: 1000, status: 'ok' },
+    { komponente: 'Rahmen_Carbon', bestand: 3800, sicherheit: 1000, status: 'ok' },
+    { komponente: 'Reifen_Standard', bestand: 750, sicherheit: 1000, status: 'kritisch' },
+    { komponente: 'Schaltung_Shimano', bestand: 4100, sicherheit: 1000, status: 'ok' },
+    { komponente: 'Bremsen_Premium', bestand: 850, sicherheit: 1000, status: 'kritisch' },
+  ]
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold">Produktion & Warehouse</h1>
+        <p className="text-muted-foreground mt-1">
+          Produktionssteuerung ohne Solver - First-Come-First-Serve Regel
+        </p>
+      </div>
+
+      {/* Übersicht Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Geplante Produktion</CardTitle>
+              <Factory className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatNumber(produktionsStats.geplant, 0)}</div>
+            <p className="text-xs text-muted-foreground">MTBs Jahresplan</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Tatsächlich produziert</CardTitle>
+              <TrendingUp className="h-4 w-4 text-green-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatNumber(produktionsStats.produziert, 0)}</div>
+            <p className="text-xs text-muted-foreground">
+              {formatNumber(produktionsStats.planerfuellungsgrad, 2)}% Planerfüllung
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Materialmangel</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{produktionsStats.mitMaterialmangel}</div>
+            <p className="text-xs text-muted-foreground">Aufträge betroffen</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Auslastung</CardTitle>
+              <Factory className="h-4 w-4 text-blue-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatNumber(produktionsStats.auslastung, 1)}%</div>
+            <p className="text-xs text-muted-foreground">Kapazitätsauslastung</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Produktionslogik ohne Solver */}
+      <Card className="border-blue-200 bg-blue-50">
+        <CardHeader>
+          <div className="flex items-center space-x-2">
+            <Factory className="h-5 w-5 text-blue-600" />
+            <CardTitle className="text-blue-900">Produktionslogik (ohne Solver)</CardTitle>
+          </div>
+          <CardDescription className="text-blue-700">
+            Code-Lösung Ermäßigung: Einfache First-Come-First-Serve Regel statt mathematischer Optimierung
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-white rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">FCFS-Regel (First-Come-First-Serve):</h4>
+            <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
+              <li>
+                <strong>Schritt 1: ATP-Check</strong> - Prüfe für jeden Produktionsauftrag: 
+                Ist genug Material im Lager?
+              </li>
+              <li>
+                <strong>Schritt 2a: JA</strong> - Produziere die volle Menge & buche Material ab
+              </li>
+              <li>
+                <strong>Schritt 2b: NEIN</strong> - Auftrag zurückstellen oder Teilproduktion
+              </li>
+              <li>
+                <strong>Keine Optimierung:</strong> Kein Solver, keine Prioritäten nach Deckungsbeitrag
+              </li>
+            </ol>
+          </div>
+
+          <div className="bg-white rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">ATP-Check (Available-to-Promise):</h4>
+            <p className="text-sm text-blue-800">
+              Für jede Komponente in der Stückliste wird geprüft:<br/>
+              <code className="bg-blue-100 px-2 py-1 rounded">
+                Verfügbar im Lager ≥ Benötigt für Auftrag
+              </code>
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Lagerbestand */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Aktueller Lagerbestand</CardTitle>
+          <CardDescription>
+            Komponentenverfügbarkeit mit Sicherheitsbeständen
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Komponente</TableHead>
+                <TableHead className="text-right">Bestand</TableHead>
+                <TableHead className="text-right">Sicherheitsbestand</TableHead>
+                <TableHead className="text-right">Verfügbar</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lagerbestaende.map(l => (
+                <TableRow key={l.komponente}>
+                  <TableCell className="font-medium">
+                    {l.komponente.replace(/_/g, ' ')}
+                  </TableCell>
+                  <TableCell className="text-right">{formatNumber(l.bestand, 0)}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {formatNumber(l.sicherheit, 0)}
+                  </TableCell>
+                  <TableCell className="text-right font-semibold">
+                    {formatNumber(l.bestand - l.sicherheit, 0)}
+                  </TableCell>
+                  <TableCell>
+                    {l.status === 'ok' ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        OK
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Kritisch
+                      </span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Materialfluss */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Materialfluss-Diagramm</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center space-x-4 text-sm">
+            <div className="text-center">
+              <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg font-semibold">
+                Bestellung China
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">21 AT + 35 KT</div>
+            </div>
+            
+            <div className="text-2xl">→</div>
+            
+            <div className="text-center">
+              <div className="bg-green-100 text-green-800 px-4 py-2 rounded-lg font-semibold">
+                Lager (Eingang)
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">Buchung +</div>
+            </div>
+            
+            <div className="text-2xl">→</div>
+            
+            <div className="text-center">
+              <div className="bg-purple-100 text-purple-800 px-4 py-2 rounded-lg font-semibold">
+                Produktion
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">ATP-Check</div>
+            </div>
+            
+            <div className="text-2xl">→</div>
+            
+            <div className="text-center">
+              <div className="bg-orange-100 text-orange-800 px-4 py-2 rounded-lg font-semibold">
+                Lager (Ausgang)
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">Buchung -</div>
+            </div>
+            
+            <div className="text-2xl">→</div>
+            
+            <div className="text-center">
+              <div className="bg-slate-100 text-slate-800 px-4 py-2 rounded-lg font-semibold">
+                Fertigware
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">Kein Outbound</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Erfüllte Anforderungen */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Erfüllte Anforderungen</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 md:grid-cols-2">
+            <RequirementItem text="ATP-Check (Available-to-Promise)" />
+            <RequirementItem text="First-Come-First-Serve Regel" />
+            <RequirementItem text="Lagerbestand-Management" />
+            <RequirementItem text="Sicherheitsbestände" />
+            <RequirementItem text="Materialbuchung (Ein-/Ausgang)" />
+            <RequirementItem text="Planerfüllungsgrad-Tracking" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function RequirementItem({ text }: { text: string }) {
+  return (
+    <div className="flex items-center space-x-2 text-sm">
+      <CheckCircle2 className="h-4 w-4 text-green-600" />
+      <span>{text}</span>
+    </div>
+  )
+}

@@ -1,0 +1,221 @@
+'use client'
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { CheckCircle2, Ship, AlertTriangle, Package } from 'lucide-react'
+import { formatNumber } from '@/lib/utils'
+import lieferantData from '@/data/lieferant-china.json'
+import feiertagsData from '@/data/feiertage-china.json'
+
+export default function InboundPage() {
+  const lieferant = lieferantData.lieferant
+  const springFestival = feiertagsData.feiertage2027.filter(f => f.name.includes('Spring Festival'))
+  
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold">Inbound Logistik - China</h1>
+        <p className="text-muted-foreground mt-1">
+          Einziger Lieferant für ALLE Komponenten (Code-Lösung Ermäßigung)
+        </p>
+      </div>
+
+      {/* Übersicht Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Bearbeitungszeit</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{lieferant.vorlaufzeitArbeitstage}</div>
+            <p className="text-xs text-muted-foreground">Arbeitstage Produktion</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Transportzeit</CardTitle>
+              <Ship className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{lieferant.vorlaufzeitKalendertage}</div>
+            <p className="text-xs text-muted-foreground">Kalendertage Schiff</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Losgröße</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatNumber(lieferant.losgroesse, 0)}</div>
+            <p className="text-xs text-muted-foreground">Stück Mindestbestellung</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Lieferintervall</CardTitle>
+              <Ship className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{lieferant.lieferintervall}</div>
+            <p className="text-xs text-muted-foreground">Tage zwischen Lieferungen</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Lieferanten-Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle>🇨🇳 {lieferant.name}</CardTitle>
+          <CardDescription>
+            Einziger Lieferant für alle {lieferantData.komponenten.length} Komponenten
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <h4 className="font-semibold mb-2">Vorlaufzeiten:</h4>
+              <ul className="space-y-1 text-sm">
+                <li>✓ Produktion in China: <strong>{lieferant.vorlaufzeitArbeitstage} Arbeitstage</strong></li>
+                <li>✓ Schiff-Transport: <strong>{lieferant.vorlaufzeitKalendertage} Kalendertage (24/7)</strong></li>
+                <li>✓ Gesamt: <strong>~{lieferant.vorlaufzeitArbeitstage + lieferant.vorlaufzeitKalendertage} Tage</strong></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-2">Besonderheiten:</h4>
+              <ul className="space-y-1 text-sm">
+                {lieferant.besonderheiten.map((b, idx) => (
+                  <li key={idx}>✓ {b}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Spring Festival Warnung */}
+      <Card className="border-orange-200 bg-orange-50">
+        <CardHeader>
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="h-5 w-5 text-orange-600" />
+            <CardTitle className="text-orange-900">Spring Festival 2027</CardTitle>
+          </div>
+          <CardDescription className="text-orange-700">
+            7 Tage kompletter Produktionsstopp in China!
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <p className="text-sm text-orange-800">
+              <strong>Zeitraum:</strong> 28. Januar - 3. Februar 2027
+            </p>
+            <p className="text-sm text-orange-800">
+              <strong>Auswirkung:</strong> Keine Produktion, keine Bestellungsbearbeitung
+            </p>
+            <p className="text-sm text-orange-800">
+              <strong>Planung:</strong> Bestellungen müssen vor dem 28.1. oder nach dem 3.2. eingehen
+            </p>
+          </div>
+          
+          <div className="mt-4">
+            <h4 className="font-semibold text-orange-900 mb-2">Betroffene Feiertage:</h4>
+            <div className="grid gap-2 md:grid-cols-2">
+              {springFestival.map(f => (
+                <div key={f.datum} className="text-sm bg-white rounded px-2 py-1">
+                  {new Date(f.datum).toLocaleDateString('de-DE')}: {f.name}
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Komponenten */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Gelieferte Komponenten ({lieferantData.komponenten.length})</CardTitle>
+          <CardDescription>
+            Alle Komponenten kommen von diesem einen Lieferanten
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 md:grid-cols-3">
+            {lieferantData.komponenten.map(k => (
+              <div key={k} className="text-sm bg-slate-50 rounded px-3 py-2">
+                {k.replace(/_/g, ' ')}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bestelllogik */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Bestelllogik (Rückwärts-Berechnung)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">Bedarfsdatum → Bestelldatum:</h4>
+            <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
+              <li>Vom Bedarfsdatum <strong>{lieferant.vorlaufzeitKalendertage} Kalendertage</strong> (Transport) abziehen</li>
+              <li>Dann <strong>{lieferant.vorlaufzeitArbeitstage} Arbeitstage</strong> (Produktion) abziehen</li>
+              <li>1 Tag Puffer abziehen</li>
+              <li>Sicherstellen dass Bestelldatum ein Arbeitstag ist</li>
+            </ol>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <h4 className="font-semibold text-green-900 mb-2">Losgrößen-Aufrundung:</h4>
+            <p className="text-sm text-green-800">
+              Jede Bestellung wird auf Vielfache von <strong>{formatNumber(lieferant.losgroesse, 0)} Stück</strong> aufgerundet.
+            </p>
+            <p className="text-sm text-green-800 mt-2">
+              Beispiel: Bedarf 3.500 Stück → Bestellung <strong>4.000 Stück</strong> (2x Losgröße)
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Erfüllte Anforderungen */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Erfüllte Anforderungen</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 md:grid-cols-2">
+            <RequirementItem text="Rückwärts-Berechnung Bestelldatum" />
+            <RequirementItem text="21 Arbeitstage Bearbeitungszeit" />
+            <RequirementItem text="35 Kalendertage Schiff-Transport" />
+            <RequirementItem text="Losgrößen-Optimierung (2.000 Stück)" />
+            <RequirementItem text="Spring Festival Berücksichtigung" />
+            <RequirementItem text="Chinesische Feiertage integriert" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function RequirementItem({ text }: { text: string }) {
+  return (
+    <div className="flex items-center space-x-2 text-sm">
+      <CheckCircle2 className="h-4 w-4 text-green-600" />
+      <span>{text}</span>
+    </div>
+  )
+}
