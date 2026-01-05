@@ -47,9 +47,9 @@ export function SzenarienProvider({ children }: { children: ReactNode }) {
     try {
       const gespeicherteSzenarien = localStorage.getItem('mtb-szenarien')
       if (gespeicherteSzenarien) {
-        const parsed = JSON.parse(gespeicherteSzenarien)
+        const parsed = JSON.parse(gespeicherteSzenarien) as Array<Omit<SzenarioConfig, 'erstelltAm'> & { erstelltAm: string }>
         // Konvertiere Datum-Strings zurück zu Date-Objekten
-        const wiederhergestellt = parsed.map((s: any) => ({
+        const wiederhergestellt: SzenarioConfig[] = parsed.map(s => ({
           ...s,
           erstelltAm: new Date(s.erstelltAm)
         }))
@@ -130,15 +130,20 @@ export function useSzenarien() {
 }
 
 /**
+ * Baseline-Werte für Supply Chain Metriken
+ */
+export const BASELINE_WERTE = {
+  produktionsmenge: 370000,
+  materialverfuegbarkeit: 98.5,
+  liefertreue: 95.2,
+  durchlaufzeit: 56
+} as const
+
+/**
  * Berechnet die Auswirkungen aller aktiven Szenarien auf die Supply Chain
  */
 export function berechneGlobaleAuswirkungen(szenarien: SzenarioConfig[]) {
-  const baselineWerte = {
-    produktionsmenge: 370000,
-    materialverfuegbarkeit: 98.5,
-    liefertreue: 95.2,
-    durchlaufzeit: 56
-  }
+  const baselineWerte = { ...BASELINE_WERTE }
 
   let auswirkungen = { ...baselineWerte }
 

@@ -28,7 +28,7 @@ import {
   Zap
 } from 'lucide-react'
 import stammdatenData from '@/data/stammdaten.json'
-import { useSzenarien, berechneGlobaleAuswirkungen } from '@/contexts/SzenarienContext'
+import { useSzenarien, berechneGlobaleAuswirkungen, BASELINE_WERTE } from '@/contexts/SzenarienContext'
 import { useMemo } from 'react'
 
 /**
@@ -44,12 +44,7 @@ export default function Dashboard() {
   }, [aktiveSzenarien])
 
   // Berechne Änderungen gegenüber Baseline
-  const baselineWerte = {
-    produktionsmenge: 370000,
-    materialverfuegbarkeit: 98.5,
-    liefertreue: 95.2,
-    durchlaufzeit: 56
-  }
+  const baselineWerte = BASELINE_WERTE
 
   const produktionsDiff = auswirkungen.produktionsmenge - baselineWerte.produktionsmenge
   const produktionsProzent = ((produktionsDiff / baselineWerte.produktionsmenge) * 100).toFixed(1)
