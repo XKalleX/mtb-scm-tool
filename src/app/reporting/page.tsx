@@ -407,27 +407,31 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
                 key: 'kategorie',
                 label: 'SCOR Kategorie',
                 width: '150px',
-                align: 'left'
+                align: 'left',
+                sumable: false
               },
               {
                 key: 'metrik',
                 label: 'Metrik',
                 width: '200px',
-                align: 'left'
+                align: 'left',
+                sumable: false
               },
               {
                 key: 'istwert',
                 label: 'Ist-Wert',
                 width: '120px',
                 align: 'right',
-                format: (val) => val
+                format: (val) => val,
+                sumable: false
               },
               {
                 key: 'zielwert',
                 label: 'Ziel-Wert',
                 width: '120px',
                 align: 'right',
-                format: (val) => val
+                format: (val) => val,
+                sumable: false
               },
               {
                 key: 'zielerreichung',
@@ -435,7 +439,8 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
                 width: '130px',
                 align: 'right',
                 formula: '(Ist / Ziel) × 100',
-                format: (val) => formatPercent(val, 1)
+                format: (val) => formatPercent(val, 1),
+                sumable: true
               },
               {
                 key: 'status',
@@ -446,7 +451,8 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
                   if (val === 'good') return '✓ Gut'
                   if (val === 'medium') return '◐ Mittel'
                   return '✗ Schwach'
-                }
+                },
+                sumable: false
               }
             ]}
             data={[
@@ -517,6 +523,10 @@ function SCORMetrikenView({ metriken }: { metriken: any }) {
             ]}
             maxHeight="500px"
             showFormulas={true}
+            showSums={true}
+            sumRowLabel="DURCHSCHNITT Zielerreichung"
+            groupBy="kategorie"
+            subtotalLabel="Kategorie-Durchschnitt"
           />
         </CardContent>
       </Card>

@@ -291,19 +291,22 @@ export default function ProduktionPage() {
                 key: 'tag',
                 label: 'Tag',
                 width: '60px',
-                align: 'center'
+                align: 'center',
+                sumable: false
               },
               {
                 key: 'datum',
                 label: 'Datum',
                 width: '80px',
-                align: 'center'
+                align: 'center',
+                sumable: false
               },
               {
                 key: 'wochentag',
                 label: 'WT',
                 width: '50px',
-                align: 'center'
+                align: 'center',
+                sumable: false
               },
               {
                 key: 'schichten',
@@ -311,21 +314,24 @@ export default function ProduktionPage() {
                 width: '80px',
                 align: 'center',
                 formula: '⌈Plan / 1.040⌉',
-                format: (val) => val > 0 ? val + ' Schicht(en)' : '-'
+                format: (val) => val > 0 ? val + ' Schicht(en)' : '-',
+                sumable: true
               },
               {
                 key: 'planMenge',
                 label: 'Plan-Menge',
                 width: '110px',
                 align: 'right',
-                format: (val) => val > 0 ? formatNumber(val, 0) + ' Bikes' : '-'
+                format: (val) => val > 0 ? formatNumber(val, 0) + ' Bikes' : '-',
+                sumable: true
               },
               {
                 key: 'istMenge',
                 label: 'Ist-Menge',
                 width: '110px',
                 align: 'right',
-                format: (val) => val > 0 ? formatNumber(val, 0) + ' Bikes' : '-'
+                format: (val) => val > 0 ? formatNumber(val, 0) + ' Bikes' : '-',
+                sumable: true
               },
               {
                 key: 'abweichung',
@@ -337,7 +343,8 @@ export default function ProduktionPage() {
                   if (val === 0) return '±0'
                   const sign = val > 0 ? '+' : ''
                   return sign + formatNumber(val, 0)
-                }
+                },
+                sumable: true
               },
               {
                 key: 'materialVerfuegbar',
@@ -345,7 +352,8 @@ export default function ProduktionPage() {
                 width: '100px',
                 align: 'center',
                 formula: 'ATP-Check',
-                format: (val) => val ? '✓ Ja' : '✗ Nein'
+                format: (val) => val ? '✓ Ja' : '✗ Nein',
+                sumable: false
               },
               {
                 key: 'auslastung',
@@ -353,7 +361,8 @@ export default function ProduktionPage() {
                 width: '100px',
                 align: 'right',
                 formula: '(Ist / Plan) × 100',
-                format: (val) => val > 0 ? formatNumber(val, 1) + ' %' : '-'
+                format: (val) => val > 0 ? formatNumber(val, 1) + ' %' : '-',
+                sumable: false
               },
               {
                 key: 'kumulativPlan',
@@ -361,7 +370,8 @@ export default function ProduktionPage() {
                 width: '110px',
                 align: 'right',
                 formula: 'Σ(Plan)',
-                format: (val) => formatNumber(val, 0)
+                format: (val) => formatNumber(val, 0),
+                sumable: false
               },
               {
                 key: 'kumulativIst',
@@ -369,12 +379,15 @@ export default function ProduktionPage() {
                 width: '110px',
                 align: 'right',
                 formula: 'Σ(Ist)',
-                format: (val) => formatNumber(val, 0)
+                format: (val) => formatNumber(val, 0),
+                sumable: false
               }
             ]}
             data={tagesProduktion}
             maxHeight="500px"
             showFormulas={true}
+            showSums={true}
+            sumRowLabel="SUMME (90 Tage)"
           />
         </CardContent>
       </Card>
@@ -420,28 +433,32 @@ export default function ProduktionPage() {
                 key: 'komponente',
                 label: 'Komponente',
                 width: '200px',
-                format: (val) => val.replace(/_/g, ' ')
+                format: (val) => val.replace(/_/g, ' '),
+                sumable: false
               },
               {
                 key: 'bestand',
                 label: 'Bestand',
                 width: '110px',
                 align: 'right',
-                format: (val) => formatNumber(val, 0)
+                format: (val) => formatNumber(val, 0),
+                sumable: true
               },
               {
                 key: 'sicherheit',
                 label: 'Sicherheitsbestand',
                 width: '150px',
                 align: 'right',
-                format: (val) => formatNumber(val, 0)
+                format: (val) => formatNumber(val, 0),
+                sumable: true
               },
               {
                 key: 'bedarf',
                 label: 'Wochenbedarf',
                 width: '130px',
                 align: 'right',
-                format: (val) => formatNumber(val, 0)
+                format: (val) => formatNumber(val, 0),
+                sumable: true
               },
               {
                 key: 'verfuegbar',
@@ -449,7 +466,8 @@ export default function ProduktionPage() {
                 width: '140px',
                 align: 'right',
                 formula: 'Bestand - Sicherheitsbestand',
-                format: (val) => formatNumber(val, 0)
+                format: (val) => formatNumber(val, 0),
+                sumable: true
               },
               {
                 key: 'reichweite',
@@ -457,7 +475,8 @@ export default function ProduktionPage() {
                 width: '110px',
                 align: 'right',
                 formula: 'Verfügbar / Wochenbedarf',
-                format: (val) => formatNumber(val, 1) + ' Wo.'
+                format: (val) => formatNumber(val, 1) + ' Wo.',
+                sumable: false
               },
               {
                 key: 'status',
@@ -466,7 +485,8 @@ export default function ProduktionPage() {
                 align: 'center',
                 format: (val) => val === 'ok' 
                   ? '✓ OK' 
-                  : '⚠ Kritisch'
+                  : '⚠ Kritisch',
+                sumable: false
               }
             ]}
             data={lagerbestaende.map(l => ({
@@ -480,6 +500,8 @@ export default function ProduktionPage() {
             }))}
             maxHeight="500px"
             showFormulas={true}
+            showSums={true}
+            sumRowLabel="GESAMT Lagerbestand"
           />
         </CardContent>
       </Card>

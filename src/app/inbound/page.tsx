@@ -293,14 +293,16 @@ export default function InboundPage() {
                 key: 'monat',
                 label: 'Monat',
                 width: '80px',
-                align: 'center'
+                align: 'center',
+                sumable: false
               },
               {
                 key: 'bestelldatum',
                 label: 'Bestelldatum',
                 width: '120px',
                 align: 'center',
-                format: (val) => new Date(val).toLocaleDateString('de-DE')
+                format: (val) => new Date(val).toLocaleDateString('de-DE'),
+                sumable: false
               },
               {
                 key: 'vorlaufzeit',
@@ -308,7 +310,8 @@ export default function InboundPage() {
                 width: '100px',
                 align: 'center',
                 formula: '5 AT + 44 KT',
-                format: (val) => `${val} Tage`
+                format: (val) => `${val} Tage`,
+                sumable: false
               },
               {
                 key: 'lieferdatum',
@@ -316,21 +319,24 @@ export default function InboundPage() {
                 width: '120px',
                 align: 'center',
                 formula: 'Bestelldatum + Vorlaufzeit',
-                format: (val) => new Date(val).toLocaleDateString('de-DE')
+                format: (val) => new Date(val).toLocaleDateString('de-DE'),
+                sumable: false
               },
               {
                 key: 'menge',
                 label: 'Bestellmenge',
                 width: '120px',
                 align: 'right',
-                format: (val) => formatNumber(val, 0) + ' Stk'
+                format: (val) => formatNumber(val, 0) + ' Stk',
+                sumable: true
               },
               {
                 key: 'losgroesse',
                 label: 'Losgröße',
                 width: '100px',
                 align: 'right',
-                format: (val) => formatNumber(val, 0)
+                format: (val) => formatNumber(val, 0),
+                sumable: false
               },
               {
                 key: 'anzahlLose',
@@ -338,7 +344,8 @@ export default function InboundPage() {
                 width: '110px',
                 align: 'center',
                 formula: 'AUFRUNDEN(Menge / Losgröße)',
-                format: (val) => `${val} Lose`
+                format: (val) => `${val} Lose`,
+                sumable: true
               },
               {
                 key: 'status',
@@ -352,12 +359,15 @@ export default function InboundPage() {
                     'Geplant': '📅 Geplant'
                   }
                   return colors[val] || val
-                }
+                },
+                sumable: false
               }
             ]}
             data={lieferplanDaten}
             maxHeight="500px"
             showFormulas={true}
+            showSums={true}
+            sumRowLabel="JAHRESSUMME 2027"
           />
         </CardContent>
       </Card>
