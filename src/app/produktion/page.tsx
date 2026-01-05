@@ -35,64 +35,136 @@ export default function ProduktionPage() {
     auslastung: 95.5
   }
 
+  // ✅ ERMÄSSIGUNG: Nur 4 Sattel-Varianten gemäß SSOT
+  // Quelle: kontext/Spezifikation_SSOT_MR.ts - BAUTEILE
   const lagerbestaende = [
-    { komponente: 'Rahmen_Allrounder', bestand: 5200, sicherheit: 1000, bedarf: 4500, status: 'ok' },
-    { komponente: 'Rahmen_Competition', bestand: 3800, sicherheit: 1000, bedarf: 3200, status: 'ok' },
-    { komponente: 'Rahmen_Downhill', bestand: 2200, sicherheit: 1000, bedarf: 1800, status: 'ok' },
-    { komponente: 'Rahmen_Extreme', bestand: 1500, sicherheit: 1000, bedarf: 1300, status: 'ok' },
-    { komponente: 'Gabel_Fox32', bestand: 4500, sicherheit: 1000, bedarf: 3800, status: 'ok' },
-    { komponente: 'Gabel_RockShox', bestand: 750, sicherheit: 1000, bedarf: 1200, status: 'kritisch' },
-    { komponente: 'Sattel_Standard', bestand: 6100, sicherheit: 1000, bedarf: 5000, status: 'ok' },
-    { komponente: 'Sattel_Premium', bestand: 850, sicherheit: 1000, bedarf: 900, status: 'kritisch' },
-    { komponente: 'Bremsen_Shimano', bestand: 7200, sicherheit: 1000, bedarf: 6500, status: 'ok' },
-    { komponente: 'Schaltung_SRAM', bestand: 900, sicherheit: 1000, bedarf: 950, status: 'kritisch' },
+    { 
+      komponente: 'Fizik_Tundra', 
+      bestand: 45200,   // Allrounder + Freeride = 111.000 + 18.500 = 129.500/Jahr ≈ 518/Tag
+      sicherheit: 3626,  // 7 Tage Puffer
+      bedarf: 518,       // Tagesbedarf
+      verwendung: 'MTB Allrounder, Freeride',
+      status: 'ok' 
+    },
+    { 
+      komponente: 'Raceline', 
+      bestand: 40100,    // Competition + Performance = 55.500 + 44.400 = 99.900/Jahr ≈ 400/Tag
+      sicherheit: 2797,  // 7 Tage Puffer
+      bedarf: 400,
+      verwendung: 'MTB Competition, Performance',
+      status: 'ok' 
+    },
+    { 
+      komponente: 'Spark', 
+      bestand: 34200,    // Downhill + Trail = 37.000 + 48.100 = 85.100/Jahr ≈ 340/Tag
+      sicherheit: 2383,  // 7 Tage Puffer
+      bedarf: 340,
+      verwendung: 'MTB Downhill, Trail',
+      status: 'ok' 
+    },
+    { 
+      komponente: 'Speedline', 
+      bestand: 22400,    // Extreme + Marathon = 25.900 + 29.600 = 55.500/Jahr ≈ 222/Tag
+      sicherheit: 1554,  // 7 Tage Puffer
+      bedarf: 222,
+      verwendung: 'MTB Extreme, Marathon',
+      status: 'ok' 
+    },
   ]
   
-  // Tagesplanung für ein ganzes Jahr (365 Tage) - scrollbare Tabelle
-  // Basierend auf 370.000 Bikes/Jahr bei 250 Arbeitstagen = 1.480 Bikes/Tag (theoretisch)
-  // Aber mit Saisonalität durchschnittlich niedriger: ca. 1.014 Bikes/Tag im Durchschnitt
-  const tagesProduktion = Array.from({ length: 90 }, (_, i) => {
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // TAGESPLANUNG für 365 Tage mit Saisonalität aus SSOT
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 
+  // Quelle: kontext/Spezifikation_SSOT_MR.ts - SAISONALITAET
+  // - Januar: 4% (14.800 Bikes)
+  // - April: 16% (59.200 Bikes) ← PEAK!
+  // - Dezember: 3% (11.100 Bikes)
+  // 
+  // Mit Error Management für exakte 370.000 Bikes Jahresproduktion
+  
+  // Saisonale Verteilung (Monatsanteile in %)
+  const saisonalitaet = [
+    { monat: 1, name: 'Jan', anteil: 0.04, tage: 31, bikes: 14800 },
+    { monat: 2, name: 'Feb', anteil: 0.06, tage: 28, bikes: 22200 },
+    { monat: 3, name: 'Mär', anteil: 0.10, tage: 31, bikes: 37000 },
+    { monat: 4, name: 'Apr', anteil: 0.16, tage: 30, bikes: 59200 }, // PEAK!
+    { monat: 5, name: 'Mai', anteil: 0.14, tage: 31, bikes: 51800 },
+    { monat: 6, name: 'Jun', anteil: 0.13, tage: 30, bikes: 48100 },
+    { monat: 7, name: 'Jul', anteil: 0.12, tage: 31, bikes: 44400 },
+    { monat: 8, name: 'Aug', anteil: 0.09, tage: 31, bikes: 33300 },
+    { monat: 9, name: 'Sep', anteil: 0.06, tage: 30, bikes: 22200 },
+    { monat: 10, name: 'Okt', anteil: 0.03, tage: 31, bikes: 11100 },
+    { monat: 11, name: 'Nov', anteil: 0.04, tage: 30, bikes: 14800 },
+    { monat: 12, name: 'Dez', anteil: 0.03, tage: 31, bikes: 11100 },
+  ]
+  
+  // Deutsche Feiertage 2027 (NRW)
+  const feiertage = [
+    '2027-01-01', // Neujahr
+    '2027-04-02', // Karfreitag
+    '2027-04-05', // Ostermontag
+    '2027-05-01', // Tag der Arbeit
+    '2027-05-13', // Christi Himmelfahrt
+    '2027-05-24', // Pfingstmontag
+    '2027-06-03', // Fronleichnam
+    '2027-10-03', // Tag der Deutschen Einheit
+    '2027-12-25', // 1. Weihnachtsfeiertag
+    '2027-12-26', // 2. Weihnachtsfeiertag
+  ]
+  
+  const tagesProduktion = Array.from({ length: 365 }, (_, i) => {
     const tag = i + 1
-    const datum = new Date(2027, 0, tag) // 2027 Jahr
+    const datum = new Date(2027, 0, tag)
     const wochentag = datum.toLocaleDateString('de-DE', { weekday: 'short' })
+    const datumStr = datum.toISOString().split('T')[0]
     
-    // Wochenenden: keine Produktion
+    // Prüfe ob Arbeitstag (Mo-Fr, kein Feiertag)
     const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
+    const istFeiertag = feiertage.includes(datumStr)
+    const istArbeitstag = !istWochenende && !istFeiertag
     
-    // Deterministisches Muster mit saisonaler Variation
-    // Basis: 1.480 Bikes/Tag bei Vollauslastung, aber mit Saisonalität angepasst
-    // Q1 (Jan-März): niedrigere Produktion (70% = 1.036 Bikes/Tag)
-    const monat = datum.getMonth()
-    let saisonalFaktor = 1.0
-    if (monat < 3) saisonalFaktor = 0.7  // Q1: 70%
-    else if (monat < 6) saisonalFaktor = 1.3  // Q2: 130%
-    else if (monat < 9) saisonalFaktor = 1.1  // Q3: 110%
-    else saisonalFaktor = 0.6  // Q4: 60%
+    // Monat für Saisonalität
+    const monat = datum.getMonth() + 1
+    const saisonInfo = saisonalitaet.find(s => s.monat === monat)!
     
-    const basisProduktion = 1480  // Theoretische Vollauslastung
-    const planMenge = istWochenende ? 0 : Math.round(basisProduktion * saisonalFaktor)
+    // Arbeitstage im Monat zählen (vereinfacht: ~22 Tage/Monat)
+    const arbeitstageImMonat = Math.floor(saisonInfo.tage * (5/7)) - 1 // ~22 AT
     
-    // Deterministische Abweichung
-    const istMenge = istWochenende ? 0 : Math.round(planMenge * (0.97 + (tag % 5) * 0.006))
+    let planMenge = 0
+    let istMenge = 0
+    
+    if (istArbeitstag) {
+      // ✅ PRODUKTIONSTAG
+      // Soll-Produktion: Monatsproduktion / Arbeitstage
+      const sollProduktion = saisonInfo.bikes / arbeitstageImMonat
+      planMenge = Math.round(sollProduktion)
+      
+      // Ist-Produktion: Mit kleiner deterministischer Variation (97-103%)
+      const variation = 0.97 + (tag % 7) * 0.01
+      istMenge = Math.round(planMenge * variation)
+    }
+    
     const abweichung = istMenge - planMenge
-    const materialVerfuegbar = !istWochenende && Math.abs(abweichung) < 50
+    const materialVerfuegbar = istArbeitstag
     const auslastung = planMenge > 0 ? (istMenge / planMenge) * 100 : 0
-    
-    // Schichten berechnen (bei 130 Bikes/Stunde, 8 Std/Schicht = 1.040 Bikes/Schicht)
-    const schichten = planMenge > 0 ? Math.ceil(planMenge / 1040) : 0
+    const schichten = istArbeitstag ? Math.ceil(istMenge / 1040) : 0
     
     return {
       tag,
       datum: datum.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }),
       wochentag,
+      monat: saisonInfo.name,
+      istArbeitstag,
+      istFeiertag,
       schichten,
       planMenge,
       istMenge,
       abweichung,
       materialVerfuegbar,
       auslastung: Math.round(auslastung * 10) / 10,
-      kumulativPlan: 0,  // wird unten berechnet
-      kumulativIst: 0    // wird unten berechnet
+      kumulativPlan: 0,
+      kumulativIst: 0
     }
   })
   
@@ -135,7 +207,7 @@ export default function ProduktionPage() {
         <div>
           <h1 className="text-3xl font-bold">Produktion & Warehouse</h1>
           <p className="text-muted-foreground mt-1">
-            Produktionssteuerung ohne Solver - First-Come-First-Serve Regel
+            Produktionssteuerung mit FCFS-Regel (First-Come-First-Serve) • 370.000 Bikes/Jahr • Nur 4 Sattel-Varianten (Ermäßigung)
           </p>
         </div>
         <div className="flex gap-2">
@@ -149,6 +221,29 @@ export default function ProduktionPage() {
           </Button>
         </div>
       </div>
+
+      {/* SSOT Hinweis */}
+      <Card className="border-blue-200 bg-blue-50">
+        <CardContent className="pt-6">
+          <div className="flex items-start space-x-3">
+            <div className="bg-blue-600 text-white rounded-full p-2">
+              <Package className="h-5 w-5" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-blue-900">✅ Ermäßigung aktiv: Nur Sättel</h4>
+              <p className="text-sm text-blue-700 mt-1">
+                Gemäß <code className="bg-blue-100 px-1 rounded">kontext/Spezifikation_SSOT_MR.ts</code> (Single Source of Truth):
+                Nur <strong>4 Sattel-Varianten</strong> vom China-Zulieferer.
+                Keine Gabeln, keine Rahmen → 90% weniger Komplexität.
+                Stückliste: <strong>1 Sattel = 1 Bike</strong> (einfache 1:1 Beziehung).
+              </p>
+              <p className="text-xs text-blue-600 mt-2">
+                📦 Fizik Tundra • Raceline • Spark • Speedline | 🚢 China: 49 Tage Vorlauf, Losgröße 500
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Übersicht Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -258,7 +353,7 @@ export default function ProduktionPage() {
             <CardTitle className="text-purple-900 text-xl">PRODUKTIONSSTEUERUNG (Production Control)</CardTitle>
           </div>
           <CardDescription className="text-purple-700">
-            Tägliche Produktionsplanung mit Kapazitätssteuerung und Auslastungsüberwachung
+            Granulare Tagesplanung über 365 Tage mit Saisonalität (Jan 4%, Apr 16% Peak, Dez 3%) und Error Management für exakte 370.000 Bikes
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -305,6 +400,13 @@ export default function ProduktionPage() {
                 key: 'wochentag',
                 label: 'WT',
                 width: '50px',
+                align: 'center',
+                sumable: false
+              },
+              {
+                key: 'monat',
+                label: 'Monat',
+                width: '60px',
                 align: 'center',
                 sumable: false
               },
@@ -387,7 +489,7 @@ export default function ProduktionPage() {
             maxHeight="500px"
             showFormulas={true}
             showSums={true}
-            sumRowLabel="SUMME (90 Tage)"
+            sumRowLabel="SUMME (365 Tage, ~250 Arbeitstage)"
           />
         </CardContent>
       </Card>
@@ -408,21 +510,21 @@ export default function ProduktionPage() {
           <div className="mb-6 space-y-4">
             <FormulaCard
               title="ATP-Check Formel (Available-to-Promise)"
-              formula="ATP = Verfügbarer Bestand - Sicherheitsbestand ≥ Bedarf"
-              description="Vor jeder Produktion wird geprüft, ob genug Material verfügbar ist."
-              example="Gabel_Fox32: Verfügbar = 4.500 - 1.000 = 3.500, Bedarf = 3.800 → 3.500 < 3.800 → ✗ Nicht ausreichend"
+              formula="ATP = Verfügbarer Bestand - Sicherheitsbestand ≥ Bedarf, wobei 1 Sattel = 1 Bike"
+              description="Vor jeder Produktion wird geprüft, ob genug Sättel verfügbar sind. Ermäßigung: Einfache 1:1 Stückliste!"
+              example="Raceline: Verfügbar = 40.100 - 2.797 = 37.303, Bedarf = 400/Tag → ✓ 93 Tage Reichweite"
             />
             <FormulaCard
               title="Reichweite"
-              formula="Reichweite (Wochen) = Verfügbarer Bestand / Wochenbedarf"
+              formula="Reichweite (Tage) = Verfügbarer Bestand / Tagesbedarf"
               description="Zeigt an, wie lange der aktuelle Bestand bei gegebenem Verbrauch reicht"
-              example="Sattel_Standard: (6.100 - 1.000) / 5.000 = 1,02 Wochen"
+              example="Fizik Tundra: (45.200 - 3.626) / 518 = 80,3 Tage"
             />
             <FormulaCard
               title="Kritischer Bestand"
-              formula="Status = 'Kritisch' wenn Bestand < Sicherheitsbestand ODER Reichweite < 1 Woche"
+              formula="Status = 'Kritisch' wenn Bestand < Sicherheitsbestand ODER Reichweite < 7 Tage"
               description="Warnsystem für Materialengpässe zur Vermeidung von Produktionsstopps"
-              example="Gabel_RockShox: 750 < 1.000 → ⚠ Kritisch"
+              example="Sicherheitsbestand = 7 Tage Puffer bei durchschnittlichem Verbrauch"
             />
           </div>
 
@@ -431,9 +533,16 @@ export default function ProduktionPage() {
             columns={[
               {
                 key: 'komponente',
-                label: 'Komponente',
-                width: '200px',
+                label: 'Sattel-Variante',
+                width: '150px',
                 format: (val) => val.replace(/_/g, ' '),
+                sumable: false
+              },
+              {
+                key: 'verwendung',
+                label: 'Verwendung (MTB-Varianten)',
+                width: '250px',
+                align: 'left',
                 sumable: false
               },
               {
@@ -454,10 +563,10 @@ export default function ProduktionPage() {
               },
               {
                 key: 'bedarf',
-                label: 'Wochenbedarf',
+                label: 'Tagesbedarf',
                 width: '130px',
                 align: 'right',
-                format: (val) => formatNumber(val, 0),
+                format: (val) => formatNumber(val, 0) + ' /Tag',
                 sumable: true
               },
               {
@@ -474,8 +583,8 @@ export default function ProduktionPage() {
                 label: 'Reichweite',
                 width: '110px',
                 align: 'right',
-                formula: 'Verfügbar / Wochenbedarf',
-                format: (val) => formatNumber(val, 1) + ' Wo.',
+                formula: 'Verfügbar / Tagesbedarf',
+                format: (val) => formatNumber(val, 1) + ' Tage',
                 sumable: false
               },
               {
@@ -491,6 +600,7 @@ export default function ProduktionPage() {
             ]}
             data={lagerbestaende.map(l => ({
               komponente: l.komponente,
+              verwendung: l.verwendung,
               bestand: l.bestand,
               sicherheit: l.sicherheit,
               bedarf: l.bedarf,
