@@ -49,7 +49,8 @@ export default function ProduktionPage() {
   ]
   
   // Tagesplanung für ein ganzes Jahr (365 Tage) - scrollbare Tabelle
-  // Basierend auf 370.000 Bikes/Jahr = ca. 1.014 Bikes/Tag (an Arbeitstagen)
+  // Basierend auf 370.000 Bikes/Jahr bei 250 Arbeitstagen = 1.480 Bikes/Tag (theoretisch)
+  // Aber mit Saisonalität durchschnittlich niedriger: ca. 1.014 Bikes/Tag im Durchschnitt
   const tagesProduktion = Array.from({ length: 90 }, (_, i) => {
     const tag = i + 1
     const datum = new Date(2027, 0, tag) // 2027 Jahr
@@ -58,8 +59,9 @@ export default function ProduktionPage() {
     // Wochenenden: keine Produktion
     const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
     
-    // Deterministisches Muster: ca. 1.014 Bikes/Tag mit saisonaler Variation
-    // Q1 (Jan-März): niedrigere Produktion
+    // Deterministisches Muster mit saisonaler Variation
+    // Basis: 1.480 Bikes/Tag bei Vollauslastung, aber mit Saisonalität angepasst
+    // Q1 (Jan-März): niedrigere Produktion (70% = 1.036 Bikes/Tag)
     const monat = datum.getMonth()
     let saisonalFaktor = 1.0
     if (monat < 3) saisonalFaktor = 0.7  // Q1: 70%
@@ -67,7 +69,7 @@ export default function ProduktionPage() {
     else if (monat < 9) saisonalFaktor = 1.1  // Q3: 110%
     else saisonalFaktor = 0.6  // Q4: 60%
     
-    const basisProduktion = 1014
+    const basisProduktion = 1480  // Theoretische Vollauslastung
     const planMenge = istWochenende ? 0 : Math.round(basisProduktion * saisonalFaktor)
     
     // Deterministische Abweichung
@@ -264,13 +266,13 @@ export default function ProduktionPage() {
           <div className="mb-6 space-y-4">
             <FormulaCard
               title="Tagesproduktion"
-              formula="Jahresproduktion / Arbeitstage = 370.000 / 250 ≈ 1.480 Bikes/Tag (bei Vollauslastung)"
-              description="Basierend auf 250 Arbeitstagen im Jahr (ohne Wochenenden und Feiertage)"
-              example="Tatsächlich: ~1.014 Bikes/Tag (Durchschnitt mit Saisonalität)"
+              formula="Jahresproduktion / Arbeitstage = 370.000 / 250 = 1.480 Bikes/Tag (Vollauslastung)"
+              description="Theoretische Tagesproduktion bei 250 Arbeitstagen. Mit Saisonalität: Q1 ca. 1.036/Tag (70%)"
+              example="Q1 (Jan-März): 1.480 × 0,7 = 1.036 Bikes/Tag durchschnittlich"
             />
             <FormulaCard
               title="Schichtplanung"
-              formula="Benötigte Schichten = Plan-Menge / Kapazität pro Schicht, wobei Kapazität = 130 Bikes/h × 8h = 1.040 Bikes"
+              formula="Benötigte Schichten = ⌈Plan-Menge / Kapazität pro Schicht⌉, wobei Kapazität = 130 Bikes/h × 8h = 1.040 Bikes"
               description="Anzahl der erforderlichen Schichten basierend auf Tagesproduktion"
               example="1.480 Bikes geplant → 1.480 / 1.040 = 1,42 → 2 Schichten nötig"
             />
@@ -278,7 +280,7 @@ export default function ProduktionPage() {
               title="Produktionsauslastung"
               formula="Auslastung (%) = (Ist-Menge / Plan-Menge) × 100"
               description="Zeigt die tatsächliche Produktionsleistung im Verhältnis zur Planung"
-              example="Tag 1: 711 / 710 = 100,1% Auslastung"
+              example="Tag 1: 711 / 710 × 100 = 100,1% Auslastung"
             />
           </div>
 
@@ -395,7 +397,7 @@ export default function ProduktionPage() {
               title="ATP-Check Formel (Available-to-Promise)"
               formula="ATP = Verfügbarer Bestand - Sicherheitsbestand ≥ Bedarf"
               description="Vor jeder Produktion wird geprüft, ob genug Material verfügbar ist."
-              example="Gabel_Fox32: 4.500 - 1.000 = 3.500 verfügbar ≥ 3.800 Bedarf → ✗ Nicht ausreichend"
+              example="Gabel_Fox32: Verfügbar = 4.500 - 1.000 = 3.500, Bedarf = 3.800 → 3.500 < 3.800 → ✗ Nicht ausreichend"
             />
             <FormulaCard
               title="Reichweite"
