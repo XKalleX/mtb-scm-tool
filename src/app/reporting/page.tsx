@@ -61,7 +61,7 @@ const VARIANTEN_FARBEN = [
  */
 export default function ReportingPage() {
   const [selectedView, setSelectedView] = useState<'metrics' | 'charts'>('metrics')
-  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter' | 'year'>('month')
+  const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month' | 'quarter' | 'year'>('month')
   
   /**
    * Exportiert SCOR-Metriken als CSV
@@ -598,6 +598,18 @@ function VisualisierungenView({
     { monat: 'Dez', plan: 11100, ist: 11000, abweichung: -100 }
   ]
 
+  // Tägliche Basis-Daten (365 Tage)
+  const basisTaeglicherDaten = Array.from({ length: 365 }, (_, i) => {
+    const basisProduktion = 1014  // 370.000 / 365 ≈ 1014 Bikes/Tag
+    const saisonaleFaktor = Math.sin((i / 365) * Math.PI * 2) * 200
+    return {
+      tag: i + 1,
+      plan: Math.round((basisProduktion + saisonaleFaktor) * 1.05),
+      ist: Math.round(basisProduktion + saisonaleFaktor),
+      abweichung: Math.round((basisProduktion + saisonaleFaktor) * -0.05)
+    }
+  })
+
   // Variantenverteilung
   const variantenDaten = [
     { name: 'MTB Allrounder', wert: 111000, prozent: 30 },
@@ -611,9 +623,8 @@ function VisualisierungenView({
   ]
 
   // Basis-Lagerbestandsverlauf (monatlich, deterministisch)
+  // ERMÄSSIGUNG: Nur Sättel (keine Rahmen/Gabeln)
   const basisLagerDaten = Array.from({ length: 12 }, (_, i) => {
-    const baseRahmen = 1200
-    const baseGabeln = 2100
     const baseSaettel = 3800
     
     // Sinuswelle für natürliche Schwankungen
@@ -621,8 +632,18 @@ function VisualisierungenView({
     
     return {
       monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
-      rahmen: baseRahmen + schwankung,
-      gabeln: baseGabeln + schwankung * 1.5,
+      saettel: baseSaettel + schwankung * 2
+    }
+  })
+
+  // Tägliche Lagerdaten (365 Tage)
+  // ERMÄSSIGUNG: Nur Sättel (keine Rahmen/Gabeln)
+  const basisTaeglicherLagerDaten = Array.from({ length: 365 }, (_, i) => {
+    const baseSaettel = 3800
+    const schwankung = Math.sin(i * 0.1) * 150
+    
+    return {
+      tag: i + 1,
       saettel: baseSaettel + schwankung * 2
     }
   })
@@ -639,9 +660,29 @@ function VisualisierungenView({
     }
   })
 
+  // Tägliche Auslastung (365 Tage)
+  const basisTaeglicherAuslastung = Array.from({ length: 365 }, (_, i) => {
+    const basisAuslastung = 85
+    const saisonaleFaktor = Math.sin((i / 365) * Math.PI * 2) * 10
+    
+    return {
+      tag: i + 1,
+      auslastung: basisAuslastung + saisonaleFaktor,
+      produktion: 1014 + saisonaleFaktor * 10
+    }
+  })
+
   // Filter/Aggregiere Produktionsdaten basierend auf timeRange
   const produktionsDaten = (() => {
-    if (timeRange === 'week') {
+    if (timeRange === 'day') {
+      // Zeige die letzten 30 Tage
+      return basisTaeglicherDaten.slice(-30).map(t => ({
+        monat: `Tag ${t.tag}`,
+        plan: t.plan,
+        ist: t.ist,
+        abweichung: t.abweichung
+      }))
+    } else if (timeRange === 'week') {
       // Zeige die letzten 8 Wochen basierend auf wöchentlichen Daten
       return basisWoechentlicheDaten.slice(-8).map(w => ({
         monat: `KW ${w.woche}`,
@@ -692,13 +733,17 @@ function VisualisierungenView({
 
   // Filter/Aggregiere Lagerdaten basierend auf timeRange
   const lagerDaten = (() => {
-    if (timeRange === 'week') {
+    if (timeRange === 'day') {
+      // Zeige die letzten 30 Tage
+      return basisTaeglicherLagerDaten.slice(-30).map(t => ({
+        monat: `Tag ${t.tag}`,
+        saettel: t.saettel
+      }))
+    } else if (timeRange === 'week') {
       // Zeige die letzten 8 Wochen (berechnet aus Monatsdaten, deterministisch)
       return basisLagerDaten.slice(-2).flatMap((monat, idx) => {
         return Array.from({ length: 4 }, (_, w) => ({
           monat: `KW ${44 + idx * 4 + w}`,
-          rahmen: monat.rahmen + Math.sin((idx * 4 + w) * 0.5) * 50,
-          gabeln: monat.gabeln + Math.sin((idx * 4 + w) * 0.5) * 75,
           saettel: monat.saettel + Math.sin((idx * 4 + w) * 0.5) * 100
         }))
       })
@@ -707,26 +752,18 @@ function VisualisierungenView({
       return [
         {
           monat: 'Q1',
-          rahmen: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.rahmen, 0) / 3,
-          gabeln: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.gabeln, 0) / 3,
           saettel: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.saettel, 0) / 3
         },
         {
           monat: 'Q2',
-          rahmen: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.rahmen, 0) / 3,
-          gabeln: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.gabeln, 0) / 3,
           saettel: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.saettel, 0) / 3
         },
         {
           monat: 'Q3',
-          rahmen: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.rahmen, 0) / 3,
-          gabeln: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.gabeln, 0) / 3,
           saettel: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.saettel, 0) / 3
         },
         {
           monat: 'Q4',
-          rahmen: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.rahmen, 0) / 3,
-          gabeln: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.gabeln, 0) / 3,
           saettel: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.saettel, 0) / 3
         }
       ]
@@ -734,8 +771,6 @@ function VisualisierungenView({
       // Zeige Jahresdurchschnitt
       return [{
         monat: '2027',
-        rahmen: basisLagerDaten.reduce((sum, m) => sum + m.rahmen, 0) / 12,
-        gabeln: basisLagerDaten.reduce((sum, m) => sum + m.gabeln, 0) / 12,
         saettel: basisLagerDaten.reduce((sum, m) => sum + m.saettel, 0) / 12
       }]
     }
@@ -745,7 +780,14 @@ function VisualisierungenView({
 
   // Filter wöchentliche Daten basierend auf timeRange
   const woechentlicheDaten = (() => {
-    if (timeRange === 'week') {
+    if (timeRange === 'day') {
+      // Zeige die letzten 30 Tage
+      return basisTaeglicherAuslastung.slice(-30).map(t => ({
+        woche: `Tag ${t.tag}`,
+        auslastung: t.auslastung,
+        produktion: t.produktion
+      }))
+    } else if (timeRange === 'week') {
       // Zeige die letzten 8 Wochen
       return basisWoechentlicheDaten.slice(-8)
     } else if (timeRange === 'quarter') {
@@ -784,6 +826,7 @@ function VisualisierungenView({
   // Helper für Zeitbereichs-Beschriftungen
   const getTimeRangeLabel = () => {
     switch (timeRange) {
+      case 'day': return 'Täglich'
       case 'week': return 'Wöchentlich'
       case 'quarter': return 'Quartalsweise'
       case 'year': return 'Jährlich'
@@ -793,6 +836,7 @@ function VisualisierungenView({
 
   const getXAxisLabel = () => {
     switch (timeRange) {
+      case 'day': return 'Tag'
       case 'week': return 'Kalenderwoche'
       case 'quarter': return 'Quartal'
       case 'year': return 'Jahr'
@@ -806,7 +850,7 @@ function VisualisierungenView({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Interaktive Visualisierungen</h3>
         <div className="flex items-center gap-1 bg-white border rounded-lg p-1">
-          {(['week', 'month', 'quarter', 'year'] as const).map((range) => (
+          {(['day', 'week', 'month', 'quarter', 'year'] as const).map((range) => (
             <button
               key={range}
               onClick={() => setTimeRange(range)}
@@ -816,6 +860,7 @@ function VisualisierungenView({
                   : 'hover:bg-gray-100'
               }`}
             >
+              {range === 'day' && 'Tag'}
               {range === 'week' && 'Woche'}
               {range === 'month' && 'Monat'}
               {range === 'quarter' && 'Quartal'}
@@ -912,8 +957,8 @@ function VisualisierungenView({
         {/* Lagerbestandsentwicklung */}
         <Card>
           <CardHeader>
-            <CardTitle>Lagerbestandsentwicklung 2027</CardTitle>
-            <CardDescription>Bestandsverläufe der Hauptkomponenten ({getTimeRangeLabel()})</CardDescription>
+            <CardTitle>Lagerbestandsentwicklung 2027 - Sättel</CardTitle>
+            <CardDescription>Bestandsverlauf der Sättel aus China ({getTimeRangeLabel()})</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -938,24 +983,8 @@ function VisualisierungenView({
                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
                 <Line
                   type="monotone"
-                  dataKey="rahmen"
-                  stroke={VARIANTEN_FARBEN[0]}
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                  name="Rahmen"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="gabeln"
-                  stroke={VARIANTEN_FARBEN[1]}
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                  name="Gabeln"
-                />
-                <Line
-                  type="monotone"
                   dataKey="saettel"
-                  stroke={VARIANTEN_FARBEN[3]}
+                  stroke={COLORS.primary}
                   strokeWidth={3}
                   dot={{ r: 4 }}
                   name="Sättel"

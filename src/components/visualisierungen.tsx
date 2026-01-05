@@ -69,7 +69,7 @@ const VARIANTEN_FARBEN = [
 
 export default function VisualisierungsDashboard() {
   const [selectedView, setSelectedView] = useState<'overview' | 'production' | 'supply' | 'scor'>('overview')
-  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter' | 'year'>('month')
+  const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month' | 'quarter' | 'year'>('month')
   
   return (
     <div className="p-6 space-y-6 bg-gray-50">
@@ -84,7 +84,7 @@ export default function VisualisierungsDashboard() {
         
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-white border rounded-lg p-1">
-            {(['week', 'month', 'quarter', 'year'] as const).map((range) => (
+            {(['day', 'week', 'month', 'quarter', 'year'] as const).map((range) => (
               <button
                 key={range}
                 onClick={() => setTimeRange(range)}
@@ -94,6 +94,7 @@ export default function VisualisierungsDashboard() {
                     : 'hover:bg-gray-100'
                 }`}
               >
+                {range === 'day' && 'Tag'}
                 {range === 'week' && 'Woche'}
                 {range === 'month' && 'Monat'}
                 {range === 'quarter' && 'Quartal'}
@@ -215,6 +216,18 @@ function OverviewDashboard({ timeRange }: { timeRange: string }) {
     { name: 'MTB Trail', wert: 48100, prozent: 13 }
   ]
 
+  // Tägliche Basis-Daten (365 Tage des Jahres 2027)
+  const basisTaeglicherDaten = Array.from({ length: 365 }, (_, i) => {
+    const basisProduktion = 1014  // 370.000 / 365 ≈ 1014 Bikes/Tag
+    const saisonaleFaktor = Math.sin((i / 365) * Math.PI * 2) * 200
+    return {
+      tag: i + 1,
+      plan: Math.round((basisProduktion + saisonaleFaktor) * 1.05),
+      ist: Math.round(basisProduktion + saisonaleFaktor),
+      abweichung: Math.round((basisProduktion + saisonaleFaktor) * -0.05)
+    }
+  })
+
   // Wöchentliche Basis-Daten
   const basisWoechentlicheDaten = Array.from({ length: 52 }, (_, i) => {
     const basisProduktion = 7000
@@ -229,7 +242,15 @@ function OverviewDashboard({ timeRange }: { timeRange: string }) {
 
   // Filter/Aggregiere Produktionsdaten basierend auf timeRange
   const produktionsDaten = (() => {
-    if (timeRange === 'week') {
+    if (timeRange === 'day') {
+      // Zeige die letzten 30 Tage (tägliche Detailansicht)
+      return basisTaeglicherDaten.slice(-30).map(t => ({
+        monat: `Tag ${t.tag}`,
+        plan: t.plan,
+        ist: t.ist,
+        abweichung: t.abweichung
+      }))
+    } else if (timeRange === 'week') {
       return basisWoechentlicheDaten.slice(-8).map(w => ({
         monat: `KW ${w.woche}`,
         plan: w.plan,
@@ -405,6 +426,18 @@ function OverviewDashboard({ timeRange }: { timeRange: string }) {
  * Production Dashboard
  */
 function ProductionDashboard({ timeRange }: { timeRange: string }) {
+  // Tägliche Basis-Produktionsdaten (365 Tage)
+  const basisTaeglicherDaten = Array.from({ length: 365 }, (_, i) => {
+    const basisAuslastung = 85
+    const saisonaleFaktor = Math.sin((i / 365) * Math.PI * 2) * 10
+    return {
+      tag: i + 1,
+      auslastung: basisAuslastung + saisonaleFaktor,
+      produktion: 1014 + saisonaleFaktor * 10,
+      ausschuss: 15 + saisonaleFaktor * 2
+    }
+  })
+
   // Wöchentliche Basis-Produktionsdaten (deterministisch)
   const basisWoechentlicheDaten = Array.from({ length: 52 }, (_, i) => {
     const basisAuslastung = 85
@@ -426,7 +459,15 @@ function ProductionDashboard({ timeRange }: { timeRange: string }) {
 
   // Filter wöchentliche Daten basierend auf timeRange
   const woechentlicheDaten = (() => {
-    if (timeRange === 'week') {
+    if (timeRange === 'day') {
+      // Zeige die letzten 30 Tage
+      return basisTaeglicherDaten.slice(-30).map(t => ({
+        woche: `Tag ${t.tag}`,
+        auslastung: t.auslastung,
+        produktion: t.produktion,
+        ausschuss: t.ausschuss
+      }))
+    } else if (timeRange === 'week') {
       return basisWoechentlicheDaten.slice(-8)
     } else if (timeRange === 'quarter') {
       return [1, 2, 3, 4].map(q => {
@@ -563,36 +604,48 @@ function ProductionDashboard({ timeRange }: { timeRange: string }) {
  * Supply Chain Dashboard
  */
 function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
+  // Basis-Tägliche Lagerdaten (365 Tage)
+  // ERMÄSSIGUNG: Nur Sättel (keine Rahmen/Gabeln)
+  const basisTaeglicherLagerDaten = Array.from({ length: 365 }, (_, i) => {
+    const baseSaettel = 3800
+    const schwankung = Math.sin(i * 0.1) * 150
+    
+    return {
+      tag: i + 1,
+      saettel: baseSaettel + schwankung * 2
+    }
+  })
+
   // Basis-Lagerbestandsverlauf (monatlich, deterministisch)
+  // ERMÄSSIGUNG: Nur Sättel (keine Rahmen/Gabeln)
   const basisLagerDaten = Array.from({ length: 12 }, (_, i) => {
-    const baseRahmen = 1200
-    const baseGabeln = 2100
     const baseSaettel = 3800
     const schwankung = Math.sin(i * 0.8) * 150
     
     return {
       monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
-      rahmen: baseRahmen + schwankung,
-      gabeln: baseGabeln + schwankung * 1.5,
       saettel: baseSaettel + schwankung * 2
     }
   })
 
   // Lieferanten-Performance
+  // ERMÄSSIGUNG: Nur China als Zulieferer
   const lieferantenDaten = [
-    { lieferant: 'China (Sättel)', liefertreue: 96, durchlaufzeit: 42, kosten: 85000 },
-    { lieferant: 'Spanien (Gabeln)', liefertreue: 89, durchlaufzeit: 14, kosten: 125000 },
-    { lieferant: 'Heilbronn (Rahmen)', liefertreue: 98, durchlaufzeit: 4, kosten: 95000 }
+    { lieferant: 'China (Sättel)', liefertreue: 96, durchlaufzeit: 49, kosten: 85000 }
   ]
 
   // Filter/Aggregiere Lagerdaten basierend auf timeRange
   const lagerDaten = (() => {
-    if (timeRange === 'week') {
+    if (timeRange === 'day') {
+      // Zeige die letzten 30 Tage
+      return basisTaeglicherLagerDaten.slice(-30).map(t => ({
+        monat: `Tag ${t.tag}`,
+        saettel: t.saettel
+      }))
+    } else if (timeRange === 'week') {
       return basisLagerDaten.slice(-2).flatMap((monat, idx) => {
         return Array.from({ length: 4 }, (_, w) => ({
           monat: `KW ${44 + idx * 4 + w}`,
-          rahmen: monat.rahmen + Math.sin((idx * 4 + w) * 0.5) * 50,
-          gabeln: monat.gabeln + Math.sin((idx * 4 + w) * 0.5) * 75,
           saettel: monat.saettel + Math.sin((idx * 4 + w) * 0.5) * 100
         }))
       })
@@ -600,34 +653,24 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
       return [
         {
           monat: 'Q1',
-          rahmen: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.rahmen, 0) / 3,
-          gabeln: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.gabeln, 0) / 3,
           saettel: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.saettel, 0) / 3
         },
         {
           monat: 'Q2',
-          rahmen: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.rahmen, 0) / 3,
-          gabeln: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.gabeln, 0) / 3,
           saettel: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.saettel, 0) / 3
         },
         {
           monat: 'Q3',
-          rahmen: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.rahmen, 0) / 3,
-          gabeln: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.gabeln, 0) / 3,
           saettel: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.saettel, 0) / 3
         },
         {
           monat: 'Q4',
-          rahmen: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.rahmen, 0) / 3,
-          gabeln: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.gabeln, 0) / 3,
           saettel: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.saettel, 0) / 3
         }
       ]
     } else if (timeRange === 'year') {
       return [{
         monat: '2027',
-        rahmen: basisLagerDaten.reduce((sum, m) => sum + m.rahmen, 0) / 12,
-        gabeln: basisLagerDaten.reduce((sum, m) => sum + m.gabeln, 0) / 12,
         saettel: basisLagerDaten.reduce((sum, m) => sum + m.saettel, 0) / 12
       }]
     }
@@ -639,9 +682,9 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
       {/* Lagerbestand Timeline */}
       <Card>
         <CardHeader>
-          <CardTitle>Lagerbestandsentwicklung 2027</CardTitle>
+          <CardTitle>Lagerbestandsentwicklung 2027 - Sättel</CardTitle>
           <CardDescription>
-            Bestandsverläufe der Hauptkomponenten
+            Bestandsverlauf der Sättel aus China (Ermäßigung: nur Sättel, keine Rahmen/Gabeln)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -654,24 +697,8 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
               <Legend />
               <Line
                 type="monotone"
-                dataKey="rahmen"
-                stroke={VARIANTEN_FARBEN[0]}
-                strokeWidth={3}
-                dot={{ r: 4 }}
-                name="Rahmen"
-              />
-              <Line
-                type="monotone"
-                dataKey="gabeln"
-                stroke={VARIANTEN_FARBEN[1]}
-                strokeWidth={3}
-                dot={{ r: 4 }}
-                name="Gabeln"
-              />
-              <Line
-                type="monotone"
                 dataKey="saettel"
-                stroke={VARIANTEN_FARBEN[3]}
+                stroke={COLORS.primary}
                 strokeWidth={3}
                 dot={{ r: 4 }}
                 name="Sättel"
