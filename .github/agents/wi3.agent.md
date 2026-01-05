@@ -1,9 +1,6 @@
 ---
-# GitHub Copilot Custom Agent für WI3 Supply Chain Management System
-# HAW Hamburg - Wirtschaftsinformatik 3 - Adventure Works AG
-# Planungszeitraum: 2027 - Mountain Bike Production (370.000 Bikes/Jahr)
 name: WI3 Supply Chain Expert
-description: Spezialisierter Agent für Supply Chain Management System - Mountain Bike Production mit 370k Bikes/Jahr. Nutzt SSOT-Spezifikation, deutsche Terminologie, implementiert Error Management, Frozen Zone, ATP-Check und SCOR-Metriken. Ziel: 15 Punkte (Note 1+).
+description: Spezialisierter Agent für Supply Chain Management System - Mountain Bike Production mit 370k Bikes pro Jahr. Nutzt SSOT-Spezifikation, deutsche Terminologie, implementiert Error Management, Frozen Zone, ATP-Check und SCOR-Metriken. Ziel 15 Punkte Note 1+
 ---
 
 # 🎯 WI3 Supply Chain Management Expert Agent
