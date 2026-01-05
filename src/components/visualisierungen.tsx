@@ -124,15 +124,15 @@ export default function VisualisierungsDashboard() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <OverviewDashboard />
+          <OverviewDashboard timeRange={timeRange} />
         </TabsContent>
 
         <TabsContent value="production" className="space-y-6">
-          <ProductionDashboard />
+          <ProductionDashboard timeRange={timeRange} />
         </TabsContent>
 
         <TabsContent value="supply" className="space-y-6">
-          <SupplyChainDashboard />
+          <SupplyChainDashboard timeRange={timeRange} />
         </TabsContent>
 
         <TabsContent value="scor" className="space-y-6">
@@ -146,7 +146,7 @@ export default function VisualisierungsDashboard() {
 /**
  * Overview Dashboard
  */
-function OverviewDashboard() {
+function OverviewDashboard({ timeRange }: { timeRange: string }) {
   // KPI-Daten
   const kpis = [
     {
@@ -187,8 +187,8 @@ function OverviewDashboard() {
     }
   ]
 
-  // Produktionsdaten (monatlich)
-  const produktionsDaten = [
+  // Basis-Produktionsdaten (monatlich)
+  const basisProduktionsDaten = [
     { monat: 'Jan', plan: 14800, ist: 14200, abweichung: -600 },
     { monat: 'Feb', plan: 22200, ist: 21800, abweichung: -400 },
     { monat: 'Mrz', plan: 37000, ist: 36500, abweichung: -500 },
@@ -214,6 +214,65 @@ function OverviewDashboard() {
     { name: 'MTB Performance', wert: 44400, prozent: 12 },
     { name: 'MTB Trail', wert: 48100, prozent: 13 }
   ]
+
+  // Wöchentliche Basis-Daten
+  const basisWoechentlicheDaten = Array.from({ length: 52 }, (_, i) => {
+    const basisProduktion = 7000
+    const saisonaleFaktor = Math.sin((i / 52) * Math.PI * 2) * 500
+    return {
+      woche: i + 1,
+      plan: Math.round((basisProduktion + saisonaleFaktor) * 1.05),
+      ist: Math.round(basisProduktion + saisonaleFaktor),
+      abweichung: Math.round((basisProduktion + saisonaleFaktor) * -0.05)
+    }
+  })
+
+  // Filter/Aggregiere Produktionsdaten basierend auf timeRange
+  const produktionsDaten = (() => {
+    if (timeRange === 'week') {
+      return basisWoechentlicheDaten.slice(-8).map(w => ({
+        monat: `KW ${w.woche}`,
+        plan: w.plan,
+        ist: w.ist,
+        abweichung: w.abweichung
+      }))
+    } else if (timeRange === 'quarter') {
+      return [
+        {
+          monat: 'Q1',
+          plan: basisProduktionsDaten.slice(0, 3).reduce((sum, m) => sum + m.plan, 0),
+          ist: basisProduktionsDaten.slice(0, 3).reduce((sum, m) => sum + m.ist, 0),
+          abweichung: basisProduktionsDaten.slice(0, 3).reduce((sum, m) => sum + m.abweichung, 0)
+        },
+        {
+          monat: 'Q2',
+          plan: basisProduktionsDaten.slice(3, 6).reduce((sum, m) => sum + m.plan, 0),
+          ist: basisProduktionsDaten.slice(3, 6).reduce((sum, m) => sum + m.ist, 0),
+          abweichung: basisProduktionsDaten.slice(3, 6).reduce((sum, m) => sum + m.abweichung, 0)
+        },
+        {
+          monat: 'Q3',
+          plan: basisProduktionsDaten.slice(6, 9).reduce((sum, m) => sum + m.plan, 0),
+          ist: basisProduktionsDaten.slice(6, 9).reduce((sum, m) => sum + m.ist, 0),
+          abweichung: basisProduktionsDaten.slice(6, 9).reduce((sum, m) => sum + m.abweichung, 0)
+        },
+        {
+          monat: 'Q4',
+          plan: basisProduktionsDaten.slice(9, 12).reduce((sum, m) => sum + m.plan, 0),
+          ist: basisProduktionsDaten.slice(9, 12).reduce((sum, m) => sum + m.ist, 0),
+          abweichung: basisProduktionsDaten.slice(9, 12).reduce((sum, m) => sum + m.abweichung, 0)
+        }
+      ]
+    } else if (timeRange === 'year') {
+      return [{
+        monat: '2027',
+        plan: basisProduktionsDaten.reduce((sum, m) => sum + m.plan, 0),
+        ist: basisProduktionsDaten.reduce((sum, m) => sum + m.ist, 0),
+        abweichung: basisProduktionsDaten.reduce((sum, m) => sum + m.abweichung, 0)
+      }]
+    }
+    return basisProduktionsDaten
+  })()
 
   return (
     <>
@@ -345,14 +404,18 @@ function OverviewDashboard() {
 /**
  * Production Dashboard
  */
-function ProductionDashboard() {
-  // Wöchentliche Produktionsdaten
-  const woechentlicheDaten = Array.from({ length: 52 }, (_, i) => ({
-    woche: i + 1,
-    auslastung: 75 + Math.random() * 20,
-    produktion: 6000 + Math.random() * 2000,
-    ausschuss: Math.random() * 150
-  }))
+function ProductionDashboard({ timeRange }: { timeRange: string }) {
+  // Wöchentliche Basis-Produktionsdaten (deterministisch)
+  const basisWoechentlicheDaten = Array.from({ length: 52 }, (_, i) => {
+    const basisAuslastung = 85
+    const saisonaleFaktor = Math.sin((i / 52) * Math.PI * 2) * 10
+    return {
+      woche: i + 1,
+      auslastung: basisAuslastung + saisonaleFaktor,
+      produktion: 6000 + saisonaleFaktor * 100,
+      ausschuss: 100 + saisonaleFaktor * 5
+    }
+  })
 
   // Schichtdaten
   const schichtDaten = [
@@ -360,6 +423,43 @@ function ProductionDashboard() {
     { schicht: '2-Schicht', wochen: 28, produktion: 196000 },
     { schicht: '3-Schicht', wochen: 12, produktion: 102000 }
   ]
+
+  // Filter wöchentliche Daten basierend auf timeRange
+  const woechentlicheDaten = (() => {
+    if (timeRange === 'week') {
+      return basisWoechentlicheDaten.slice(-8)
+    } else if (timeRange === 'quarter') {
+      return [1, 2, 3, 4].map(q => {
+        const startWeek = (q - 1) * 13
+        const quarterData = basisWoechentlicheDaten.slice(startWeek, startWeek + 13)
+        return {
+          woche: `Q${q}`,
+          auslastung: quarterData.reduce((sum, w) => sum + w.auslastung, 0) / quarterData.length,
+          produktion: quarterData.reduce((sum, w) => sum + w.produktion, 0),
+          ausschuss: quarterData.reduce((sum, w) => sum + w.ausschuss, 0)
+        }
+      })
+    } else if (timeRange === 'year') {
+      return [{
+        woche: '2027',
+        auslastung: basisWoechentlicheDaten.reduce((sum, w) => sum + w.auslastung, 0) / 52,
+        produktion: basisWoechentlicheDaten.reduce((sum, w) => sum + w.produktion, 0),
+        ausschuss: basisWoechentlicheDaten.reduce((sum, w) => sum + w.ausschuss, 0)
+      }]
+    }
+    // Standard: Monat - aggregiere zu 12 Monaten
+    return Array.from({ length: 12 }, (_, m) => {
+      const startWeek = Math.floor(m * 52 / 12)
+      const endWeek = Math.floor((m + 1) * 52 / 12)
+      const monthData = basisWoechentlicheDaten.slice(startWeek, endWeek)
+      return {
+        woche: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][m],
+        auslastung: monthData.reduce((sum, w) => sum + w.auslastung, 0) / monthData.length,
+        produktion: monthData.reduce((sum, w) => sum + w.produktion, 0),
+        ausschuss: monthData.reduce((sum, w) => sum + w.ausschuss, 0)
+      }
+    })
+  })()
 
   return (
     <>
@@ -462,14 +562,21 @@ function ProductionDashboard() {
 /**
  * Supply Chain Dashboard
  */
-function SupplyChainDashboard() {
-  // Lagerbestandsverlauf
-  const lagerDaten = Array.from({ length: 12 }, (_, i) => ({
-    monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
-    rahmen: 1200 + Math.random() * 400,
-    gabeln: 2100 + Math.random() * 600,
-    saettel: 3800 + Math.random() * 800
-  }))
+function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
+  // Basis-Lagerbestandsverlauf (monatlich, deterministisch)
+  const basisLagerDaten = Array.from({ length: 12 }, (_, i) => {
+    const baseRahmen = 1200
+    const baseGabeln = 2100
+    const baseSaettel = 3800
+    const schwankung = Math.sin(i * 0.8) * 150
+    
+    return {
+      monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
+      rahmen: baseRahmen + schwankung,
+      gabeln: baseGabeln + schwankung * 1.5,
+      saettel: baseSaettel + schwankung * 2
+    }
+  })
 
   // Lieferanten-Performance
   const lieferantenDaten = [
@@ -477,6 +584,55 @@ function SupplyChainDashboard() {
     { lieferant: 'Spanien (Gabeln)', liefertreue: 89, durchlaufzeit: 14, kosten: 125000 },
     { lieferant: 'Heilbronn (Rahmen)', liefertreue: 98, durchlaufzeit: 4, kosten: 95000 }
   ]
+
+  // Filter/Aggregiere Lagerdaten basierend auf timeRange
+  const lagerDaten = (() => {
+    if (timeRange === 'week') {
+      return basisLagerDaten.slice(-2).flatMap((monat, idx) => {
+        return Array.from({ length: 4 }, (_, w) => ({
+          monat: `KW ${44 + idx * 4 + w}`,
+          rahmen: monat.rahmen + Math.sin(w) * 50,
+          gabeln: monat.gabeln + Math.sin(w) * 75,
+          saettel: monat.saettel + Math.sin(w) * 100
+        }))
+      })
+    } else if (timeRange === 'quarter') {
+      return [
+        {
+          monat: 'Q1',
+          rahmen: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.rahmen, 0) / 3,
+          gabeln: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.gabeln, 0) / 3,
+          saettel: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.saettel, 0) / 3
+        },
+        {
+          monat: 'Q2',
+          rahmen: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.rahmen, 0) / 3,
+          gabeln: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.gabeln, 0) / 3,
+          saettel: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.saettel, 0) / 3
+        },
+        {
+          monat: 'Q3',
+          rahmen: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.rahmen, 0) / 3,
+          gabeln: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.gabeln, 0) / 3,
+          saettel: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.saettel, 0) / 3
+        },
+        {
+          monat: 'Q4',
+          rahmen: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.rahmen, 0) / 3,
+          gabeln: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.gabeln, 0) / 3,
+          saettel: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.saettel, 0) / 3
+        }
+      ]
+    } else if (timeRange === 'year') {
+      return [{
+        monat: '2027',
+        rahmen: basisLagerDaten.reduce((sum, m) => sum + m.rahmen, 0) / 12,
+        gabeln: basisLagerDaten.reduce((sum, m) => sum + m.gabeln, 0) / 12,
+        saettel: basisLagerDaten.reduce((sum, m) => sum + m.saettel, 0) / 12
+      }]
+    }
+    return basisLagerDaten
+  })()
 
   return (
     <>

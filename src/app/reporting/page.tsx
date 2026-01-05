@@ -582,8 +582,8 @@ function VisualisierungenView({
   timeRange: string
   setTimeRange: (range: any) => void 
 }) {
-  // Produktionsdaten (monatlich)
-  const produktionsDaten = [
+  // Basis-Produktionsdaten (monatlich)
+  const basisProduktionsDaten = [
     { monat: 'Jan', plan: 14800, ist: 14200, abweichung: -600 },
     { monat: 'Feb', plan: 22200, ist: 21800, abweichung: -400 },
     { monat: 'Mrz', plan: 37000, ist: 36500, abweichung: -500 },
@@ -610,8 +610,8 @@ function VisualisierungenView({
     { name: 'MTB Trail', wert: 48100, prozent: 13 }
   ]
 
-  // Lagerbestandsverlauf (deterministisch)
-  const lagerDaten = Array.from({ length: 12 }, (_, i) => {
+  // Basis-Lagerbestandsverlauf (monatlich, deterministisch)
+  const basisLagerDaten = Array.from({ length: 12 }, (_, i) => {
     const baseRahmen = 1200
     const baseGabeln = 2100
     const baseSaettel = 3800
@@ -628,7 +628,7 @@ function VisualisierungenView({
   })
 
   // Wöchentliche Auslastung (deterministisch)
-  const woechentlicheDaten = Array.from({ length: 52 }, (_, i) => {
+  const basisWoechentlicheDaten = Array.from({ length: 52 }, (_, i) => {
     const basisAuslastung = 85
     const saisonaleFaktor = Math.sin((i / 52) * Math.PI * 2) * 10 // Jährliche Schwankung
     
@@ -638,6 +638,167 @@ function VisualisierungenView({
       produktion: 6000 + saisonaleFaktor * 100
     }
   })
+
+  // Filter/Aggregiere Produktionsdaten basierend auf timeRange
+  const produktionsDaten = (() => {
+    if (timeRange === 'week') {
+      // Zeige die letzten 8 Wochen basierend auf wöchentlichen Daten
+      return basisWoechentlicheDaten.slice(-8).map(w => ({
+        monat: `KW ${w.woche}`,
+        plan: Math.round(w.produktion * 1.05),
+        ist: Math.round(w.produktion),
+        abweichung: Math.round(w.produktion * -0.05)
+      }))
+    } else if (timeRange === 'quarter') {
+      // Aggregiere nach Quartalen
+      return [
+        {
+          monat: 'Q1',
+          plan: basisProduktionsDaten.slice(0, 3).reduce((sum, m) => sum + m.plan, 0),
+          ist: basisProduktionsDaten.slice(0, 3).reduce((sum, m) => sum + m.ist, 0),
+          abweichung: basisProduktionsDaten.slice(0, 3).reduce((sum, m) => sum + m.abweichung, 0)
+        },
+        {
+          monat: 'Q2',
+          plan: basisProduktionsDaten.slice(3, 6).reduce((sum, m) => sum + m.plan, 0),
+          ist: basisProduktionsDaten.slice(3, 6).reduce((sum, m) => sum + m.ist, 0),
+          abweichung: basisProduktionsDaten.slice(3, 6).reduce((sum, m) => sum + m.abweichung, 0)
+        },
+        {
+          monat: 'Q3',
+          plan: basisProduktionsDaten.slice(6, 9).reduce((sum, m) => sum + m.plan, 0),
+          ist: basisProduktionsDaten.slice(6, 9).reduce((sum, m) => sum + m.ist, 0),
+          abweichung: basisProduktionsDaten.slice(6, 9).reduce((sum, m) => sum + m.abweichung, 0)
+        },
+        {
+          monat: 'Q4',
+          plan: basisProduktionsDaten.slice(9, 12).reduce((sum, m) => sum + m.plan, 0),
+          ist: basisProduktionsDaten.slice(9, 12).reduce((sum, m) => sum + m.ist, 0),
+          abweichung: basisProduktionsDaten.slice(9, 12).reduce((sum, m) => sum + m.abweichung, 0)
+        }
+      ]
+    } else if (timeRange === 'year') {
+      // Zeige Jahressumme
+      return [{
+        monat: '2027',
+        plan: basisProduktionsDaten.reduce((sum, m) => sum + m.plan, 0),
+        ist: basisProduktionsDaten.reduce((sum, m) => sum + m.ist, 0),
+        abweichung: basisProduktionsDaten.reduce((sum, m) => sum + m.abweichung, 0)
+      }]
+    }
+    // Standard: Monat - zeige alle 12 Monate
+    return basisProduktionsDaten
+  })()
+
+  // Filter/Aggregiere Lagerdaten basierend auf timeRange
+  const lagerDaten = (() => {
+    if (timeRange === 'week') {
+      // Zeige die letzten 8 Wochen (berechnet aus Monatsdaten)
+      return basisLagerDaten.slice(-2).flatMap((monat, idx) => {
+        return Array.from({ length: 4 }, (_, w) => ({
+          monat: `KW ${44 + idx * 4 + w}`,
+          rahmen: monat.rahmen + (Math.random() - 0.5) * 100,
+          gabeln: monat.gabeln + (Math.random() - 0.5) * 150,
+          saettel: monat.saettel + (Math.random() - 0.5) * 200
+        }))
+      })
+    } else if (timeRange === 'quarter') {
+      // Aggregiere nach Quartalen (Durchschnitt)
+      return [
+        {
+          monat: 'Q1',
+          rahmen: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.rahmen, 0) / 3,
+          gabeln: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.gabeln, 0) / 3,
+          saettel: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.saettel, 0) / 3
+        },
+        {
+          monat: 'Q2',
+          rahmen: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.rahmen, 0) / 3,
+          gabeln: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.gabeln, 0) / 3,
+          saettel: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.saettel, 0) / 3
+        },
+        {
+          monat: 'Q3',
+          rahmen: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.rahmen, 0) / 3,
+          gabeln: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.gabeln, 0) / 3,
+          saettel: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.saettel, 0) / 3
+        },
+        {
+          monat: 'Q4',
+          rahmen: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.rahmen, 0) / 3,
+          gabeln: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.gabeln, 0) / 3,
+          saettel: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.saettel, 0) / 3
+        }
+      ]
+    } else if (timeRange === 'year') {
+      // Zeige Jahresdurchschnitt
+      return [{
+        monat: '2027',
+        rahmen: basisLagerDaten.reduce((sum, m) => sum + m.rahmen, 0) / 12,
+        gabeln: basisLagerDaten.reduce((sum, m) => sum + m.gabeln, 0) / 12,
+        saettel: basisLagerDaten.reduce((sum, m) => sum + m.saettel, 0) / 12
+      }]
+    }
+    // Standard: Monat
+    return basisLagerDaten
+  })()
+
+  // Filter wöchentliche Daten basierend auf timeRange
+  const woechentlicheDaten = (() => {
+    if (timeRange === 'week') {
+      // Zeige die letzten 8 Wochen
+      return basisWoechentlicheDaten.slice(-8)
+    } else if (timeRange === 'quarter') {
+      // Zeige 4 Quartale (aggregiere je 13 Wochen)
+      return [1, 2, 3, 4].map(q => {
+        const startWeek = (q - 1) * 13
+        const quarterData = basisWoechentlicheDaten.slice(startWeek, startWeek + 13)
+        return {
+          woche: `Q${q}`,
+          auslastung: quarterData.reduce((sum, w) => sum + w.auslastung, 0) / quarterData.length,
+          produktion: quarterData.reduce((sum, w) => sum + w.produktion, 0)
+        }
+      })
+    } else if (timeRange === 'year') {
+      // Zeige Jahressumme
+      return [{
+        woche: '2027',
+        auslastung: basisWoechentlicheDaten.reduce((sum, w) => sum + w.auslastung, 0) / 52,
+        produktion: basisWoechentlicheDaten.reduce((sum, w) => sum + w.produktion, 0)
+      }]
+    }
+    // Standard: Monat - aggregiere zu 12 Monaten
+    return Array.from({ length: 12 }, (_, m) => {
+      const monthName = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][m]
+      const startWeek = Math.floor(m * 52 / 12)
+      const endWeek = Math.floor((m + 1) * 52 / 12)
+      const monthData = basisWoechentlicheDaten.slice(startWeek, endWeek)
+      return {
+        woche: monthName,
+        auslastung: monthData.reduce((sum, w) => sum + w.auslastung, 0) / monthData.length,
+        produktion: monthData.reduce((sum, w) => sum + w.produktion, 0)
+      }
+    })
+  })()
+
+  // Helper für Zeitbereichs-Beschriftungen
+  const getTimeRangeLabel = () => {
+    switch (timeRange) {
+      case 'week': return 'Wöchentlich'
+      case 'quarter': return 'Quartalsweise'
+      case 'year': return 'Jährlich'
+      default: return 'Monatlich'
+    }
+  }
+
+  const getXAxisLabel = () => {
+    switch (timeRange) {
+      case 'week': return 'Kalenderwoche'
+      case 'quarter': return 'Quartal'
+      case 'year': return 'Jahr'
+      default: return 'Monat'
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -670,7 +831,7 @@ function VisualisierungenView({
         <Card>
           <CardHeader>
             <CardTitle>Produktionsverlauf 2027</CardTitle>
-            <CardDescription>Plan vs. Ist mit Abweichungen</CardDescription>
+            <CardDescription>Plan vs. Ist mit Abweichungen ({getTimeRangeLabel()})</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -679,7 +840,7 @@ function VisualisierungenView({
                 <XAxis 
                   dataKey="monat" 
                   stroke="#666"
-                  label={{ value: 'Monat', position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
+                  label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
                 />
                 <YAxis 
                   stroke="#666"
@@ -752,7 +913,7 @@ function VisualisierungenView({
         <Card>
           <CardHeader>
             <CardTitle>Lagerbestandsentwicklung 2027</CardTitle>
-            <CardDescription>Bestandsverläufe der Hauptkomponenten</CardDescription>
+            <CardDescription>Bestandsverläufe der Hauptkomponenten ({getTimeRangeLabel()})</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -761,7 +922,7 @@ function VisualisierungenView({
                 <XAxis 
                   dataKey="monat" 
                   stroke="#666"
-                  label={{ value: 'Monat', position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
+                  label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
                 />
                 <YAxis 
                   stroke="#666"
@@ -808,7 +969,7 @@ function VisualisierungenView({
         <Card>
           <CardHeader>
             <CardTitle>Produktionsauslastung 2027</CardTitle>
-            <CardDescription>Wöchentliche Auslastung in %</CardDescription>
+            <CardDescription>Auslastung in % ({getTimeRangeLabel()})</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -823,7 +984,7 @@ function VisualisierungenView({
                 <XAxis 
                   dataKey="woche" 
                   stroke="#666"
-                  label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
+                  label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
                 />
                 <YAxis 
                   stroke="#666" 
