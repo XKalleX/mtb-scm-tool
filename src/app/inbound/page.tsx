@@ -34,7 +34,7 @@ export default function InboundPage() {
   const lieferplanDaten = Array.from({ length: 12 }, (_, i) => {
     const monat = i + 1
     const bestelldatum = new Date(2027, monat - 1, 5).toISOString().split('T')[0]
-    const lieferdatum = new Date(2027, monat - 1, 5 + 56).toISOString().split('T')[0] // 56 Tage später
+    const lieferdatum = new Date(2027, monat - 1, 5 + 49).toISOString().split('T')[0] // 49 Tage später
     
     // Deterministisches Muster basierend auf Saisonalität
     const saisonalitaet = [0.04, 0.05, 0.10, 0.16, 0.14, 0.12, 0.10, 0.08, 0.09, 0.06, 0.03, 0.03]
@@ -47,7 +47,7 @@ export default function InboundPage() {
       monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
       bestelldatum,
       lieferdatum,
-      vorlaufzeit: 56,
+      vorlaufzeit: 49,
       menge,
       losgroesse: lieferant.losgroesse,
       anzahlLose: Math.ceil(menge / lieferant.losgroesse),
@@ -157,11 +157,11 @@ export default function InboundPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <h4 className="font-semibold mb-2">Vorlaufzeiten:</h4>
+              <h4 className="font-semibold mb-2">Vorlaufzeiten (SSOT):</h4>
               <ul className="space-y-1 text-sm">
                 <li>✓ Produktion in China: <strong>{lieferant.vorlaufzeitArbeitstage} Arbeitstage</strong></li>
                 <li>✓ Schiff-Transport: <strong>{lieferant.vorlaufzeitKalendertage} Kalendertage (24/7)</strong></li>
-                <li>✓ Gesamt: <strong>~{lieferant.vorlaufzeitArbeitstage + lieferant.vorlaufzeitKalendertage} Tage</strong></li>
+                <li>✓ Gesamt: <strong>49 Tage (7 Wochen)</strong></li>
               </ul>
             </div>
             
@@ -274,9 +274,9 @@ export default function InboundPage() {
           <div className="grid gap-4 md:grid-cols-2 mb-6">
             <FormulaCard
               title="Vorlaufzeit Berechnung"
-              formula="Vorlaufzeit = 21 AT (Produktion) + 35 KT (Transport) + 2 AT (Puffer) ≈ 56 Tage"
-              description="Gesamte Durchlaufzeit von Bestellung bis Ankunft in Deutschland"
-              example="Bestellung 05.01. → Lieferung ~02.03. (56 Tage später)"
+              formula="Vorlaufzeit = 5 AT (Produktion) + 44 KT (Transport) = 49 Tage (7 Wochen)"
+              description="Gesamte Durchlaufzeit von Bestellung bis Ankunft in Deutschland (gemäß SSOT)"
+              example="Bestellung 05.01. → Lieferung ~23.02. (49 Tage später)"
             />
             <FormulaCard
               title="Losgrößen-Aufrundung"
@@ -307,7 +307,7 @@ export default function InboundPage() {
                 label: 'Vorlaufzeit',
                 width: '100px',
                 align: 'center',
-                formula: '21 AT + 35 KT',
+                formula: '5 AT + 44 KT',
                 format: (val) => `${val} Tage`
               },
               {

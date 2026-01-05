@@ -3,19 +3,22 @@
  * INBOUND LOGISTIK - CHINA
  * ========================================
  * 
- * Bestellungen beim einzigen Lieferanten (China)
+ * Bestellungen beim einzigen Lieferanten (China) - nur Sättel!
  * 
- * WICHTIGE PARAMETER:
- * - Vorlaufzeit: 21 Arbeitstage (Produktion) + 35 Kalendertage (Transport)
- * - Losgröße: 2.000 Stück Mindestbestellung
+ * WICHTIGE PARAMETER (gemäß SSOT-Spezifikation):
+ * - Vorlaufzeit: 49 Tage GESAMT (7 Wochen)
+ *   - 5 Arbeitstage Produktion
+ *   - 44 Kalendertage Transport (Seefracht)
+ * - Losgröße: 500 Stück Sättel (Mindestbestellung)
  * - Lieferintervall: Alle 14 Tage
- * - Spring Festival: 28.1.-4.2.2027 = 7 Tage Produktionsstopp!
+ * - Spring Festival: 28.1.-4.2.2027 = 8 Tage Produktionsstopp!
+ * - Nur 4 Sattel-Varianten (Ermäßigung Code-Lösung)
  * 
  * BERECHNUNGSLOGIK:
- * 1. Komponentenbedarf aus Produktionsplan ermitteln
- * 2. Bestelldatum rückwärts berechnen (inkl. Vorlaufzeiten)
- * 3. Losgrößen aufrunden (min. 2.000 Stück)
- * 4. Spring Festival berücksichtigen
+ * 1. Sattel-Bedarf aus Produktionsplan ermitteln (1 Sattel = 1 Bike)
+ * 2. Bestelldatum rückwärts berechnen (inkl. 49 Tage Vorlaufzeit)
+ * 3. Losgrößen aufrunden (min. 500 Stück)
+ * 4. Spring Festival berücksichtigen (8 Tage)
  */
 
 import { Bestellung, TagesProduktionsplan, Stueckliste, Maschinenausfall } from '@/types'
@@ -93,7 +96,7 @@ export function berechneGesamtbedarfKomponente(
 }
 
 /**
- * Rundet Bestellmenge auf Losgröße auf (min. 2.000 Stück)
+ * Rundet Bestellmenge auf Losgröße auf (min. 500 Stück Sättel)
  * 
  * @param menge - Benötigte Menge
  * @returns Aufgerundete Bestellmenge
@@ -140,8 +143,8 @@ export function erstelleBestellung(
  * Generiert Bestellungen für das ganze Jahr
  * 
  * Strategie: Monatliche Bestellungen
- * - Berechne Bedarf pro Monat
- * - Bestelle jeweils am Monatsanfang für den Monat + 2 Monate Vorlauf
+ * - Berechne Sattel-Bedarf pro Monat (1 Sattel = 1 Bike)
+ * - Bestelle jeweils am Monatsanfang für den Monat + 49 Tage Vorlauf
  * 
  * @param alleProduktionsplaene - Pläne aller Varianten
  * @returns Array von Bestellungen
@@ -237,13 +240,13 @@ export function berechneUeberbestand(bestellt: number, benoetigt: number): numbe
  * Prüft ob Spring Festival die Bestellung betrifft
  * 
  * @param bestellung - Bestellung
- * @returns True wenn Spring Festival die Produktion verzögert
+ * @returns True wenn Spring Festival die Produktion verzögert (8 Tage Shutdown)
  */
 export function betrifftSpringFestival(bestellung: Bestellung): boolean {
   const bestelldatum = new Date(bestellung.bestelldatum)
   
-  // Prüfe ob Produktionsphase (21 AT) mit Spring Festival überlappt
-  for (let i = 0; i < 30; i++) {
+  // Prüfe ob Produktionsphase (5 AT) mit Spring Festival überlappt
+  for (let i = 0; i < 10; i++) {
     const tag = addDays(bestelldatum, i)
     if (istSpringFestival(tag)) {
       return true

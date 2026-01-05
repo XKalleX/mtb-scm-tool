@@ -199,9 +199,10 @@ export function subtractArbeitstage(zielDatum: Date, arbeitstage: number): Date 
  * @returns Bestelldatum bei China
  */
 export function berechneBestelldatum(bedarfsdatum: Date): Date {
-  // China-spezifische Vorlaufzeiten
-  const TRANSPORT_KALENDERTAGE = 35  // Schiff-Transport
-  const BEARBEITUNG_ARBEITSTAGE = 21 // Produktion in China
+  // China-spezifische Vorlaufzeiten gemäß SSOT-Spezifikation
+  // TOTAL: 49 Tage = 7 Wochen Vorlaufzeit
+  const TRANSPORT_KALENDERTAGE = 44  // Schiff-Transport (statt 35)
+  const BEARBEITUNG_ARBEITSTAGE = 5  // Produktion in China (statt 21)
   
   // Schritt 1: Vom Bedarfsdatum die Transportzeit (Kalendertage) abziehen
   // Transport läuft 24/7, also einfach Kalendertage subtrahieren
@@ -229,8 +230,9 @@ export function berechneBestelldatum(bedarfsdatum: Date): Date {
  * @returns Ankunftsdatum in Deutschland
  */
 export function berechneAnkunftsdatum(bestelldatum: Date): Date {
-  const TRANSPORT_KALENDERTAGE = 35
-  const BEARBEITUNG_ARBEITSTAGE = 21
+  // Vorlaufzeit gemäß SSOT: 49 Tage = 5 AT Produktion + 44 KT Transport
+  const TRANSPORT_KALENDERTAGE = 44
+  const BEARBEITUNG_ARBEITSTAGE = 5
   
   // Schritt 1: Bearbeitung in China (Arbeitstage)
   let nachBearbeitung = addArbeitstage(bestelldatum, BEARBEITUNG_ARBEITSTAGE)
