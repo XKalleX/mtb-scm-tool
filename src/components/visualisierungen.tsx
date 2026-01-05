@@ -591,9 +591,9 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
       return basisLagerDaten.slice(-2).flatMap((monat, idx) => {
         return Array.from({ length: 4 }, (_, w) => ({
           monat: `KW ${44 + idx * 4 + w}`,
-          rahmen: monat.rahmen + Math.sin(w) * 50,
-          gabeln: monat.gabeln + Math.sin(w) * 75,
-          saettel: monat.saettel + Math.sin(w) * 100
+          rahmen: monat.rahmen + Math.sin((idx * 4 + w) * 0.5) * 50,
+          gabeln: monat.gabeln + Math.sin((idx * 4 + w) * 0.5) * 75,
+          saettel: monat.saettel + Math.sin((idx * 4 + w) * 0.5) * 100
         }))
       })
     } else if (timeRange === 'quarter') {
