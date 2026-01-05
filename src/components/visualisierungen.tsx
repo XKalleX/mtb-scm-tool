@@ -605,40 +605,33 @@ function ProductionDashboard({ timeRange }: { timeRange: string }) {
  */
 function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
   // Basis-Tägliche Lagerdaten (365 Tage)
+  // ERMÄSSIGUNG: Nur Sättel (keine Rahmen/Gabeln)
   const basisTaeglicherLagerDaten = Array.from({ length: 365 }, (_, i) => {
-    const baseRahmen = 1200
-    const baseGabeln = 2100
     const baseSaettel = 3800
     const schwankung = Math.sin(i * 0.1) * 150
     
     return {
       tag: i + 1,
-      rahmen: baseRahmen + schwankung,
-      gabeln: baseGabeln + schwankung * 1.5,
       saettel: baseSaettel + schwankung * 2
     }
   })
 
   // Basis-Lagerbestandsverlauf (monatlich, deterministisch)
+  // ERMÄSSIGUNG: Nur Sättel (keine Rahmen/Gabeln)
   const basisLagerDaten = Array.from({ length: 12 }, (_, i) => {
-    const baseRahmen = 1200
-    const baseGabeln = 2100
     const baseSaettel = 3800
     const schwankung = Math.sin(i * 0.8) * 150
     
     return {
       monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
-      rahmen: baseRahmen + schwankung,
-      gabeln: baseGabeln + schwankung * 1.5,
       saettel: baseSaettel + schwankung * 2
     }
   })
 
   // Lieferanten-Performance
+  // ERMÄSSIGUNG: Nur China als Zulieferer
   const lieferantenDaten = [
-    { lieferant: 'China (Sättel)', liefertreue: 96, durchlaufzeit: 42, kosten: 85000 },
-    { lieferant: 'Spanien (Gabeln)', liefertreue: 89, durchlaufzeit: 14, kosten: 125000 },
-    { lieferant: 'Heilbronn (Rahmen)', liefertreue: 98, durchlaufzeit: 4, kosten: 95000 }
+    { lieferant: 'China (Sättel)', liefertreue: 96, durchlaufzeit: 49, kosten: 85000 }
   ]
 
   // Filter/Aggregiere Lagerdaten basierend auf timeRange
@@ -647,16 +640,12 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
       // Zeige die letzten 30 Tage
       return basisTaeglicherLagerDaten.slice(-30).map(t => ({
         monat: `Tag ${t.tag}`,
-        rahmen: t.rahmen,
-        gabeln: t.gabeln,
         saettel: t.saettel
       }))
     } else if (timeRange === 'week') {
       return basisLagerDaten.slice(-2).flatMap((monat, idx) => {
         return Array.from({ length: 4 }, (_, w) => ({
           monat: `KW ${44 + idx * 4 + w}`,
-          rahmen: monat.rahmen + Math.sin((idx * 4 + w) * 0.5) * 50,
-          gabeln: monat.gabeln + Math.sin((idx * 4 + w) * 0.5) * 75,
           saettel: monat.saettel + Math.sin((idx * 4 + w) * 0.5) * 100
         }))
       })
@@ -664,34 +653,24 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
       return [
         {
           monat: 'Q1',
-          rahmen: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.rahmen, 0) / 3,
-          gabeln: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.gabeln, 0) / 3,
           saettel: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.saettel, 0) / 3
         },
         {
           monat: 'Q2',
-          rahmen: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.rahmen, 0) / 3,
-          gabeln: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.gabeln, 0) / 3,
           saettel: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.saettel, 0) / 3
         },
         {
           monat: 'Q3',
-          rahmen: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.rahmen, 0) / 3,
-          gabeln: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.gabeln, 0) / 3,
           saettel: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.saettel, 0) / 3
         },
         {
           monat: 'Q4',
-          rahmen: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.rahmen, 0) / 3,
-          gabeln: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.gabeln, 0) / 3,
           saettel: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.saettel, 0) / 3
         }
       ]
     } else if (timeRange === 'year') {
       return [{
         monat: '2027',
-        rahmen: basisLagerDaten.reduce((sum, m) => sum + m.rahmen, 0) / 12,
-        gabeln: basisLagerDaten.reduce((sum, m) => sum + m.gabeln, 0) / 12,
         saettel: basisLagerDaten.reduce((sum, m) => sum + m.saettel, 0) / 12
       }]
     }
@@ -703,9 +682,9 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
       {/* Lagerbestand Timeline */}
       <Card>
         <CardHeader>
-          <CardTitle>Lagerbestandsentwicklung 2027</CardTitle>
+          <CardTitle>Lagerbestandsentwicklung 2027 - Sättel</CardTitle>
           <CardDescription>
-            Bestandsverläufe der Hauptkomponenten
+            Bestandsverlauf der Sättel aus China (Ermäßigung: nur Sättel, keine Rahmen/Gabeln)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -718,24 +697,8 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
               <Legend />
               <Line
                 type="monotone"
-                dataKey="rahmen"
-                stroke={VARIANTEN_FARBEN[0]}
-                strokeWidth={3}
-                dot={{ r: 4 }}
-                name="Rahmen"
-              />
-              <Line
-                type="monotone"
-                dataKey="gabeln"
-                stroke={VARIANTEN_FARBEN[1]}
-                strokeWidth={3}
-                dot={{ r: 4 }}
-                name="Gabeln"
-              />
-              <Line
-                type="monotone"
                 dataKey="saettel"
-                stroke={VARIANTEN_FARBEN[3]}
+                stroke={COLORS.primary}
                 strokeWidth={3}
                 dot={{ r: 4 }}
                 name="Sättel"
