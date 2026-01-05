@@ -11,9 +11,10 @@
  * - Vertikaler Scroll für viele Zeilen
  * - Zebra-Streifen für bessere Lesbarkeit
  * - Formel-Tooltips
+ * - Summenzeilen und Zwischensummen
  */
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Info } from 'lucide-react'
 import { formatNumber } from '@/lib/utils'
 
@@ -24,6 +25,8 @@ interface ExcelTableColumn {
   width?: string
   formula?: string // Optional: Formel-Erklärung
   format?: (value: any) => string
+  sumable?: boolean // Spalte kann summiert werden
+  sumLabel?: string // Optionales Label für Summe (z.B. "Gesamt")
 }
 
 interface ExcelTableProps {
@@ -33,6 +36,10 @@ interface ExcelTableProps {
   showFormulas?: boolean
   title?: string
   description?: string
+  showSums?: boolean // Zeige Summenzeile am Ende
+  sumRowLabel?: string // Label für die Summenzeile (Standard: "SUMME")
+  groupBy?: string // Optional: Gruppiere nach Spalte für Zwischensummen
+  subtotalLabel?: string // Label für Zwischensummen (Standard: "Zwischensumme")
 }
 
 /**
@@ -44,9 +51,58 @@ export default function ExcelTable({
   maxHeight = '600px',
   showFormulas = false,
   title,
-  description
+  description,
+  showSums = false,
+  sumRowLabel = 'SUMME',
+  groupBy,
+  subtotalLabel = 'Zwischensumme'
 }: ExcelTableProps) {
   const [selectedFormula, setSelectedFormula] = useState<string | null>(null)
+  
+  /**
+   * Berechnet Summen für numerische Spalten
+   */
+  const calculateSums = (dataToSum: any[]) => {
+    const sums: Record<string, number> = {}
+    
+    columns.forEach(col => {
+      if (col.sumable !== false) {
+        // Standardmäßig alle numerischen Spalten summieren
+        const values = dataToSum.map(row => row[col.key])
+        const numericValues = values.filter(v => typeof v === 'number')
+        
+        if (numericValues.length > 0) {
+          sums[col.key] = numericValues.reduce((sum, val) => sum + val, 0)
+        }
+      }
+    })
+    
+    return sums
+  }
+  
+  /**
+   * Gruppiert Daten nach Spalte für Zwischensummen
+   */
+  const groupData = () => {
+    if (!groupBy) return [{ group: null, items: data }]
+    
+    const groups: Record<string, any[]> = {}
+    data.forEach(row => {
+      const groupValue = row[groupBy]
+      if (!groups[groupValue]) {
+        groups[groupValue] = []
+      }
+      groups[groupValue].push(row)
+    })
+    
+    return Object.entries(groups).map(([group, items]) => ({
+      group,
+      items
+    }))
+  }
+  
+  const groupedData = groupData()
+  const totalSums = showSums ? calculateSums(data) : {}
 
   return (
     <div className="space-y-4">
@@ -109,28 +165,89 @@ export default function ExcelTable({
             </tr>
           </thead>
 
-          {/* Body mit Zebra-Streifen */}
+          {/* Body mit Zebra-Streifen, Gruppen und Zwischensummen */}
           <tbody>
-            {data.map((row, rowIdx) => (
-              <tr 
-                key={rowIdx}
-                className={`border-b border-slate-200 hover:bg-slate-50 transition-colors ${
-                  rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
-                }`}
-              >
+            {groupedData.map((group, groupIdx) => {
+              const groupSums = groupBy ? calculateSums(group.items) : {}
+              let rowCounter = 0
+              
+              return (
+                <React.Fragment key={groupIdx}>
+                  {/* Datenzeilen der Gruppe */}
+                  {group.items.map((row, rowIdx) => {
+                    rowCounter++
+                    return (
+                      <tr 
+                        key={`${groupIdx}-${rowIdx}`}
+                        className={`border-b border-slate-200 hover:bg-slate-50 transition-colors ${
+                          rowCounter % 2 === 0 ? 'bg-slate-50' : 'bg-white'
+                        }`}
+                      >
+                        {columns.map((col) => (
+                          <td
+                            key={col.key}
+                            className={`px-4 py-2 text-sm border-r border-slate-200 last:border-r-0 ${
+                              col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                            }`}
+                            style={{ minWidth: col.width || '120px' }}
+                          >
+                            {col.format ? col.format(row[col.key]) : row[col.key]}
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })}
+                  
+                  {/* Zwischensumme nach jeder Gruppe (außer wenn es nur eine Gruppe gibt) */}
+                  {groupBy && groupedData.length > 1 && (
+                    <tr className="bg-amber-50 border-b-2 border-amber-300 font-semibold">
+                      {columns.map((col, colIdx) => (
+                        <td
+                          key={col.key}
+                          className={`px-4 py-3 text-sm border-r border-slate-200 last:border-r-0 ${
+                            col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                          }`}
+                          style={{ minWidth: col.width || '120px' }}
+                        >
+                          {colIdx === 0 ? (
+                            <span>{subtotalLabel} {group.group}</span>
+                          ) : groupSums[col.key] !== undefined ? (
+                            col.format ? col.format(groupSums[col.key]) : formatNumber(groupSums[col.key], 0)
+                          ) : (
+                            ''
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  )}
+                </React.Fragment>
+              )
+            })}
+            
+            {/* Gesamtsumme am Ende */}
+            {showSums && data.length > 0 && (
+              <tr className="bg-green-100 border-t-2 border-green-600 font-bold sticky bottom-0">
                 {columns.map((col, colIdx) => (
                   <td
                     key={col.key}
-                    className={`px-4 py-2 text-sm border-r border-slate-200 last:border-r-0 ${
+                    className={`px-4 py-3 text-sm border-r border-slate-200 last:border-r-0 ${
                       col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                     }`}
                     style={{ minWidth: col.width || '120px' }}
                   >
-                    {col.format ? col.format(row[col.key]) : row[col.key]}
+                    {colIdx === 0 ? (
+                      <span className="text-green-900">{sumRowLabel}</span>
+                    ) : totalSums[col.key] !== undefined ? (
+                      <span className="text-green-900">
+                        {col.format ? col.format(totalSums[col.key]) : formatNumber(totalSums[col.key], 0)}
+                      </span>
+                    ) : (
+                      ''
+                    )}
                   </td>
                 ))}
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

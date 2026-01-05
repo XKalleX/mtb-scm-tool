@@ -522,26 +522,30 @@ export default function OEMProgrammPage() {
                         key: 'datum',
                         label: 'Datum',
                         width: '110px',
-                        format: (val) => formatDate(new Date(val))
+                        format: (val) => formatDate(new Date(val)),
+                        sumable: false
                       },
                       {
                         key: 'wochentag',
                         label: 'Tag',
                         width: '70px',
                         align: 'center',
-                        format: (val) => ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(val).getDay()]
+                        format: (val) => ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(val).getDay()],
+                        sumable: false
                       },
                       {
                         key: 'kw',
                         label: 'KW',
                         width: '60px',
-                        align: 'center'
+                        align: 'center',
+                        sumable: false
                       },
                       {
                         key: 'monat',
                         label: 'Monat',
                         width: '80px',
-                        align: 'center'
+                        align: 'center',
+                        sumable: false
                       },
                       {
                         key: 'sollMenge',
@@ -549,7 +553,8 @@ export default function OEMProgrammPage() {
                         width: '110px',
                         align: 'right',
                         formula: '(Jahresprod / AT) × Saison',
-                        format: (val) => formatNumber(val, 2)
+                        format: (val) => formatNumber(val, 2),
+                        sumable: true
                       },
                       {
                         key: 'istMenge',
@@ -557,7 +562,8 @@ export default function OEMProgrammPage() {
                         width: '100px',
                         align: 'right',
                         formula: 'RUNDEN(Soll + Error)',
-                        format: (val) => formatNumber(val, 0)
+                        format: (val) => formatNumber(val, 0),
+                        sumable: true
                       },
                       {
                         key: 'sattelBedarf',
@@ -565,7 +571,8 @@ export default function OEMProgrammPage() {
                         width: '140px',
                         align: 'right',
                         formula: 'Ist Bikes × 1',
-                        format: (val) => formatNumber(val, 0) + ' Stück'
+                        format: (val) => formatNumber(val, 0) + ' Stück',
+                        sumable: true
                       },
                       {
                         key: 'kumulierterError',
@@ -573,14 +580,16 @@ export default function OEMProgrammPage() {
                         width: '110px',
                         align: 'right',
                         formula: 'Error(t-1) + (Soll - Ist)',
-                        format: (val) => formatNumber(val, 3)
+                        format: (val) => formatNumber(val, 3),
+                        sumable: false
                       },
                       {
                         key: 'kumulativBikes',
                         label: 'Kumulativ',
                         width: '110px',
                         align: 'right',
-                        format: (val) => formatNumber(val, 0)
+                        format: (val) => formatNumber(val, 0),
+                        sumable: false
                       }
                     ]}
                     data={(() => {
@@ -612,6 +621,10 @@ export default function OEMProgrammPage() {
                     })()}
                     maxHeight="500px"
                     showFormulas={true}
+                    showSums={true}
+                    sumRowLabel="JAHRESSUMME"
+                    groupBy="monat"
+                    subtotalLabel="Monatssumme"
                   />
                 )
               })()}
