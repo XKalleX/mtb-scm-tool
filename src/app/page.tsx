@@ -28,14 +28,33 @@ import {
   Zap
 } from 'lucide-react'
 import stammdatenData from '@/data/stammdaten.json'
-import { useSzenarien } from '@/contexts/SzenarienContext'
+import { useSzenarien, berechneGlobaleAuswirkungen } from '@/contexts/SzenarienContext'
+import { useMemo } from 'react'
 
 /**
- * Dashboard Hauptkomponente mit Szenarien-Integration
+ * Dashboard Hauptkomponente mit Szenarien-Integration und Live-Berechnungen
  */
 export default function Dashboard() {
   const { szenarien, getAktiveSzenarien } = useSzenarien()
   const aktiveSzenarien = getAktiveSzenarien()
+  
+  // Berechne Auswirkungen der aktiven Szenarien in Echtzeit
+  const auswirkungen = useMemo(() => {
+    return berechneGlobaleAuswirkungen(aktiveSzenarien)
+  }, [aktiveSzenarien])
+
+  // Berechne Änderungen gegenüber Baseline
+  const baselineWerte = {
+    produktionsmenge: 370000,
+    materialverfuegbarkeit: 98.5,
+    liefertreue: 95.2,
+    durchlaufzeit: 56
+  }
+
+  const produktionsDiff = auswirkungen.produktionsmenge - baselineWerte.produktionsmenge
+  const produktionsProzent = ((produktionsDiff / baselineWerte.produktionsmenge) * 100).toFixed(1)
+  const liefertreueDiff = auswirkungen.liefertreue - baselineWerte.liefertreue
+  const liefertreueProzent = (liefertreueDiff).toFixed(1)
   
   return (
     <div className="space-y-6">
@@ -44,18 +63,19 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold">Supply Chain Dashboard</h1>
         <p className="text-muted-foreground mt-1">
           Übersicht über alle wichtigen Kennzahlen und Funktionen
+          {aktiveSzenarien.length > 0 && ' - Live-Berechnung mit aktiven Szenarien'}
         </p>
       </div>
 
-      {/* KPI Cards - Wichtigste Kennzahlen */}
+      {/* KPI Cards - Wichtigste Kennzahlen mit Live-Updates */}
       <div className="grid gap-4 md:grid-cols-4">
         <KPICard
           title="Jahresproduktion"
-          value="370.000"
+          value={Math.round(auswirkungen.produktionsmenge).toLocaleString('de-DE')}
           unit="Bikes"
           icon={Factory}
-          trend="+12%"
-          trendUp={true}
+          trend={aktiveSzenarien.length > 0 ? `${parseFloat(produktionsProzent) > 0 ? '+' : ''}${produktionsProzent}%` : '+12%'}
+          trendUp={produktionsDiff >= 0}
         />
         <KPICard
           title="Produktionstage"
@@ -67,19 +87,19 @@ export default function Dashboard() {
         />
         <KPICard
           title="Liefertreue"
-          value="94,2%"
+          value={`${auswirkungen.liefertreue.toFixed(1)}%`}
           unit=""
           icon={TrendingUp}
-          trend="+2,1%"
-          trendUp={true}
+          trend={aktiveSzenarien.length > 0 ? `${liefertreueDiff > 0 ? '+' : ''}${liefertreueProzent}%` : '+2,1%'}
+          trendUp={liefertreueDiff >= 0}
         />
         <KPICard
-          title="Varianten"
-          value="8"
-          unit="Modelle"
+          title="Materialverfügbarkeit"
+          value={`${auswirkungen.materialverfuegbarkeit.toFixed(1)}%`}
+          unit=""
           icon={Package}
-          trend="Aktiv"
-          trendUp={true}
+          trend={aktiveSzenarien.length > 0 ? 'Live' : 'Baseline'}
+          trendUp={auswirkungen.materialverfuegbarkeit >= 95}
         />
       </div>
 

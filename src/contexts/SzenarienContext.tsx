@@ -9,9 +9,10 @@
  * - Persistiert Szenarien über Tab-Wechsel hinweg
  * - Macht Szenarien für alle Berechnungen verfügbar
  * - Nur China als Lieferant (keine anderen Länder)
+ * - Speichert Szenarien in localStorage für Persistenz beim Neuladen
  */
 
-import React, { createContext, useContext, useState, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
 export type SzenarioTyp = 'marketingaktion' | 'maschinenausfall' | 'wasserschaden' | 'schiffsverspaetung'
 
@@ -35,10 +36,42 @@ interface SzenarienContextType {
 const SzenarienContext = createContext<SzenarienContextType | undefined>(undefined)
 
 /**
- * Provider-Komponente für globalen Szenarien-State
+ * Provider-Komponente für globalen Szenarien-State mit localStorage-Persistenz
  */
 export function SzenarienProvider({ children }: { children: ReactNode }) {
   const [szenarien, setSzenarien] = useState<SzenarioConfig[]>([])
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // Lade Szenarien aus localStorage beim Start
+  useEffect(() => {
+    try {
+      const gespeicherteSzenarien = localStorage.getItem('mtb-szenarien')
+      if (gespeicherteSzenarien) {
+        const parsed = JSON.parse(gespeicherteSzenarien)
+        // Konvertiere Datum-Strings zurück zu Date-Objekten
+        const wiederhergestellt = parsed.map((s: any) => ({
+          ...s,
+          erstelltAm: new Date(s.erstelltAm)
+        }))
+        setSzenarien(wiederhergestellt)
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden der Szenarien:', error)
+    } finally {
+      setIsInitialized(true)
+    }
+  }, [])
+
+  // Speichere Szenarien in localStorage bei jeder Änderung
+  useEffect(() => {
+    if (isInitialized) {
+      try {
+        localStorage.setItem('mtb-szenarien', JSON.stringify(szenarien))
+      } catch (error) {
+        console.error('Fehler beim Speichern der Szenarien:', error)
+      }
+    }
+  }, [szenarien, isInitialized])
 
   const hinzufuegen = (typ: SzenarioTyp, parameter: Record<string, any>) => {
     const neuesSzenario: SzenarioConfig = {
