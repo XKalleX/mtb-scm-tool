@@ -1,49 +1,54 @@
 {
   "lieferant": {
     "id": "CHN",
-    "name": "China Manufacturing Ltd.",
+    "name": "Dengwong Manufacturing Ltd.",
     "land": "China",
-    "vorlaufzeitKalendertage": 35,
-    "vorlaufzeitArbeitstage": 21,
-    "losgroesse": 2000,
+    "vorlaufzeitKalendertage": 44,
+    "vorlaufzeitArbeitstage": 5,
+    "losgroesse": 500,
     "kapazitaet": 50000,
     "lieferintervall": 14,
     "besonderheiten": [
-      "Einziger Lieferant für ALLE Komponenten",
-      "Spring Festival: 28. Jan - 4. Feb 2027 (7 Tage Produktionsstopp)",
-      "Schiff-Transport: 35 Kalendertage (24/7 unterwegs)",
-      "Bearbeitung: 21 Arbeitstage (Mo-Fr ohne Feiertage)",
-      "Mindestbestellung: 2.000 Stück (Losgröße)",
+      "Einziger Lieferant für Sättel (Ermäßigung Code-Lösung)",
+      "Spring Festival: 28. Jan - 4. Feb 2027 (8 Tage Produktionsstopp)",
+      "Schiff-Transport: 44 Kalendertage (24/7 unterwegs)",
+      "Bearbeitung: 5 Arbeitstage (Mo-Fr ohne Feiertage)",
+      "Gesamte Vorlaufzeit: 49 Tage (7 Wochen)",
+      "Mindestbestellung: 500 Stück Sättel (Losgröße)",
       "Lieferintervall: Alle 14 Tage"
     ]
   },
   "komponenten": [
-    "Gabel_Fox32F100",
-    "Gabel_Fox32F80",
-    "Gabel_FoxTalas140",
-    "Gabel_RockShoxReba",
-    "Gabel_RockShoxRecon",
-    "Gabel_SRSuntour",
-    "Rahmen_Alu",
-    "Rahmen_AluReinforced",
-    "Rahmen_Carbon",
-    "Rahmen_CarbonPremium",
-    "Reifen_Standard",
-    "Reifen_Race",
-    "Reifen_Downhill",
-    "Reifen_Extreme",
-    "Reifen_Freeride",
-    "Reifen_Marathon",
-    "Reifen_Performance",
-    "Reifen_Trail",
-    "Schaltung_Shimano",
-    "Schaltung_ShimanoXT",
-    "Schaltung_ShimanoSLX",
-    "Schaltung_ShimanoXTR",
-    "Bremsen_Scheibe",
-    "Bremsen_Premium",
-    "Daempfer_RockShox",
-    "Daempfer_Premium"
+    "SAT_FT",
+    "SAT_RL",
+    "SAT_SP",
+    "SAT_SL"
   ],
-  "hinweis": "Code-Lösung: Alle 26 Komponenten kommen von diesem einen Lieferanten"
+  "komponentenDetails": {
+    "SAT_FT": {
+      "id": "SAT_FT",
+      "name": "Fizik Tundra",
+      "kategorie": "Sattel",
+      "beschreibung": "Premium Sattel für Langstrecken"
+    },
+    "SAT_RL": {
+      "id": "SAT_RL",
+      "name": "Raceline",
+      "kategorie": "Sattel",
+      "beschreibung": "Sportlicher Sattel für Wettkampf"
+    },
+    "SAT_SP": {
+      "id": "SAT_SP",
+      "name": "Spark",
+      "kategorie": "Sattel",
+      "beschreibung": "Leichter Performance-Sattel"
+    },
+    "SAT_SL": {
+      "id": "SAT_SL",
+      "name": "Speedline",
+      "kategorie": "Sattel",
+      "beschreibung": "Aerodynamischer Sattel für Speed"
+    }
+  },
+  "hinweis": "Code-Lösung (Ermäßigung): Nur 4 Sattel-Varianten statt 14 Bauteile. Jedes Bike benötigt genau 1 Sattel."
 }

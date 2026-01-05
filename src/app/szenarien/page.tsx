@@ -113,7 +113,7 @@ export default function SzenarienPage() {
           break
         case 'wasserschaden':
           texte.push(`💧 ${szenario.parameter.verlustMenge} Teile verloren`)
-          texte.push(`⏱️ Nachbestellung benötigt ~56 Tage Vorlaufzeit aus China`)
+          texte.push(`⏱️ Nachbestellung benötigt 49 Tage Vorlaufzeit aus China (7 Wochen)`)
           break
         case 'schiffsverspaetung':
           texte.push(`🚢 Schiff verspätet sich um ${szenario.parameter.verspaetungTage} Tage`)

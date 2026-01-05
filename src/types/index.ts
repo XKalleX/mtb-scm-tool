@@ -117,12 +117,12 @@ export interface LieferantChina {
   id: 'CHN';
   name: string;
   land: 'China';
-  vorlaufzeitKalendertage: number;  // 35 Tage Schiff-Transport
-  vorlaufzeitArbeitstage: number;   // 21 Arbeitstage Bearbeitung
-  losgroesse: number;               // 2000 Stück Mindestbestellung
+  vorlaufzeitKalendertage: number;  // 44 Tage Schiff-Transport
+  vorlaufzeitArbeitstage: number;   // 5 Arbeitstage Bearbeitung
+  losgroesse: number;               // 500 Stück Sättel Mindestbestellung
   kapazitaet: number;               // Max. Produktion pro Tag
   lieferintervall: number;          // Alle 14 Tage
-  besonderheiten: string[];         // Spring Festival!
+  besonderheiten: string[];         // Spring Festival (8 Tage)!
 }
 
 /**

@@ -1,96 +1,31 @@
 {
-  "hinweis": "WICHTIG: Code-Lösung - ALLE Komponenten kommen von China (CHN)!",
+  "hinweis": "ERMÄSSIGUNG Code-Lösung: Nur Sättel! Jedes Bike benötigt genau 1 Sattel (1:1 Verhältnis)",
   "stuecklisten": {
     "MTBAllrounder": {
       "varianteId": "MTBAllrounder",
       "komponenten": {
-        "Gabel_Fox32F100": {
-          "name": "Fox 32 F100 Gabel",
+        "SAT_FT": {
+          "name": "Fizik Tundra",
           "menge": 1,
           "einheit": "Stück"
-        },
-        "Rahmen_Alu": {
-          "name": "Aluminium Rahmen Standard",
-          "menge": 1,
-          "einheit": "Stück"
-        },
-        "Reifen_Standard": {
-          "name": "MTB Reifen 27.5\" Standard",
-          "menge": 2,
-          "einheit": "Stück"
-        },
-        "Schaltung_Shimano": {
-          "name": "Shimano Deore 10-Gang",
-          "menge": 1,
-          "einheit": "Set"
-        },
-        "Bremsen_Scheibe": {
-          "name": "Scheibenbremsen hydraulisch",
-          "menge": 1,
-          "einheit": "Set"
         }
       }
     },
     "MTBCompetition": {
       "varianteId": "MTBCompetition",
       "komponenten": {
-        "Gabel_FoxTalas140": {
-          "name": "Fox Talas 140 Gabel",
+        "SAT_RL": {
+          "name": "Raceline",
           "menge": 1,
           "einheit": "Stück"
-        },
-        "Rahmen_Carbon": {
-          "name": "Carbon Rahmen Competition",
-          "menge": 1,
-          "einheit": "Stück"
-        },
-        "Reifen_Race": {
-          "name": "MTB Reifen 29\" Race",
-          "menge": 2,
-          "einheit": "Stück"
-        },
-        "Schaltung_ShimanoXT": {
-          "name": "Shimano XT 12-Gang",
-          "menge": 1,
-          "einheit": "Set"
-        },
-        "Bremsen_Premium": {
-          "name": "Scheibenbremsen Premium",
-          "menge": 1,
-          "einheit": "Set"
         }
       }
     },
     "MTBDownhill": {
       "varianteId": "MTBDownhill",
       "komponenten": {
-        "Gabel_FoxTalas140": {
-          "name": "Fox Talas 140 Gabel",
-          "menge": 1,
-          "einheit": "Stück"
-        },
-        "Rahmen_AluReinforced": {
-          "name": "Aluminium Rahmen Verstärkt",
-          "menge": 1,
-          "einheit": "Stück"
-        },
-        "Reifen_Downhill": {
-          "name": "MTB Reifen 27.5\" Downhill",
-          "menge": 2,
-          "einheit": "Stück"
-        },
-        "Schaltung_ShimanoSLX": {
-          "name": "Shimano SLX 11-Gang",
-          "menge": 1,
-          "einheit": "Set"
-        },
-        "Bremsen_Premium": {
-          "name": "Scheibenbremsen Premium",
-          "menge": 1,
-          "einheit": "Set"
-        },
-        "Daempfer_RockShox": {
-          "name": "RockShox Dämpfer",
+        "SAT_SP": {
+          "name": "Spark",
           "menge": 1,
           "einheit": "Stück"
         }
@@ -99,33 +34,8 @@
     "MTBExtreme": {
       "varianteId": "MTBExtreme",
       "komponenten": {
-        "Gabel_FoxTalas140": {
-          "name": "Fox Talas 140 Gabel",
-          "menge": 1,
-          "einheit": "Stück"
-        },
-        "Rahmen_CarbonPremium": {
-          "name": "Carbon Rahmen Premium",
-          "menge": 1,
-          "einheit": "Stück"
-        },
-        "Reifen_Extreme": {
-          "name": "MTB Reifen 29\" Extreme",
-          "menge": 2,
-          "einheit": "Stück"
-        },
-        "Schaltung_ShimanoXTR": {
-          "name": "Shimano XTR 12-Gang",
-          "menge": 1,
-          "einheit": "Set"
-        },
-        "Bremsen_Premium": {
-          "name": "Scheibenbremsen Premium",
-          "menge": 1,
-          "einheit": "Set"
-        },
-        "Daempfer_Premium": {
-          "name": "Premium Dämpfer",
+        "SAT_SL": {
+          "name": "Speedline",
           "menge": 1,
           "einheit": "Stück"
         }
@@ -134,120 +44,40 @@
     "MTBFreeride": {
       "varianteId": "MTBFreeride",
       "komponenten": {
-        "Gabel_RockShoxReba": {
-          "name": "RockShox Reba Gabel",
+        "SAT_FT": {
+          "name": "Fizik Tundra",
           "menge": 1,
           "einheit": "Stück"
-        },
-        "Rahmen_AluReinforced": {
-          "name": "Aluminium Rahmen Verstärkt",
-          "menge": 1,
-          "einheit": "Stück"
-        },
-        "Reifen_Freeride": {
-          "name": "MTB Reifen 26\" Freeride",
-          "menge": 2,
-          "einheit": "Stück"
-        },
-        "Schaltung_ShimanoSLX": {
-          "name": "Shimano SLX 11-Gang",
-          "menge": 1,
-          "einheit": "Set"
-        },
-        "Bremsen_Premium": {
-          "name": "Scheibenbremsen Premium",
-          "menge": 1,
-          "einheit": "Set"
         }
       }
     },
     "MTBMarathon": {
       "varianteId": "MTBMarathon",
       "komponenten": {
-        "Gabel_Fox32F80": {
-          "name": "Fox 32 F80 Gabel",
+        "SAT_SL": {
+          "name": "Speedline",
           "menge": 1,
           "einheit": "Stück"
-        },
-        "Rahmen_Carbon": {
-          "name": "Carbon Rahmen Competition",
-          "menge": 1,
-          "einheit": "Stück"
-        },
-        "Reifen_Marathon": {
-          "name": "MTB Reifen 29\" Marathon",
-          "menge": 2,
-          "einheit": "Stück"
-        },
-        "Schaltung_ShimanoXT": {
-          "name": "Shimano XT 12-Gang",
-          "menge": 1,
-          "einheit": "Set"
-        },
-        "Bremsen_Scheibe": {
-          "name": "Scheibenbremsen hydraulisch",
-          "menge": 1,
-          "einheit": "Set"
         }
       }
     },
     "MTBPerformance": {
       "varianteId": "MTBPerformance",
       "komponenten": {
-        "Gabel_RockShoxRecon": {
-          "name": "RockShox Recon 351 Gabel",
+        "SAT_RL": {
+          "name": "Raceline",
           "menge": 1,
           "einheit": "Stück"
-        },
-        "Rahmen_Alu": {
-          "name": "Aluminium Rahmen Standard",
-          "menge": 1,
-          "einheit": "Stück"
-        },
-        "Reifen_Performance": {
-          "name": "MTB Reifen 27.5\" Performance",
-          "menge": 2,
-          "einheit": "Stück"
-        },
-        "Schaltung_Shimano": {
-          "name": "Shimano Deore 10-Gang",
-          "menge": 1,
-          "einheit": "Set"
-        },
-        "Bremsen_Scheibe": {
-          "name": "Scheibenbremsen hydraulisch",
-          "menge": 1,
-          "einheit": "Set"
         }
       }
     },
     "MTBTrail": {
       "varianteId": "MTBTrail",
       "komponenten": {
-        "Gabel_SRSuntour": {
-          "name": "SR Suntour Raidon Gabel",
+        "SAT_SP": {
+          "name": "Spark",
           "menge": 1,
           "einheit": "Stück"
-        },
-        "Rahmen_Alu": {
-          "name": "Aluminium Rahmen Standard",
-          "menge": 1,
-          "einheit": "Stück"
-        },
-        "Reifen_Trail": {
-          "name": "MTB Reifen 27.5\" Trail",
-          "menge": 2,
-          "einheit": "Stück"
-        },
-        "Schaltung_Shimano": {
-          "name": "Shimano Deore 10-Gang",
-          "menge": 1,
-          "einheit": "Set"
-        },
-        "Bremsen_Scheibe": {
-          "name": "Scheibenbremsen hydraulisch",
-          "menge": 1,
-          "einheit": "Set"
         }
       }
     }

@@ -108,10 +108,10 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <ul className="space-y-2 text-sm text-orange-800">
-            <li>• Spring Festival China: 28.01. - 03.02.2027 (7 Tage Produktionsstopp)</li>
-            <li>• April-Peak: 16% der Jahresproduktion (Kapazitätsplanung beachten)</li>
-            <li>• China-Vorlaufzeit: 21 AT + 35 KT = ~56 Tage</li>
-            <li>• Nur China als Lieferant für ALLE Komponenten (vereinfachte Lösung)</li>
+            <li>• Spring Festival China: <strong>28.01. - 04.02.2027</strong> (8 Tage Produktionsstopp)</li>
+            <li>• April-Peak: <strong>16%</strong> der Jahresproduktion (Kapazitätsplanung beachten)</li>
+            <li>• China-Vorlaufzeit: <strong>49 Tage</strong> (5 AT Produktion + 44 KT Transport)</li>
+            <li>• Nur Sättel (4 Varianten) von China-Zulieferer (Ermäßigung Code-Lösung)</li>
           </ul>
         </CardContent>
       </Card>

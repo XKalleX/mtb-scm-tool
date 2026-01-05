@@ -153,9 +153,10 @@
   
   "zulieferer": {
     "china": {
-      "name": "Dengwong Supplies Ltd.",
+      "name": "Dengwong Manufacturing Ltd.",
       "standort": "Dengwong, China",
       "liefert": ["Sättel"],
+      "beschreibung": "Einziger Zulieferer (Ermäßigung Code-Lösung) - Nur 4 Sattel-Varianten",
       "vorlaufzeit": {
         "tage": 5,
         "typ": "Arbeitstage",
@@ -166,14 +167,14 @@
           "typ": "LKW",
           "von": "Dengwong",
           "nach": "Hafen Shanghai",
-          "dauer": 2,
+          "dauer": 1,
           "einheit": "Arbeitstage"
         },
         {
           "typ": "Schiff",
           "von": "Hafen Shanghai",
           "nach": "Hafen Hamburg",
-          "dauer": 30,
+          "dauer": 40,
           "einheit": "Kalendertage",
           "fahrplan": "Mittwochs",
           "frequenz": "1x pro Woche"
@@ -182,7 +183,7 @@
           "typ": "LKW",
           "von": "Hafen Hamburg",
           "nach": "Dortmund",
-          "dauer": 2,
+          "dauer": 1,
           "einheit": "Arbeitstage"
         }
       ],
@@ -190,65 +191,14 @@
         "saettel": 500
       },
       "gesamtDurchlaufzeit": {
-        "minimum": 39,
+        "minimum": 49,
         "einheit": "Kalendertage",
-        "beschreibung": "Gesamte Durchlaufzeit von Bestellung bis Ankunft"
-      }
-    },
-    "spanien": {
-      "name": "Saragossa Components S.A.",
-      "standort": "Saragossa, Spanien",
-      "liefert": ["Gabeln"],
-      "vorlaufzeit": {
-        "tage": 5,
-        "typ": "Arbeitstage",
-        "beschreibung": "Zeit von Bestelleingang bis Ende der Produktion"
+        "beschreibung": "Gesamte Durchlaufzeit von Bestellung bis Ankunft (7 Wochen)"
       },
-      "transportwege": [
-        {
-          "typ": "Zug",
-          "von": "Saragossa",
-          "nach": "Dortmund",
-          "dauer": 9,
-          "einheit": "Kalendertage",
-          "fahrplan": "Montags und Donnerstags",
-          "frequenz": "2x pro Woche"
-        }
-      ],
-      "losgroessen": {
-        "gabeln": 75
-      },
-      "gesamtDurchlaufzeit": {
-        "minimum": 14,
-        "einheit": "Kalendertage",
-        "beschreibung": "Gesamte Durchlaufzeit von Bestellung bis Ankunft"
-      }
-    },
-    "deutschland": {
-      "name": "Heilbronn Rahmen GmbH",
-      "standort": "Heilbronn, Deutschland",
-      "liefert": ["Rahmen"],
-      "vorlaufzeit": {
-        "tage": 2,
-        "typ": "Arbeitstage",
-        "beschreibung": "Zeit von Bestelleingang bis Ende der Produktion"
-      },
-      "transportwege": [
-        {
-          "typ": "LKW",
-          "von": "Heilbronn",
-          "nach": "Dortmund",
-          "dauer": 2,
-          "einheit": "Arbeitstage"
-        }
-      ],
-      "losgroessen": {
-        "rahmen": 10
-      },
-      "gesamtDurchlaufzeit": {
-        "minimum": 4,
-        "einheit": "Arbeitstage",
-        "beschreibung": "Gesamte Durchlaufzeit von Bestellung bis Ankunft"
+      "springFestival": {
+        "datum": "28.01.-04.02.2027",
+        "dauer": 8,
+        "beschreibung": "Kein Betrieb während Spring Festival"
       }
     }
   },
@@ -369,13 +319,14 @@
   },
   
   "hinweise": {
-    "codeLoesung": "Alle Komponenten kommen aus China (vereinfacht), kein Outbound zu internationalen Märkten erforderlich",
-    "excel LösungAlternative": "Bei Excel-Lösung: 3 Zulieferer (China, Spanien, Deutschland) + Outbound zu 6 Märkten",
+    "codeLoesung": "ERMÄSSIGUNG: Nur Sättel von China-Zulieferer, kein Outbound zu internationalen Märkten",
+    "excelLösungAlternative": "Bei Excel-Lösung: 3 Zulieferer (China, Spanien, Deutschland) + Outbound zu 6 Märkten",
     "vereinfachungen": [
-      "Nur ein Zulieferer-Land (China) statt drei",
+      "Nur ein Zulieferer-Land (China) statt drei (Heilbronn entfernt, Spanien entfernt)",
+      "Nur 4 Sattel-Varianten statt 14 Bauteile (keine Gabeln, keine Rahmen)",
       "Kein Outbound zu internationalen Märkten",
-      "Keine Solver-basierte Optimierung erforderlich (First-Come-First-Serve)",
-      "Reduzierung von ca. 18 Modulen auf 5 Kernmodule"
+      "FCFS statt Solver-basierte Optimierung (First-Come-First-Serve)",
+      "Vorlaufzeit: 49 Tage (7 Wochen), Losgröße: 500 Sättel"
     ]
   }
 }
