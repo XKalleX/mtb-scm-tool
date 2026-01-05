@@ -22,7 +22,7 @@ import {
   FEIERTAGE_DEUTSCHLAND,
   BAUTEILE,
   STUECKLISTE
-} from '@/../../kontext/Spezifikation_SSOT_MR'
+} from '../../../kontext/Spezifikation_SSOT_MR'
 
 /**
  * Tagesproduktionseintrag mit Error Management
