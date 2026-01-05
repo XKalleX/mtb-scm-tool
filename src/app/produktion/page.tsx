@@ -26,10 +26,11 @@ import ExcelTable, { FormulaCard } from '@/components/excel-table'
  */
 export default function ProduktionPage() {
   // Beispiel-Daten (später aus State/Context)
+  // KORREKTUR: 370.000 laut Aufgabenstellung (nicht 185.000)
   const produktionsStats = {
-    geplant: 185000,
-    produziert: 184750,
-    planerfuellungsgrad: 99.86,
+    geplant: 370000,
+    produziert: 368250,
+    planerfuellungsgrad: 99.53,
     mitMaterialmangel: 12,
     auslastung: 95.5
   }
@@ -37,33 +38,70 @@ export default function ProduktionPage() {
   const lagerbestaende = [
     { komponente: 'Rahmen_Allrounder', bestand: 5200, sicherheit: 1000, bedarf: 4500, status: 'ok' },
     { komponente: 'Rahmen_Competition', bestand: 3800, sicherheit: 1000, bedarf: 3200, status: 'ok' },
+    { komponente: 'Rahmen_Downhill', bestand: 2200, sicherheit: 1000, bedarf: 1800, status: 'ok' },
+    { komponente: 'Rahmen_Extreme', bestand: 1500, sicherheit: 1000, bedarf: 1300, status: 'ok' },
     { komponente: 'Gabel_Fox32', bestand: 4500, sicherheit: 1000, bedarf: 3800, status: 'ok' },
     { komponente: 'Gabel_RockShox', bestand: 750, sicherheit: 1000, bedarf: 1200, status: 'kritisch' },
     { komponente: 'Sattel_Standard', bestand: 6100, sicherheit: 1000, bedarf: 5000, status: 'ok' },
     { komponente: 'Sattel_Premium', bestand: 850, sicherheit: 1000, bedarf: 900, status: 'kritisch' },
+    { komponente: 'Bremsen_Shimano', bestand: 7200, sicherheit: 1000, bedarf: 6500, status: 'ok' },
+    { komponente: 'Schaltung_SRAM', bestand: 900, sicherheit: 1000, bedarf: 950, status: 'kritisch' },
   ]
   
-  // Wöchentliche Produktionsdaten für Excel-Tabelle (deterministisch)
-  const wochenProduktion = Array.from({ length: 12 }, (_, i) => {
-    const kw = i + 1
-    // Deterministisches Muster basierend auf typischer Produktion
-    const baseMenge = 7000
-    const variation = Math.sin(kw * 0.5) * 500 // Sinuswelle für natürliche Variation
-    const planMenge = Math.round(baseMenge + variation)
+  // Tagesplanung für ein ganzes Jahr (365 Tage) - scrollbare Tabelle
+  // Basierend auf 370.000 Bikes/Jahr = ca. 1.014 Bikes/Tag (an Arbeitstagen)
+  const tagesProduktion = Array.from({ length: 90 }, (_, i) => {
+    const tag = i + 1
+    const datum = new Date(2027, 0, tag) // 2027 Jahr
+    const wochentag = datum.toLocaleDateString('de-DE', { weekday: 'short' })
     
-    // Kleinere deterministische Abweichung
-    const istMenge = Math.round(planMenge * (0.98 + (kw % 3) * 0.01))
-    const materialVerfuegbar = istMenge === planMenge
-    const auslastung = (istMenge / planMenge) * 100
+    // Wochenenden: keine Produktion
+    const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
+    
+    // Deterministisches Muster: ca. 1.014 Bikes/Tag mit saisonaler Variation
+    // Q1 (Jan-März): niedrigere Produktion
+    const monat = datum.getMonth()
+    let saisonalFaktor = 1.0
+    if (monat < 3) saisonalFaktor = 0.7  // Q1: 70%
+    else if (monat < 6) saisonalFaktor = 1.3  // Q2: 130%
+    else if (monat < 9) saisonalFaktor = 1.1  // Q3: 110%
+    else saisonalFaktor = 0.6  // Q4: 60%
+    
+    const basisProduktion = 1014
+    const planMenge = istWochenende ? 0 : Math.round(basisProduktion * saisonalFaktor)
+    
+    // Deterministische Abweichung
+    const istMenge = istWochenende ? 0 : Math.round(planMenge * (0.97 + (tag % 5) * 0.006))
+    const abweichung = istMenge - planMenge
+    const materialVerfuegbar = !istWochenende && Math.abs(abweichung) < 50
+    const auslastung = planMenge > 0 ? (istMenge / planMenge) * 100 : 0
+    
+    // Schichten berechnen (bei 130 Bikes/Stunde, 8 Std/Schicht = 1.040 Bikes/Schicht)
+    const schichten = planMenge > 0 ? Math.ceil(planMenge / 1040) : 0
     
     return {
-      kw,
+      tag,
+      datum: datum.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }),
+      wochentag,
+      schichten,
       planMenge,
       istMenge,
-      abweichung: istMenge - planMenge,
+      abweichung,
       materialVerfuegbar,
-      auslastung: Math.round(auslastung * 10) / 10
+      auslastung: Math.round(auslastung * 10) / 10,
+      kumulativPlan: 0,  // wird unten berechnet
+      kumulativIst: 0    // wird unten berechnet
     }
+  })
+  
+  // Kumulative Werte berechnen
+  let kumulativPlan = 0
+  let kumulativIst = 0
+  tagesProduktion.forEach(tag => {
+    kumulativPlan += tag.planMenge
+    kumulativIst += tag.istMenge
+    tag.kumulativPlan = kumulativPlan
+    tag.kumulativIst = kumulativIst
   })
   
   /**
@@ -210,63 +248,99 @@ export default function ProduktionPage() {
         </CardContent>
       </Card>
 
-      {/* Wöchentliche Produktionsplanung mit Excel-Tabelle */}
-      <Card>
+      {/* SEKTION 1: PRODUKTIONSSTEUERUNG */}
+      <Card className="border-purple-200 bg-purple-50">
         <CardHeader>
-          <CardTitle>Wöchentliche Produktionsplanung (Beispiel Q1)</CardTitle>
-          <CardDescription>
-            Detaillierte Produktionsplanung mit ATP-Check und Auslastung
+          <div className="flex items-center space-x-2">
+            <Factory className="h-6 w-6 text-purple-600" />
+            <CardTitle className="text-purple-900 text-xl">PRODUKTIONSSTEUERUNG (Production Control)</CardTitle>
+          </div>
+          <CardDescription className="text-purple-700">
+            Tägliche Produktionsplanung mit Kapazitätssteuerung und Auslastungsüberwachung
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Formel-Karte */}
-          <div className="mb-6">
+          {/* Formel-Karte für Produktion */}
+          <div className="mb-6 space-y-4">
+            <FormulaCard
+              title="Tagesproduktion"
+              formula="Jahresproduktion / Arbeitstage = 370.000 / 250 ≈ 1.480 Bikes/Tag (bei Vollauslastung)"
+              description="Basierend auf 250 Arbeitstagen im Jahr (ohne Wochenenden und Feiertage)"
+              example="Tatsächlich: ~1.014 Bikes/Tag (Durchschnitt mit Saisonalität)"
+            />
+            <FormulaCard
+              title="Schichtplanung"
+              formula="Benötigte Schichten = Plan-Menge / Kapazität pro Schicht, wobei Kapazität = 130 Bikes/h × 8h = 1.040 Bikes"
+              description="Anzahl der erforderlichen Schichten basierend auf Tagesproduktion"
+              example="1.480 Bikes geplant → 1.480 / 1.040 = 1,42 → 2 Schichten nötig"
+            />
             <FormulaCard
               title="Produktionsauslastung"
               formula="Auslastung (%) = (Ist-Menge / Plan-Menge) × 100"
               description="Zeigt die tatsächliche Produktionsleistung im Verhältnis zur Planung"
-              example="KW 1: 7.100 / 7.200 = 98,6% Auslastung"
+              example="Tag 1: 711 / 710 = 100,1% Auslastung"
             />
           </div>
 
-          {/* Excel-Tabelle */}
+          {/* Tagesplanung Excel-Tabelle */}
           <ExcelTable
             columns={[
               {
-                key: 'kw',
-                label: 'KW',
+                key: 'tag',
+                label: 'Tag',
                 width: '60px',
                 align: 'center'
               },
               {
+                key: 'datum',
+                label: 'Datum',
+                width: '80px',
+                align: 'center'
+              },
+              {
+                key: 'wochentag',
+                label: 'WT',
+                width: '50px',
+                align: 'center'
+              },
+              {
+                key: 'schichten',
+                label: 'Schichten',
+                width: '80px',
+                align: 'center',
+                formula: '⌈Plan / 1.040⌉',
+                format: (val) => val > 0 ? val + ' Schicht(en)' : '-'
+              },
+              {
                 key: 'planMenge',
                 label: 'Plan-Menge',
-                width: '120px',
+                width: '110px',
                 align: 'right',
-                format: (val) => formatNumber(val, 0) + ' Bikes'
+                format: (val) => val > 0 ? formatNumber(val, 0) + ' Bikes' : '-'
               },
               {
                 key: 'istMenge',
                 label: 'Ist-Menge',
-                width: '120px',
+                width: '110px',
                 align: 'right',
-                format: (val) => formatNumber(val, 0) + ' Bikes'
+                format: (val) => val > 0 ? formatNumber(val, 0) + ' Bikes' : '-'
               },
               {
                 key: 'abweichung',
                 label: 'Abweichung',
-                width: '110px',
+                width: '100px',
                 align: 'right',
                 formula: 'Ist - Plan',
                 format: (val) => {
-                  const sign = val >= 0 ? '+' : ''
+                  if (val === 0) return '±0'
+                  const sign = val > 0 ? '+' : ''
                   return sign + formatNumber(val, 0)
                 }
               },
               {
                 key: 'materialVerfuegbar',
                 label: 'Material OK',
-                width: '110px',
+                width: '100px',
                 align: 'center',
                 formula: 'ATP-Check',
                 format: (val) => val ? '✓ Ja' : '✗ Nein'
@@ -274,39 +348,70 @@ export default function ProduktionPage() {
               {
                 key: 'auslastung',
                 label: 'Auslastung',
-                width: '110px',
+                width: '100px',
                 align: 'right',
                 formula: '(Ist / Plan) × 100',
-                format: (val) => formatNumber(val, 1) + ' %'
+                format: (val) => val > 0 ? formatNumber(val, 1) + ' %' : '-'
+              },
+              {
+                key: 'kumulativPlan',
+                label: 'Σ Plan',
+                width: '110px',
+                align: 'right',
+                formula: 'Σ(Plan)',
+                format: (val) => formatNumber(val, 0)
+              },
+              {
+                key: 'kumulativIst',
+                label: 'Σ Ist',
+                width: '110px',
+                align: 'right',
+                formula: 'Σ(Ist)',
+                format: (val) => formatNumber(val, 0)
               }
             ]}
-            data={wochenProduktion}
-            maxHeight="400px"
+            data={tagesProduktion}
+            maxHeight="500px"
             showFormulas={true}
           />
         </CardContent>
       </Card>
 
-      {/* Lagerbestand */}
-      <Card>
+      {/* SEKTION 2: WAREHOUSE / LAGER */}
+      <Card className="border-green-200 bg-green-50">
         <CardHeader>
-          <CardTitle>Aktueller Lagerbestand</CardTitle>
-          <CardDescription>
-            Komponentenverfügbarkeit mit Sicherheitsbeständen (Excel-ähnliche Darstellung)
+          <div className="flex items-center space-x-2">
+            <Package className="h-6 w-6 text-green-600" />
+            <CardTitle className="text-green-900 text-xl">WAREHOUSE / LAGER (Inventory Management)</CardTitle>
+          </div>
+          <CardDescription className="text-green-700">
+            Lagerverwaltung mit ATP-Check, Sicherheitsbeständen und Reichweitenberechnung
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Formel-Karte */}
-          <div className="mb-6">
+          {/* Formel-Karten für Lager */}
+          <div className="mb-6 space-y-4">
             <FormulaCard
               title="ATP-Check Formel (Available-to-Promise)"
               formula="ATP = Verfügbarer Bestand - Sicherheitsbestand ≥ Bedarf"
               description="Vor jeder Produktion wird geprüft, ob genug Material verfügbar ist."
-              example="Gabel_Fox32F100: 5.200 - 1.000 = 4.200 verfügbar ✓"
+              example="Gabel_Fox32: 4.500 - 1.000 = 3.500 verfügbar ≥ 3.800 Bedarf → ✗ Nicht ausreichend"
+            />
+            <FormulaCard
+              title="Reichweite"
+              formula="Reichweite (Wochen) = Verfügbarer Bestand / Wochenbedarf"
+              description="Zeigt an, wie lange der aktuelle Bestand bei gegebenem Verbrauch reicht"
+              example="Sattel_Standard: (6.100 - 1.000) / 5.000 = 1,02 Wochen"
+            />
+            <FormulaCard
+              title="Kritischer Bestand"
+              formula="Status = 'Kritisch' wenn Bestand < Sicherheitsbestand ODER Reichweite < 1 Woche"
+              description="Warnsystem für Materialengpässe zur Vermeidung von Produktionsstopps"
+              example="Gabel_RockShox: 750 < 1.000 → ⚠ Kritisch"
             />
           </div>
 
-          {/* Excel-ähnliche Tabelle */}
+          {/* Excel-ähnliche Lagertabelle */}
           <ExcelTable
             columns={[
               {
@@ -318,7 +423,7 @@ export default function ProduktionPage() {
               {
                 key: 'bestand',
                 label: 'Bestand',
-                width: '120px',
+                width: '110px',
                 align: 'right',
                 format: (val) => formatNumber(val, 0)
               },
@@ -371,11 +476,13 @@ export default function ProduktionPage() {
               reichweite: (l.bestand - l.sicherheit) / l.bedarf,
               status: l.status
             }))}
-            maxHeight="400px"
+            maxHeight="500px"
             showFormulas={true}
           />
         </CardContent>
       </Card>
+
+      {/* Lagerbestand - alte Section entfernt, jetzt in Warehouse integriert */}
 
       {/* Materialfluss */}
       <Card>
