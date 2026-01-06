@@ -46,8 +46,9 @@ Diese Datei ist die **authoritative Quelle** für:
 
 Das Projekt nutzt **Code-Ermäßigungen**, die Komplexität reduzieren:
 
-- ✅ **Nur 1 Zulieferer:** China (statt Heilbronn, Spanien, China)
-- ✅ **Nur Sättel:** 4 Varianten (statt 14 Bauteile: Sättel + Gabeln + Rahmen)
+- ✅ **Nur 1 Zulieferer:** China (keine anderen Länder)
+- ✅ **Nur Sättel:** 4 Varianten (keine Gabeln, keine Rahmen)
+- ✅ **Transport:** Nur Schiff (China→Hamburg) + LKW (Hamburg→Dortmund), keine Bahn
 - ✅ **Kein Outbound:** Keine Distribution zu 6 Märkten
 - ✅ **FCFS statt Solver:** First-Come-First-Serve statt Excel-Solver-Optimierung
 
@@ -284,12 +285,14 @@ function istSpringFestival(datum: Date): boolean {
 3. **Ermäßigungen ignorieren**
    ```typescript
    // ✗ NIEMALS! Wir haben Ermäßigungen
-   const zulieferer = ['Heilbronn', 'Spanien', 'China']; // Zu komplex!
+   const zulieferer = ['China', 'Spanien', 'Deutschland']; // Zu komplex!
    const bauteile = [...saettel, ...gabeln, ...rahmen]; // Zu viel!
+   const transport = ['Schiff', 'Bahn', 'LKW']; // Bahn gibt es nicht!
    
-   // ✓ KORREKT: Nur China, nur Sättel
+   // ✓ KORREKT: Nur China, nur Sättel, nur Schiff + LKW
    const zulieferer = ['China'];
-   const bauteile = saettel; // Nur 4 Varianten
+   const bauteile = saettel; // Nur 4 Sattel-Varianten
+   const transport = ['Schiff', 'LKW']; // Seefracht + LKW-Transport
    ```
 
 4. **Englische Begriffe in Business-Logik**

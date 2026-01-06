@@ -352,7 +352,7 @@ export interface Bauteil {
   id: string;
   name: string;
   kategorie: "Sattel" | "Gabel" | "Rahmen";
-  zulieferer: "China" | "Spanien" | "Heilbronn";
+  zulieferer: "China"; // Ermäßigung: Nur China (nicht Spanien oder Heilbronn)
   beschreibung: string;
 }
 
@@ -494,11 +494,11 @@ export const BAUTEIL_JAHRESBEDARF = BAUTEILE.map(bauteil => {
  * WICHTIG: Ermäßigung aktiv!
  * 
  * Nur 1 Zulieferer: China (statt 3)
+ * Nur Sättel als Bauteile (statt Sättel + Gabeln + Rahmen)
  * 
- * Vollversion hätte:
- * - Heilbronn (Deutschland): Rahmen, 7 Tage Vorlauf, 2 Tage Produktion
- * - Saragossa (Spanien): Gabeln, 14 Tage Vorlauf, 5 Tage Produktion
- * - China: Sättel, 49 Tage Vorlauf (7 Wochen), 5 Tage Produktion
+ * Transport erfolgt ausschließlich per:
+ * - Seefracht (Schiff): China → Hamburg
+ * - LKW: Hamburg → Werk Dortmund
  * 
  * Vereinfachung: Nur China für Sättel!
  */
@@ -525,7 +525,7 @@ export interface Zulieferer {
   
   transportzeit: {
     tage: number; // Berechnet: Vorlaufzeit - Produktionszeit
-    modus: "Schiff" | "Bahn" | "LKW" | "Mix";
+    modus: "Schiff" | "LKW"; // Ermäßigung: Nur Schiff + LKW (keine Bahn)
     beschreibung: string;
   };
   
