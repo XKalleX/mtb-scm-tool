@@ -76,7 +76,7 @@ export default function InboundPage() {
         <div>
           <h1 className="text-3xl font-bold">Inbound Logistik - China</h1>
           <p className="text-muted-foreground mt-1">
-            Einziger Lieferant für ALLE Komponenten (Code-Lösung Ermäßigung)
+            Einziger Lieferant für ALLE Komponenten
           </p>
         </div>
         <div className="flex gap-2">

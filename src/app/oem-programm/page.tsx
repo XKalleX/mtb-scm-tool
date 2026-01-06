@@ -315,25 +315,16 @@ export default function OEMProgrammPage() {
           </Card>
         </TabsContent>
 
-        {/* Stückliste Tab - NUR SÄTTEL (Code-Ermäßigung!) */}
+        {/* Stückliste Tab - NUR SÄTTEL */}
         <TabsContent value="stueckliste" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Stückliste - Mountain Bikes (Code-Ermäßigung)</CardTitle>
+              <CardTitle>Stückliste - Mountain Bikes</CardTitle>
               <CardDescription>
                 Vereinfachte Stückliste: 1x Sattel = 1 Fahrrad (Rahmen & Gabeln vereinfacht)
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 mb-6">
-                <p className="text-sm text-amber-900">
-                  <strong>📋 CODE-ERMÄSSIGUNG AKTIV:</strong> {stuecklisteData.hinweis}
-                </p>
-                <p className="text-xs text-amber-700 mt-2">
-                  In der Vollversion würde jedes Bike aus 1 Rahmen + 1 Gabel + 1 Sattel bestehen. 
-                  Für die Code-Lösung fokussieren wir auf die Sättel-Beschaffung aus China.
-                </p>
-              </div>
               
               <Table>
                 <TableHeader>
@@ -682,7 +673,7 @@ export default function OEMProgrammPage() {
       {/* Erfüllte Anforderungen */}
       <Card>
         <CardHeader>
-          <CardTitle>Erfüllte Anforderungen (Code-Ermäßigung)</CardTitle>
+          <CardTitle>Erfüllte Anforderungen</CardTitle>
           <CardDescription>
             Fokus auf Kernkonzepte mit vereinfachter Stückliste
           </CardDescription>
@@ -699,14 +690,6 @@ export default function OEMProgrammPage() {
             <RequirementItem text="✓ Roter Faden: Saison → Tagesplanung" />
             <RequirementItem text="✓ Marketing-Zusatzaufträge möglich" />
             <RequirementItem text="✓ China-Zulieferer (49 Tage Vorlauf)" />
-          </div>
-          
-          <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-sm text-amber-900">
-              <strong>💡 Code-Ermäßigung aktiv:</strong> Vereinfachte Stückliste mit nur Sätteln ermöglicht
-              Fokus auf Supply-Chain-Kernkonzepte (Vorlaufzeit, Losgrößen, Error-Management) ohne 
-              unnötige Komplexität von 14 Bauteilen.
-            </p>
           </div>
         </CardContent>
       </Card>
