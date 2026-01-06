@@ -1250,54 +1250,55 @@ function VisualisierungenView({
         <Card>
           <CardHeader>
             <CardTitle>Wöchentlicher Produktionsdurchsatz</CardTitle>
-            <CardDescription>Alle 52 KWs in 2027 (unabhängig von Zeitfiltern) - Vertikal scrollbar</CardDescription>
+            <CardDescription>Alle 52 KWs in 2027 (unabhängig von Zeitfiltern) - Horizontal scrollbar</CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Vertikale Scrollfunktion für alle 52 Wochen */}
-            <div className="w-full overflow-y-auto" style={{ maxHeight: '600px' }}>
-              <ResponsiveContainer width="100%" height={52 * 30}>
-                <BarChart 
-                  data={Array.from({ length: 52 }, (_, i) => {
-                    const basisDurchsatz = 7000
-                    const schwankung = Math.sin(i * 0.7) * 400
-                    
-                    return {
-                      woche: `KW ${i + 1}`,
-                      durchsatz: Math.round(basisDurchsatz + schwankung)
-                    }
-                  })}
-                  layout="horizontal"
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis 
-                    type="number"
-                    stroke="#666"
-                    label={{ value: 'Bikes pro Woche', position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
-                  />
-                  <YAxis 
-                    type="category"
-                    dataKey="woche" 
-                    stroke="#666"
-                    width={70}
-                    label={{ value: 'Kalenderwoche', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
-                  />
-                  <Tooltip 
-                    formatter={(value: any) => {
-                      if (typeof value === 'number') {
-                        return formatNumber(value, 0) + ' Bikes'
+            {/* Horizontale Scrollfunktion für alle 52 Wochen */}
+            <div className="w-full overflow-x-auto">
+              <div style={{ width: `${52 * 40}px`, minWidth: '100%' }}>
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart 
+                    data={Array.from({ length: 52 }, (_, i) => {
+                      const basisDurchsatz = 7000
+                      const schwankung = Math.sin(i * 0.7) * 400
+                      
+                      return {
+                        woche: `KW ${i + 1}`,
+                        durchsatz: Math.round(basisDurchsatz + schwankung)
                       }
-                      return String(value)
-                    }}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Bar
-                    dataKey="durchsatz"
-                    fill={COLORS.primary}
-                    name="Wöchentliche Produktion"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+                    })}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="woche"
+                      stroke="#666"
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -10, style: { fontWeight: 'bold' } }}
+                    />
+                    <YAxis 
+                      stroke="#666"
+                      label={{ value: 'Bikes pro Woche', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                    />
+                    <Tooltip 
+                      formatter={(value: any) => {
+                        if (typeof value === 'number') {
+                          return formatNumber(value, 0) + ' Bikes'
+                        }
+                        return String(value)
+                      }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                    <Bar
+                      dataKey="durchsatz"
+                      fill={COLORS.primary}
+                      name="Wöchentliche Produktion"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </CardContent>
         </Card>
