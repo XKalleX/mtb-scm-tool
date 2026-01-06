@@ -424,10 +424,62 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
         <CardHeader>
           <CardTitle>Alle SCOR-Metriken im Überblick</CardTitle>
           <CardDescription>
-            Vollständige Übersicht aller KPIs mit Zielwerten und Status (Excel-Darstellung)
+            Vollständige Übersicht aller KPIs mit Zielwerten, Status und Formel-Erklärungen (Excel-Darstellung)
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Formel-Erklärungen */}
+          <div className="grid gap-4 mb-6">
+            <FormulaCard
+              title="Planerfüllungsgrad"
+              formula="(Vollständig produzierte Aufträge / Gesamt Aufträge) × 100%"
+              description="Misst, wie viele Produktionsaufträge die geplante Menge vollständig erreicht haben. Ein hoher Wert zeigt zuverlässige Planung und Ausführung."
+              example="Wenn 355 von 365 Tagesaufträgen vollständig erfüllt wurden: (355 / 365) × 100% = 97,3%"
+            />
+            <FormulaCard
+              title="Liefertreue China"
+              formula="(Pünktliche Bestellungen / Gesamt Bestellungen) × 100%"
+              description="Gibt an, wie viele Bestellungen vom China-Lieferanten termingerecht ankommen. Wichtig für Just-in-Time Produktion."
+              example="Bei 48 von 50 pünktlichen Lieferungen: (48 / 50) × 100% = 96,0%"
+            />
+            <FormulaCard
+              title="Durchlaufzeit Produktion"
+              formula="Ø (Ankunftsdatum Komponenten - Bestelldatum)"
+              description="Durchschnittliche Zeit von der Bestellung in China bis zur Ankunft im Werk. Beinhaltet Produktion (49 Tage) und Transport."
+              example="Bei 49 Tage Vorlaufzeit + 14 Tage Seetransport: ~63 Tage Durchlaufzeit"
+            />
+            <FormulaCard
+              title="Lagerumschlag"
+              formula="Jahresproduktion (Bikes) / Durchschnittlicher Lagerbestand (Komponenten)"
+              description="Zeigt, wie oft der Lagerbestand pro Jahr umgeschlagen wird. Hoher Wert = effiziente Lagerhaltung, wenig gebundenes Kapital."
+              example="Bei 370.000 Bikes und Ø 92.500 Sätteln im Lager: 370.000 / 92.500 = 4,0x pro Jahr"
+            />
+            <FormulaCard
+              title="Produktionsflexibilität"
+              formula="(Tage mit vollständiger Produktion / Gesamt Produktionstage) × 100%"
+              description="Misst die Fähigkeit, geplante Mengen auch bei Störungen zu produzieren. Identisch mit Planerfüllungsgrad für Produktionsperspektive."
+              example="Bei 340 von 365 Tagen ohne Materialmangel: (340 / 365) × 100% = 93,2%"
+            />
+            <FormulaCard
+              title="Materialverfügbarkeit"
+              formula="(Produktionstage ohne Materialmangel / Gesamt Produktionstage) × 100%"
+              description="Prozentsatz der Tage, an denen alle benötigten Komponenten verfügbar waren. Schlüssel-KPI für Beschaffungsplanung."
+              example="Wenn an 350 von 365 Tagen Material verfügbar war: (350 / 365) × 100% = 95,9%"
+            />
+            <FormulaCard
+              title="Gesamtkosten"
+              formula="Herstellkosten + Beschaffungskosten + Lagerkosten"
+              description="Summe aller Supply Chain Kosten. Herstellkosten dominieren (~98%), aber Beschaffung und Lager sind optimierbar."
+              example="185M € (Herstellung) + 1,25M € (Beschaffung) + 1,25M € (Lager) = 187,5M € gesamt"
+            />
+            <FormulaCard
+              title="Kapitalbindung"
+              formula="(Durchschnittlicher Lagerbestand × Kosten pro Stück × 365 Tage) / (Jahresproduktion × 1.000 €/Bike)"
+              description="Zeigt, wie viele Tage Kapital im Lager gebunden ist. Niedrigerer Wert = besserer Cashflow."
+              example="Bei Ø 92.500 Sätteln á 100€: (92.500 × 100 × 365) / (370.000 × 1.000) = 9,1 Tage"
+            />
+          </div>
+
           <ExcelTable
             columns={[
               {
@@ -465,7 +517,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                 label: 'Zielerreichung',
                 width: '130px',
                 align: 'right',
-                formula: '(Ist / Ziel) × 100',
+                formula: '(Ist / Ziel) × 100%',
                 format: (val) => formatPercent(val, 1),
                 sumable: true
               },
@@ -548,12 +600,13 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                 status: metriken.kapitalbindung <= 30 ? 'good' : 'medium'
               }
             ]}
-            maxHeight="500px"
+            maxHeight="600px"
             showFormulas={true}
             showSums={true}
             sumRowLabel="DURCHSCHNITT Zielerreichung"
             groupBy="kategorie"
             subtotalLabel="Kategorie-Durchschnitt"
+            useAverage={true}
           />
         </CardContent>
       </Card>
