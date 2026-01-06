@@ -576,8 +576,8 @@ export const ZULIEFERER_CHINA: Zulieferer = {
   
   transportzeit: {
     tage: 49 - 7, // ≈ 42 Tage Seefracht (vereinfacht, exakt komplexer)
-    modus: "Schiff",
-    beschreibung: "Seefracht von China nach Deutschland über ~42 Tage"
+    modus: "Schiff", // Haupttransport: Seefracht (LKW Hamburg→Dortmund erfolgt durch OEM)
+    beschreibung: "Seefracht von China nach Deutschland über ~42 Tage, anschließend LKW-Transport durch OEM"
   },
   
   losgroessen: {
