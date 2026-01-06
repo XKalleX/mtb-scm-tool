@@ -685,8 +685,8 @@ function VisualisierungenView({
   // Filter/Aggregiere Produktionsdaten basierend auf timeRange
   const produktionsDaten = (() => {
     if (timeRange === 'day') {
-      // Zeige die letzten 30 Tage
-      return basisTaeglicherDaten.slice(-30).map(t => ({
+      // Zeige ALLE 365 Tage für vollständige Transparenz
+      return basisTaeglicherDaten.map(t => ({
         monat: `Tag ${t.tag}`,
         plan: t.plan,
         ist: t.ist,
@@ -744,8 +744,8 @@ function VisualisierungenView({
   // Filter/Aggregiere Lagerdaten basierend auf timeRange
   const lagerDaten = (() => {
     if (timeRange === 'day') {
-      // Zeige die letzten 30 Tage
-      return basisTaeglicherLagerDaten.slice(-30).map(t => ({
+      // Zeige ALLE 365 Tage für vollständige Transparenz
+      return basisTaeglicherLagerDaten.map(t => ({
         monat: `Tag ${t.tag}`,
         saettel: t.saettel
       }))
@@ -791,8 +791,8 @@ function VisualisierungenView({
   // Filter wöchentliche Daten basierend auf timeRange
   const woechentlicheDaten = (() => {
     if (timeRange === 'day') {
-      // Zeige die letzten 30 Tage
-      return basisTaeglicherAuslastung.slice(-30).map(t => ({
+      // Zeige ALLE 365 Tage für vollständige Transparenz
+      return basisTaeglicherAuslastung.map(t => ({
         woche: `Tag ${t.tag}`,
         auslastung: t.auslastung,
         produktion: t.produktion
@@ -880,63 +880,116 @@ function VisualisierungenView({
         </div>
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-2 gap-6">
+      {/* Charts Grid - Volle Breite für Tagesansicht, sonst 2-spaltig */}
+      <div className={timeRange === 'day' ? 'space-y-6' : 'grid grid-cols-2 gap-6'}>
         {/* Produktionsverlauf */}
         <Card>
           <CardHeader>
             <CardTitle>Produktionsverlauf 2027</CardTitle>
-            <CardDescription>Plan vs. Ist mit Abweichungen ({getTimeRangeLabel()})</CardDescription>
+            <CardDescription>
+              Plan vs. Ist mit Abweichungen ({getTimeRangeLabel()})
+              {timeRange === 'day' && ' - Horizontal scrollbar für alle 365 Tage'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart data={produktionsDaten}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="monat" 
-                  stroke="#666"
-                  label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
-                />
-                <YAxis 
-                  stroke="#666"
-                  label={{ value: 'Produktion (Bikes)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px'
-                  }}
-                  formatter={(value) => {
-                    if (value === undefined || value === null) return 'N/A'
-                    if (typeof value !== 'number') return String(value)
-                    return value.toLocaleString('de-DE') + ' Bikes'
-                  }}
-                />
-                <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                <Bar dataKey="plan" fill={COLORS.secondary} name="Plan" opacity={0.8} />
-                <Bar dataKey="ist" fill={COLORS.primary} name="Ist" />
-                <Line
-                  type="monotone"
-                  dataKey="abweichung"
-                  stroke={COLORS.danger}
-                  strokeWidth={2}
-                  name="Abweichung"
-                  dot={{ fill: COLORS.danger }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
+            {timeRange === 'day' ? (
+              // Tagesansicht mit horizontaler Scrollfunktion
+              <div className="w-full overflow-x-auto">
+                <div style={{ width: `${produktionsDaten.length * 20}px`, minWidth: '100%' }}>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <ComposedChart data={produktionsDaten}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="monat" 
+                        stroke="#666"
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                        interval={Math.floor(produktionsDaten.length / 50)}
+                        label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -10, style: { fontWeight: 'bold' } }}
+                      />
+                      <YAxis 
+                        stroke="#666"
+                        label={{ value: 'Produktion (Bikes)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '6px'
+                        }}
+                        formatter={(value) => {
+                          if (value === undefined || value === null) return 'N/A'
+                          if (typeof value !== 'number') return String(value)
+                          return value.toLocaleString('de-DE') + ' Bikes'
+                        }}
+                      />
+                      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                      <Bar dataKey="plan" fill={COLORS.secondary} name="Plan" opacity={0.8} />
+                      <Bar dataKey="ist" fill={COLORS.primary} name="Ist" />
+                      <Line
+                        type="monotone"
+                        dataKey="abweichung"
+                        stroke={COLORS.danger}
+                        strokeWidth={2}
+                        name="Abweichung"
+                        dot={false}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            ) : (
+              // Normale Ansicht ohne Scrolling
+              <ResponsiveContainer width="100%" height={350}>
+                <ComposedChart data={produktionsDaten}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="monat" 
+                    stroke="#666"
+                    label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
+                  />
+                  <YAxis 
+                    stroke="#666"
+                    label={{ value: 'Produktion (Bikes)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px'
+                    }}
+                    formatter={(value) => {
+                      if (value === undefined || value === null) return 'N/A'
+                      if (typeof value !== 'number') return String(value)
+                      return value.toLocaleString('de-DE') + ' Bikes'
+                    }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                  <Bar dataKey="plan" fill={COLORS.secondary} name="Plan" opacity={0.8} />
+                  <Bar dataKey="ist" fill={COLORS.primary} name="Ist" />
+                  <Line
+                    type="monotone"
+                    dataKey="abweichung"
+                    stroke={COLORS.danger}
+                    strokeWidth={2}
+                    name="Abweichung"
+                    dot={{ fill: COLORS.danger }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
-        {/* Variantenverteilung */}
+        {/* Variantenverteilung - unverändert (keine Zeitbereichs-Abhängigkeit) */}
         <Card>
           <CardHeader>
             <CardTitle>Produktvariantenverteilung</CardTitle>
             <CardDescription>Jahresproduktion nach Varianten</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={timeRange === 'day' ? 400 : 350}>
               <PieChart>
                 <Pie
                   data={variantenDaten}
@@ -944,7 +997,7 @@ function VisualisierungenView({
                   cy="50%"
                   labelLine={false}
                   label={(entry) => `${entry.name.replace('MTB ', '')}: ${entry.prozent}%`}
-                  outerRadius={100}
+                  outerRadius={timeRange === 'day' ? 130 : 100}
                   fill="#8884d8"
                   dataKey="wert"
                 >
@@ -968,39 +1021,85 @@ function VisualisierungenView({
         <Card>
           <CardHeader>
             <CardTitle>Lagerbestandsentwicklung 2027 - Sättel</CardTitle>
-            <CardDescription>Bestandsverlauf der Sättel aus China ({getTimeRangeLabel()})</CardDescription>
+            <CardDescription>
+              Bestandsverlauf der Sättel aus China ({getTimeRangeLabel()})
+              {timeRange === 'day' && ' - Horizontal scrollbar für alle 365 Tage'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={lagerDaten}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="monat" 
-                  stroke="#666"
-                  label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
-                />
-                <YAxis 
-                  stroke="#666"
-                  label={{ value: 'Bestand (Stück)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
-                />
-                <Tooltip 
-                  formatter={(value) => {
-                    if (value === undefined || value === null) return 'N/A'
-                    if (typeof value !== 'number') return String(value)
-                    return Math.round(value).toLocaleString('de-DE') + ' Stück'
-                  }}
-                />
-                <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                <Line
-                  type="monotone"
-                  dataKey="saettel"
-                  stroke={COLORS.primary}
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                  name="Sättel"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {timeRange === 'day' ? (
+              // Tagesansicht mit horizontaler Scrollfunktion
+              <div className="w-full overflow-x-auto">
+                <div style={{ width: `${lagerDaten.length * 20}px`, minWidth: '100%' }}>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart data={lagerDaten}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="monat" 
+                        stroke="#666"
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                        interval={Math.floor(lagerDaten.length / 50)}
+                        label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -10, style: { fontWeight: 'bold' } }}
+                      />
+                      <YAxis 
+                        stroke="#666"
+                        label={{ value: 'Bestand (Stück)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                      />
+                      <Tooltip 
+                        formatter={(value) => {
+                          if (value === undefined || value === null) return 'N/A'
+                          if (typeof value !== 'number') return String(value)
+                          return Math.round(value).toLocaleString('de-DE') + ' Stück'
+                        }}
+                      />
+                      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                      <Line
+                        type="monotone"
+                        dataKey="saettel"
+                        stroke={COLORS.primary}
+                        strokeWidth={2}
+                        dot={false}
+                        name="Sättel"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            ) : (
+              // Normale Ansicht ohne Scrolling
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={lagerDaten}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="monat" 
+                    stroke="#666"
+                    label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
+                  />
+                  <YAxis 
+                    stroke="#666"
+                    label={{ value: 'Bestand (Stück)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                  />
+                  <Tooltip 
+                    formatter={(value) => {
+                      if (value === undefined || value === null) return 'N/A'
+                      if (typeof value !== 'number') return String(value)
+                      return Math.round(value).toLocaleString('de-DE') + ' Stück'
+                    }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                  <Line
+                    type="monotone"
+                    dataKey="saettel"
+                    stroke={COLORS.primary}
+                    strokeWidth={3}
+                    dot={{ r: 4 }}
+                    name="Sättel"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -1008,46 +1107,99 @@ function VisualisierungenView({
         <Card>
           <CardHeader>
             <CardTitle>Produktionsauslastung 2027</CardTitle>
-            <CardDescription>Auslastung in % ({getTimeRangeLabel()})</CardDescription>
+            <CardDescription>
+              Auslastung in % ({getTimeRangeLabel()})
+              {timeRange === 'day' && ' - Horizontal scrollbar für alle 365 Tage'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={woechentlicheDaten}>
-                <defs>
-                  <linearGradient id="colorAuslastung" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0.1}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="woche" 
-                  stroke="#666"
-                  label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
-                />
-                <YAxis 
-                  stroke="#666" 
-                  domain={[0, 100]}
-                  label={{ value: 'Auslastung (%)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
-                />
-                <Tooltip 
-                  formatter={(value) => {
-                    if (value === undefined || value === null) return 'N/A'
-                    if (typeof value !== 'number') return String(value)
-                    return value.toFixed(1) + '%'
-                  }}
-                />
-                <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                <Area
-                  type="monotone"
-                  dataKey="auslastung"
-                  stroke={COLORS.primary}
-                  fillOpacity={1}
-                  fill="url(#colorAuslastung)"
-                  name="Auslastung %"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {timeRange === 'day' ? (
+              // Tagesansicht mit horizontaler Scrollfunktion
+              <div className="w-full overflow-x-auto">
+                <div style={{ width: `${woechentlicheDaten.length * 20}px`, minWidth: '100%' }}>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <AreaChart data={woechentlicheDaten}>
+                      <defs>
+                        <linearGradient id="colorAuslastung" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0.1}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="woche" 
+                        stroke="#666"
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                        interval={Math.floor(woechentlicheDaten.length / 50)}
+                        label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -10, style: { fontWeight: 'bold' } }}
+                      />
+                      <YAxis 
+                        stroke="#666" 
+                        domain={[0, 100]}
+                        label={{ value: 'Auslastung (%)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                      />
+                      <Tooltip 
+                        formatter={(value) => {
+                          if (value === undefined || value === null) return 'N/A'
+                          if (typeof value !== 'number') return String(value)
+                          return value.toFixed(1) + '%'
+                        }}
+                      />
+                      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                      <Area
+                        type="monotone"
+                        dataKey="auslastung"
+                        stroke={COLORS.primary}
+                        fillOpacity={1}
+                        fill="url(#colorAuslastung)"
+                        name="Auslastung %"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            ) : (
+              // Normale Ansicht ohne Scrolling
+              <ResponsiveContainer width="100%" height={350}>
+                <AreaChart data={woechentlicheDaten}>
+                  <defs>
+                    <linearGradient id="colorAuslastung" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="woche" 
+                    stroke="#666"
+                    label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
+                  />
+                  <YAxis 
+                    stroke="#666" 
+                    domain={[0, 100]}
+                    label={{ value: 'Auslastung (%)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                  />
+                  <Tooltip 
+                    formatter={(value) => {
+                      if (value === undefined || value === null) return 'N/A'
+                      if (typeof value !== 'number') return String(value)
+                      return value.toFixed(1) + '%'
+                    }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                  <Area
+                    type="monotone"
+                    dataKey="auslastung"
+                    stroke={COLORS.primary}
+                    fillOpacity={1}
+                    fill="url(#colorAuslastung)"
+                    name="Auslastung %"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -1061,7 +1213,7 @@ function VisualisierungenView({
             <CardDescription>Aufschlüsselung nach Kostenarten</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={350}>
               <PieChart>
                 <Pie
                   data={[
@@ -1073,7 +1225,7 @@ function VisualisierungenView({
                   cy="50%"
                   labelLine={false}
                   label={(entry) => `${entry.name}: ${((entry.value / 187500000) * 100).toFixed(1)}%`}
-                  outerRadius={100}
+                  outerRadius={110}
                   fill="#8884d8"
                   dataKey="value"
                 >
@@ -1094,52 +1246,60 @@ function VisualisierungenView({
           </CardContent>
         </Card>
 
-        {/* Wöchentlicher Durchsatz */}
+        {/* Wöchentlicher Durchsatz - UNABHÄNGIG von Zeitfiltern */}
         <Card>
           <CardHeader>
             <CardTitle>Wöchentlicher Produktionsdurchsatz</CardTitle>
-            <CardDescription>Erste 12 Wochen 2027</CardDescription>
+            <CardDescription>Alle 52 KWs in 2027 (unabhängig von Zeitfiltern) - Horizontal scrollbar</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={Array.from({ length: 12 }, (_, i) => {
-                const basisDurchsatz = 7000
-                const schwankung = Math.sin(i * 0.7) * 400
-                
-                return {
-                  woche: `KW ${i + 1}`,
-                  durchsatz: Math.round(basisDurchsatz + schwankung)
-                }
-              })}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="woche" 
-                  stroke="#666"
-                  label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
-                />
-                <YAxis 
-                  stroke="#666"
-                  label={{ value: 'Bikes pro Woche', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
-                />
-                <Tooltip 
-                  formatter={(value: any) => {
-                    if (typeof value === 'number') {
-                      return formatNumber(value, 0) + ' Bikes'
-                    }
-                    return String(value)
-                  }}
-                />
-                <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                <Line
-                  type="monotone"
-                  dataKey="durchsatz"
-                  stroke={COLORS.primary}
-                  strokeWidth={3}
-                  dot={{ fill: COLORS.primary, r: 5 }}
-                  name="Wöchentliche Produktion"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {/* Horizontale Scrollfunktion für alle 52 Wochen */}
+            <div className="w-full overflow-x-auto">
+              <div style={{ width: `${52 * 40}px`, minWidth: '100%' }}>
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart 
+                    data={Array.from({ length: 52 }, (_, i) => {
+                      const basisDurchsatz = 7000
+                      const schwankung = Math.sin(i * 0.7) * 400
+                      
+                      return {
+                        woche: `KW ${i + 1}`,
+                        durchsatz: Math.round(basisDurchsatz + schwankung)
+                      }
+                    })}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="woche"
+                      stroke="#666"
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -10, style: { fontWeight: 'bold' } }}
+                    />
+                    <YAxis 
+                      stroke="#666"
+                      label={{ value: 'Bikes pro Woche', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
+                    />
+                    <Tooltip 
+                      formatter={(value: any) => {
+                        if (typeof value === 'number') {
+                          return formatNumber(value, 0) + ' Bikes'
+                        }
+                        return String(value)
+                      }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                    <Bar
+                      dataKey="durchsatz"
+                      fill={COLORS.primary}
+                      name="Wöchentliche Produktion"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
