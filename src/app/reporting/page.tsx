@@ -10,17 +10,32 @@
  * - Interaktive Visualisierungen
  * - Performance-Dashboards
  * - Grafische Auswertungen
+ * 
+ * WICHTIG: Alle Daten werden dynamisch aus dem zentralen
+ * Supply Chain Metrics Rechner bezogen und reflektieren
+ * ALLE aktiven Szenarien für konsistente Werte!
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { TrendingUp, TrendingDown, Minus, BarChart3, Download, Filter, Maximize2 } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, BarChart3, Download, Filter, Maximize2, Zap } from 'lucide-react'
 import { formatNumber, formatPercent } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
+import { useSzenarien } from '@/contexts/SzenarienContext'
+import { 
+  berechneGesamtMetriken, 
+  berechneProduktionsDatenFuerVisualisierung,
+  berechneLagerDaten,
+  berechneWoechentlicheAuslastung,
+  berechneTaeglicherDaten,
+  berechneVariantenProduktion,
+  berechneSzenarioAuswirkungen,
+  BASELINE
+} from '@/lib/calculations/supply-chain-metrics'
 import {
   LineChart,
   Line,
@@ -58,10 +73,24 @@ const VARIANTEN_FARBEN = [
 /**
  * Reporting Hauptseite
  * Kombiniert SCOR Metriken und Visualisierungen
+ * 
+ * WICHTIG: Alle Daten werden dynamisch berechnet basierend auf aktiven Szenarien!
  */
 export default function ReportingPage() {
   const [selectedView, setSelectedView] = useState<'metrics' | 'charts'>('metrics')
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month' | 'quarter' | 'year'>('month')
+  
+  // Hole aktive Szenarien aus dem globalen Context
+  const { getAktiveSzenarien } = useSzenarien()
+  const aktiveSzenarien = getAktiveSzenarien()
+  
+  // Berechne alle Metriken dynamisch basierend auf Szenarien
+  const gesamtMetriken = useMemo(() => {
+    return berechneGesamtMetriken(aktiveSzenarien)
+  }, [aktiveSzenarien])
+  
+  // SCOR-Metriken aus dem zentralen Rechner
+  const scorMetriken = gesamtMetriken.scor
   
   /**
    * Exportiert SCOR-Metriken als CSV
@@ -83,38 +112,6 @@ export default function ReportingPage() {
     exportToCSV(metricsData, 'scor_metriken_2027')
   }
 
-  
-  // SCOR-Metriken Beispieldaten
-  const scorMetriken = {
-    // RELIABILITY
-    planerfuellungsgrad: 99.86,
-    liefertreueChina: 94.5,
-    
-    // RESPONSIVENESS
-    durchlaufzeitProduktion: 56,
-    lagerumschlag: 4.2,
-    
-    // AGILITY
-    produktionsflexibilitaet: 99.86,
-    materialverfuegbarkeit: 98.3,
-    
-    // COSTS
-    gesamtkosten: 187500000,
-    herstellkosten: 185000000,
-    lagerkosten: 1250000,
-    beschaffungskosten: 1250000,
-    
-    // ASSETS
-    lagerbestandswert: 12500000,
-    kapitalbindung: 24.7,
-    
-    // PRODUKTIONS-KPIs
-    gesamtproduktion: 184750,
-    produktionstage: 252,
-    durchschnittProTag: 733,
-    auslastung: 99.86
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -123,6 +120,7 @@ export default function ReportingPage() {
           <h1 className="text-3xl font-bold">Reporting & Visualisierungen</h1>
           <p className="text-muted-foreground mt-1">
             SCOR-Metriken, KPIs und interaktive Dashboards
+            {aktiveSzenarien.length > 0 && ' - Live-Berechnung mit aktiven Szenarien'}
           </p>
         </div>
         
@@ -142,6 +140,23 @@ export default function ReportingPage() {
         </div>
       </div>
 
+      {/* Aktive Szenarien Hinweis */}
+      {aktiveSzenarien.length > 0 && (
+        <Card className="border-green-200 bg-green-50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-green-600" />
+              <CardTitle className="text-green-900 text-lg">
+                Live-Berechnung mit {aktiveSzenarien.length} aktiven Szenario(s)
+              </CardTitle>
+            </div>
+            <CardDescription className="text-green-700">
+              Alle Metriken werden dynamisch unter Berücksichtigung der Szenarien berechnet
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       {/* Tabs für Metriken und Charts */}
       <Tabs value={selectedView} onValueChange={(v: any) => setSelectedView(v)}>
         <TabsList>
@@ -151,12 +166,16 @@ export default function ReportingPage() {
 
         {/* SCOR Metriken Tab */}
         <TabsContent value="metrics" className="space-y-6">
-          <SCORMetrikenView metriken={scorMetriken} />
+          <SCORMetrikenView metriken={scorMetriken} istBaseline={gesamtMetriken.istBaseline} />
         </TabsContent>
 
         {/* Visualisierungen Tab */}
         <TabsContent value="charts" className="space-y-6">
-          <VisualisierungenView timeRange={timeRange} setTimeRange={setTimeRange} />
+          <VisualisierungenView 
+            timeRange={timeRange} 
+            setTimeRange={setTimeRange} 
+            aktiveSzenarien={aktiveSzenarien}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -166,22 +185,30 @@ export default function ReportingPage() {
 /**
  * SCOR Metriken Ansicht
  * Zeigt alle Performance-Kennzahlen nach SCOR-Modell
+ * 
+ * DYNAMISCH: Alle Werte werden aus dem zentralen Metrics Rechner bezogen!
  */
-function SCORMetrikenView({ metriken }: { metriken: any }) {
+function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaseline: boolean }) {
   return (
     <>
       {/* SCOR Übersicht */}
-      <Card className="border-blue-200 bg-blue-50">
+      <Card className={istBaseline ? "border-blue-200 bg-blue-50" : "border-green-200 bg-green-50"}>
         <CardHeader>
-          <CardTitle className="text-blue-900">SCOR-Framework</CardTitle>
-          <CardDescription className="text-blue-700">
-            Supply Chain Operations Reference Model - Fokus auf Produktions- und Lager-KPIs
+          <CardTitle className={istBaseline ? "text-blue-900" : "text-green-900"}>
+            SCOR-Framework {istBaseline ? '(Baseline)' : '(Mit Szenarien)'}
+          </CardTitle>
+          <CardDescription className={istBaseline ? "text-blue-700" : "text-green-700"}>
+            {istBaseline 
+              ? 'Baseline-Werte ohne aktive Szenarien'
+              : 'Dynamisch berechnete Werte mit aktiven Szenarien'}
+            {' - '}Fokus auf <strong>Reliability, Responsiveness, Agility, Costs und Assets</strong>
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-blue-800">
-            Konzentration auf <strong>Reliability, Responsiveness, Agility, Costs und Assets</strong> innerhalb 
-            der Produktion und des Lagers.
+          <p className={`text-sm ${istBaseline ? "text-blue-800" : "text-green-800"}`}>
+            {istBaseline 
+              ? 'Aktivieren Sie Szenarien um die Auswirkungen auf die Supply Chain zu sehen.'
+              : 'Alle Werte werden in Echtzeit basierend auf den aktiven Szenarien berechnet.'}
           </p>
         </CardContent>
       </Card>
@@ -584,103 +611,96 @@ function getStatusInverted(value: number, goodThreshold: number, mediumThreshold
 /**
  * Visualisierungen Ansicht
  * Interaktive Charts und Diagramme zur Datenanalyse
+ * 
+ * DYNAMISCH: Alle Daten werden aus dem zentralen Metrics Rechner bezogen
+ * und reflektieren aktive Szenarien!
  */
 function VisualisierungenView({ 
   timeRange, 
-  setTimeRange 
+  setTimeRange,
+  aktiveSzenarien
 }: { 
   timeRange: string
   setTimeRange: (range: any) => void 
+  aktiveSzenarien: any[]
 }) {
-  // Basis-Produktionsdaten (monatlich)
-  const basisProduktionsDaten = [
-    { monat: 'Jan', plan: 14800, ist: 14200, abweichung: -600 },
-    { monat: 'Feb', plan: 22200, ist: 21800, abweichung: -400 },
-    { monat: 'Mrz', plan: 37000, ist: 36500, abweichung: -500 },
-    { monat: 'Apr', plan: 59200, ist: 58100, abweichung: -1100 },
-    { monat: 'Mai', plan: 51800, ist: 51200, abweichung: -600 },
-    { monat: 'Jun', plan: 48100, ist: 47900, abweichung: -200 },
-    { monat: 'Jul', plan: 44400, ist: 44800, abweichung: 400 },
-    { monat: 'Aug', plan: 33300, ist: 33100, abweichung: -200 },
-    { monat: 'Sep', plan: 22200, ist: 22500, abweichung: 300 },
-    { monat: 'Okt', plan: 11100, ist: 11300, abweichung: 200 },
-    { monat: 'Nov', plan: 14800, ist: 14600, abweichung: -200 },
-    { monat: 'Dez', plan: 11100, ist: 11000, abweichung: -100 }
-  ]
+  // DYNAMISCH: Monatliche Produktionsdaten aus dem zentralen Rechner
+  const dynamischeProduktionsDaten = useMemo(() => {
+    const daten = berechneProduktionsDatenFuerVisualisierung(aktiveSzenarien)
+    return daten.map(d => ({
+      monat: d.monat,
+      plan: d.plan,
+      ist: d.ist,
+      abweichung: d.abweichung
+    }))
+  }, [aktiveSzenarien])
 
-  // Tägliche Basis-Daten (365 Tage)
-  const basisTaeglicherDaten = Array.from({ length: 365 }, (_, i) => {
-    const basisProduktion = 1014  // 370.000 / 365 ≈ 1014 Bikes/Tag
-    const saisonaleFaktor = Math.sin((i / 365) * Math.PI * 2) * 200
-    return {
-      tag: i + 1,
-      plan: Math.round((basisProduktion + saisonaleFaktor) * 1.05),
-      ist: Math.round(basisProduktion + saisonaleFaktor),
-      abweichung: Math.round((basisProduktion + saisonaleFaktor) * -0.05)
-    }
-  })
+  // DYNAMISCH: Tägliche Produktionsdaten
+  const dynamischeTaeglicherDaten = useMemo(() => {
+    return berechneTaeglicherDaten(aktiveSzenarien)
+  }, [aktiveSzenarien])
 
-  // Variantenverteilung
-  const variantenDaten = [
-    { name: 'MTB Allrounder', wert: 111000, prozent: 30 },
-    { name: 'MTB Competition', wert: 55500, prozent: 15 },
-    { name: 'MTB Downhill', wert: 37000, prozent: 10 },
-    { name: 'MTB Extreme', wert: 25900, prozent: 7 },
-    { name: 'MTB Freeride', wert: 18500, prozent: 5 },
-    { name: 'MTB Marathon', wert: 29600, prozent: 8 },
-    { name: 'MTB Performance', wert: 44400, prozent: 12 },
-    { name: 'MTB Trail', wert: 48100, prozent: 13 }
-  ]
+  // DYNAMISCH: Variantenverteilung
+  const dynamischeVariantenDaten = useMemo(() => {
+    const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
+    return berechneVariantenProduktion(auswirkungen.produktionsmenge).map(v => ({
+      name: v.name,
+      wert: v.wert,
+      prozent: v.prozent
+    }))
+  }, [aktiveSzenarien])
 
-  // Basis-Lagerbestandsverlauf (monatlich, deterministisch)
-  // ERMÄSSIGUNG: Nur Sättel (keine Rahmen/Gabeln)
-  const basisLagerDaten = Array.from({ length: 12 }, (_, i) => {
-    const baseSaettel = 3800
-    
-    // Sinuswelle für natürliche Schwankungen
-    const schwankung = Math.sin(i * 0.8) * 150
-    
-    return {
-      monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
-      saettel: baseSaettel + schwankung * 2
-    }
-  })
+  // DYNAMISCH: Lagerbestandsdaten
+  const dynamischeLagerDaten = useMemo(() => {
+    return berechneLagerDaten(aktiveSzenarien)
+  }, [aktiveSzenarien])
 
-  // Tägliche Lagerdaten (365 Tage)
-  // ERMÄSSIGUNG: Nur Sättel (keine Rahmen/Gabeln)
-  const basisTaeglicherLagerDaten = Array.from({ length: 365 }, (_, i) => {
-    const baseSaettel = 3800
-    const schwankung = Math.sin(i * 0.1) * 150
-    
-    return {
-      tag: i + 1,
-      saettel: baseSaettel + schwankung * 2
-    }
-  })
+  // DYNAMISCH: Wöchentliche Auslastungsdaten
+  const dynamischeWoechentlicheDaten = useMemo(() => {
+    return berechneWoechentlicheAuslastung(aktiveSzenarien)
+  }, [aktiveSzenarien])
 
-  // Wöchentliche Auslastung (deterministisch)
-  const basisWoechentlicheDaten = Array.from({ length: 52 }, (_, i) => {
-    const basisAuslastung = 85
-    const saisonaleFaktor = Math.sin((i / 52) * Math.PI * 2) * 10 // Jährliche Schwankung
-    
-    return {
-      woche: i + 1,
-      auslastung: basisAuslastung + saisonaleFaktor,
-      produktion: 6000 + saisonaleFaktor * 100
-    }
-  })
+  // Basis-Referenzen für Kompatibilität
+  const basisProduktionsDaten = dynamischeProduktionsDaten
+  const basisTaeglicherDaten = dynamischeTaeglicherDaten
+  const variantenDaten = dynamischeVariantenDaten
+  const basisLagerDaten = dynamischeLagerDaten
+  const basisWoechentlicheDaten = dynamischeWoechentlicheDaten
+  
+  // Konstanten für Berechnungen
+  const KALENDERTAGE_PRO_JAHR = 365
+  const DURCHSCHNITT_TAGE_PRO_MONAT = 30.4
+  const TAGE_PRO_WOCHE = 7
+  const WOCHEN_PRO_JAHR = 52
 
-  // Tägliche Auslastung (365 Tage)
-  const basisTaeglicherAuslastung = Array.from({ length: 365 }, (_, i) => {
-    const basisAuslastung = 85
-    const saisonaleFaktor = Math.sin((i / 365) * Math.PI * 2) * 10
-    
-    return {
-      tag: i + 1,
-      auslastung: basisAuslastung + saisonaleFaktor,
-      produktion: 1014 + saisonaleFaktor * 10
-    }
-  })
+  // Tägliche Lagerdaten (basierend auf monatlichen Daten interpoliert)
+  const basisTaeglicherLagerDaten = useMemo(() => {
+    const monatsDaten = dynamischeLagerDaten
+    return Array.from({ length: KALENDERTAGE_PRO_JAHR }, (_, i) => {
+      const monatIndex = Math.floor(i / DURCHSCHNITT_TAGE_PRO_MONAT)
+      const monat = monatsDaten[Math.min(monatIndex, 11)]
+      // Tägliche Schwankung innerhalb des Monats
+      const schwankung = Math.sin(i * 0.1) * 100
+      return {
+        tag: i + 1,
+        saettel: Math.round(monat.saettel + schwankung)
+      }
+    })
+  }, [dynamischeLagerDaten])
+
+  // Tägliche Auslastung
+  const basisTaeglicherAuslastung = useMemo(() => {
+    const wochenDaten = dynamischeWoechentlicheDaten
+    return Array.from({ length: KALENDERTAGE_PRO_JAHR }, (_, i) => {
+      const wochenIndex = Math.floor(i / TAGE_PRO_WOCHE)
+      const woche = wochenDaten[Math.min(wochenIndex, WOCHEN_PRO_JAHR - 1)]
+      return {
+        tag: i + 1,
+        auslastung: woche.auslastung,
+        produktion: Math.round(woche.produktion / TAGE_PRO_WOCHE) // Tägliche Produktion
+      }
+    })
+  }, [dynamischeWoechentlicheDaten])
 
   // Filter/Aggregiere Produktionsdaten basierend auf timeRange
   const produktionsDaten = (() => {

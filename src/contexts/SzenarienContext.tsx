@@ -10,9 +10,19 @@
  * - Macht Szenarien für alle Berechnungen verfügbar
  * - Nur China als Lieferant (keine anderen Länder)
  * - Speichert Szenarien in localStorage für Persistenz beim Neuladen
+ * 
+ * WICHTIG: Alle Berechnungen nutzen den zentralen Supply Chain Metrics Rechner
+ * für konsistente Werte über alle Seiten hinweg!
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { 
+  BASELINE, 
+  berechneSzenarioAuswirkungen, 
+  berechneSCORMetriken,
+  berechneGesamtMetriken,
+  JAHRESPRODUKTION_SSOT 
+} from '@/lib/calculations/supply-chain-metrics'
 
 export type SzenarioTyp = 'marketingaktion' | 'maschinenausfall' | 'wasserschaden' | 'schiffsverspaetung'
 
@@ -131,52 +141,37 @@ export function useSzenarien() {
 
 /**
  * Baseline-Werte für Supply Chain Metriken
+ * WICHTIG: Nutzt die SSOT-Werte aus dem zentralen Metrics Rechner!
  */
 export const BASELINE_WERTE = {
-  produktionsmenge: 370000,
-  materialverfuegbarkeit: 98.5,
-  liefertreue: 95.2,
-  durchlaufzeit: 56
+  produktionsmenge: JAHRESPRODUKTION_SSOT,
+  materialverfuegbarkeit: BASELINE.materialverfuegbarkeit,
+  liefertreue: BASELINE.liefertreue,
+  durchlaufzeit: BASELINE.durchlaufzeit
 } as const
 
 /**
  * Berechnet die Auswirkungen aller aktiven Szenarien auf die Supply Chain
+ * WICHTIG: Nutzt den zentralen Supply Chain Metrics Rechner für konsistente Werte!
  */
 export function berechneGlobaleAuswirkungen(szenarien: SzenarioConfig[]) {
-  const baselineWerte = { ...BASELINE_WERTE }
-
-  let auswirkungen = { ...baselineWerte }
-
-  szenarien.forEach(szenario => {
-    switch (szenario.typ) {
-      case 'marketingaktion':
-        const erhoehung = (szenario.parameter.erhoehungProzent || 20) / 100
-        auswirkungen.produktionsmenge *= (1 + erhoehung)
-        auswirkungen.materialverfuegbarkeit -= 5
-        break
-
-      case 'maschinenausfall':
-        // Nur China betroffen (keine anderen Zulieferer)
-        const reduktion = (szenario.parameter.reduktionProzent || 60) / 100
-        auswirkungen.produktionsmenge *= (1 - reduktion * 0.3)
-        auswirkungen.materialverfuegbarkeit -= reduktion * 40
-        auswirkungen.liefertreue -= 8
-        break
-
-      case 'wasserschaden':
-        const verlust = szenario.parameter.verlustMenge || 1000
-        auswirkungen.materialverfuegbarkeit -= verlust / 10000
-        auswirkungen.liefertreue -= 5
-        break
-
-      case 'schiffsverspaetung':
-        const tage = szenario.parameter.verspaetungTage || 4
-        auswirkungen.durchlaufzeit += tage
-        auswirkungen.liefertreue -= tage
-        auswirkungen.materialverfuegbarkeit -= tage / 8
-        break
-    }
-  })
-
-  return auswirkungen
+  const aktiveSzenarien = szenarien.filter(s => s.aktiv)
+  const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
+  
+  // Konvertiere zur Legacy-Schnittstelle für Abwärtskompatibilität
+  return {
+    produktionsmenge: auswirkungen.produktionsmenge,
+    materialverfuegbarkeit: auswirkungen.materialverfuegbarkeit,
+    liefertreue: auswirkungen.liefertreue,
+    durchlaufzeit: auswirkungen.durchlaufzeit
+  }
 }
+
+// Re-Export der zentralen Berechnungsfunktionen für einfachen Zugriff
+export { 
+  berechneSzenarioAuswirkungen, 
+  berechneSCORMetriken, 
+  berechneGesamtMetriken,
+  BASELINE,
+  JAHRESPRODUKTION_SSOT
+} from '@/lib/calculations/supply-chain-metrics'
