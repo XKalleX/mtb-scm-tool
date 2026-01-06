@@ -78,6 +78,11 @@ const VARIANTEN_FARBEN = [
 ]
 
 /**
+ * Fallback-Wert für Arbeitstage wenn Konfiguration noch nicht geladen ist
+ */
+const DEFAULT_ARBEITSTAGE_FALLBACK = 252
+
+/**
  * Reporting Hauptseite
  * Kombiniert SCOR Metriken und Visualisierungen
  * 
@@ -98,7 +103,7 @@ export default function ReportingPage() {
   // Erstelle dynamische Konfiguration für Berechnungen
   const dynamicConfig: DynamicConfig = useMemo(() => ({
     jahresproduktion: konfiguration.jahresproduktion,
-    arbeitstage: isInitialized ? getArbeitstageProJahr() : 252,
+    arbeitstage: isInitialized ? getArbeitstageProJahr() : DEFAULT_ARBEITSTAGE_FALLBACK,
     saisonalitaet: konfiguration.saisonalitaet.map(s => ({ monat: s.monat, anteil: s.anteil })),
     varianten: konfiguration.varianten.map(v => ({
       id: v.id,

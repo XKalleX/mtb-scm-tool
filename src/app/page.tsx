@@ -30,10 +30,16 @@ import {
   Settings
 } from 'lucide-react'
 import { useSzenarien, berechneGlobaleAuswirkungen, BASELINE_WERTE } from '@/contexts/SzenarienContext'
-import { useKonfiguration } from '@/contexts/KonfigurationContext'
+import { useKonfiguration, STANDARD_KONFIGURATION } from '@/contexts/KonfigurationContext'
 import { useMemo, useState } from 'react'
 import { EinstellungenPanel } from '@/components/EinstellungenPanel'
 import { formatNumber } from '@/lib/utils'
+
+/**
+ * Fallback-Wert für Arbeitstage wenn Konfiguration noch nicht geladen ist
+ * Entspricht durchschnittlicher Anzahl Arbeitstage pro Jahr in Deutschland
+ */
+const DEFAULT_ARBEITSTAGE_FALLBACK = 252
 
 /**
  * Dashboard Hauptkomponente mit Szenarien-Integration und Live-Berechnungen
@@ -52,8 +58,11 @@ export default function Dashboard() {
   // Berechne Änderungen gegenüber Baseline
   // Nutze Konfiguration statt hardcodierter Werte
   const jahresproduktion = konfiguration.jahresproduktion
+  
+  // Berechne Produktionsmenge mit Szenarien-Effekten
+  // Wenn Szenarien aktiv sind, skaliere den Effekt proportional zur konfigurierten Jahresproduktion
   const produktionsmenge = aktiveSzenarien.length > 0 
-    ? Math.round(jahresproduktion * (auswirkungen.produktionsmenge / BASELINE_WERTE.produktionsmenge))
+    ? Math.round(jahresproduktion * (auswirkungen.produktionsmenge / STANDARD_KONFIGURATION.jahresproduktion))
     : jahresproduktion
 
   const produktionsDiff = produktionsmenge - jahresproduktion
@@ -62,7 +71,7 @@ export default function Dashboard() {
   const liefertreueProzent = (liefertreueDiff).toFixed(1)
 
   // Arbeitstage aus Konfiguration berechnen
-  const arbeitstage = isInitialized ? getArbeitstageProJahr() : 252
+  const arbeitstage = isInitialized ? getArbeitstageProJahr() : DEFAULT_ARBEITSTAGE_FALLBACK
 
   // Spring Festival Daten aus Konfiguration
   const springFestival = konfiguration.feiertage.filter(f => f.name.includes('Spring Festival'))

@@ -210,7 +210,8 @@ export function EinstellungenPanel() {
 
           {/* SAISONALITÄT TAB */}
           <TabsContent value="saisonalitaet" className="space-y-4 mt-4">
-            <div className={`p-3 rounded-lg ${saisonalitaetValid ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+            <div className={`p-3 rounded-lg flex items-center gap-2 ${saisonalitaetValid ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+              {saisonalitaetValid ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
               <span className="font-medium">Summe der Anteile: {saisonalitaetSumme.toFixed(1)}%</span>
               {!saisonalitaetValid && <span className="ml-2">(muss 100% ergeben!)</span>}
             </div>
@@ -259,7 +260,8 @@ export function EinstellungenPanel() {
 
           {/* VARIANTEN TAB */}
           <TabsContent value="varianten" className="space-y-4 mt-4">
-            <div className={`p-3 rounded-lg ${variantenValid ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+            <div className={`p-3 rounded-lg flex items-center gap-2 ${variantenValid ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+              {variantenValid ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
               <span className="font-medium">Summe der Anteile: {variantenSumme.toFixed(1)}%</span>
               {!variantenValid && <span className="ml-2">(muss 100% ergeben!)</span>}
             </div>

@@ -495,9 +495,12 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
     const jahr = konfiguration.planungsjahr
     let arbeitstage = 0
     
-    const deutscheFeiertage = konfiguration.feiertage
-      .filter(f => f.land === 'Deutschland')
-      .map(f => f.datum)
+    // Verwende Set für O(1) Lookup statt Array.includes() mit O(n)
+    const deutscheFeiertagSet = new Set(
+      konfiguration.feiertage
+        .filter(f => f.land === 'Deutschland')
+        .map(f => f.datum)
+    )
     
     for (let i = 0; i < 365; i++) {
       const datum = new Date(jahr, 0, 1 + i)
@@ -505,7 +508,7 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
       const datumStr = datum.toISOString().split('T')[0]
       
       // Kein Wochenende und kein Feiertag
-      if (wochentag !== 0 && wochentag !== 6 && !deutscheFeiertage.includes(datumStr)) {
+      if (wochentag !== 0 && wochentag !== 6 && !deutscheFeiertagSet.has(datumStr)) {
         arbeitstage++
       }
     }
