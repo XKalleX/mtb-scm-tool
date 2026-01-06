@@ -40,6 +40,7 @@ interface ExcelTableProps {
   sumRowLabel?: string // Label für die Summenzeile (Standard: "SUMME")
   groupBy?: string // Optional: Gruppiere nach Spalte für Zwischensummen
   subtotalLabel?: string // Label für Zwischensummen (Standard: "Zwischensumme")
+  useAverage?: boolean // Verwende Durchschnitt statt Summe (Standard: false)
 }
 
 /**
@@ -55,24 +56,27 @@ export default function ExcelTable({
   showSums = false,
   sumRowLabel = 'SUMME',
   groupBy,
-  subtotalLabel = 'Zwischensumme'
+  subtotalLabel = 'Zwischensumme',
+  useAverage = false
 }: ExcelTableProps) {
   const [selectedFormula, setSelectedFormula] = useState<string | null>(null)
   
   /**
-   * Berechnet Summen für numerische Spalten
+   * Berechnet Summen oder Durchschnitte für numerische Spalten
    */
   const calculateSums = (dataToSum: any[]) => {
     const sums: Record<string, number> = {}
     
     columns.forEach(col => {
       if (col.sumable !== false) {
-        // Standardmäßig alle numerischen Spalten summieren
+        // Standardmäßig alle numerischen Spalten summieren/durchschnittlich berechnen
         const values = dataToSum.map(row => row[col.key])
         const numericValues = values.filter(v => typeof v === 'number')
         
         if (numericValues.length > 0) {
-          sums[col.key] = numericValues.reduce((sum, val) => sum + val, 0)
+          const sum = numericValues.reduce((sum, val) => sum + val, 0)
+          // Wenn useAverage=true, berechne Durchschnitt statt Summe
+          sums[col.key] = useAverage ? sum / numericValues.length : sum
         }
       }
     })
