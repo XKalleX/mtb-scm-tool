@@ -92,7 +92,7 @@ Comprehensive Supply Chain Management System für Adventure Works AG - entwickel
 | **China**   | Dengwong  | **Sättel (4 Varianten)** | 49 Tage (7 Wochen) | Schiff + LKW | 500     |
 
 **Code-Ermäßigung aktiv:**
-- ✅ Nur 1 Zulieferer: China (statt 3: Deutschland/Heilbronn, Spanien/Saragossa, China)
+- ✅ Nur 1 Zulieferer: China (statt 3: Deutschland/Heilbronn, Spanien/Zaragoza, China)
 - ✅ Nur Sättel: 4 Varianten (statt 14 Bauteile inkl. Gabeln und Rahmen)
 - ✅ Transport: Nur Schiff (China→Hamburg) + LKW (Hamburg→Dortmund), keine Bahn
 - ✅ Kein Outbound zu 6 Märkten
