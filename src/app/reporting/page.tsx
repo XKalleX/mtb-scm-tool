@@ -667,11 +667,17 @@ function VisualisierungenView({
   const basisLagerDaten = dynamischeLagerDaten
   const basisWoechentlicheDaten = dynamischeWoechentlicheDaten
   
+  // Konstanten für Berechnungen
+  const KALENDERTAGE_PRO_JAHR = 365
+  const DURCHSCHNITT_TAGE_PRO_MONAT = 30.4
+  const TAGE_PRO_WOCHE = 7
+  const WOCHEN_PRO_JAHR = 52
+
   // Tägliche Lagerdaten (basierend auf monatlichen Daten interpoliert)
   const basisTaeglicherLagerDaten = useMemo(() => {
     const monatsDaten = dynamischeLagerDaten
-    return Array.from({ length: 365 }, (_, i) => {
-      const monatIndex = Math.floor(i / 30.4)
+    return Array.from({ length: KALENDERTAGE_PRO_JAHR }, (_, i) => {
+      const monatIndex = Math.floor(i / DURCHSCHNITT_TAGE_PRO_MONAT)
       const monat = monatsDaten[Math.min(monatIndex, 11)]
       // Tägliche Schwankung innerhalb des Monats
       const schwankung = Math.sin(i * 0.1) * 100
@@ -685,13 +691,13 @@ function VisualisierungenView({
   // Tägliche Auslastung
   const basisTaeglicherAuslastung = useMemo(() => {
     const wochenDaten = dynamischeWoechentlicheDaten
-    return Array.from({ length: 365 }, (_, i) => {
-      const wochenIndex = Math.floor(i / 7)
-      const woche = wochenDaten[Math.min(wochenIndex, 51)]
+    return Array.from({ length: KALENDERTAGE_PRO_JAHR }, (_, i) => {
+      const wochenIndex = Math.floor(i / TAGE_PRO_WOCHE)
+      const woche = wochenDaten[Math.min(wochenIndex, WOCHEN_PRO_JAHR - 1)]
       return {
         tag: i + 1,
         auslastung: woche.auslastung,
-        produktion: Math.round(woche.produktion / 7) // Tägliche Produktion
+        produktion: Math.round(woche.produktion / TAGE_PRO_WOCHE) // Tägliche Produktion
       }
     })
   }, [dynamischeWoechentlicheDaten])

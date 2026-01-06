@@ -52,6 +52,46 @@ export const ARBEITSTAGE_PRO_JAHR = 252
  */
 export const KALENDERTAGE_PRO_JAHR = 365
 
+/**
+ * Durchschnittliche Tage pro Monat
+ */
+export const DURCHSCHNITT_TAGE_PRO_MONAT = 30.4
+
+/**
+ * Gleichmäßiger monatlicher Anteil in Prozent (100% / 12 Monate)
+ */
+export const GLEICHMAESSIGER_MONATSANTEIL = 100 / 12 // ≈ 8.33%
+
+/**
+ * Herstellkosten pro Bike in EUR (Durchschnitt aller Varianten)
+ */
+export const HERSTELLKOSTEN_PRO_BIKE = 1000
+
+/**
+ * Beschaffungskosten pro Sattel in EUR
+ */
+export const BESCHAFFUNGSKOSTEN_PRO_SATTEL = 50
+
+/**
+ * Lagerkostensatz (10% des Lagerwertes pro Jahr)
+ */
+export const LAGERKOSTENSATZ = 0.1
+
+/**
+ * Wert pro Sattel-Set in EUR für Lagerbestandsberechnung
+ */
+export const WERT_PRO_SATTEL_SET = 150
+
+/**
+ * Wasserschaden: Maximaler relativer Verlusteffekt
+ */
+export const WASSERSCHADEN_MAX_VERLUST_EFFEKT = 0.3
+
+/**
+ * Wasserschaden: Divisor für relative Verlustberechnung
+ */
+export const WASSERSCHADEN_VERLUST_DIVISOR = 10000
+
 // ========================================
 // BASELINE WERTE (ohne Szenarien)
 // ========================================
@@ -99,6 +139,12 @@ export interface MonatsProduktion {
 
 /**
  * Berechnet die monatliche Produktionsverteilung basierend auf SSOT
+ * 
+ * Verwendet saisonalitaetData.saisonalitaetMonatlich mit Struktur:
+ * - monat: 1-12 (Monatsnummer)
+ * - anteil: Prozentanteil der Jahresproduktion (Summe muss 100% ergeben)
+ * - name: Monatsname (z.B. "Januar")
+ * 
  * @param jahresproduktion - Gesamtproduktion pro Jahr
  * @returns Array mit 12 Monatsproduktionen
  */
@@ -213,7 +259,7 @@ export function berechneSzenarioAuswirkungen(aktiveSzenarien: SzenarioConfig[]):
         const reduktion = (szenario.parameter.reduktionProzent || 60) / 100
         const dauerTage = szenario.parameter.dauerTage || 7
         // Auswirkung auf Materialverfügbarkeit
-        const ausfallEffekt = (dauerTage / 365) * reduktion
+        const ausfallEffekt = (dauerTage / KALENDERTAGE_PRO_JAHR) * reduktion
         materialverfuegbarkeit -= reduktion * 25 // Deutlicher Rückgang
         liefertreue -= reduktion * 15
         planerfuellungsgrad -= ausfallEffekt * 100
@@ -226,7 +272,7 @@ export function berechneSzenarioAuswirkungen(aktiveSzenarien: SzenarioConfig[]):
         // Container-Verlust → sofortiger Materialverlust
         const verlustMenge = szenario.parameter.verlustMenge || 1000
         // Relative Auswirkung basierend auf typischem Lagerbestand
-        const verlustEffekt = Math.min(0.3, verlustMenge / 10000)
+        const verlustEffekt = Math.min(WASSERSCHADEN_MAX_VERLUST_EFFEKT, verlustMenge / WASSERSCHADEN_VERLUST_DIVISOR)
         materialverfuegbarkeit -= verlustEffekt * 30
         liefertreue -= verlustEffekt * 20
         planerfuellungsgrad -= verlustEffekt * 15
@@ -323,18 +369,19 @@ export function berechneSCORMetriken(aktiveSzenarien: SzenarioConfig[]): SCORMet
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
   
   // Berechne Kosten basierend auf Produktion
-  // Pro Bike: ca. 1.000 € Herstellkosten (aus stammdaten.json)
-  const herstellkosten = auswirkungen.produktionsmenge * 1000
+  // Pro Bike: Herstellkosten aus Konstante (Durchschnitt aller Varianten)
+  const herstellkosten = auswirkungen.produktionsmenge * HERSTELLKOSTEN_PRO_BIKE
   
-  // Beschaffungskosten: ca. 50€ pro Sattel * Anzahl Sättel
-  // 1 Sattel pro Bike
-  const beschaffungskosten = auswirkungen.produktionsmenge * 50
+  // Beschaffungskosten pro Sattel * Anzahl Sättel (1 Sattel pro Bike)
+  const beschaffungskosten = auswirkungen.produktionsmenge * BESCHAFFUNGSKOSTEN_PRO_SATTEL
   
-  // Lagerkosten: 10% des durchschnittlichen Lagerwertes
-  // Durchschnittlicher Lagerbestand: ca. 2 Wochen Produktion
-  const durchschnittlicherLagerbestand = Math.round(auswirkungen.produktionsmenge / 26) // 2 Wochen
-  const lagerbestandswert = durchschnittlicherLagerbestand * 150 // 150€ pro Sattel-Set
-  const lagerkosten = Math.round(lagerbestandswert * 0.1) // 10% Lagerkostensatz
+  // Lagerkosten: Lagerkostensatz des durchschnittlichen Lagerwertes
+  // Durchschnittlicher Lagerbestand: ca. 2 Wochen Produktion (52 Wochen / 2 = 26)
+  const WOCHEN_PRO_JAHR = 52
+  const LAGERBESTAND_WOCHEN = 2
+  const durchschnittlicherLagerbestand = Math.round(auswirkungen.produktionsmenge / (WOCHEN_PRO_JAHR / LAGERBESTAND_WOCHEN))
+  const lagerbestandswert = durchschnittlicherLagerbestand * WERT_PRO_SATTEL_SET
+  const lagerkosten = Math.round(lagerbestandswert * LAGERKOSTENSATZ)
   
   const gesamtkosten = herstellkosten + beschaffungskosten + lagerkosten
   
@@ -422,13 +469,15 @@ export function berechneWoechentlicheAuslastung(
   aktiveSzenarien: SzenarioConfig[]
 ): { woche: number; auslastung: number; produktion: number }[] {
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
-  const wochenProduktion = Math.round(auswirkungen.produktionsmenge / 52)
+  const WOCHEN_PRO_JAHR = 52
+  const wochenProduktion = Math.round(auswirkungen.produktionsmenge / WOCHEN_PRO_JAHR)
+  const WOCHEN_PRO_MONAT = WOCHEN_PRO_JAHR / 12 // ≈ 4.33
   
-  return Array.from({ length: 52 }, (_, i) => {
+  return Array.from({ length: WOCHEN_PRO_JAHR }, (_, i) => {
     // Saisonale Schwankung
-    const monat = Math.floor(i / 4.33)
+    const monat = Math.floor(i / WOCHEN_PRO_MONAT)
     const saisonalitaet = saisonalitaetData.saisonalitaetMonatlich[Math.min(monat, 11)]
-    const saisonFaktor = saisonalitaet.anteil / 8.33
+    const saisonFaktor = saisonalitaet.anteil / GLEICHMAESSIGER_MONATSANTEIL
     
     return {
       woche: i + 1,
@@ -448,8 +497,10 @@ export function berechneLagerDaten(
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
   const monatsnamen = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
   
-  // Basisbestand: ca. 2 Wochen Produktion
-  const basisBestand = Math.round(auswirkungen.produktionsmenge / 26)
+  // Basisbestand: ca. 2 Wochen Produktion (52 Wochen / 2 = 26)
+  const WOCHEN_PRO_JAHR = 52
+  const LAGERBESTAND_WOCHEN = 2
+  const basisBestand = Math.round(auswirkungen.produktionsmenge / (WOCHEN_PRO_JAHR / LAGERBESTAND_WOCHEN))
   
   // Materialverfügbarkeit beeinflusst Lagerbestand
   const verfuegbarkeitsFaktor = auswirkungen.materialverfuegbarkeit / 100
@@ -458,7 +509,7 @@ export function berechneLagerDaten(
     // Saisonale Schwankung im Lager (invers zur Produktion)
     const saisonalitaet = saisonalitaetData.saisonalitaetMonatlich[i]
     // Hohe Produktion = niedriger Lagerbestand
-    const saisonFaktor = 1 - ((saisonalitaet.anteil - 8.33) / 100)
+    const saisonFaktor = 1 - ((saisonalitaet.anteil - GLEICHMAESSIGER_MONATSANTEIL) / 100)
     
     return {
       monat,
