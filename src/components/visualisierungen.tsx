@@ -767,7 +767,7 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
         <CardHeader>
           <CardTitle>Lagerbestandsentwicklung 2027 - Sättel</CardTitle>
           <CardDescription>
-            Bestandsverlauf der Sättel aus China (Ermäßigung: nur Sättel, keine Rahmen/Gabeln)
+            Bestandsverlauf der Sättel aus China
             {timeRange === 'day' && ' - Horizontal scrollbar für alle 365 Tage'}
           </CardDescription>
         </CardHeader>

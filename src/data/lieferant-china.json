@@ -9,7 +9,7 @@
     "kapazitaet": 50000,
     "lieferintervall": 14,
     "besonderheiten": [
-      "Einziger Lieferant für Sättel (Ermäßigung Code-Lösung)",
+      "Einziger Lieferant für Sättel",
       "Spring Festival: 28. Jan - 4. Feb 2027 (8 Tage Produktionsstopp)",
       "Schiff-Transport: 44 Kalendertage (24/7 unterwegs)",
       "Bearbeitung: 5 Arbeitstage (Mo-Fr ohne Feiertage)",
@@ -50,5 +50,5 @@
       "beschreibung": "Aerodynamischer Sattel für Speed"
     }
   },
-  "hinweis": "Code-Lösung (Ermäßigung): Nur 4 Sattel-Varianten statt 14 Bauteile. Jedes Bike benötigt genau 1 Sattel."
+  "hinweis": "Nur 4 Sattel-Varianten statt 14 Bauteile. Jedes Bike benötigt genau 1 Sattel."
 }

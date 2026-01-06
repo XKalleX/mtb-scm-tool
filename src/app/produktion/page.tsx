@@ -207,7 +207,7 @@ export default function ProduktionPage() {
         <div>
           <h1 className="text-3xl font-bold">Produktion & Warehouse</h1>
           <p className="text-muted-foreground mt-1">
-            Produktionssteuerung mit FCFS-Regel (First-Come-First-Serve) • 370.000 Bikes/Jahr • Nur 4 Sattel-Varianten (Ermäßigung)
+            Produktionssteuerung mit FCFS-Regel (First-Come-First-Serve) • 370.000 Bikes/Jahr • Nur 4 Sattel-Varianten
           </p>
         </div>
         <div className="flex gap-2">
@@ -221,29 +221,6 @@ export default function ProduktionPage() {
           </Button>
         </div>
       </div>
-
-      {/* SSOT Hinweis */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="pt-6">
-          <div className="flex items-start space-x-3">
-            <div className="bg-blue-600 text-white rounded-full p-2">
-              <Package className="h-5 w-5" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-blue-900">✅ Ermäßigung aktiv: Nur Sättel</h4>
-              <p className="text-sm text-blue-700 mt-1">
-                Gemäß <code className="bg-blue-100 px-1 rounded">kontext/Spezifikation_SSOT_MR.ts</code> (Single Source of Truth):
-                Nur <strong>4 Sattel-Varianten</strong> vom China-Zulieferer.
-                Keine Gabeln, keine Rahmen → 90% weniger Komplexität.
-                Stückliste: <strong>1 Sattel = 1 Bike</strong> (einfache 1:1 Beziehung).
-              </p>
-              <p className="text-xs text-blue-600 mt-2">
-                📦 Fizik Tundra • Raceline • Spark • Speedline | 🚢 China: 49 Tage Vorlauf, Losgröße 500
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Übersicht Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -310,7 +287,7 @@ export default function ProduktionPage() {
             <CardTitle className="text-blue-900">Produktionslogik (ohne Solver)</CardTitle>
           </div>
           <CardDescription className="text-blue-700">
-            Code-Lösung Ermäßigung: Einfache First-Come-First-Serve Regel statt mathematischer Optimierung
+            Einfache First-Come-First-Serve Regel statt mathematischer Optimierung
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -511,7 +488,7 @@ export default function ProduktionPage() {
             <FormulaCard
               title="ATP-Check Formel (Available-to-Promise)"
               formula="ATP = Verfügbarer Bestand - Sicherheitsbestand ≥ Bedarf, wobei 1 Sattel = 1 Bike"
-              description="Vor jeder Produktion wird geprüft, ob genug Sättel verfügbar sind. Ermäßigung: Einfache 1:1 Stückliste!"
+              description="Vor jeder Produktion wird geprüft, ob genug Sättel verfügbar sind. Einfache 1:1 Stückliste!"
               example="Raceline: Verfügbar = 40.100 - 2.797 = 37.303, Bedarf = 400/Tag → ✓ 93 Tage Reichweite"
             />
             <FormulaCard

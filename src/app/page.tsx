@@ -111,7 +111,7 @@ export default function Dashboard() {
             <li>• Spring Festival China: <strong>28.01. - 04.02.2027</strong> (8 Tage Produktionsstopp)</li>
             <li>• April-Peak: <strong>16%</strong> der Jahresproduktion (Kapazitätsplanung beachten)</li>
             <li>• China-Vorlaufzeit: <strong>49 Tage</strong> (5 AT Produktion + 44 KT Transport)</li>
-            <li>• Nur Sättel (4 Varianten) von China-Zulieferer (Ermäßigung Code-Lösung)</li>
+            <li>• Nur Sättel (4 Varianten) von China-Zulieferer</li>
           </ul>
         </CardContent>
       </Card>
