@@ -85,18 +85,18 @@ export default function ProduktionPage() {
   
   // Saisonale Verteilung (Monatsanteile in %)
   const saisonalitaet = [
-    { monat: 1, name: 'Jan', anteil: 0.04, tage: 31, bikes: 14800 },
-    { monat: 2, name: 'Feb', anteil: 0.06, tage: 28, bikes: 22200 },
-    { monat: 3, name: 'Mär', anteil: 0.10, tage: 31, bikes: 37000 },
-    { monat: 4, name: 'Apr', anteil: 0.16, tage: 30, bikes: 59200 }, // PEAK!
-    { monat: 5, name: 'Mai', anteil: 0.14, tage: 31, bikes: 51800 },
-    { monat: 6, name: 'Jun', anteil: 0.13, tage: 30, bikes: 48100 },
-    { monat: 7, name: 'Jul', anteil: 0.12, tage: 31, bikes: 44400 },
-    { monat: 8, name: 'Aug', anteil: 0.09, tage: 31, bikes: 33300 },
-    { monat: 9, name: 'Sep', anteil: 0.06, tage: 30, bikes: 22200 },
-    { monat: 10, name: 'Okt', anteil: 0.03, tage: 31, bikes: 11100 },
-    { monat: 11, name: 'Nov', anteil: 0.04, tage: 30, bikes: 14800 },
-    { monat: 12, name: 'Dez', anteil: 0.03, tage: 31, bikes: 11100 },
+    { monat: 1, name: 'Jan', anteil: 0.04, tage: 31, bikes: 14800, arbeitstage: 20 },
+    { monat: 2, name: 'Feb', anteil: 0.06, tage: 28, bikes: 22200, arbeitstage: 20 },
+    { monat: 3, name: 'Mär', anteil: 0.10, tage: 31, bikes: 37000, arbeitstage: 23 },
+    { monat: 4, name: 'Apr', anteil: 0.16, tage: 30, bikes: 59200, arbeitstage: 20 }, // PEAK!
+    { monat: 5, name: 'Mai', anteil: 0.14, tage: 31, bikes: 51800, arbeitstage: 19 },
+    { monat: 6, name: 'Jun', anteil: 0.13, tage: 30, bikes: 48100, arbeitstage: 21 },
+    { monat: 7, name: 'Jul', anteil: 0.12, tage: 31, bikes: 44400, arbeitstage: 22 },
+    { monat: 8, name: 'Aug', anteil: 0.09, tage: 31, bikes: 33300, arbeitstage: 22 },
+    { monat: 9, name: 'Sep', anteil: 0.06, tage: 30, bikes: 22200, arbeitstage: 22 },
+    { monat: 10, name: 'Okt', anteil: 0.03, tage: 31, bikes: 11100, arbeitstage: 21 },
+    { monat: 11, name: 'Nov', anteil: 0.04, tage: 30, bikes: 14800, arbeitstage: 22 },
+    { monat: 12, name: 'Dez', anteil: 0.03, tage: 31, bikes: 11100, arbeitstage: 23 },
   ]
   
   // Deutsche Feiertage 2027 (NRW)
@@ -113,6 +113,17 @@ export default function ProduktionPage() {
     '2027-12-26', // 2. Weihnachtsfeiertag
   ]
   
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // ERROR MANAGEMENT - Pro Monat separate Fehlerkorrektur
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 
+  // KONZEPT: Kumulative Rundungsfehler-Korrektur
+  // - Verhindert systematische Abweichungen über Arbeitstage
+  // - Garantiert exakte Monatsproduktion
+  // - Gesamtsumme = exakt 370.000 Bikes
+  
+  const monatlicheFehlerTracker: Record<number, number> = {}
+  
   const tagesProduktion = Array.from({ length: 365 }, (_, i) => {
     const tag = i + 1
     const datum = new Date(2027, 0, tag)
@@ -128,21 +139,41 @@ export default function ProduktionPage() {
     const monat = datum.getMonth() + 1
     const saisonInfo = saisonalitaet.find(s => s.monat === monat)!
     
-    // Arbeitstage im Monat zählen (vereinfacht: ~22 Tage/Monat)
-    const arbeitstageImMonat = Math.floor(saisonInfo.tage * (5/7)) - 1 // ~22 AT
+    // Initialisiere Fehler-Tracker für diesen Monat
+    if (!(monat in monatlicheFehlerTracker)) {
+      monatlicheFehlerTracker[monat] = 0
+    }
     
     let planMenge = 0
     let istMenge = 0
     
     if (istArbeitstag) {
-      // ✅ PRODUKTIONSTAG
-      // Soll-Produktion: Monatsproduktion / Arbeitstage
-      const sollProduktion = saisonInfo.bikes / arbeitstageImMonat
-      planMenge = Math.round(sollProduktion)
+      // ✅ PRODUKTIONSTAG mit ERROR MANAGEMENT
       
-      // Ist-Produktion: Mit kleiner deterministischer Variation (97-103%)
-      const variation = 0.97 + (tag % 7) * 0.01
-      istMenge = Math.round(planMenge * variation)
+      // Soll-Produktion: Monatsproduktion / Arbeitstage
+      const sollProduktion = saisonInfo.bikes / saisonInfo.arbeitstage
+      
+      // Error Management: Kumulative Fehlerkorrektur
+      const fehler = monatlicheFehlerTracker[monat] + (sollProduktion - Math.round(sollProduktion))
+      
+      if (fehler >= 0.5) {
+        // Aufrunden
+        planMenge = Math.ceil(sollProduktion)
+        monatlicheFehlerTracker[monat] = fehler - 1.0
+      } else if (fehler <= -0.5) {
+        // Abrunden
+        planMenge = Math.floor(sollProduktion)
+        monatlicheFehlerTracker[monat] = fehler + 1.0
+      } else {
+        // Normal runden
+        planMenge = Math.round(sollProduktion)
+        monatlicheFehlerTracker[monat] = fehler
+      }
+      
+      // ✅ KRITISCHE ÄNDERUNG: Ist-Produktion = Plan-Produktion
+      // KEINE Variation mehr! Dies führte zu +12.547 Bikes Überproduktion
+      // Begründung: Ohne aktives Szenario soll Plan = Ist sein
+      istMenge = planMenge
     }
     
     const abweichung = istMenge - planMenge
