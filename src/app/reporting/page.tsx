@@ -14,6 +14,8 @@
  * WICHTIG: Alle Daten werden dynamisch aus dem zentralen
  * Supply Chain Metrics Rechner bezogen und reflektieren
  * ALLE aktiven Szenarien für konsistente Werte!
+ * 
+ * NEU: Nutzt dynamische Konfiguration aus KonfigurationContext
  */
 
 import { useState, useMemo } from 'react'
@@ -26,15 +28,20 @@ import { formatNumber, formatPercent } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useSzenarien } from '@/contexts/SzenarienContext'
+import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { 
-  berechneGesamtMetriken, 
+  berechneGesamtMetriken,
+  berechneGesamtMetrikenMitKonfig,
   berechneProduktionsDatenFuerVisualisierung,
+  berechneMonatlicheProduktionMitKonfig,
   berechneLagerDaten,
   berechneWoechentlicheAuslastung,
   berechneTaeglicherDaten,
   berechneVariantenProduktion,
+  berechneVariantenProduktionMitKonfig,
   berechneSzenarioAuswirkungen,
-  BASELINE
+  BASELINE,
+  DynamicConfig
 } from '@/lib/calculations/supply-chain-metrics'
 import {
   LineChart,
@@ -75,6 +82,7 @@ const VARIANTEN_FARBEN = [
  * Kombiniert SCOR Metriken und Visualisierungen
  * 
  * WICHTIG: Alle Daten werden dynamisch berechnet basierend auf aktiven Szenarien!
+ * NEU: Nutzt auch dynamische Konfiguration aus KonfigurationContext
  */
 export default function ReportingPage() {
   const [selectedView, setSelectedView] = useState<'metrics' | 'charts'>('metrics')
@@ -84,10 +92,29 @@ export default function ReportingPage() {
   const { getAktiveSzenarien } = useSzenarien()
   const aktiveSzenarien = getAktiveSzenarien()
   
-  // Berechne alle Metriken dynamisch basierend auf Szenarien
+  // Hole Konfiguration aus dem globalen Context
+  const { konfiguration, isInitialized, getArbeitstageProJahr } = useKonfiguration()
+  
+  // Erstelle dynamische Konfiguration für Berechnungen
+  const dynamicConfig: DynamicConfig = useMemo(() => ({
+    jahresproduktion: konfiguration.jahresproduktion,
+    arbeitstage: isInitialized ? getArbeitstageProJahr() : 252,
+    saisonalitaet: konfiguration.saisonalitaet.map(s => ({ monat: s.monat, anteil: s.anteil })),
+    varianten: konfiguration.varianten.map(v => ({
+      id: v.id,
+      name: v.name,
+      anteilPrognose: v.anteilPrognose,
+      herstellkosten: v.herstellkosten
+    }))
+  }), [konfiguration, isInitialized, getArbeitstageProJahr])
+  
+  // Berechne alle Metriken dynamisch basierend auf Szenarien UND Konfiguration
   const gesamtMetriken = useMemo(() => {
+    if (isInitialized) {
+      return berechneGesamtMetrikenMitKonfig(aktiveSzenarien, dynamicConfig)
+    }
     return berechneGesamtMetriken(aktiveSzenarien)
-  }, [aktiveSzenarien])
+  }, [aktiveSzenarien, dynamicConfig, isInitialized])
   
   // SCOR-Metriken aus dem zentralen Rechner
   const scorMetriken = gesamtMetriken.scor

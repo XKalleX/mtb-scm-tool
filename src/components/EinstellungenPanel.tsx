@@ -554,8 +554,8 @@ function FeiertagEditor() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {gefilterteFeiertage.map((f) => (
-              <TableRow key={f.datum}>
+            {gefilterteFeiertage.map((f, index) => (
+              <TableRow key={`${f.datum}-${f.land}-${index}`}>
                 <TableCell>
                   {editingDatum === f.datum ? (
                     <Input
