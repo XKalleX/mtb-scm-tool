@@ -136,13 +136,16 @@ export function generiereVariantenProduktionsplan(
       // ✅ PRODUKTIONSTAG
       
       // 1️⃣ Berechne Soll-Produktion (Dezimal)
-      // Formel: (Jahresproduktion / 365) * Saisonalitätsfaktor
-      const durchschnittProTag = variante.jahresProduktion / 365
-      sollProduktion = durchschnittProTag * (saisonFaktor / (1/12)) // Normalisierung
+      // KRITISCH: saisonMonat.produktionsMenge ist für ALLE Bikes, nicht nur diese Variante!
+      // Korrekte Formel: Varianten-Jahresproduktion * Saisonaler Anteil / Arbeitstage
       
-      // Einfachere Formel: Nutze Monatsproduktion / Arbeitstage im Monat
       const arbeitstageImMonat = countArbeitstageInMonat(datum)
-      sollProduktion = saisonMonat.produktionsMenge / arbeitstageImMonat
+      
+      // Schritt A: Berechne Monatsproduktion dieser Variante
+      const variantenMonatsProduktion = variante.jahresProduktion * (saisonFaktor / 100)
+      
+      // Schritt B: Verteile auf Arbeitstage
+      sollProduktion = variantenMonatsProduktion / arbeitstageImMonat
       
       // 2️⃣ Error Management: Kumulative Fehlerkorrektur
       fehler += (sollProduktion - Math.round(sollProduktion))
