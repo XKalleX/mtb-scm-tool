@@ -10,6 +10,7 @@
  * - Schnellzugriff auf alle Module
  * - Aktuelle Warnungen und Hinweise
  * - Aktive Szenarien Status
+ * - Einstellungen/Konfiguration (global editierbar)
  */
 
 import Link from 'next/link'
@@ -25,18 +26,29 @@ import {
   TrendingUp,
   Calendar,
   ArrowRight,
-  Zap
+  Zap,
+  Settings
 } from 'lucide-react'
-import stammdatenData from '@/data/stammdaten.json'
 import { useSzenarien, berechneGlobaleAuswirkungen, BASELINE_WERTE } from '@/contexts/SzenarienContext'
-import { useMemo } from 'react'
+import { useKonfiguration, STANDARD_KONFIGURATION } from '@/contexts/KonfigurationContext'
+import { useMemo, useState } from 'react'
+import { EinstellungenPanel } from '@/components/EinstellungenPanel'
+import { formatNumber } from '@/lib/utils'
+
+/**
+ * Fallback-Wert für Arbeitstage wenn Konfiguration noch nicht geladen ist
+ * Entspricht durchschnittlicher Anzahl Arbeitstage pro Jahr in Deutschland
+ */
+const DEFAULT_ARBEITSTAGE_FALLBACK = 252
 
 /**
  * Dashboard Hauptkomponente mit Szenarien-Integration und Live-Berechnungen
  */
 export default function Dashboard() {
   const { szenarien, getAktiveSzenarien } = useSzenarien()
+  const { konfiguration, isInitialized, getArbeitstageProJahr } = useKonfiguration()
   const aktiveSzenarien = getAktiveSzenarien()
+  const [showSettings, setShowSettings] = useState(false)
   
   // Berechne Auswirkungen der aktiven Szenarien in Echtzeit
   const auswirkungen = useMemo(() => {
@@ -44,29 +56,66 @@ export default function Dashboard() {
   }, [aktiveSzenarien])
 
   // Berechne Änderungen gegenüber Baseline
-  const baselineWerte = BASELINE_WERTE
+  // Nutze Konfiguration statt hardcodierter Werte
+  const jahresproduktion = konfiguration.jahresproduktion
+  
+  // Berechne Produktionsmenge mit Szenarien-Effekten
+  // Wenn Szenarien aktiv sind, skaliere den Effekt proportional zur konfigurierten Jahresproduktion
+  const produktionsmenge = aktiveSzenarien.length > 0 
+    ? Math.round(jahresproduktion * (auswirkungen.produktionsmenge / STANDARD_KONFIGURATION.jahresproduktion))
+    : jahresproduktion
 
-  const produktionsDiff = auswirkungen.produktionsmenge - baselineWerte.produktionsmenge
-  const produktionsProzent = ((produktionsDiff / baselineWerte.produktionsmenge) * 100).toFixed(1)
-  const liefertreueDiff = auswirkungen.liefertreue - baselineWerte.liefertreue
+  const produktionsDiff = produktionsmenge - jahresproduktion
+  const produktionsProzent = ((produktionsDiff / jahresproduktion) * 100).toFixed(1)
+  const liefertreueDiff = auswirkungen.liefertreue - BASELINE_WERTE.liefertreue
   const liefertreueProzent = (liefertreueDiff).toFixed(1)
+
+  // Arbeitstage aus Konfiguration berechnen
+  const arbeitstage = isInitialized ? getArbeitstageProJahr() : DEFAULT_ARBEITSTAGE_FALLBACK
+
+  // Spring Festival Daten aus Konfiguration
+  const springFestival = konfiguration.feiertage.filter(f => f.name.includes('Spring Festival'))
+  const springFestivalStart = springFestival.length > 0 ? springFestival[0].datum : '2027-01-28'
+  const springFestivalEnde = springFestival.length > 0 ? springFestival[springFestival.length - 1].datum : '2027-02-04'
+
+  // Vorlaufzeit aus Konfiguration
+  const gesamtVorlaufzeit = konfiguration.lieferant.vorlaufzeitArbeitstage + konfiguration.lieferant.vorlaufzeitKalendertage
+
+  // Peak-Monat aus Saisonalität ermitteln
+  const peakMonat = konfiguration.saisonalitaet.reduce((max, s) => s.anteil > max.anteil ? s : max)
+  
+  if (!isInitialized) {
+    return <div className="text-center py-8">Lade Dashboard...</div>
+  }
   
   return (
     <div className="space-y-6">
-      {/* Willkommens-Bereich */}
-      <div>
-        <h1 className="text-3xl font-bold">Supply Chain Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Übersicht über alle wichtigen Kennzahlen und Funktionen
-          {aktiveSzenarien.length > 0 && ' - Live-Berechnung mit aktiven Szenarien'}
-        </p>
+      {/* Willkommens-Bereich mit Settings Toggle */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Supply Chain Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Übersicht über alle wichtigen Kennzahlen und Funktionen
+            {aktiveSzenarien.length > 0 && ' - Live-Berechnung mit aktiven Szenarien'}
+          </p>
+        </div>
+        <Button
+          variant={showSettings ? 'default' : 'outline'}
+          onClick={() => setShowSettings(!showSettings)}
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          {showSettings ? 'Einstellungen schließen' : 'Einstellungen öffnen'}
+        </Button>
       </div>
+
+      {/* Einstellungen Panel (einklappbar) */}
+      {showSettings && <EinstellungenPanel />}
 
       {/* KPI Cards - Wichtigste Kennzahlen mit Live-Updates */}
       <div className="grid gap-4 md:grid-cols-4">
         <KPICard
           title="Jahresproduktion"
-          value={Math.round(auswirkungen.produktionsmenge).toLocaleString('de-DE')}
+          value={formatNumber(produktionsmenge, 0)}
           unit="Bikes"
           icon={Factory}
           trend={aktiveSzenarien.length > 0 ? `${parseFloat(produktionsProzent) > 0 ? '+' : ''}${produktionsProzent}%` : '+12%'}
@@ -74,7 +123,7 @@ export default function Dashboard() {
         />
         <KPICard
           title="Produktionstage"
-          value="252"
+          value={arbeitstage.toString()}
           unit="Tage"
           icon={Calendar}
           trend="von 365"
@@ -98,7 +147,7 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Aktuelle Warnungen */}
+      {/* Aktuelle Warnungen - dynamisch aus Konfiguration */}
       <Card className="border-orange-200 bg-orange-50">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -108,10 +157,10 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <ul className="space-y-2 text-sm text-orange-800">
-            <li>• Spring Festival China: <strong>28.01. - 04.02.2027</strong> (8 Tage Produktionsstopp)</li>
-            <li>• April-Peak: <strong>16%</strong> der Jahresproduktion (Kapazitätsplanung beachten)</li>
-            <li>• China-Vorlaufzeit: <strong>49 Tage</strong> (5 AT Produktion + 44 KT Transport)</li>
-            <li>• Nur Sättel (4 Varianten) von China-Zulieferer</li>
+            <li>• Spring Festival China: <strong>{new Date(springFestivalStart).toLocaleDateString('de-DE')} - {new Date(springFestivalEnde).toLocaleDateString('de-DE')}</strong> ({springFestival.length} Tage Produktionsstopp)</li>
+            <li>• {peakMonat.name}-Peak: <strong>{peakMonat.anteil}%</strong> der Jahresproduktion (Kapazitätsplanung beachten)</li>
+            <li>• China-Vorlaufzeit: <strong>{gesamtVorlaufzeit} Tage</strong> ({konfiguration.lieferant.vorlaufzeitArbeitstage} AT Produktion + {konfiguration.lieferant.vorlaufzeitKalendertage} KT Transport)</li>
+            <li>• Losgröße Sättel: <strong>{formatNumber(konfiguration.lieferant.losgroesse, 0)} Stück</strong> (Mindestbestellung)</li>
           </ul>
         </CardContent>
       </Card>
