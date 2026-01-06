@@ -10,6 +10,8 @@
  * - Saisonale Verteilung (April-Peak)
  * - Error-Management für Rundungsfehler
  * - Stücklisten-Übersicht
+ * 
+ * NEU: Nutzt dynamische Konfiguration aus KonfigurationContext
  */
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,25 +25,47 @@ import { generiereAlleProduktionsplaene, berechneProduktionsstatistik } from '@/
 import { kalenderStatistik } from '@/lib/kalender'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import { showError, showSuccess } from '@/lib/notifications'
-import stammdatenData from '@/data/stammdaten.json'
-import stuecklisteData from '@/data/stueckliste.json'
-import { useState, useEffect } from 'react'
+import { useKonfiguration } from '@/contexts/KonfigurationContext'
+import { useState, useEffect, useMemo } from 'react'
 
 /**
  * OEM Programm Hauptseite
  * Zeigt Produktionsplanung und Stücklisten
+ * Nutzt dynamische Konfiguration aus KonfigurationContext
  */
 export default function OEMProgrammPage() {
   const [produktionsplaene, setProduktionsplaene] = useState<any>(null)
   const [selectedVariante, setSelectedVariante] = useState('MTBAllrounder')
   
+  // Hole Konfiguration aus Context
+  const { konfiguration, isInitialized, getArbeitstageProJahr, getJahresproduktionProVariante } = useKonfiguration()
+
   useEffect(() => {
     // Generiere Produktionspläne beim Laden
     const plaene = generiereAlleProduktionsplaene()
     setProduktionsplaene(plaene)
   }, [])
 
-  const kalenderStats = kalenderStatistik(2027)
+  // Berechne Statistiken aus Konfiguration
+  const arbeitstage = isInitialized ? getArbeitstageProJahr() : 252
+  const jahresproduktionProVariante = isInitialized ? getJahresproduktionProVariante() : {}
+  
+  // Erstelle stueckliste basierend auf Konfiguration
+  const stuecklistenMap = useMemo(() => {
+    const map: Record<string, { komponenten: Record<string, { name: string; menge: number }> }> = {}
+    konfiguration.stueckliste.forEach(s => {
+      map[s.mtbVariante] = {
+        komponenten: {
+          [s.bauteilId]: { name: s.bauteilName, menge: s.menge }
+        }
+      }
+    })
+    return map
+  }, [konfiguration.stueckliste])
+  
+  if (!isInitialized) {
+    return <div className="text-center py-8">Lade Konfiguration...</div>
+  }
   
   /**
    * Exportiert Produktionsplan als CSV
@@ -108,7 +132,7 @@ export default function OEMProgrammPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatNumber(stammdatenData.jahresproduktion.gesamt, 0)}
+              {formatNumber(konfiguration.jahresproduktion, 0)}
             </div>
             <p className="text-xs text-muted-foreground">MTBs gesamt</p>
           </CardContent>
@@ -119,7 +143,7 @@ export default function OEMProgrammPage() {
             <CardTitle className="text-sm font-medium">Produktionstage</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{kalenderStats.arbeitstage}</div>
+            <div className="text-2xl font-bold">{arbeitstage}</div>
             <p className="text-xs text-muted-foreground">von 365 Tagen</p>
           </CardContent>
         </Card>
@@ -130,7 +154,7 @@ export default function OEMProgrammPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatNumber(stammdatenData.jahresproduktion.gesamt / kalenderStats.arbeitstage, 0)}
+              {formatNumber(konfiguration.jahresproduktion / arbeitstage, 0)}
             </div>
             <p className="text-xs text-muted-foreground">Bikes pro Arbeitstag</p>
           </CardContent>
@@ -141,7 +165,7 @@ export default function OEMProgrammPage() {
             <CardTitle className="text-sm font-medium">Varianten</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stammdatenData.varianten.length}</div>
+            <div className="text-2xl font-bold">{konfiguration.varianten.length}</div>
             <p className="text-xs text-muted-foreground">MTB-Modelle</p>
           </CardContent>
         </Card>
@@ -174,25 +198,25 @@ export default function OEMProgrammPage() {
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex-1 text-center">
                     <div className="text-xs text-muted-foreground mb-1">1. Jahresproduktion</div>
-                    <div className="font-bold text-lg">{formatNumber(stammdatenData.jahresproduktion.gesamt, 0)} Bikes</div>
-                    <div className="text-xs text-muted-foreground">Gesamtziel 2027</div>
+                    <div className="font-bold text-lg">{formatNumber(konfiguration.jahresproduktion, 0)} Bikes</div>
+                    <div className="text-xs text-muted-foreground">Gesamtziel {konfiguration.planungsjahr}</div>
                   </div>
                   <div className="text-2xl text-muted-foreground">→</div>
                   <div className="flex-1 text-center">
                     <div className="text-xs text-muted-foreground mb-1">2. Saisonale Verteilung</div>
-                    <div className="font-bold text-lg text-green-600">Jan 4% ... Apr 16%</div>
+                    <div className="font-bold text-lg text-green-600">Jan {konfiguration.saisonalitaet[0]?.anteil}% ... Apr {konfiguration.saisonalitaet[3]?.anteil}%</div>
                     <div className="text-xs text-muted-foreground">Monatliche Peaks</div>
                   </div>
                   <div className="text-2xl text-muted-foreground">→</div>
                   <div className="flex-1 text-center">
                     <div className="text-xs text-muted-foreground mb-1">3. Tagesplanung</div>
-                    <div className="font-bold text-lg text-blue-600">{kalenderStats.arbeitstage} Tage</div>
+                    <div className="font-bold text-lg text-blue-600">{arbeitstage} Tage</div>
                     <div className="text-xs text-muted-foreground">Mit Error-Management</div>
                   </div>
                   <div className="text-2xl text-muted-foreground">→</div>
                   <div className="flex-1 text-center">
                     <div className="text-xs text-muted-foreground mb-1">4. Sattel-Bedarf</div>
-                    <div className="font-bold text-lg text-orange-600">{formatNumber(stammdatenData.jahresproduktion.gesamt, 0)} Stk</div>
+                    <div className="font-bold text-lg text-orange-600">{formatNumber(konfiguration.jahresproduktion, 0)} Stk</div>
                     <div className="text-xs text-muted-foreground">1:1 Verhältnis</div>
                   </div>
                 </div>
@@ -202,38 +226,31 @@ export default function OEMProgrammPage() {
               <div>
                 <h4 className="text-sm font-semibold mb-3">Saisonale Produktionsverteilung (% der Jahresproduktion)</h4>
                 <div className="space-y-2">
-                  {[
-                    { monat: 'Januar', anteil: 4, bikes: Math.round(370_000 * 0.04) },
-                    { monat: 'Februar', anteil: 5, bikes: Math.round(370_000 * 0.05) },
-                    { monat: 'März', anteil: 10, bikes: Math.round(370_000 * 0.10) },
-                    { monat: 'April', anteil: 16, isPeak: true, bikes: Math.round(370_000 * 0.16) },
-                    { monat: 'Mai', anteil: 14, bikes: Math.round(370_000 * 0.14) },
-                    { monat: 'Juni', anteil: 12, bikes: Math.round(370_000 * 0.12) },
-                    { monat: 'Juli', anteil: 10, bikes: Math.round(370_000 * 0.10) },
-                    { monat: 'August', anteil: 8, bikes: Math.round(370_000 * 0.08) },
-                    { monat: 'September', anteil: 9, bikes: Math.round(370_000 * 0.09) },
-                    { monat: 'Oktober', anteil: 6, bikes: Math.round(370_000 * 0.06) },
-                    { monat: 'November', anteil: 3, bikes: Math.round(370_000 * 0.03) },
-                    { monat: 'Dezember', anteil: 3, bikes: Math.round(370_000 * 0.03) },
-                  ].map(m => (
-                    <div key={m.monat} className="flex items-center gap-4">
-                      <div className="w-20 text-sm font-medium">{m.monat}</div>
-                      <div className="flex-1 bg-slate-200 rounded-full h-8 relative">
-                        <div 
-                          className={`h-8 rounded-full ${m.isPeak ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-blue-500'} flex items-center justify-between px-3`}
-                          style={{ width: `${m.anteil * 6.25}%` }}
-                        >
-                          <span className="text-xs text-white font-medium">{m.anteil}%</span>
-                          <span className="text-xs text-white">{formatNumber(m.bikes, 0)} Bikes</span>
-                        </div>
-                        {m.isPeak && (
-                          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-bold text-green-600">
-                            🏔️ PEAK
+                  {konfiguration.saisonalitaet.map((s, index) => {
+                    const bikes = Math.round(konfiguration.jahresproduktion * (s.anteil / 100))
+                    const peakMonat = konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max)
+                    const isPeak = s.monat === peakMonat.monat
+                    
+                    return (
+                      <div key={s.monat} className="flex items-center gap-4">
+                        <div className="w-20 text-sm font-medium">{s.name}</div>
+                        <div className="flex-1 bg-slate-200 rounded-full h-8 relative">
+                          <div 
+                            className={`h-8 rounded-full ${isPeak ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-blue-500'} flex items-center justify-between px-3`}
+                            style={{ width: `${Math.min(s.anteil * 6.25, 100)}%` }}
+                          >
+                            <span className="text-xs text-white font-medium">{s.anteil}%</span>
+                            <span className="text-xs text-white">{formatNumber(bikes, 0)} Bikes</span>
                           </div>
-                        )}
+                          {isPeak && (
+                            <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-bold text-green-600">
+                              🏔️ PEAK
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 
@@ -243,23 +260,31 @@ export default function OEMProgrammPage() {
                   <AlertCircle className="h-4 w-4" />
                   Wie wird die Saisonalität auf die Tagesplanung übertragen?
                 </h4>
-                <div className="text-sm text-blue-800 space-y-2">
-                  <p>
-                    <strong>Schritt 1:</strong> April hat 16% der Jahresproduktion = {formatNumber(370_000 * 0.16, 0)} Bikes
-                  </p>
-                  <p>
-                    <strong>Schritt 2:</strong> April 2027 hat ca. 22 Arbeitstage (ohne Wochenenden/Feiertage)
-                  </p>
-                  <p>
-                    <strong>Schritt 3:</strong> {formatNumber(370_000 * 0.16, 0)} / 22 ≈ {formatNumber((370_000 * 0.16) / 22, 1)} Bikes pro Tag im April
-                  </p>
-                  <p>
-                    <strong>Schritt 4:</strong> Error-Management korrigiert Rundungsfehler → exakt {formatNumber(370_000 * 0.16, 0)} Bikes am Monatsende
-                  </p>
-                  <p className="pt-2 border-t border-blue-300 mt-3">
-                    → Diese Logik sehen Sie detailliert im Tab <strong>"Tagesplanung"</strong> für jede der 8 Varianten!
-                  </p>
-                </div>
+                {(() => {
+                  const peakMonat = konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max)
+                  const peakProduktion = Math.round(konfiguration.jahresproduktion * (peakMonat.anteil / 100))
+                  const peakArbeitstage = 22 // Approximation
+                  
+                  return (
+                    <div className="text-sm text-blue-800 space-y-2">
+                      <p>
+                        <strong>Schritt 1:</strong> {peakMonat.name} hat {peakMonat.anteil}% der Jahresproduktion = {formatNumber(peakProduktion, 0)} Bikes
+                      </p>
+                      <p>
+                        <strong>Schritt 2:</strong> {peakMonat.name} {konfiguration.planungsjahr} hat ca. {peakArbeitstage} Arbeitstage (ohne Wochenenden/Feiertage)
+                      </p>
+                      <p>
+                        <strong>Schritt 3:</strong> {formatNumber(peakProduktion, 0)} / {peakArbeitstage} ≈ {formatNumber(peakProduktion / peakArbeitstage, 1)} Bikes pro Tag im {peakMonat.name}
+                      </p>
+                      <p>
+                        <strong>Schritt 4:</strong> Error-Management korrigiert Rundungsfehler → exakt {formatNumber(peakProduktion, 0)} Bikes am Monatsende
+                      </p>
+                      <p className="pt-2 border-t border-blue-300 mt-3">
+                        → Diese Logik sehen Sie detailliert im Tab <strong>"Tagesplanung"</strong> für jede der {konfiguration.varianten.length} Varianten!
+                      </p>
+                    </div>
+                  )
+                })()}
               </div>
             </CardContent>
           </Card>
@@ -280,15 +305,16 @@ export default function OEMProgrammPage() {
                     <TableHead className="text-right">Jahresproduktion</TableHead>
                     <TableHead className="text-right">Sattel-Bedarf</TableHead>
                     <TableHead className="text-right">Ø pro AT</TableHead>
-                    <TableHead className="text-right">Peak April</TableHead>
+                    <TableHead className="text-right">Peak Monat</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stammdatenData.varianten.map(v => {
-                    const jahresprod = stammdatenData.jahresproduktion.proVariante[v.id as keyof typeof stammdatenData.jahresproduktion.proVariante]
-                    const durchschnitt = jahresprod / kalenderStats.arbeitstage
-                    const aprilPeak = jahresprod * 0.16 // 16% im April
-                    const stl = stuecklisteData.stuecklisten[v.id as keyof typeof stuecklisteData.stuecklisten]
+                  {konfiguration.varianten.map(v => {
+                    const jahresprod = jahresproduktionProVariante[v.id] || Math.round(konfiguration.jahresproduktion * v.anteilPrognose)
+                    const durchschnitt = jahresprod / arbeitstage
+                    const peakMonat = konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max)
+                    const peakProduktion = jahresprod * (peakMonat.anteil / 100)
+                    const stl = stuecklistenMap[v.id]
                     const sattel = stl ? Object.values(stl.komponenten)[0] as any : null
                     
                     return (
@@ -298,16 +324,16 @@ export default function OEMProgrammPage() {
                         <TableCell className="text-right font-semibold">{formatNumber(jahresprod, 0)} Bikes</TableCell>
                         <TableCell className="text-right text-blue-600">{formatNumber(jahresprod, 0)} Stk</TableCell>
                         <TableCell className="text-right">{formatNumber(durchschnitt, 1)}</TableCell>
-                        <TableCell className="text-right">{formatNumber(aprilPeak, 0)}</TableCell>
+                        <TableCell className="text-right">{formatNumber(peakProduktion, 0)}</TableCell>
                       </TableRow>
                     )
                   })}
                   <TableRow className="bg-slate-50 font-bold">
                     <TableCell colSpan={2}>GESAMT</TableCell>
-                    <TableCell className="text-right">{formatNumber(stammdatenData.jahresproduktion.gesamt, 0)} Bikes</TableCell>
-                    <TableCell className="text-right text-blue-600">{formatNumber(stammdatenData.jahresproduktion.gesamt, 0)} Stk</TableCell>
-                    <TableCell className="text-right">{formatNumber(stammdatenData.jahresproduktion.gesamt / kalenderStats.arbeitstage, 1)}</TableCell>
-                    <TableCell className="text-right">{formatNumber(stammdatenData.jahresproduktion.gesamt * 0.16, 0)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(konfiguration.jahresproduktion, 0)} Bikes</TableCell>
+                    <TableCell className="text-right text-blue-600">{formatNumber(konfiguration.jahresproduktion, 0)} Stk</TableCell>
+                    <TableCell className="text-right">{formatNumber(konfiguration.jahresproduktion / arbeitstage, 1)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(konfiguration.jahresproduktion * (konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max).anteil / 100), 0)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -337,13 +363,13 @@ export default function OEMProgrammPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stammdatenData.varianten.map((v) => {
-                    const stl = stuecklisteData.stuecklisten[v.id as keyof typeof stuecklisteData.stuecklisten]
+                  {konfiguration.varianten.map((v) => {
+                    const stl = stuecklistenMap[v.id]
                     if (!stl) return null
                     
                     // Nur Sattel extrahieren
                     const sattel = Object.values(stl.komponenten)[0] as any
-                    const jahresprod = stammdatenData.jahresproduktion.proVariante[v.id as keyof typeof stammdatenData.jahresproduktion.proVariante]
+                    const jahresprod = jahresproduktionProVariante[v.id] || Math.round(konfiguration.jahresproduktion * v.anteilPrognose)
                     
                     return (
                       <TableRow key={v.id}>
@@ -356,7 +382,7 @@ export default function OEMProgrammPage() {
                           {formatNumber(jahresprod, 0)} Stück
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          China (49 Tage Vorlauf)
+                          {konfiguration.lieferant.land} ({konfiguration.lieferant.vorlaufzeitArbeitstage + konfiguration.lieferant.vorlaufzeitKalendertage} Tage Vorlauf)
                         </TableCell>
                       </TableRow>
                     )
@@ -364,7 +390,7 @@ export default function OEMProgrammPage() {
                   <TableRow className="bg-slate-50 font-bold">
                     <TableCell colSpan={3}>GESAMT Sättel benötigt:</TableCell>
                     <TableCell className="text-right">
-                      {formatNumber(stammdatenData.jahresproduktion.gesamt, 0)} Stück
+                      {formatNumber(konfiguration.jahresproduktion, 0)} Stück
                     </TableCell>
                     <TableCell></TableCell>
                   </TableRow>
@@ -375,23 +401,21 @@ export default function OEMProgrammPage() {
               <div className="mt-6">
                 <h4 className="text-sm font-semibold mb-3">Sattel-Varianten Aggregation (für Bestellung):</h4>
                 <div className="grid gap-3 md:grid-cols-2">
-                  {['Fizik Tundra', 'Raceline', 'Spark', 'Speedline'].map(sattelName => {
-                    const bedarf = stammdatenData.varianten
-                      .filter(v => {
-                        const stl = stuecklisteData.stuecklisten[v.id as keyof typeof stuecklisteData.stuecklisten]
-                        const sattel = stl ? Object.values(stl.komponenten)[0] as any : null
-                        return sattel?.name === sattelName
-                      })
-                      .reduce((sum, v) => {
-                        return sum + (stammdatenData.jahresproduktion.proVariante[v.id as keyof typeof stammdatenData.jahresproduktion.proVariante] || 0)
+                  {konfiguration.bauteile.map(bauteil => {
+                    const bedarf = konfiguration.stueckliste
+                      .filter(s => s.bauteilId === bauteil.id)
+                      .reduce((sum, s) => {
+                        const variante = konfiguration.varianten.find(v => v.id === s.mtbVariante)
+                        if (!variante) return sum
+                        return sum + Math.round(konfiguration.jahresproduktion * variante.anteilPrognose) * s.menge
                       }, 0)
                     
                     return (
-                      <div key={sattelName} className="bg-slate-50 border rounded-lg p-3">
-                        <div className="text-sm font-medium">{sattelName}</div>
+                      <div key={bauteil.id} className="bg-slate-50 border rounded-lg p-3">
+                        <div className="text-sm font-medium">{bauteil.name}</div>
                         <div className="text-lg font-bold text-blue-600">{formatNumber(bedarf, 0)} Stück/Jahr</div>
                         <div className="text-xs text-muted-foreground">
-                          ≈ {formatNumber(bedarf / 252, 0)} Stück/Arbeitstag
+                          ≈ {formatNumber(bedarf / arbeitstage, 0)} Stück/Arbeitstag
                         </div>
                       </div>
                     )
@@ -407,9 +431,10 @@ export default function OEMProgrammPage() {
           {produktionsplaene && selectedVariante && (() => {
             const variantePlan = produktionsplaene[selectedVariante]
             const stats = berechneProduktionsstatistik(variantePlan)
-            const varianteInfo = stammdatenData.varianten.find(v => v.id === selectedVariante)
-            const stl = stuecklisteData.stuecklisten[selectedVariante as keyof typeof stuecklisteData.stuecklisten]
+            const varianteInfo = konfiguration.varianten.find(v => v.id === selectedVariante)
+            const stl = stuecklistenMap[selectedVariante]
             const sattel = stl ? Object.values(stl.komponenten)[0] as any : null
+            const peakMonat = konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max)
             
             return (
               <div className="grid gap-4 md:grid-cols-5 mb-4">
@@ -446,7 +471,7 @@ export default function OEMProgrammPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-xl font-bold">{formatNumber(stats.maxProTag, 0)}</div>
-                    <p className="text-xs text-muted-foreground">im April</p>
+                    <p className="text-xs text-muted-foreground">im {peakMonat.name}</p>
                   </CardContent>
                 </Card>
                 <Card>
@@ -464,7 +489,7 @@ export default function OEMProgrammPage() {
           
           <Card>
             <CardHeader>
-              <CardTitle>Vollständige Tagesplanung 2027 - {stammdatenData.varianten.find(v => v.id === selectedVariante)?.name}</CardTitle>
+              <CardTitle>Vollständige Tagesplanung {konfiguration.planungsjahr} - {konfiguration.varianten.find(v => v.id === selectedVariante)?.name}</CardTitle>
               <CardDescription>
                 Alle {produktionsplaene?.[selectedVariante]?.filter((t: any) => t.istMenge > 0).length} Produktionstage mit Error-Management (scrollbar nutzen)
               </CardDescription>
@@ -473,7 +498,7 @@ export default function OEMProgrammPage() {
               {/* Varianten-Auswahl */}
               <div className="mb-4 flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium">Variante wählen:</span>
-                {stammdatenData.varianten.map(v => (
+                {konfiguration.varianten.map(v => (
                   <Button
                     key={v.id}
                     variant={selectedVariante === v.id ? 'default' : 'outline'}
@@ -490,8 +515,8 @@ export default function OEMProgrammPage() {
                 <FormulaCard
                   title="Soll-Menge Berechnung"
                   formula="Soll-Menge = (Jahresproduktion / Arbeitstage) × Saisonaler Faktor"
-                  description="Die tägliche Soll-Menge berücksichtigt die saisonale Verteilung (April-Peak 16%)."
-                  example="MTB Allrounder: 111.000 / 252 AT × 1,6 (April) = 704,76 Bikes/Tag"
+                  description={`Die tägliche Soll-Menge berücksichtigt die saisonale Verteilung (${konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max).name}-Peak ${konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max).anteil}%).`}
+                  example={`MTB Allrounder: ${formatNumber(Math.round(konfiguration.jahresproduktion * 0.3), 0)} / ${arbeitstage} AT × ${(konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max).anteil / 8.33).toFixed(1)} = ${formatNumber(Math.round(konfiguration.jahresproduktion * 0.3) / arbeitstage * (konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max).anteil / 8.33), 2)} Bikes/Tag`}
                 />
                 <FormulaCard
                   title="Error-Management Formel"
@@ -503,7 +528,7 @@ export default function OEMProgrammPage() {
 
               {/* Excel-ähnliche Tabelle mit allen Tagen */}
               {produktionsplaene && (() => {
-                const stl = stuecklisteData.stuecklisten[selectedVariante as keyof typeof stuecklisteData.stuecklisten]
+                const stl = stuecklistenMap[selectedVariante]
                 const sattel = stl ? Object.values(stl.komponenten)[0] as any : null
                 
                 return (

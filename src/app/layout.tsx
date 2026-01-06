@@ -3,6 +3,7 @@ import './globals.css'
 import Link from 'next/link'
 import { Package, LineChart, Download, Factory, BarChart3, Zap } from 'lucide-react'
 import { SzenarienProvider } from '@/contexts/SzenarienContext'
+import { KonfigurationProvider } from '@/contexts/KonfigurationContext'
 import { SzenarienFloatingButton } from '@/components/SzenarienSidebar'
 
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ export default function RootLayout({
   return (
     <html lang="de">
       <body className="font-sans antialiased">
+        <KonfigurationProvider>
         <SzenarienProvider>
         <div className="min-h-screen flex flex-col">
           {/* Header */}
@@ -78,6 +80,7 @@ export default function RootLayout({
           <SzenarienFloatingButton />
         </div>
         </SzenarienProvider>
+        </KonfigurationProvider>
       </body>
     </html>
   )

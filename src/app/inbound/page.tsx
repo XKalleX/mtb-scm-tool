@@ -10,6 +10,8 @@
  * - Spring Festival Berücksichtigung
  * - Losgrößen-Optimierung
  * - Bestellplanung
+ * 
+ * NEU: Nutzt dynamische Konfiguration aus KonfigurationContext
  */
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,54 +21,71 @@ import { CheckCircle2, Ship, AlertTriangle, Package, Download } from 'lucide-rea
 import { formatNumber } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
-import lieferantData from '@/data/lieferant-china.json'
-import feiertagsData from '@/data/feiertage-china.json'
+import { useKonfiguration } from '@/contexts/KonfigurationContext'
+import { useMemo } from 'react'
 
 /**
  * Inbound Logistik Hauptseite
  * Zeigt Lieferanteninformationen und Logistikdetails mit Excel-Tabellen
+ * Nutzt dynamische Konfiguration aus KonfigurationContext
  */
 export default function InboundPage() {
-  const lieferant = lieferantData.lieferant
-  const springFestival = feiertagsData.feiertage2027.filter(f => f.name.includes('Spring Festival'))
+  const { konfiguration, isInitialized } = useKonfiguration()
   
-  // Lieferplan-Daten für Excel-Tabelle (deterministisch)
-  const lieferplanDaten = Array.from({ length: 12 }, (_, i) => {
-    const monat = i + 1
-    const bestelldatum = new Date(2027, monat - 1, 5).toISOString().split('T')[0]
-    const lieferdatum = new Date(2027, monat - 1, 5 + 49).toISOString().split('T')[0] // 49 Tage später
-    
-    // Deterministisches Muster basierend auf Saisonalität
-    const saisonalitaet = [0.04, 0.05, 0.10, 0.16, 0.14, 0.12, 0.10, 0.08, 0.09, 0.06, 0.03, 0.03]
-    const jahresproduktion = 370000
-    const menge = Math.round(jahresproduktion * saisonalitaet[i] * 1.1) // 10% Buffer
-    
-    const status = monat <= 3 ? 'Geliefert' : monat <= 6 ? 'Unterwegs' : 'Geplant'
-    
-    return {
-      monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
-      bestelldatum,
-      lieferdatum,
-      vorlaufzeit: 49,
-      menge,
-      losgroesse: lieferant.losgroesse,
-      anzahlLose: Math.ceil(menge / lieferant.losgroesse),
-      status
-    }
-  })
+  // Lieferant aus Konfiguration
+  const lieferant = konfiguration.lieferant
+  
+  // Gesamtvorlaufzeit berechnen
+  const gesamtVorlaufzeit = lieferant.vorlaufzeitArbeitstage + lieferant.vorlaufzeitKalendertage
+  
+  // Spring Festival aus Feiertagen filtern
+  const springFestival = useMemo(() => 
+    konfiguration.feiertage.filter(f => f.name.includes('Spring Festival') && f.land === 'China'),
+    [konfiguration.feiertage]
+  )
+  
+  // Lieferplan-Daten für Excel-Tabelle (deterministisch, basierend auf Konfiguration)
+  const lieferplanDaten = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const monat = i + 1
+      const bestelldatum = new Date(konfiguration.planungsjahr, monat - 1, 5).toISOString().split('T')[0]
+      const lieferdatum = new Date(konfiguration.planungsjahr, monat - 1, 5 + gesamtVorlaufzeit).toISOString().split('T')[0]
+      
+      // Menge basierend auf Saisonalität aus Konfiguration
+      const saisonAnteil = konfiguration.saisonalitaet[i]?.anteil || 8.33
+      const menge = Math.round(konfiguration.jahresproduktion * (saisonAnteil / 100) * 1.1) // 10% Buffer
+      
+      const status = monat <= 3 ? 'Geliefert' : monat <= 6 ? 'Unterwegs' : 'Geplant'
+      
+      return {
+        monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
+        bestelldatum,
+        lieferdatum,
+        vorlaufzeit: gesamtVorlaufzeit,
+        menge,
+        losgroesse: lieferant.losgroesse,
+        anzahlLose: Math.ceil(menge / lieferant.losgroesse),
+        status
+      }
+    })
+  }, [konfiguration, lieferant, gesamtVorlaufzeit])
   
   /**
    * Exportiert Lieferanten-Daten als JSON
    */
   const handleExportLieferant = () => {
-    exportToJSON(lieferantData, 'lieferant_china_2027')
+    exportToJSON({ lieferant: konfiguration.lieferant }, `lieferant_${konfiguration.planungsjahr}`)
   }
   
   /**
    * Exportiert Feiertags-Daten als JSON
    */
   const handleExportFeiertage = () => {
-    exportToJSON(feiertagsData, 'feiertage_china_2027')
+    exportToJSON({ feiertage: konfiguration.feiertage }, `feiertage_${konfiguration.planungsjahr}`)
+  }
+  
+  if (!isInitialized) {
+    return <div className="text-center py-8">Lade Konfiguration...</div>
   }
   
   return (
@@ -74,7 +93,7 @@ export default function InboundPage() {
       {/* Header mit Export */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Inbound Logistik - China</h1>
+          <h1 className="text-3xl font-bold">Inbound Logistik - {lieferant.land}</h1>
           <p className="text-muted-foreground mt-1">
             Einziger Lieferant für ALLE Komponenten
           </p>
@@ -149,19 +168,19 @@ export default function InboundPage() {
       {/* Lieferanten-Details */}
       <Card>
         <CardHeader>
-          <CardTitle>🇨🇳 {lieferant.name}</CardTitle>
+          <CardTitle>{lieferant.land === 'China' ? '🇨🇳' : '🏭'} {lieferant.name}</CardTitle>
           <CardDescription>
-            Einziger Lieferant für alle {lieferantData.komponenten.length} Komponenten
+            Einziger Lieferant für alle {konfiguration.bauteile.length} Komponenten
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <h4 className="font-semibold mb-2">Vorlaufzeiten (SSOT):</h4>
+              <h4 className="font-semibold mb-2">Vorlaufzeiten (aus Konfiguration):</h4>
               <ul className="space-y-1 text-sm">
-                <li>✓ Produktion in China: <strong>{lieferant.vorlaufzeitArbeitstage} Arbeitstage</strong></li>
+                <li>✓ Produktion: <strong>{lieferant.vorlaufzeitArbeitstage} Arbeitstage</strong></li>
                 <li>✓ Schiff-Transport: <strong>{lieferant.vorlaufzeitKalendertage} Kalendertage (24/7)</strong></li>
-                <li>✓ Gesamt: <strong>49 Tage (7 Wochen)</strong></li>
+                <li>✓ Gesamt: <strong>{gesamtVorlaufzeit} Tage ({Math.ceil(gesamtVorlaufzeit / 7)} Wochen)</strong></li>
               </ul>
             </div>
             
@@ -178,55 +197,58 @@ export default function InboundPage() {
       </Card>
 
       {/* Spring Festival Warnung */}
-      <Card className="border-orange-200 bg-orange-50">
-        <CardHeader>
-          <div className="flex items-center space-x-2">
-            <AlertTriangle className="h-5 w-5 text-orange-600" />
-            <CardTitle className="text-orange-900">Spring Festival 2027</CardTitle>
-          </div>
-          <CardDescription className="text-orange-700">
-            7 Tage kompletter Produktionsstopp in China!
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <p className="text-sm text-orange-800">
-              <strong>Zeitraum:</strong> 28. Januar - 3. Februar 2027
-            </p>
-            <p className="text-sm text-orange-800">
-              <strong>Auswirkung:</strong> Keine Produktion, keine Bestellungsbearbeitung
-            </p>
-            <p className="text-sm text-orange-800">
-              <strong>Planung:</strong> Bestellungen müssen vor dem 28.1. oder nach dem 3.2. eingehen
-            </p>
-          </div>
-          
-          <div className="mt-4">
-            <h4 className="font-semibold text-orange-900 mb-2">Betroffene Feiertage:</h4>
-            <div className="grid gap-2 md:grid-cols-2">
-              {springFestival.map(f => (
-                <div key={f.datum} className="text-sm bg-white rounded px-2 py-1">
-                  {new Date(f.datum).toLocaleDateString('de-DE')}: {f.name}
-                </div>
-              ))}
+      {springFestival.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardHeader>
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              <CardTitle className="text-orange-900">Spring Festival {konfiguration.planungsjahr}</CardTitle>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+            <CardDescription className="text-orange-700">
+              {springFestival.length} Tage kompletter Produktionsstopp in {lieferant.land}!
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <p className="text-sm text-orange-800">
+                <strong>Zeitraum:</strong> {new Date(springFestival[0]?.datum).toLocaleDateString('de-DE')} - {new Date(springFestival[springFestival.length - 1]?.datum).toLocaleDateString('de-DE')}
+              </p>
+              <p className="text-sm text-orange-800">
+                <strong>Auswirkung:</strong> Keine Produktion, keine Bestellungsbearbeitung
+              </p>
+              <p className="text-sm text-orange-800">
+                <strong>Planung:</strong> Bestellungen müssen vor oder nach dem Festival eingehen
+              </p>
+            </div>
+            
+            <div className="mt-4">
+              <h4 className="font-semibold text-orange-900 mb-2">Betroffene Feiertage:</h4>
+              <div className="grid gap-2 md:grid-cols-2">
+                {springFestival.map(f => (
+                  <div key={f.datum} className="text-sm bg-white rounded px-2 py-1">
+                    {new Date(f.datum).toLocaleDateString('de-DE')}: {f.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Komponenten */}
       <Card>
         <CardHeader>
-          <CardTitle>Gelieferte Komponenten ({lieferantData.komponenten.length})</CardTitle>
+          <CardTitle>Gelieferte Komponenten ({konfiguration.bauteile.length})</CardTitle>
           <CardDescription>
             Alle Komponenten kommen von diesem einen Lieferanten
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-2 md:grid-cols-3">
-            {lieferantData.komponenten.map(k => (
-              <div key={k} className="text-sm bg-slate-50 rounded px-3 py-2">
-                {k.replace(/_/g, ' ')}
+            {konfiguration.bauteile.map(b => (
+              <div key={b.id} className="text-sm bg-slate-50 rounded px-3 py-2">
+                <span className="font-medium">{b.name}</span>
+                <span className="text-muted-foreground ml-2">({b.kategorie})</span>
               </div>
             ))}
           </div>
@@ -255,7 +277,7 @@ export default function InboundPage() {
               Jede Bestellung wird auf Vielfache von <strong>{formatNumber(lieferant.losgroesse, 0)} Stück</strong> aufgerundet.
             </p>
             <p className="text-sm text-green-800 mt-2">
-              Beispiel: Bedarf 3.500 Stück → Bestellung <strong>4.000 Stück</strong> (2x Losgröße)
+              Beispiel: Bedarf 3.500 Stück → Bestellung <strong>{formatNumber(Math.ceil(3500 / lieferant.losgroesse) * lieferant.losgroesse, 0)} Stück</strong> ({Math.ceil(3500 / lieferant.losgroesse)}x Losgröße)
             </p>
           </div>
         </CardContent>
@@ -264,7 +286,7 @@ export default function InboundPage() {
       {/* Lieferplan mit Excel-Tabelle */}
       <Card>
         <CardHeader>
-          <CardTitle>Lieferplan 2027 - China Komponenten</CardTitle>
+          <CardTitle>Lieferplan {konfiguration.planungsjahr} - {lieferant.land} Komponenten</CardTitle>
           <CardDescription>
             Monatlicher Lieferplan mit Vorlaufzeiten und Losgrößen (Excel-Darstellung)
           </CardDescription>
@@ -274,15 +296,15 @@ export default function InboundPage() {
           <div className="grid gap-4 md:grid-cols-2 mb-6">
             <FormulaCard
               title="Vorlaufzeit Berechnung"
-              formula="Vorlaufzeit = 5 AT (Produktion) + 44 KT (Transport) = 49 Tage (7 Wochen)"
-              description="Gesamte Durchlaufzeit von Bestellung bis Ankunft in Deutschland (gemäß SSOT)"
-              example="Bestellung 05.01. → Lieferung ~23.02. (49 Tage später)"
+              formula={`Vorlaufzeit = ${lieferant.vorlaufzeitArbeitstage} AT (Produktion) + ${lieferant.vorlaufzeitKalendertage} KT (Transport) = ${gesamtVorlaufzeit} Tage (${Math.ceil(gesamtVorlaufzeit / 7)} Wochen)`}
+              description="Gesamte Durchlaufzeit von Bestellung bis Ankunft in Deutschland (aus Konfiguration)"
+              example={`Bestellung 05.01. → Lieferung ~${new Date(konfiguration.planungsjahr, 0, 5 + gesamtVorlaufzeit).toLocaleDateString('de-DE')} (${gesamtVorlaufzeit} Tage später)`}
             />
             <FormulaCard
               title="Losgrößen-Aufrundung"
               formula="Anzahl Lose = AUFRUNDEN(Bestellmenge / Losgröße)"
               description="Jede Bestellung wird auf Vielfache der Losgröße aufgerundet"
-              example="Bedarf 35.000 → 18 Lose × 2.000 = 36.000 Stück"
+              example={`Bedarf 35.000 → ${Math.ceil(35000 / lieferant.losgroesse)} Lose × ${formatNumber(lieferant.losgroesse, 0)} = ${formatNumber(Math.ceil(35000 / lieferant.losgroesse) * lieferant.losgroesse, 0)} Stück`}
             />
           </div>
 
@@ -309,7 +331,7 @@ export default function InboundPage() {
                 label: 'Vorlaufzeit',
                 width: '100px',
                 align: 'center',
-                formula: '5 AT + 44 KT',
+                formula: `${lieferant.vorlaufzeitArbeitstage} AT + ${lieferant.vorlaufzeitKalendertage} KT`,
                 format: (val) => `${val} Tage`,
                 sumable: false
               },
@@ -367,7 +389,7 @@ export default function InboundPage() {
             maxHeight="500px"
             showFormulas={true}
             showSums={true}
-            sumRowLabel="JAHRESSUMME 2027"
+            sumRowLabel={`JAHRESSUMME ${konfiguration.planungsjahr}`}
           />
         </CardContent>
       </Card>
@@ -380,11 +402,12 @@ export default function InboundPage() {
         <CardContent>
           <div className="grid gap-2 md:grid-cols-2">
             <RequirementItem text="Rückwärts-Berechnung Bestelldatum" />
-            <RequirementItem text="21 Arbeitstage Bearbeitungszeit" />
-            <RequirementItem text="35 Kalendertage Schiff-Transport" />
-            <RequirementItem text="Losgrößen-Optimierung (2.000 Stück)" />
+            <RequirementItem text={`${lieferant.vorlaufzeitArbeitstage} Arbeitstage Bearbeitungszeit`} />
+            <RequirementItem text={`${lieferant.vorlaufzeitKalendertage} Kalendertage Schiff-Transport`} />
+            <RequirementItem text={`Losgrößen-Optimierung (${formatNumber(lieferant.losgroesse, 0)} Stück)`} />
             <RequirementItem text="Spring Festival Berücksichtigung" />
             <RequirementItem text="Chinesische Feiertage integriert" />
+            <RequirementItem text="Dynamische Konfiguration" />
           </div>
         </CardContent>
       </Card>
