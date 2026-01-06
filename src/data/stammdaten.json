@@ -319,13 +319,14 @@
   },
   
   "hinweise": {
-    "codeLoesung": "ERMÄSSIGUNG: Nur Sättel von China-Zulieferer, kein Outbound zu internationalen Märkten",
-    "excelLösungAlternative": "Bei Excel-Lösung: 3 Zulieferer (China, Spanien, Deutschland) + Outbound zu 6 Märkten",
+    "codeLoesung": "ERMÄSSIGUNG: Nur Sättel von China-Zulieferer, Transport per Schiff + LKW, kein Outbound zu Märkten",
+    "ermässigungAktiv": "Code-Version mit reduzierten Anforderungen für bessere Fokussierung auf Kernkonzepte",
     "vereinfachungen": [
-      "Nur ein Zulieferer-Land (China) statt drei (Heilbronn entfernt, Spanien entfernt)",
-      "Nur 4 Sattel-Varianten statt 14 Bauteile (keine Gabeln, keine Rahmen)",
-      "Kein Outbound zu internationalen Märkten",
-      "FCFS statt Solver-basierte Optimierung (First-Come-First-Serve)",
+      "Nur 1 Zulieferer: China (keine anderen Länder)",
+      "Nur 4 Sattel-Varianten (keine Gabeln, keine Rahmen)",
+      "Transport: Nur Schiff (China→Hamburg) + LKW (Hamburg→Dortmund), keine Bahn",
+      "Kein Outbound zu 6 internationalen Märkten",
+      "FCFS statt Solver-Optimierung (First-Come-First-Serve)",
       "Vorlaufzeit: 49 Tage (7 Wochen), Losgröße: 500 Sättel"
     ]
   }
