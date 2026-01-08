@@ -21,12 +21,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CheckCircle2, Calendar, TrendingUp, AlertCircle, Download } from 'lucide-react'
 import { formatNumber, formatDate } from '@/lib/utils'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
-import { generiereAlleProduktionsplaene, berechneProduktionsstatistik } from '@/lib/calculations/oem-programm'
-import { kalenderStatistik } from '@/lib/kalender'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import { showError, showSuccess } from '@/lib/notifications'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
+import { 
+  generiereAlleVariantenProduktionsplaene,
+  berechneProduktionsStatistiken
+} from '@/lib/calculations/zentrale-produktionsplanung'
 
 /**
  * OEM Programm Hauptseite
@@ -34,17 +36,16 @@ import { useState, useEffect, useMemo } from 'react'
  * Nutzt dynamische Konfiguration aus KonfigurationContext
  */
 export default function OEMProgrammPage() {
-  const [produktionsplaene, setProduktionsplaene] = useState<any>(null)
   const [selectedVariante, setSelectedVariante] = useState('MTBAllrounder')
   
   // Hole Konfiguration aus Context
   const { konfiguration, isInitialized, getArbeitstageProJahr, getJahresproduktionProVariante } = useKonfiguration()
 
-  useEffect(() => {
-    // Generiere Produktionspläne beim Laden
-    const plaene = generiereAlleProduktionsplaene()
-    setProduktionsplaene(plaene)
-  }, [])
+  // Generiere Produktionspläne aus zentralem Modul
+  const produktionsplaene = useMemo(() => 
+    generiereAlleVariantenProduktionsplaene(konfiguration),
+    [konfiguration]
+  )
 
   // Berechne Statistiken aus Konfiguration
   const arbeitstage = isInitialized ? getArbeitstageProJahr() : 252
@@ -54,10 +55,12 @@ export default function OEMProgrammPage() {
   const stuecklistenMap = useMemo(() => {
     const map: Record<string, { komponenten: Record<string, { name: string; menge: number }> }> = {}
     konfiguration.stueckliste.forEach(s => {
-      map[s.mtbVariante] = {
-        komponenten: {
-          [s.bauteilId]: { name: s.bauteilName, menge: s.menge }
-        }
+      if (!map[s.mtbVariante]) {
+        map[s.mtbVariante] = { komponenten: {} }
+      }
+      map[s.mtbVariante].komponenten[s.bauteilId] = { 
+        name: s.bauteilName, 
+        menge: s.menge 
       }
     })
     return map
@@ -71,21 +74,24 @@ export default function OEMProgrammPage() {
    * Exportiert Produktionsplan als CSV
    */
   const handleExportCSV = () => {
-    if (!produktionsplaene || !produktionsplaene[selectedVariante]) {
+    const plan = produktionsplaene[selectedVariante]
+    if (!plan) {
       showError('Keine Daten zum Exportieren verfügbar')
       return
     }
     
-    const data = produktionsplaene[selectedVariante]
-      .filter((t: any) => t.istMenge > 0)
-      .map((tag: any) => ({
-        Datum: formatDate(new Date(tag.datum)),
-        'Soll-Menge': formatNumber(tag.sollMenge, 2),
+    const data = plan.tage
+      .filter(t => t.istMenge > 0)
+      .map(tag => ({
+        Datum: formatDate(tag.datum),
+        'Plan-Menge': tag.planMenge,
         'Ist-Menge': tag.istMenge,
-        'Kumulierter Error': formatNumber(tag.kumulierterError, 3)
+        'Abweichung': tag.abweichung,
+        'Schichten': tag.schichten,
+        'Auslastung': tag.auslastung + '%'
       }))
     
-    exportToCSV(data, `produktionsplan_${selectedVariante}_2027`)
+    exportToCSV(data, `produktionsplan_${selectedVariante}_${konfiguration.planungsjahr}`)
     showSuccess('Produktionsplan erfolgreich exportiert')
   }
   
@@ -98,7 +104,7 @@ export default function OEMProgrammPage() {
       return
     }
     
-    exportToJSON(produktionsplaene, 'alle_produktionsplaene_2027')
+    exportToJSON(produktionsplaene, `alle_produktionsplaene_${konfiguration.planungsjahr}`)
     showSuccess('Daten erfolgreich als JSON exportiert')
   }
   
@@ -430,7 +436,7 @@ export default function OEMProgrammPage() {
           {/* Statistik-Cards für ausgewählte Variante */}
           {produktionsplaene && selectedVariante && (() => {
             const variantePlan = produktionsplaene[selectedVariante]
-            const stats = berechneProduktionsstatistik(variantePlan)
+            const stats = berechneProduktionsStatistiken(variantePlan.tage)
             const varianteInfo = konfiguration.varianten.find(v => v.id === selectedVariante)
             const stl = stuecklistenMap[selectedVariante]
             const sattel = stl ? Object.values(stl.komponenten)[0] as any : null
@@ -443,7 +449,7 @@ export default function OEMProgrammPage() {
                     <CardTitle className="text-xs font-medium text-muted-foreground">Jahresproduktion</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-xl font-bold">{formatNumber(stats.gesamt, 0)}</div>
+                    <div className="text-xl font-bold">{formatNumber(stats.produziert, 0)}</div>
                     <p className="text-xs text-muted-foreground">Bikes</p>
                   </CardContent>
                 </Card>
@@ -461,7 +467,7 @@ export default function OEMProgrammPage() {
                     <CardTitle className="text-xs font-medium text-muted-foreground">Ø pro Tag</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-xl font-bold">{formatNumber(stats.durchschnitt, 1)}</div>
+                    <div className="text-xl font-bold">{formatNumber(stats.produziert / stats.arbeitstage, 1)}</div>
                     <p className="text-xs text-muted-foreground">Bikes/Tag</p>
                   </CardContent>
                 </Card>
@@ -470,7 +476,7 @@ export default function OEMProgrammPage() {
                     <CardTitle className="text-xs font-medium text-muted-foreground">Peak Tag</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-xl font-bold">{formatNumber(stats.maxProTag, 0)}</div>
+                    <div className="text-xl font-bold">{formatNumber(Math.max(...variantePlan.tage.map(t => t.istMenge)), 0)}</div>
                     <p className="text-xs text-muted-foreground">im {peakMonat.name}</p>
                   </CardContent>
                 </Card>
@@ -479,7 +485,7 @@ export default function OEMProgrammPage() {
                     <CardTitle className="text-xs font-medium text-muted-foreground">Sattel benötigt</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-xl font-bold text-blue-600">{formatNumber(stats.gesamt, 0)}</div>
+                    <div className="text-xl font-bold text-blue-600">{formatNumber(stats.produziert, 0)}</div>
                     <p className="text-xs text-muted-foreground">{sattel?.name}</p>
                   </CardContent>
                 </Card>
@@ -491,7 +497,7 @@ export default function OEMProgrammPage() {
             <CardHeader>
               <CardTitle>Vollständige Tagesplanung {konfiguration.planungsjahr} - {konfiguration.varianten.find(v => v.id === selectedVariante)?.name}</CardTitle>
               <CardDescription>
-                Alle {produktionsplaene?.[selectedVariante]?.filter((t: any) => t.istMenge > 0).length} Produktionstage mit Error-Management (scrollbar nutzen)
+                Alle {produktionsplaene?.[selectedVariante]?.tage.filter(t => t.istMenge > 0).length} Produktionstage mit Error-Management (scrollbar nutzen)
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -610,10 +616,10 @@ export default function OEMProgrammPage() {
                     ]}
                     data={(() => {
                       let kumulativ = 0
-                      return produktionsplaene[selectedVariante]
-                        ?.filter((t: any) => t.istMenge > 0)
-                        .map((tag: any) => {
-                          const date = new Date(tag.datum)
+                      return produktionsplaene[selectedVariante]?.tage
+                        ?.filter(t => t.istMenge > 0)
+                        .map(tag => {
+                          const date = tag.datum
                           // ISO week calculation
                           const thursday = new Date(date.getTime())
                           thursday.setDate(thursday.getDate() - (date.getDay() + 6) % 7 + 3)
@@ -623,14 +629,14 @@ export default function OEMProgrammPage() {
                           kumulativ += tag.istMenge
                           
                           return {
-                            datum: tag.datum,
-                            wochentag: tag.datum,
+                            datum: date,
+                            wochentag: date,
                             kw: weekNumber,
-                            monat: ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][date.getMonth()],
-                            sollMenge: tag.sollMenge,
+                            monat: tag.monatName,
+                            sollMenge: tag.planMenge,
                             istMenge: tag.istMenge,
                             sattelBedarf: tag.istMenge, // 1:1 Verhältnis
-                            kumulierterError: tag.kumulierterError,
+                            kumulierterError: (tag.kumulativIst - tag.kumulativPlan) / tag.kumulativPlan * 100,
                             kumulativBikes: kumulativ
                           }
                         }) || []
