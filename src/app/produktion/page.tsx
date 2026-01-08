@@ -22,7 +22,7 @@ import { formatNumber } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 
 /**
  * Produktion Hauptseite
@@ -253,8 +253,8 @@ export default function ProduktionPage() {
     })
   }, [jahresproduktion, saisonalitaet, feiertage, konfiguration.planungsjahr, produktionConfig])
   
-  // Kumulative Werte berechnen (außerhalb useMemo, da Mutation)
-  useMemo(() => {
+  // Kumulative Werte berechnen (useEffect für Side Effects statt useMemo)
+  useEffect(() => {
     let kumulativPlan = 0
     let kumulativIst = 0
     tagesProduktion.forEach(tag => {
@@ -263,7 +263,6 @@ export default function ProduktionPage() {
       tag.kumulativPlan = kumulativPlan
       tag.kumulativIst = kumulativIst
     })
-    return null
   }, [tagesProduktion])
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
