@@ -118,7 +118,7 @@ export default function Dashboard() {
           value={formatNumber(produktionsmenge, 0)}
           unit="Bikes"
           icon={Factory}
-          trend={aktiveSzenarien.length > 0 ? `${parseFloat(produktionsProzent) > 0 ? '+' : ''}${produktionsProzent}%` : '+12%'}
+          trend={aktiveSzenarien.length > 0 ? `${parseFloat(produktionsProzent) > 0 ? '+' : ''}${produktionsProzent}%` : undefined}
           trendUp={produktionsDiff >= 0}
         />
         <KPICard
@@ -134,7 +134,7 @@ export default function Dashboard() {
           value={`${auswirkungen.liefertreue.toFixed(1)}%`}
           unit=""
           icon={TrendingUp}
-          trend={aktiveSzenarien.length > 0 ? `${liefertreueDiff > 0 ? '+' : ''}${liefertreueProzent}%` : '+2,1%'}
+          trend={aktiveSzenarien.length > 0 ? `${liefertreueDiff > 0 ? '+' : ''}${liefertreueProzent}%` : undefined}
           trendUp={liefertreueDiff >= 0}
         />
         <KPICard
@@ -262,7 +262,7 @@ function KPICard({
   value: string
   unit: string
   icon: any
-  trend: string
+  trend?: string
   trendUp: boolean
 }) {
   return (
@@ -276,9 +276,11 @@ function KPICard({
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
         <p className="text-xs text-muted-foreground">{unit}</p>
-        <p className={`text-xs mt-2 ${trendUp ? 'text-green-600' : 'text-gray-600'}`}>
-          {trend}
-        </p>
+        {trend && (
+          <p className={`text-xs mt-2 ${trendUp ? 'text-green-600' : 'text-gray-600'}`}>
+            {trend}
+          </p>
+        )}
       </CardContent>
     </Card>
   )
