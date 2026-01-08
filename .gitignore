@@ -9,6 +9,8 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+# If package-lock.json is already tracked, remove it from the index
+# by running: git rm --cached package-lock.json
 package-lock.json
 
 # testing
