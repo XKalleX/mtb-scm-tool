@@ -15,14 +15,18 @@
  */
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Factory, AlertTriangle, TrendingUp, Package, Download } from 'lucide-react'
 import { formatNumber } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
-import { useMemo, useEffect } from 'react'
+import { useMemo } from 'react'
+import { 
+  generiereTagesproduktion, 
+  berechneLagerbestaende,
+  berechneProduktionsStatistiken 
+} from '@/lib/calculations/zentrale-produktionsplanung'
 
 /**
  * Produktion Hauptseite
@@ -33,237 +37,45 @@ export default function ProduktionPage() {
   // Hole Konfiguration aus Context
   const { konfiguration, isInitialized, getArbeitstageProJahr } = useKonfiguration()
   
-  // Extrahiere Werte aus Konfiguration (hooks müssen vor early return)
-  const jahresproduktion = konfiguration.jahresproduktion
-  const varianten = konfiguration.varianten
-  const saisonalitaetConfig = konfiguration.saisonalitaet
-  const feiertagConfig = konfiguration.feiertage
-  const produktionConfig = konfiguration.produktion
-  
-  // Berechne Produktionsstatistiken dynamisch
-  const produktionsStats = useMemo(() => ({
-    geplant: jahresproduktion,
-    produziert: Math.round(jahresproduktion * 0.9953), // 99.53% Planerfüllung
-    planerfuellungsgrad: 99.53,
-    mitMaterialmangel: 12,
-    auslastung: 95.5
-  }), [jahresproduktion])
-
   // ✅ ERMÄSSIGUNG: Nur 4 Sattel-Varianten gemäß SSOT
   // Quelle: kontext/Spezifikation_SSOT_MR.ts - BAUTEILE
   // Dynamisch berechnet basierend auf aktueller Jahresproduktion und Varianten-Anteilen
-  const lagerbestaende = useMemo(() => {
-    // Berechne Jahresproduktion pro Variante basierend auf Anteilen
-    const variantenProduktion: Record<string, number> = {}
-    varianten.forEach(v => {
-      variantenProduktion[v.id] = Math.round(jahresproduktion * v.anteilPrognose)
-    })
-    
-    // Berechne Bedarf für jede Sattel-Variante basierend auf Stückliste
-    const sattelBedarf: Record<string, { jahresbedarf: number; verwendung: string[] }> = {
-      'SAT_FT': { jahresbedarf: 0, verwendung: [] }, // Fizik Tundra
-      'SAT_RL': { jahresbedarf: 0, verwendung: [] }, // Raceline
-      'SAT_SP': { jahresbedarf: 0, verwendung: [] }, // Spark
-      'SAT_SL': { jahresbedarf: 0, verwendung: [] }  // Speedline
-    }
-    
-    // Mapping von MTB-Varianten zu Sätteln (aus Stückliste)
-    const varianteSattelMapping: Record<string, string> = {
-      'MTBAllrounder': 'SAT_FT',
-      'MTBFreeride': 'SAT_FT',
-      'MTBCompetition': 'SAT_RL',
-      'MTBPerformance': 'SAT_RL',
-      'MTBDownhill': 'SAT_SP',
-      'MTBTrail': 'SAT_SP',
-      'MTBExtreme': 'SAT_SL',
-      'MTBMarathon': 'SAT_SL'
-    }
-    
-    // Berechne Jahresbedarf für jeden Sattel
-    Object.entries(varianteSattelMapping).forEach(([varianteId, sattelId]) => {
-      const produktion = variantenProduktion[varianteId] || 0
-      if (sattelBedarf[sattelId]) {
-        sattelBedarf[sattelId].jahresbedarf += produktion
-        const variante = varianten.find(v => v.id === varianteId)
-        if (variante) {
-          sattelBedarf[sattelId].verwendung.push(variante.name)
-        }
-      }
-    })
-    
-    // Generiere Lagerbestände
-    return [
-      { 
-        komponente: 'Fizik_Tundra',
-        bestand: Math.round(sattelBedarf['SAT_FT'].jahresbedarf * 0.35), // 35% Puffer
-        sicherheit: Math.round(sattelBedarf['SAT_FT'].jahresbedarf / 365 * 7), // 7 Tage
-        bedarf: Math.round(sattelBedarf['SAT_FT'].jahresbedarf / 365),
-        verwendung: sattelBedarf['SAT_FT'].verwendung.join(', '),
-        status: 'ok' 
-      },
-      { 
-        komponente: 'Raceline',
-        bestand: Math.round(sattelBedarf['SAT_RL'].jahresbedarf * 0.40), // 40% Puffer
-        sicherheit: Math.round(sattelBedarf['SAT_RL'].jahresbedarf / 365 * 7), // 7 Tage
-        bedarf: Math.round(sattelBedarf['SAT_RL'].jahresbedarf / 365),
-        verwendung: sattelBedarf['SAT_RL'].verwendung.join(', '),
-        status: 'ok' 
-      },
-      { 
-        komponente: 'Spark',
-        bestand: Math.round(sattelBedarf['SAT_SP'].jahresbedarf * 0.40), // 40% Puffer
-        sicherheit: Math.round(sattelBedarf['SAT_SP'].jahresbedarf / 365 * 7), // 7 Tage
-        bedarf: Math.round(sattelBedarf['SAT_SP'].jahresbedarf / 365),
-        verwendung: sattelBedarf['SAT_SP'].verwendung.join(', '),
-        status: 'ok' 
-      },
-      { 
-        komponente: 'Speedline',
-        bestand: Math.round(sattelBedarf['SAT_SL'].jahresbedarf * 0.40), // 40% Puffer
-        sicherheit: Math.round(sattelBedarf['SAT_SL'].jahresbedarf / 365 * 7), // 7 Tage
-        bedarf: Math.round(sattelBedarf['SAT_SL'].jahresbedarf / 365),
-        verwendung: sattelBedarf['SAT_SL'].verwendung.join(', '),
-        status: 'ok' 
-      }
-    ]
-  }, [jahresproduktion, varianten])
+  const lagerbestaende = useMemo(() => 
+    berechneLagerbestaende(konfiguration),
+    [konfiguration]
+  )
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // TAGESPLANUNG für 365 Tage mit Saisonalität aus SSOT
   // ═══════════════════════════════════════════════════════════════════════════════
   // 
-  // Quelle: KonfigurationContext - saisonalitaet
+  // Quelle: zentrale-produktionsplanung.ts
   // Mit Error Management für exakte Jahresproduktion
-  
-  // Saisonale Verteilung aus Konfiguration mit Arbeitstagen
-  const saisonalitaet = useMemo(() => {
-    const arbeitstage = getArbeitstageProJahr()
-    
-    return saisonalitaetConfig.map(s => {
-      const monatsBikes = Math.round(jahresproduktion * (s.anteil / 100))
-      // Grobe Schätzung der Arbeitstage pro Monat (wird später genau berechnet)
-      const daysInMonth = new Date(konfiguration.planungsjahr, s.monat, 0).getDate()
-      const estimatedArbeitstage = Math.round(daysInMonth * (arbeitstage / 365))
-      
-      return {
-        monat: s.monat,
-        name: s.name.substring(0, 3), // Kürzel (Jan, Feb, etc.)
-        anteil: s.anteil / 100,
-        tage: daysInMonth,
-        bikes: monatsBikes,
-        arbeitstage: estimatedArbeitstage
-      }
-    })
-  }, [saisonalitaetConfig, jahresproduktion, getArbeitstageProJahr, konfiguration.planungsjahr])
-  
-  // Deutsche Feiertage aus Konfiguration
-  const feiertage = useMemo(() => 
-    feiertagConfig
-      .filter(f => f.land === 'Deutschland')
-      .map(f => f.datum),
-    [feiertagConfig]
-  )
-  
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // ERROR MANAGEMENT - Pro Monat separate Fehlerkorrektur
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // 
-  // KONZEPT: Kumulative Rundungsfehler-Korrektur
-  // - Verhindert systematische Abweichungen über Arbeitstage
-  // - Garantiert exakte Monatsproduktion
-  // - Gesamtsumme = exakt Jahresproduktion (dynamisch aus Context)
-  
   const tagesProduktion = useMemo(() => {
-    const monatlicheFehlerTracker: Record<number, number> = {}
+    const result = generiereTagesproduktion(konfiguration)
     
-    return Array.from({ length: 365 }, (_, i) => {
-      const tag = i + 1
-      const datum = new Date(konfiguration.planungsjahr, 0, tag)
-      const wochentag = datum.toLocaleDateString('de-DE', { weekday: 'short' })
-      const datumStr = datum.toISOString().split('T')[0]
-      
-      // Prüfe ob Arbeitstag (Mo-Fr, kein Feiertag)
-      const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
-      const istFeiertag = feiertage.includes(datumStr)
-      const istArbeitstag = !istWochenende && !istFeiertag
-      
-      // Monat für Saisonalität
-      const monat = datum.getMonth() + 1
-      const saisonInfo = saisonalitaet.find(s => s.monat === monat)!
-      
-      // Initialisiere Fehler-Tracker für diesen Monat
-      if (!(monat in monatlicheFehlerTracker)) {
-        monatlicheFehlerTracker[monat] = 0
-      }
-      
-      let planMenge = 0
-      let istMenge = 0
-      
-      if (istArbeitstag) {
-        // ✅ PRODUKTIONSTAG mit ERROR MANAGEMENT
-        
-        // Soll-Produktion: Monatsproduktion / Arbeitstage
-        const sollProduktion = saisonInfo.bikes / saisonInfo.arbeitstage
-        
-        // Error Management: Kumulative Fehlerkorrektur
-        const fehler = monatlicheFehlerTracker[monat] + (sollProduktion - Math.round(sollProduktion))
-        
-        if (fehler >= 0.5) {
-          // Aufrunden
-          planMenge = Math.ceil(sollProduktion)
-          monatlicheFehlerTracker[monat] = fehler - 1.0
-        } else if (fehler <= -0.5) {
-          // Abrunden
-          planMenge = Math.floor(sollProduktion)
-          monatlicheFehlerTracker[monat] = fehler + 1.0
-        } else {
-          // Normal runden
-          planMenge = Math.round(sollProduktion)
-          monatlicheFehlerTracker[monat] = fehler
-        }
-        
-        // ✅ KRITISCHE ÄNDERUNG: Ist-Produktion = Plan-Produktion
-        // KEINE Variation mehr! Dies führte zu Überproduktion
-        // Begründung: Ohne aktives Szenario soll Plan = Ist sein
-        istMenge = planMenge
-      }
-      
-      const abweichung = istMenge - planMenge
-      const materialVerfuegbar = istArbeitstag
-      const auslastung = planMenge > 0 ? (istMenge / planMenge) * 100 : 0
-      const kapazitaetProSchicht = produktionConfig.kapazitaetProStunde * produktionConfig.stundenProSchicht
-      const schichten = istArbeitstag ? Math.ceil(istMenge / kapazitaetProSchicht) : 0
-      
-      return {
-        tag,
-        datum: datum.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }),
-        wochentag,
-        monat: saisonInfo.name,
-        istArbeitstag,
-        istFeiertag,
-        schichten,
-        planMenge,
-        istMenge,
-        abweichung,
-        materialVerfuegbar,
-        auslastung: Math.round(auslastung * 10) / 10,
-        kumulativPlan: 0,
-        kumulativIst: 0
-      }
-    })
-  }, [jahresproduktion, saisonalitaet, feiertage, konfiguration.planungsjahr, produktionConfig])
+    // ✅ VALIDIERUNG: Log zur Kontrolle
+    const summePlan = result.reduce((sum, tag) => sum + tag.planMenge, 0)
+    const summeIst = result.reduce((sum, tag) => sum + tag.istMenge, 0)
+    
+    console.log(`📊 Tagesproduktion Validierung:`)
+    console.log(`   Plan-Menge Summe: ${summePlan.toLocaleString('de-DE')} Bikes`)
+    console.log(`   Ist-Menge Summe: ${summeIst.toLocaleString('de-DE')} Bikes`)
+    console.log(`   Soll (Jahresproduktion): ${konfiguration.jahresproduktion.toLocaleString('de-DE')} Bikes`)
+    console.log(`   Abweichung: ${(summePlan - konfiguration.jahresproduktion).toLocaleString('de-DE')} Bikes`)
+    
+    if (Math.abs(summePlan - konfiguration.jahresproduktion) <= 10) {
+      console.log(`✅ Error Management funktioniert korrekt!`)
+    }
+    
+    return result
+  }, [konfiguration])
   
-  // Kumulative Werte berechnen (useEffect für Side Effects statt useMemo)
-  useEffect(() => {
-    let kumulativPlan = 0
-    let kumulativIst = 0
-    tagesProduktion.forEach(tag => {
-      kumulativPlan += tag.planMenge
-      kumulativIst += tag.istMenge
-      tag.kumulativPlan = kumulativPlan
-      tag.kumulativIst = kumulativIst
-    })
-  }, [tagesProduktion])
+  // Berechne Produktionsstatistiken dynamisch
+  const produktionsStats = useMemo(() => 
+    berechneProduktionsStatistiken(tagesProduktion),
+    [tagesProduktion]
+  )
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
@@ -299,7 +111,7 @@ export default function ProduktionPage() {
         <div>
           <h1 className="text-3xl font-bold">Produktion & Warehouse</h1>
           <p className="text-muted-foreground mt-1">
-            Produktionssteuerung mit FCFS-Regel (First-Come-First-Serve) • {formatNumber(jahresproduktion, 0)} Bikes/Jahr • Nur 4 Sattel-Varianten
+            Produktionssteuerung mit FCFS-Regel (First-Come-First-Serve) • {formatNumber(konfiguration.jahresproduktion, 0)} Bikes/Jahr • Nur 4 Sattel-Varianten
           </p>
         </div>
         <div className="flex gap-2">
@@ -422,7 +234,7 @@ export default function ProduktionPage() {
             <CardTitle className="text-purple-900 text-xl">PRODUKTIONSSTEUERUNG (Production Control)</CardTitle>
           </div>
           <CardDescription className="text-purple-700">
-            Granulare Tagesplanung über 365 Tage mit Saisonalität (Jan {saisonalitaetConfig[0].anteil}%, Apr {saisonalitaetConfig[3].anteil}% Peak, Dez {saisonalitaetConfig[11].anteil}%) und Error Management für exakte {formatNumber(jahresproduktion, 0)} Bikes
+            Granulare Tagesplanung über 365 Tage mit Saisonalität (Jan {konfiguration.saisonalitaet[0].anteil}%, Apr {konfiguration.saisonalitaet[3].anteil}% Peak, Dez {konfiguration.saisonalitaet[11].anteil}%) und Error Management für exakte {formatNumber(konfiguration.jahresproduktion, 0)} Bikes
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -430,15 +242,15 @@ export default function ProduktionPage() {
           <div className="mb-6 space-y-4">
             <FormulaCard
               title="Tagesproduktion"
-              formula={`Jahresproduktion / Arbeitstage = ${formatNumber(jahresproduktion, 0)} / ${getArbeitstageProJahr()} = ${formatNumber(jahresproduktion / getArbeitstageProJahr(), 0)} Bikes/Tag (Vollauslastung)`}
+              formula={`Jahresproduktion / Arbeitstage = ${formatNumber(konfiguration.jahresproduktion, 0)} / ${getArbeitstageProJahr()} = ${formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 0)} Bikes/Tag (Vollauslastung)`}
               description="Theoretische Tagesproduktion bei allen Arbeitstagen. Mit Saisonalität: Q1 ca. 70% des Durchschnitts"
-              example={`Q1 (Jan-März): ${formatNumber(jahresproduktion / getArbeitstageProJahr(), 0)} × 0,7 = ${formatNumber((jahresproduktion / getArbeitstageProJahr()) * 0.7, 0)} Bikes/Tag durchschnittlich`}
+              example={`Q1 (Jan-März): ${formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 0)} × 0,7 = ${formatNumber((konfiguration.jahresproduktion / getArbeitstageProJahr()) * 0.7, 0)} Bikes/Tag durchschnittlich`}
             />
             <FormulaCard
               title="Schichtplanung"
-              formula={`Benötigte Schichten = ⌈Plan-Menge / Kapazität pro Schicht⌉, wobei Kapazität = ${produktionConfig.kapazitaetProStunde} Bikes/h × ${produktionConfig.stundenProSchicht}h = ${produktionConfig.kapazitaetProStunde * produktionConfig.stundenProSchicht} Bikes`}
+              formula={`Benötigte Schichten = ⌈Plan-Menge / Kapazität pro Schicht⌉, wobei Kapazität = ${konfiguration.produktion.kapazitaetProStunde} Bikes/h × ${konfiguration.produktion.stundenProSchicht}h = ${konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht} Bikes`}
               description="Anzahl der erforderlichen Schichten basierend auf Tagesproduktion"
-              example={`${formatNumber(jahresproduktion / getArbeitstageProJahr(), 0)} Bikes geplant → ${formatNumber(jahresproduktion / getArbeitstageProJahr(), 0)} / ${produktionConfig.kapazitaetProStunde * produktionConfig.stundenProSchicht} = ${formatNumber((jahresproduktion / getArbeitstageProJahr()) / (produktionConfig.kapazitaetProStunde * produktionConfig.stundenProSchicht), 2)} → ${Math.ceil((jahresproduktion / getArbeitstageProJahr()) / (produktionConfig.kapazitaetProStunde * produktionConfig.stundenProSchicht))} Schichten nötig`}
+              example={`${formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 0)} Bikes geplant → ${formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 0)} / ${konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht} = ${formatNumber((konfiguration.jahresproduktion / getArbeitstageProJahr()) / (konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht), 2)} → ${Math.ceil((konfiguration.jahresproduktion / getArbeitstageProJahr()) / (konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht))} Schichten nötig`}
             />
             <FormulaCard
               title="Produktionsauslastung"
@@ -463,6 +275,7 @@ export default function ProduktionPage() {
                 label: 'Datum',
                 width: '80px',
                 align: 'center',
+                format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : val,
                 sumable: false
               },
               {
