@@ -275,6 +275,7 @@ export default function ProduktionPage() {
                 label: 'Datum',
                 width: '80px',
                 align: 'center',
+                format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : val,
                 sumable: false
               },
               {
