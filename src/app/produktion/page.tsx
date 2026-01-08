@@ -22,7 +22,7 @@ import { formatNumber } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useCallback } from 'react'
 
 /**
  * Produktion Hauptseite
@@ -40,15 +40,6 @@ export default function ProduktionPage() {
   const feiertagConfig = konfiguration.feiertage
   const produktionConfig = konfiguration.produktion
   
-  // Berechne Produktionsstatistiken dynamisch
-  const produktionsStats = useMemo(() => ({
-    geplant: jahresproduktion,
-    produziert: Math.round(jahresproduktion * 0.9953), // 99.53% Planerfüllung
-    planerfuellungsgrad: 99.53,
-    mitMaterialmangel: 12,
-    auslastung: 95.5
-  }), [jahresproduktion])
-
   // ✅ ERMÄSSIGUNG: Nur 4 Sattel-Varianten gemäß SSOT
   // Quelle: kontext/Spezifikation_SSOT_MR.ts - BAUTEILE
   // Dynamisch berechnet basierend auf aktueller Jahresproduktion und Varianten-Anteilen
@@ -135,15 +126,42 @@ export default function ProduktionPage() {
   // Quelle: KonfigurationContext - saisonalitaet
   // Mit Error Management für exakte Jahresproduktion
   
-  // Saisonale Verteilung aus Konfiguration mit Arbeitstagen
-  const saisonalitaet = useMemo(() => {
-    const arbeitstage = getArbeitstageProJahr()
+  // Deutsche Feiertage aus Konfiguration (MUSS vor countArbeitstageInMonat!)
+  const feiertage = useMemo(() => 
+    feiertagConfig
+      .filter(f => f.land === 'Deutschland')
+      .map(f => f.datum),
+    [feiertagConfig]
+  )
+  
+  /**
+   * Zählt die tatsächlichen Arbeitstage in einem Monat
+   */
+  const countArbeitstageInMonat = useCallback((jahr: number, monat: number): number => {
+    let arbeitstage = 0
+    const daysInMonth = new Date(jahr, monat, 0).getDate()
     
+    for (let tag = 1; tag <= daysInMonth; tag++) {
+      const datum = new Date(jahr, monat - 1, tag)
+      const datumStr = datum.toISOString().split('T')[0]
+      const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
+      const istFeiertag = feiertage.includes(datumStr)
+      
+      if (!istWochenende && !istFeiertag) {
+        arbeitstage++
+      }
+    }
+    
+    return arbeitstage
+  }, [feiertage])
+  
+  // Saisonale Verteilung aus Konfiguration mit EXAKTEN Arbeitstagen
+  const saisonalitaet = useMemo(() => {
     return saisonalitaetConfig.map(s => {
       const monatsBikes = Math.round(jahresproduktion * (s.anteil / 100))
-      // Grobe Schätzung der Arbeitstage pro Monat (wird später genau berechnet)
       const daysInMonth = new Date(konfiguration.planungsjahr, s.monat, 0).getDate()
-      const estimatedArbeitstage = Math.round(daysInMonth * (arbeitstage / 365))
+      // ✅ KORREKTUR: Berechne EXAKTE Arbeitstage, nicht geschätzt!
+      const arbeitstage = countArbeitstageInMonat(konfiguration.planungsjahr, s.monat)
       
       return {
         monat: s.monat,
@@ -151,18 +169,10 @@ export default function ProduktionPage() {
         anteil: s.anteil / 100,
         tage: daysInMonth,
         bikes: monatsBikes,
-        arbeitstage: estimatedArbeitstage
+        arbeitstage: arbeitstage
       }
     })
-  }, [saisonalitaetConfig, jahresproduktion, getArbeitstageProJahr, konfiguration.planungsjahr])
-  
-  // Deutsche Feiertage aus Konfiguration
-  const feiertage = useMemo(() => 
-    feiertagConfig
-      .filter(f => f.land === 'Deutschland')
-      .map(f => f.datum),
-    [feiertagConfig]
-  )
+  }, [saisonalitaetConfig, jahresproduktion, konfiguration.planungsjahr, countArbeitstageInMonat])
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // ERROR MANAGEMENT - Pro Monat separate Fehlerkorrektur
@@ -175,8 +185,7 @@ export default function ProduktionPage() {
   
   const tagesProduktion = useMemo(() => {
     const monatlicheFehlerTracker: Record<number, number> = {}
-    
-    return Array.from({ length: 365 }, (_, i) => {
+    const result = Array.from({ length: 365 }, (_, i) => {
       const tag = i + 1
       const datum = new Date(konfiguration.planungsjahr, 0, tag)
       const wochentag = datum.toLocaleDateString('de-DE', { weekday: 'short' })
@@ -202,7 +211,8 @@ export default function ProduktionPage() {
       if (istArbeitstag) {
         // ✅ PRODUKTIONSTAG mit ERROR MANAGEMENT
         
-        // Soll-Produktion: Monatsproduktion / Arbeitstage
+        // ✅ KORREKTUR: Soll-Produktion = Geplante Jahresproduktion verteilt nach Saisonalität
+        // Dies ist die PLAN-Menge, die über das Jahr exakt 370.000 ergeben MUSS
         const sollProduktion = saisonInfo.bikes / saisonInfo.arbeitstage
         
         // Error Management: Kumulative Fehlerkorrektur
@@ -222,9 +232,13 @@ export default function ProduktionPage() {
           monatlicheFehlerTracker[monat] = fehler
         }
         
-        // ✅ KRITISCHE ÄNDERUNG: Ist-Produktion = Plan-Produktion
-        // KEINE Variation mehr! Dies führte zu Überproduktion
-        // Begründung: Ohne aktives Szenario soll Plan = Ist sein
+        // ✅ KORREKTUR: Ist-Menge = Tatsächliche Produktion
+        // Im Optimalfall (keine Störungen) entspricht Ist-Menge der Plan-Menge
+        // Aber konzeptionell sind sie unterschiedlich:
+        // - Plan-Menge = Geplante Jahresproduktion (370.000)
+        // - Ist-Menge = Tatsächlich produziert (kann abweichen bei Störungen)
+        // 
+        // Ohne aktive Szenarien: Ist = Plan (perfekte Ausführung)
         istMenge = planMenge
       }
       
@@ -251,6 +265,24 @@ export default function ProduktionPage() {
         kumulativIst: 0
       }
     })
+    
+    // ✅ VALIDIERUNG: Summe muss exakt Jahresproduktion sein
+    const summePlan = result.reduce((sum, tag) => sum + tag.planMenge, 0)
+    const summeIst = result.reduce((sum, tag) => sum + tag.istMenge, 0)
+    
+    console.log(`📊 Tagesproduktion Validierung:`)
+    console.log(`   Plan-Menge Summe: ${summePlan.toLocaleString('de-DE')} Bikes`)
+    console.log(`   Ist-Menge Summe: ${summeIst.toLocaleString('de-DE')} Bikes`)
+    console.log(`   Soll (Jahresproduktion): ${jahresproduktion.toLocaleString('de-DE')} Bikes`)
+    console.log(`   Abweichung: ${(summePlan - jahresproduktion).toLocaleString('de-DE')} Bikes`)
+    
+    if (Math.abs(summePlan - jahresproduktion) > 10) {
+      console.warn(`⚠️ WARNUNG: Plan-Menge weicht mehr als 10 Bikes von Jahresproduktion ab!`)
+    } else {
+      console.log(`✅ Error Management funktioniert korrekt!`)
+    }
+    
+    return result
   }, [jahresproduktion, saisonalitaet, feiertage, konfiguration.planungsjahr, produktionConfig])
   
   // Kumulative Werte berechnen (useEffect für Side Effects statt useMemo)
@@ -264,6 +296,23 @@ export default function ProduktionPage() {
       tag.kumulativIst = kumulativIst
     })
   }, [tagesProduktion])
+  
+  // Berechne Produktionsstatistiken dynamisch (NACH tagesProduktion!)
+  const produktionsStats = useMemo(() => {
+    // ✅ KORREKTUR: Geplant = Jahresproduktion (370.000)
+    // Ist = Tatsächlich produziert (aus Tagesproduktion summiert)
+    const geplant = jahresproduktion
+    const produziert = tagesProduktion.reduce((sum, tag) => sum + tag.istMenge, 0)
+    const planerfuellungsgrad = (produziert / geplant) * 100
+    
+    return {
+      geplant: geplant,
+      produziert: produziert,
+      planerfuellungsgrad: planerfuellungsgrad,
+      mitMaterialmangel: 12, // TODO: Aus ATP-Check berechnen
+      auslastung: 95.5 // TODO: Aus Schichtplanung berechnen
+    }
+  }, [jahresproduktion, tagesProduktion])
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
