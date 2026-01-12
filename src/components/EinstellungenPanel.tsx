@@ -66,8 +66,11 @@ export function EinstellungenPanel() {
   }
 
   const handleReset = () => {
-    zuruecksetzenAufStandard()
+    // Reset UI state BEFORE calling context update to avoid race condition
+    // When zuruecksetzenAufStandard() updates the context, it causes this component
+    // to re-render, which could interfere with the state update if done afterwards
     setShowConfirmReset(false)
+    zuruecksetzenAufStandard()
   }
 
   const arbeitstage = getArbeitstageProJahr()
