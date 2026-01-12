@@ -78,8 +78,8 @@ export default function Dashboard() {
   const springFestivalStart = springFestival.length > 0 ? springFestival[0].datum : '2027-01-28'
   const springFestivalEnde = springFestival.length > 0 ? springFestival[springFestival.length - 1].datum : '2027-02-04'
 
-  // Vorlaufzeit aus Konfiguration
-  const gesamtVorlaufzeit = konfiguration.lieferant.vorlaufzeitArbeitstage + konfiguration.lieferant.vorlaufzeitKalendertage
+  // Vorlaufzeit aus Konfiguration (49 Tage gesamt)
+  const gesamtVorlaufzeit = 49  // Fixiert auf 49 Tage gemäß SSOT
 
   // Peak-Monat aus Saisonalität ermitteln
   const peakMonat = konfiguration.saisonalitaet.reduce((max, s) => s.anteil > max.anteil ? s : max)
@@ -159,7 +159,7 @@ export default function Dashboard() {
           <ul className="space-y-2 text-sm text-orange-800">
             <li>• Spring Festival China: <strong>{new Date(springFestivalStart).toLocaleDateString('de-DE')} - {new Date(springFestivalEnde).toLocaleDateString('de-DE')}</strong> ({springFestival.length} Tage Produktionsstopp)</li>
             <li>• {peakMonat.name}-Peak: <strong>{peakMonat.anteil}%</strong> der Jahresproduktion (Kapazitätsplanung beachten)</li>
-            <li>• China-Vorlaufzeit: <strong>{gesamtVorlaufzeit} Tage</strong> ({konfiguration.lieferant.vorlaufzeitArbeitstage} AT Produktion + {konfiguration.lieferant.vorlaufzeitKalendertage} KT Transport)</li>
+            <li>• China-Vorlaufzeit: <strong>{gesamtVorlaufzeit} Tage (7 Wochen)</strong> = {konfiguration.lieferant.vorlaufzeitArbeitstage} AT Produktion + 2 AT + {konfiguration.lieferant.vorlaufzeitKalendertage} KT Seefracht + 2 AT LKW</li>
             <li>• Losgröße Sättel: <strong>{formatNumber(konfiguration.lieferant.losgroesse, 0)} Stück</strong> (Mindestbestellung)</li>
           </ul>
         </CardContent>

@@ -477,8 +477,8 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
             <FormulaCard
               title="Durchlaufzeit Produktion"
               formula="Ø (Ankunftsdatum Komponenten - Bestelldatum)"
-              description="Durchschnittliche Zeit von der Bestellung in China bis zur Ankunft im Werk. Beinhaltet Produktion (49 Tage) und Transport."
-              example="Bei 49 Tage Vorlaufzeit + 14 Tage Seetransport: ~63 Tage Durchlaufzeit"
+              description="Durchschnittliche Zeit von der Bestellung in China bis zur Ankunft im Werk. Beinhaltet Produktion (5 AT) und Transport (2 AT + 30 KT + 2 AT)."
+              example="Bei 49 Tage Vorlaufzeit: Bestellung 01.01. → Ankunft ~19.02. (49 Tage später)"
             />
             <FormulaCard
               title="Lagerumschlag"
