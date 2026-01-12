@@ -575,9 +575,16 @@ export const ZULIEFERER_CHINA: Zulieferer = {
   },
   
   transportzeit: {
-    tage: 49 - 7, // ≈ 42 Tage Seefracht (vereinfacht, exakt komplexer)
-    modus: "Schiff", // Haupttransport: Seefracht (LKW Hamburg→Dortmund erfolgt durch OEM)
-    beschreibung: "Seefracht von China nach Deutschland über ~42 Tage, anschließend LKW-Transport durch OEM"
+    tage: 49 - 5 - 4, // 30 Tage Seefracht + 4 AT LKW (2 AT China + 2 AT Hamburg)
+    kalendertage: 30, // Seefracht läuft 24/7
+    arbeitstage: 4, // 2 AT LKW China→Hafen + 2 AT LKW Hamburg→Dortmund
+    modus: "Schiff", // Haupttransport: Seefracht
+    beschreibung: "2 AT LKW (China → Hafen), 30 KT Seefracht (China → Hamburg), 2 AT LKW (Hamburg → Dortmund)",
+    detaillierteBeschreibung: {
+      schritt1: "2 Arbeitstage LKW-Transport von Dengwong zum Hafen Shanghai",
+      schritt2: "30 Kalendertage Seefracht von Shanghai nach Hamburg (24/7 unterwegs)",
+      schritt3: "2 Arbeitstage LKW-Transport von Hafen Hamburg zum Werk Dortmund"
+    }
   },
   
   losgroessen: {
@@ -597,7 +604,8 @@ export const ZULIEFERER_CHINA: Zulieferer = {
     "Spring Festival 2027: 28.01. - 04.02. (8 Tage Shutdown)",
     "Keine Produktion während Spring Festival",
     "Planung muss Shutdown berücksichtigen",
-    "Seefracht: Lange aber konstante Transitzeiten",
+    "Seefracht: 30 Kalendertage konstante Transitzeiten",
+    "LKW-Transport: 2 AT China + 2 AT Deutschland = 4 AT",
     "Losgröße 500: Gebündelte Lieferungen"
   ]
 };
@@ -1072,6 +1080,7 @@ export const ANFORDERUNGEN: Anforderung[] = [
     pruefkriterien: [
       "China: 49 Tage Vorlaufzeit (7 Wochen)",
       "Produktionszeit: 5 Arbeitstage",
+      "Transport: 2 AT LKW + 30 KT Schiff + 2 AT LKW",
       "Einbuchung zum korrekten Datum",
       "Arbeitstage vs. Kalendertage beachtet"
     ],
@@ -1152,7 +1161,7 @@ export const ANFORDERUNGEN: Anforderung[] = [
     pruefkriterien: [
       "Kompletter Flow: Bestellung → Produktion → Transport → Lager → Montage",
       "DLZ korrekt (Arbeits- vs. Kalenderzeit)",
-      "Seefracht China → Deutschland modelliert",
+      "Seefracht China → Deutschland: 2 AT LKW + 30 KT Schiff + 2 AT LKW",
       "ATP-Check im OEM"
     ],
     ermässigungRelevant: true,
@@ -1401,7 +1410,8 @@ export const SZENARIEN: Szenario[] = [
     typ: "Logistik",
     parameter: {
       route: "China → Deutschland",
-      normaleDauer: 42, // Tage Seefracht
+      normaleDauer: 30, // Tage Seefracht (Kalendertage)
+      normaleLKW: 4, // 2 AT China + 2 AT Deutschland (Arbeitstage)
       verzögerung: 7, // Zusätzliche Tage
       betroffeneLieferung: "Charge 15", // Beispiel-ID
       grund: "Schlechtwetter / Kanal-Stau"
@@ -1411,7 +1421,8 @@ export const SZENARIEN: Szenario[] = [
       "OEM wartet länger auf Bauteile",
       "Möglicher Produktionsstillstand",
       "Folgelieferungen eventuell auch betroffen",
-      "Höhere Lagerbestände nötig zur Absicherung"
+      "Höhere Lagerbestände nötig zur Absicherung",
+      "Normale Transport-Zeit: 2 AT + 30 KT + 2 AT = ~34 Tage"
     ],
     implementierungsHinweise: [
       "Verlängere Transportzeit für spezifische Charge",
@@ -1485,7 +1496,7 @@ export const SCOR_METRIKEN: SCORMetrik[] = [
     beschreibung: "Zeit von Bestelleingang bis Lieferung beim OEM",
     formel: "Durchschnitt(Lieferdatum - Bestelldatum)",
     einheit: "Tage",
-    zielwert: "≤ 56 Tage (China: 49 Tage Vorlauf + Puffer)",
+    zielwert: "≤ 49 Tage (China: 5 AT Produktion + 2 AT + 30 KT + 2 AT Transport)",
     interpretation: "Niedriger = Besser. Zeigt Geschwindigkeit der Supply Chain."
   },
   {
@@ -1775,6 +1786,7 @@ export const PROJEKT_ZUSAMMENFASSUNG = {
   kritischeParameter: [
     "370.000 Bikes/Jahr (NICHT 185.000!)",
     "China: 49 Tage Vorlaufzeit (7 Wochen, NICHT 56 Tage!)",
+    "Transport: 2 AT + 30 KT + 2 AT (NICHT 44 KT!)",
     "Losgröße Sättel: 500 Stück",
     "Spring Festival: 28.01.-04.02.2027 (8 Tage)",
     "April Peak: 16% (59.200 Bikes)"
@@ -1797,11 +1809,11 @@ export const PROJEKT_ZUSAMMENFASSUNG = {
     a3: "✓ Feiertage Deutschland",
     a4: "✓ Workflow Dashboard",
     a5: "✓ Bestellverwaltung China",
-    a6: "✓ 49 Tage Vorlauf + 5 AT Produktion",
+    a6: "✓ 49 Tage Vorlauf (5 AT Produktion + 2 AT + 30 KT + 2 AT Transport)",
     a7: "✓ Losgröße 500",
     a8: "✓ Maschinenausfall-Szenario",
     a9: "✓ Spring Festival 8 Tage",
-    a10: "✓ Ende-zu-Ende Flow",
+    a10: "✓ Ende-zu-Ende Flow (2 AT LKW + 30 KT Schiff + 2 AT LKW)",
     a11: "✓ 'Heute'-Datum Frozen Zone",
     a12: "○ ERMÄSSIGUNG - Kein Outbound",
     a13: "✓ FCFS statt Solver (ERMÄSSIGUNG)"

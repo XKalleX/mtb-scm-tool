@@ -167,14 +167,14 @@
           "typ": "LKW",
           "von": "Dengwong",
           "nach": "Hafen Shanghai",
-          "dauer": 1,
+          "dauer": 2,
           "einheit": "Arbeitstage"
         },
         {
           "typ": "Schiff",
           "von": "Hafen Shanghai",
           "nach": "Hafen Hamburg",
-          "dauer": 40,
+          "dauer": 30,
           "einheit": "Kalendertage",
           "fahrplan": "Mittwochs",
           "frequenz": "1x pro Woche"
@@ -183,7 +183,7 @@
           "typ": "LKW",
           "von": "Hafen Hamburg",
           "nach": "Dortmund",
-          "dauer": 1,
+          "dauer": 2,
           "einheit": "Arbeitstage"
         }
       ],
@@ -193,7 +193,7 @@
       "gesamtDurchlaufzeit": {
         "minimum": 49,
         "einheit": "Kalendertage",
-        "beschreibung": "Gesamte Durchlaufzeit von Bestellung bis Ankunft (7 Wochen)"
+        "beschreibung": "Gesamte Durchlaufzeit von Bestellung bis Ankunft (7 Wochen): 5 AT Produktion + 2 AT + 30 KT + 2 AT Transport"
       },
       "springFestival": {
         "datum": "28.01.-04.02.2027",
