@@ -525,8 +525,15 @@ export interface Zulieferer {
   
   transportzeit: {
     tage: number; // Berechnet: Vorlaufzeit - Produktionszeit
+    kalendertage?: number; // Optional: Seefracht-Tage (24/7)
+    arbeitstage?: number; // Optional: LKW-Tage (Mo-Fr)
     modus: "Schiff" | "LKW"; // Ermäßigung: Nur Schiff + LKW (keine Bahn)
     beschreibung: string;
+    detaillierteBeschreibung?: {
+      schritt1?: string;
+      schritt2?: string;
+      schritt3?: string;
+    };
   };
   
   // Logistik-Parameter
