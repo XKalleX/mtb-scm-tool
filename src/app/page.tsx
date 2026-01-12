@@ -78,8 +78,10 @@ export default function Dashboard() {
   const springFestivalStart = springFestival.length > 0 ? springFestival[0].datum : '2027-01-28'
   const springFestivalEnde = springFestival.length > 0 ? springFestival[springFestival.length - 1].datum : '2027-02-04'
 
-  // Vorlaufzeit aus Konfiguration (49 Tage gesamt)
-  const gesamtVorlaufzeit = 49  // Fixiert auf 49 Tage gemäß SSOT
+  // Vorlaufzeit aus Konfiguration (49 Tage gesamt gemäß SSOT)
+  // Hinweis: Kann nicht einfach aufsummiert werden da AT + KT gemischt
+  // Korrekte Berechnung in lib/kalender.ts
+  const gesamtVorlaufzeit = 49  // Fixiert auf 49 Tage gemäß SSOT (7 Wochen)
 
   // Peak-Monat aus Saisonalität ermitteln
   const peakMonat = konfiguration.saisonalitaet.reduce((max, s) => s.anteil > max.anteil ? s : max)

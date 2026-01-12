@@ -413,11 +413,13 @@ export function EinstellungenPanel() {
             <div className="bg-blue-50 rounded-lg p-4 mt-4">
               <h4 className="font-semibold text-blue-900 mb-2">Berechnete Gesamtvorlaufzeit:</h4>
               <p className="text-blue-800">
-                {konfiguration.lieferant.vorlaufzeitArbeitstage} AT (Produktion) + {konfiguration.lieferant.lkwTransportArbeitstage} AT (LKW) + {konfiguration.lieferant.vorlaufzeitKalendertage} KT (Seefracht)
-                = <strong>49 Tage gesamt (7 Wochen)</strong>
+                <strong>49 Tage gesamt (7 Wochen)</strong> von Bestellung bis Ankunft
               </p>
               <p className="text-xs text-blue-700 mt-2">
-                Aufschlüsselung: 5 AT Produktion + 2 AT LKW China + 30 KT Seefracht + 2 AT LKW Deutschland
+                Aufschlüsselung: {konfiguration.lieferant.vorlaufzeitArbeitstage} AT Produktion + 2 AT LKW (China) + {konfiguration.lieferant.vorlaufzeitKalendertage} KT Seefracht + 2 AT LKW (Deutschland)
+              </p>
+              <p className="text-xs text-blue-600 mt-1 italic">
+                Hinweis: Gesamtzeit ist Kalendertage (AT und KT überlappen sich). Detaillierte Berechnung in lib/kalender.ts
               </p>
             </div>
           </TabsContent>

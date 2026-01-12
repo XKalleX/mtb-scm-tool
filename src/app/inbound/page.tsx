@@ -36,7 +36,8 @@ export default function InboundPage() {
   const lieferant = konfiguration.lieferant
   
   // Gesamtvorlaufzeit berechnen (49 Tage = 5 AT Produktion + 4 AT LKW + 30 KT Seefracht + Puffer)
-  // Vereinfacht: 5 AT + 30 KT + 4 AT = ca. 39 Tage + Puffer ≈ 49 Tage
+  // Hinweis: Kann nicht einfach 5+4+30=39 rechnen, da AT und KT sich überlappen
+  // Die 49 Tage sind Kalendertage von Bestellung bis Ankunft (siehe lib/kalender.ts)
   const gesamtVorlaufzeit = 49  // Feste 49 Tage wie in SSOT spezifiziert
   
   // Spring Festival aus Feiertagen filtern
