@@ -208,21 +208,22 @@ export function berechneBestelldatum(bedarfsdatum: Date): Date {
   // - 2 AT LKW-Transport Hamburg → Dortmund
   const SEEFRACHT_KALENDERTAGE = 30  // Schiff-Transport (24/7)
   const BEARBEITUNG_ARBEITSTAGE = 5  // Produktion in China
-  const LKW_ARBEITSTAGE = 4          // 2 AT (China) + 2 AT (Deutschland)
+  const LKW_CHINA_ARBEITSTAGE = 2    // LKW China → Hafen
+  const LKW_DEUTSCHLAND_ARBEITSTAGE = 2  // LKW Hamburg → Dortmund
   
   // Schritt 1: Vom Bedarfsdatum die Seefracht-Zeit (Kalendertage) abziehen
   // Transport läuft 24/7, also einfach Kalendertage subtrahieren
   let datumNachSeefracht = addDays(bedarfsdatum, -SEEFRACHT_KALENDERTAGE)
   
   // Schritt 2: LKW-Transport Deutschland (2 AT) abziehen
-  datumNachSeefracht = subtractArbeitstage(datumNachSeefracht, 2)
+  datumNachSeefracht = subtractArbeitstage(datumNachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE)
   
   // Schritt 3: Von diesem Datum die Bearbeitungszeit (5 AT) abziehen
   // Dies berücksichtigt Wochenenden und chinesische Feiertage
   let nachProduktion = subtractArbeitstage(datumNachSeefracht, BEARBEITUNG_ARBEITSTAGE)
   
   // Schritt 4: LKW-Transport China (2 AT) abziehen
-  let bestelldatum = subtractArbeitstage(nachProduktion, 2)
+  let bestelldatum = subtractArbeitstage(nachProduktion, LKW_CHINA_ARBEITSTAGE)
   
   // Schritt 5: Einen zusätzlichen Tag Puffer (Best Practice)
   bestelldatum = addDays(bestelldatum, -1)
@@ -246,18 +247,20 @@ export function berechneAnkunftsdatum(bestelldatum: Date): Date {
   // Aufschlüsselung: 5 AT Produktion + 2 AT + 30 KT + 2 AT Transport
   const SEEFRACHT_KALENDERTAGE = 30
   const BEARBEITUNG_ARBEITSTAGE = 5
+  const LKW_CHINA_ARBEITSTAGE = 2
+  const LKW_DEUTSCHLAND_ARBEITSTAGE = 2
   
   // Schritt 1: Bearbeitung in China (5 AT)
   let nachBearbeitung = addArbeitstage(bestelldatum, BEARBEITUNG_ARBEITSTAGE)
   
   // Schritt 2: LKW-Transport China zum Hafen (2 AT)
-  let nachLKWChina = addArbeitstage(nachBearbeitung, 2)
+  let nachLKWChina = addArbeitstage(nachBearbeitung, LKW_CHINA_ARBEITSTAGE)
   
   // Schritt 3: Seefracht (30 KT)
   let nachSeefracht = addDays(nachLKWChina, SEEFRACHT_KALENDERTAGE)
   
   // Schritt 4: LKW-Transport Hamburg nach Dortmund (2 AT)
-  let ankunftsdatum = addArbeitstage(nachSeefracht, 2)
+  let ankunftsdatum = addArbeitstage(nachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE)
   
   return ankunftsdatum
 }
