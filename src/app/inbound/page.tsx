@@ -35,10 +35,10 @@ export default function InboundPage() {
   // Lieferant aus Konfiguration
   const lieferant = konfiguration.lieferant
   
-  // Gesamtvorlaufzeit berechnen (49 Tage = 5 AT Produktion + 4 AT LKW + 30 KT Seefracht + Puffer)
-  // Hinweis: Kann nicht einfach 5+4+30=39 rechnen, da AT und KT sich überlappen
-  // Die 49 Tage sind Kalendertage von Bestellung bis Ankunft (siehe lib/kalender.ts)
-  const gesamtVorlaufzeit = 49  // Feste 49 Tage wie in SSOT spezifiziert
+  // Gesamtvorlaufzeit aus Konfiguration (konfigurierbar durch Einstellungen)
+  // Die Transportsequenz zeigt die Reihenfolge: Produktion → LKW China → Schiff → LKW DE
+  // Feiertage werden bei der Berechnung in lib/kalender.ts berücksichtigt
+  const gesamtVorlaufzeit = lieferant.gesamtVorlaufzeitTage
   
   // Spring Festival aus Feiertagen filtern
   const springFestival = useMemo(() => 
@@ -178,13 +178,21 @@ export default function InboundPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <h4 className="font-semibold mb-2">Vorlaufzeiten (aus Konfiguration):</h4>
+              <h4 className="font-semibold mb-2">Transport-Sequenz (Reihenfolge wichtig für Feiertage!):</h4>
               <ul className="space-y-1 text-sm">
-                <li>✓ Produktion: <strong>{lieferant.vorlaufzeitArbeitstage} Arbeitstage</strong> (Mo-Fr)</li>
-                <li>✓ LKW China → Hafen: <strong>2 Arbeitstage</strong></li>
-                <li>✓ Seefracht: <strong>{lieferant.vorlaufzeitKalendertage} Kalendertage</strong> (Shanghai → Hamburg, 24/7)</li>
-                <li>✓ LKW Hamburg → Dortmund: <strong>2 Arbeitstage</strong></li>
-                <li>✓ Gesamt: <strong>{gesamtVorlaufzeit} Tage (7 Wochen)</strong></li>
+                {lieferant.transportSequenz && lieferant.transportSequenz.map((step, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="font-bold text-blue-600">{step.schritt}.</span>
+                    <span>
+                      <strong>{step.typ}:</strong> {step.dauer} {step.einheit} 
+                      {step.von !== step.nach && ` (${step.von} → ${step.nach})`}
+                      <span className="text-muted-foreground text-xs ml-1">- {step.beschreibung}</span>
+                    </span>
+                  </li>
+                ))}
+                <li className="pt-2 border-t">
+                  <strong>Gesamt: {gesamtVorlaufzeit} Tage ({Math.ceil(gesamtVorlaufzeit / 7)} Wochen)</strong>
+                </li>
               </ul>
             </div>
             
@@ -307,8 +315,8 @@ export default function InboundPage() {
           <div className="grid gap-4 md:grid-cols-2 mb-6">
             <FormulaCard
               title="Vorlaufzeit Berechnung"
-              formula={`Vorlaufzeit = ${lieferant.vorlaufzeitArbeitstage} AT (Produktion) + 2 AT + ${lieferant.vorlaufzeitKalendertage} KT + 2 AT (Transport) = ${gesamtVorlaufzeit} Tage (7 Wochen)`}
-              description="Gesamte Durchlaufzeit: 5 AT Produktion + 2 AT LKW China + 30 KT Seefracht + 2 AT LKW Deutschland = 49 Tage"
+              formula={`Vorlaufzeit = ${lieferant.vorlaufzeitArbeitstage} AT (Produktion) + ${lieferant.lkwTransportChinaArbeitstage} AT (LKW China) + ${lieferant.vorlaufzeitKalendertage} KT (Seefracht) + ${lieferant.lkwTransportDeutschlandArbeitstage} AT (LKW DE) = ${gesamtVorlaufzeit} Tage (${Math.ceil(gesamtVorlaufzeit / 7)} Wochen)`}
+              description={`Sequenz: 1. Produktion (${lieferant.vorlaufzeitArbeitstage} AT) → 2. LKW China→Hafen (${lieferant.lkwTransportChinaArbeitstage} AT) → 3. Seefracht (${lieferant.vorlaufzeitKalendertage} KT) → 4. LKW Hamburg→Werk (${lieferant.lkwTransportDeutschlandArbeitstage} AT). Reihenfolge wichtig für Feiertagsberechnung!`}
               example={`Bestellung 05.01. → Lieferung ~${new Date(konfiguration.planungsjahr, 0, 5 + gesamtVorlaufzeit).toLocaleDateString('de-DE')} (${gesamtVorlaufzeit} Tage später)`}
             />
             <FormulaCard

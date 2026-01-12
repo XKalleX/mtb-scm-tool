@@ -363,14 +363,36 @@ export function EinstellungenPanel() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>LKW-Transport Arbeitstage (2 AT China + 2 AT DE)</Label>
+                  <Label>LKW-Transport China → Hafen (Arbeitstage)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.lkwTransportArbeitstage}
-                    onChange={(e) => updateLieferant({ lkwTransportArbeitstage: parseInt(e.target.value) || 0 })}
+                    value={konfiguration.lieferant.lkwTransportChinaArbeitstage}
+                    onChange={(e) => updateLieferant({ lkwTransportChinaArbeitstage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
-                  <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.lkwTransportArbeitstage} AT gesamt</p>
+                  <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.lkwTransportChinaArbeitstage} AT (Mo-Fr)</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>LKW-Transport Hamburg → Werk (Arbeitstage)</Label>
+                  <Input
+                    type="number"
+                    value={konfiguration.lieferant.lkwTransportDeutschlandArbeitstage}
+                    onChange={(e) => updateLieferant({ lkwTransportDeutschlandArbeitstage: parseInt(e.target.value) || 0 })}
+                    min={0}
+                  />
+                  <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.lkwTransportDeutschlandArbeitstage} AT (Mo-Fr)</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Gesamte Vorlaufzeit (Kalendertage)</Label>
+                  <Input
+                    type="number"
+                    value={konfiguration.lieferant.gesamtVorlaufzeitTage}
+                    onChange={(e) => updateLieferant({ gesamtVorlaufzeitTage: parseInt(e.target.value) || 0 })}
+                    min={0}
+                  />
+                  <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.gesamtVorlaufzeitTage} Tage ({Math.ceil(STANDARD_KONFIGURATION.lieferant.gesamtVorlaufzeitTage / 7)} Wochen)</p>
                 </div>
               </div>
 
@@ -411,15 +433,18 @@ export function EinstellungenPanel() {
             </div>
 
             <div className="bg-blue-50 rounded-lg p-4 mt-4">
-              <h4 className="font-semibold text-blue-900 mb-2">Berechnete Gesamtvorlaufzeit:</h4>
-              <p className="text-blue-800">
-                <strong>49 Tage gesamt (7 Wochen)</strong> von Bestellung bis Ankunft
+              <h4 className="font-semibold text-blue-900 mb-2">Transport-Sequenz (Reihenfolge wichtig!):</h4>
+              <ol className="list-decimal list-inside text-blue-800 text-sm space-y-1">
+                <li>Produktion: {konfiguration.lieferant.vorlaufzeitArbeitstage} AT (Mo-Fr ohne Feiertage)</li>
+                <li>LKW China → Hafen: {konfiguration.lieferant.lkwTransportChinaArbeitstage} AT (Mo-Fr)</li>
+                <li>Seefracht: {konfiguration.lieferant.vorlaufzeitKalendertage} KT (24/7 unterwegs)</li>
+                <li>LKW Hamburg → Werk: {konfiguration.lieferant.lkwTransportDeutschlandArbeitstage} AT (Mo-Fr)</li>
+              </ol>
+              <p className="text-blue-900 font-bold mt-3">
+                Gesamt: {konfiguration.lieferant.gesamtVorlaufzeitTage} Tage ({Math.ceil(konfiguration.lieferant.gesamtVorlaufzeitTage / 7)} Wochen)
               </p>
-              <p className="text-xs text-blue-700 mt-2">
-                Aufschlüsselung: {konfiguration.lieferant.vorlaufzeitArbeitstage} AT Produktion + 2 AT LKW (China) + {konfiguration.lieferant.vorlaufzeitKalendertage} KT Seefracht + 2 AT LKW (Deutschland)
-              </p>
-              <p className="text-xs text-blue-600 mt-1 italic">
-                Hinweis: Gesamtzeit ist Kalendertage (AT und KT überlappen sich). Detaillierte Berechnung in lib/kalender.ts
+              <p className="text-xs text-blue-600 mt-2 italic">
+                Hinweis: Reihenfolge ist wichtig für Feiertagsberechnung. AT = Arbeitstage (Mo-Fr), KT = Kalendertage (24/7)
               </p>
             </div>
           </TabsContent>

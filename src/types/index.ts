@@ -112,6 +112,7 @@ export interface MarketingAuftrag {
 
 /**
  * China-Lieferant (einziger Lieferant)
+ * WICHTIG: Alle Werte sind über Einstellungen konfigurierbar!
  */
 export interface LieferantChina {
   id: 'CHN';
@@ -120,6 +121,9 @@ export interface LieferantChina {
   vorlaufzeitKalendertage: number;  // 30 Tage Seefracht (Shanghai → Hamburg, 24/7)
   vorlaufzeitArbeitstage: number;   // 5 Arbeitstage Produktion
   lkwTransportArbeitstage: number;  // 4 AT gesamt (2 AT China→Hafen + 2 AT Hamburg→Dortmund)
+  lkwTransportChinaArbeitstage: number;  // 2 AT China → Hafen
+  lkwTransportDeutschlandArbeitstage: number;  // 2 AT Hamburg → Dortmund
+  gesamtVorlaufzeitTage: number;    // Total: 49 Tage (konfigurierbar)
   losgroesse: number;               // 500 Stück Sättel Mindestbestellung
   kapazitaet: number;               // Max. Produktion pro Tag
   lieferintervall: number;          // Alle 14 Tage

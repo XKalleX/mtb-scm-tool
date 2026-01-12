@@ -11,6 +11,16 @@
  * ZIEL: 15 Punkte (Note 1+ / A+)
  * 
  * ═══════════════════════════════════════════════════════════════════════════════
+ * WICHTIG: KONFIGURIERBARKEIT
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * ✅ ALLE Werte in diesem System MÜSSEN durch Einstellungen änderbar sein!
+ * ✅ KEINE hardcodierten Werte in Pages oder Komponenten
+ * ✅ Einzige Datenquelle: JSON-Konfiguration (src/data/*.json)
+ * ✅ Werte werden über KonfigurationContext verwaltet
+ * ✅ Änderungen in Einstellungen wirken sich sofort auf alle Berechnungen aus
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════════
  * WICHTIG: ERMÄSSIGUNGEN AKTIV (Code-Version)
  * ═══════════════════════════════════════════════════════════════════════════════
  * 
@@ -593,6 +603,20 @@ export const ZULIEFERER_CHINA: Zulieferer = {
       schritt3: "2 Arbeitstage LKW-Transport von Hafen Hamburg zum Werk Dortmund"
     }
   },
+  
+  /**
+   * WICHTIG: Transport-Sequenz
+   * 
+   * Die Reihenfolge der Transportschritte ist KRITISCH für die Berechnung,
+   * da Feiertage nur bei Arbeitstagen (AT) relevant sind:
+   * 
+   * 1. Produktion (5 AT) - Berücksichtigt chinesische Feiertage & Spring Festival
+   * 2. LKW China → Hafen (2 AT) - Berücksichtigt chinesische Feiertage
+   * 3. Seefracht (30 KT) - Läuft 24/7, keine Feiertage relevant
+   * 4. LKW Hamburg → Dortmund (2 AT) - Berücksichtigt deutsche Feiertage
+   * 
+   * Die Berechnung erfolgt in lib/kalender.ts unter Berücksichtigung dieser Sequenz.
+   */
   
   losgroessen: {
     "Sattel": 500 // Versand erst bei 500 Stück

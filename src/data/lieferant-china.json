@@ -6,6 +6,47 @@
     "vorlaufzeitKalendertage": 30,
     "vorlaufzeitArbeitstage": 5,
     "lkwTransportArbeitstage": 4,
+    "lkwTransportChinaArbeitstage": 2,
+    "lkwTransportDeutschlandArbeitstage": 2,
+    "gesamtVorlaufzeitTage": 49,
+    "transportSequenz": [
+      {
+        "schritt": 1,
+        "typ": "Produktion",
+        "dauer": 5,
+        "einheit": "AT",
+        "von": "Dengwong",
+        "nach": "Dengwong",
+        "beschreibung": "Produktion beim Zulieferer (Mo-Fr ohne Feiertage)"
+      },
+      {
+        "schritt": 2,
+        "typ": "LKW",
+        "dauer": 2,
+        "einheit": "AT",
+        "von": "Dengwong",
+        "nach": "Hafen Shanghai",
+        "beschreibung": "LKW-Transport zum Hafen (Mo-Fr)"
+      },
+      {
+        "schritt": 3,
+        "typ": "Seefracht",
+        "dauer": 30,
+        "einheit": "KT",
+        "von": "Hafen Shanghai",
+        "nach": "Hafen Hamburg",
+        "beschreibung": "Seefracht (24/7 unterwegs)"
+      },
+      {
+        "schritt": 4,
+        "typ": "LKW",
+        "dauer": 2,
+        "einheit": "AT",
+        "von": "Hafen Hamburg",
+        "nach": "Werk Dortmund",
+        "beschreibung": "LKW-Transport zum Werk (Mo-Fr)"
+      }
+    ],
     "losgroesse": 500,
     "kapazitaet": 50000,
     "lieferintervall": 14,
