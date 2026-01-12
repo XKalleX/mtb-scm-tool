@@ -290,7 +290,7 @@ const STANDARD_LIEFERANT: LieferantConfig = {
   besonderheiten: [
     "Einziger Lieferant für Sättel",
     "Spring Festival: 28. Jan - 4. Feb 2027 (8 Tage Produktionsstopp)",
-    "Schiff-Transport: 44 Kalendertage (24/7 unterwegs)",
+    "Transport: 2 AT LKW + 30 KT Seefracht + 2 AT LKW (24/7 unterwegs)",
     "Bearbeitung: 5 Arbeitstage (Mo-Fr ohne Feiertage)",
     "Gesamte Vorlaufzeit: 49 Tage (7 Wochen)",
     "Mindestbestellung: 500 Stück Sättel (Losgröße)",

@@ -89,12 +89,12 @@ Comprehensive Supply Chain Management System für Adventure Works AG - entwickel
 
 | Zulieferer  | Standort  | Liefert | Vorlaufzeit         | Transport | Losgröße |
 | ----------- | --------- | ------- | ------------------- | --------- | -------- |
-| **China**   | Dengwong  | **Sättel (4 Varianten)** | 49 Tage (7 Wochen) | Schiff + LKW | 500     |
+| **China**   | Dengwong  | **Sättel (4 Varianten)** | 49 Tage (7 Wochen) | 2 AT + 30 KT + 2 AT | 500     |
 
 **Code-Ermäßigung aktiv:**
 - ✅ Nur 1 Zulieferer: China (statt 3: Deutschland/Heilbronn, Spanien/Zaragoza, China)
 - ✅ Nur Sättel: 4 Varianten (statt 14 Bauteile inkl. Gabeln und Rahmen)
-- ✅ Transport: Nur Schiff (China→Hamburg) + LKW (Hamburg→Dortmund), keine Bahn
+- ✅ Transport: 2 AT LKW (China→Hafen) + 30 KT Schiff + 2 AT LKW (Hamburg→Dortmund), keine Bahn
 - ✅ Kein Outbound zu 6 Märkten
 
 **Legende:** AT = Arbeitstage, KT = Kalendertage
@@ -217,7 +217,7 @@ Das System verwendet eine  **Excel-ähnliche Tab-Navigation** :
 
 #### Responsiveness (Reaktionsfähigkeit)
 
-* **RS.1.1** Order Cycle Time: 42 Tage (Ziel: 45 Tage)
+* **RS.1.1** Order Cycle Time: 39 Tage (Ziel: 49 Tage, Transport: 2 AT + 30 KT + 2 AT)
 * **RS.2.2** Production Cycle Time: 5.2 Std (Ziel: 6 Std)
 
 #### Agility (Flexibilität)
@@ -233,7 +233,7 @@ Das System verwendet eine  **Excel-ähnliche Tab-Navigation** :
 #### Assets (Vermögenswerte)
 
 * **AM.1.1** Cash-to-Cash Cycle: 56 Tage (Ziel: 60 Tage)
-* **AM.1.2** Inventory Days of Supply: 42 Tage (Ziel: 45 Tage)
+* **AM.1.2** Inventory Days of Supply: 39 Tage (Ziel: 49 Tage)
 
 **Ampel-System:**
 

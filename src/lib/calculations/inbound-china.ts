@@ -5,10 +5,12 @@
  * 
  * Bestellungen beim einzigen Lieferanten (China) - nur Sättel!
  * 
- * WICHTIGE PARAMETER (gemäß SSOT-Spezifikation):
+ * WICHTIGE PARAMETER (gemäß SSOT-Spezifikation und Anforderungen):
  * - Vorlaufzeit: 49 Tage GESAMT (7 Wochen)
  *   - 5 Arbeitstage Produktion
- *   - 44 Kalendertage Transport (Seefracht)
+ *   - 2 Arbeitstage LKW China → Hafen
+ *   - 30 Kalendertage Seefracht
+ *   - 2 Arbeitstage LKW Hamburg → Dortmund
  * - Losgröße: 500 Stück Sättel (Mindestbestellung)
  * - Lieferintervall: Alle 14 Tage
  * - Spring Festival: 28.1.-4.2.2027 = 8 Tage Produktionsstopp!
