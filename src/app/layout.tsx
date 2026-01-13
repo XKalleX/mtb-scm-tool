@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Link from 'next/link'
-import { Package, LineChart, Download, Factory, BarChart3 } from 'lucide-react'
+import { Package, LineChart, Download, Factory, BarChart3, Database } from 'lucide-react'
 import { SzenarienProvider } from '@/contexts/SzenarienContext'
 import { KonfigurationProvider } from '@/contexts/KonfigurationContext'
 import { SzenarienFloatingButton } from '@/components/SzenarienSidebar'
@@ -48,13 +48,19 @@ export default function RootLayout({
           {/* Navigation */}
           <nav className="border-b bg-slate-50">
             <div className="container mx-auto px-4">
-              <div className="flex space-x-1">
+              <div className="flex space-x-1 items-center">
                 <NavLink href="/" icon={<BarChart3 />} label="Dashboard" />
                 <NavLink href="/oem-programm" icon={<LineChart />} label="OEM Programm" />
                 <NavLink href="/inbound" icon={<Download />} label="Inbound China" />
                 <NavLink href="/produktion" icon={<Factory />} label="Produktion" />
                 <NavLink href="/reporting" icon={<BarChart3 />} label="Reporting" />
                 {/* Szenarien nur über Sidebar (Floating Button) erreichbar - keine eigene Seite mehr */}
+                
+                {/* Separator für Stammdaten */}
+                <div className="h-8 w-px bg-slate-300 mx-2" />
+                
+                {/* Stammdaten - Separater Bereich */}
+                <NavLink href="/stammdaten" icon={<Database />} label="Stammdaten" secondary={true} />
               </div>
             </div>
           </nav>
@@ -89,16 +95,22 @@ export default function RootLayout({
 function NavLink({ 
   href, 
   icon, 
-  label 
+  label,
+  secondary = false
 }: { 
   href: string
   icon: React.ReactNode
   label: string 
+  secondary?: boolean
 }) {
   return (
     <Link
       href={href}
-      className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-white hover:text-primary transition-colors border-b-2 border-transparent hover:border-primary"
+      className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 border-transparent ${
+        secondary 
+          ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 hover:border-slate-400' 
+          : 'text-slate-700 hover:bg-white hover:text-primary hover:border-primary'
+      }`}
     >
       <span className="h-4 w-4">{icon}</span>
       <span>{label}</span>
