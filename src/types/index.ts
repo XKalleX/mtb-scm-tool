@@ -195,18 +195,20 @@ export interface SCORMetriken {
   // RELIABILITY (Zuverlässigkeit)
   planerfuellungsgrad: number;           // % der geplanten Produktion erreicht
   liefertreueChina: number;              // % pünktliche Lieferungen aus China
+  deliveryPerformance: number;           // % Lieferungen innerhalb der Vorlaufzeit (NEU)
   
   // RESPONSIVENESS (Reaktionsfähigkeit)
   durchlaufzeitProduktion: number;       // in Tagen (Bestellung → Produktion)
   lagerumschlag: number;                 // Wie oft pro Jahr wird Lager umgeschlagen
+  forecastAccuracy: number;              // % Genauigkeit Plan vs. Ist (NEU)
   
   // AGILITY (Flexibilität)
   produktionsflexibilitaet: number;      // % Mehrproduktion möglich
   materialverfuegbarkeit: number;        // % der Zeit genug Material
   
-  // ASSETS (Vermögenswerte)
-  lagerbestandswert: number;             // in EUR
-  kapitalbindung: number;                // in Tagen
+  // ASSETS (Anlagenverwaltung - KEINE KOSTEN)
+  lagerreichweite: number;               // Lagerbestand in Tagen Reichweite
+  kapitalbindung: number;                // Durchschnittliche Lagerdauer in Tagen
   
   // PRODUKTIONS-KPIs
   gesamtproduktion: number;              // Anzahl Bikes
