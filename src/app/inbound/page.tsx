@@ -17,7 +17,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Ship, AlertTriangle, Package, Download } from 'lucide-react'
+import { Ship, AlertTriangle, Package, Download } from 'lucide-react'
+import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { formatNumber } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
@@ -273,8 +274,10 @@ export default function InboundPage() {
           <CardTitle>Bestelllogik (Rückwärts-Berechnung)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-semibold text-blue-900 mb-2">Bedarfsdatum → Bestelldatum (Rückwärtsrechnung):</h4>
+          <CollapsibleInfo
+            title="Bedarfsdatum → Bestelldatum (Rückwärtsrechnung)"
+            variant="info"
+          >
             <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
               <li>Vom Bedarfsdatum <strong>49 Tage</strong> (Gesamtvorlaufzeit) abziehen</li>
               <li>Detailaufschlüsselung:
@@ -288,17 +291,19 @@ export default function InboundPage() {
               <li>1 Tag Puffer für Bestellverarbeitung abziehen</li>
               <li>Sicherstellen dass Bestelldatum ein Arbeitstag ist</li>
             </ol>
-          </div>
+          </CollapsibleInfo>
 
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="font-semibold text-green-900 mb-2">Losgrößen-Aufrundung:</h4>
+          <CollapsibleInfo
+            title="Losgrößen-Aufrundung"
+            variant="success"
+          >
             <p className="text-sm text-green-800">
               Jede Bestellung wird auf Vielfache von <strong>{formatNumber(lieferant.losgroesse, 0)} Stück</strong> aufgerundet.
             </p>
             <p className="text-sm text-green-800 mt-2">
               Beispiel: Bedarf 3.500 Stück → Bestellung <strong>{formatNumber(Math.ceil(3500 / lieferant.losgroesse) * lieferant.losgroesse, 0)} Stück</strong> ({Math.ceil(3500 / lieferant.losgroesse)}x Losgröße)
             </p>
-          </div>
+          </CollapsibleInfo>
         </CardContent>
       </Card>
 
@@ -413,34 +418,6 @@ export default function InboundPage() {
         </CardContent>
       </Card>
 
-      {/* Erfüllte Anforderungen */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Erfüllte Anforderungen</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 md:grid-cols-2">
-            <RequirementItem text="Rückwärts-Berechnung Bestelldatum" />
-            <RequirementItem text={`${lieferant.vorlaufzeitArbeitstage} Arbeitstage Produktion`} />
-            <RequirementItem text={`${lieferant.vorlaufzeitKalendertage} Kalendertage Seefracht (Shanghai → Hamburg)`} />
-            <RequirementItem text={`${lieferant.lkwTransportArbeitstage} AT LKW-Transport (2 AT China + 2 AT DE)`} />
-            <RequirementItem text={`Gesamtvorlaufzeit: ${gesamtVorlaufzeit} Tage (7 Wochen)`} />
-            <RequirementItem text={`Losgrößen-Optimierung (${formatNumber(lieferant.losgroesse, 0)} Stück)`} />
-            <RequirementItem text="Spring Festival Berücksichtigung" />
-            <RequirementItem text="Chinesische Feiertage integriert" />
-            <RequirementItem text="Dynamische Konfiguration" />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function RequirementItem({ text }: { text: string }) {
-  return (
-    <div className="flex items-center space-x-2 text-sm">
-      <CheckCircle2 className="h-4 w-4 text-green-600" />
-      <span>{text}</span>
     </div>
   )
 }
