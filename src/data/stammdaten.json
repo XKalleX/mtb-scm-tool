@@ -196,7 +196,7 @@
         "beschreibung": "Gesamte Durchlaufzeit von Bestellung bis Ankunft (7 Wochen)"
       },
       "springFestival": {
-        "datum": "28.01.-04.02.2027",
+        "datum": "05.01.-12.02.2027",
         "dauer": 8,
         "beschreibung": "Kein Betrieb während Spring Festival"
       }
@@ -209,11 +209,6 @@
       "betriebstage": "Montag-Freitag",
       "ruhetage": ["Samstag", "Sonntag"],
       "beschreibung": "LKWs fahren Sa und So nicht"
-    },
-    "zug": {
-      "name": "Güterzug",
-      "fahrplan": ["Montag", "Donnerstag"],
-      "beschreibung": "Züge fahren Montags und Donnerstags ab"
     },
     "schiff": {
       "name": "Container-Schiff",

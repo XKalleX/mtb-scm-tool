@@ -9,7 +9,7 @@
     {
       "monat": 2,
       "name": "Februar",
-      "anteil": 5,
+      "anteil": 6,
       "beschreibung": "Vorbereitung auf Frühjahr"
     },
     {
@@ -33,37 +33,37 @@
     {
       "monat": 6,
       "name": "Juni",
-      "anteil": 12,
+      "anteil": 13,
       "beschreibung": "Sommeranfang"
     },
     {
       "monat": 7,
       "name": "Juli",
-      "anteil": 10,
+      "anteil": 12,
       "beschreibung": "Sommerzeit"
     },
     {
       "monat": 8,
       "name": "August",
-      "anteil": 8,
+      "anteil": 9,
       "beschreibung": "Spätsommer"
     },
     {
       "monat": 9,
       "name": "September",
-      "anteil": 9,
+      "anteil": 6,
       "beschreibung": "Herbstbeginn"
     },
     {
       "monat": 10,
       "name": "Oktober",
-      "anteil": 6,
+      "anteil": 3,
       "beschreibung": "Herbst, sinkende Nachfrage"
     },
     {
       "monat": 11,
       "name": "November",
-      "anteil": 3,
+      "anteil": 4,
       "beschreibung": "Winter naht"
     },
     {
