@@ -39,6 +39,7 @@ import {
   Info
 } from 'lucide-react'
 import { useSzenarien, SzenarioTyp, SzenarioConfig } from '@/contexts/SzenarienContext'
+import szenarioDefaults from '@/data/szenario-defaults.json'
 
 /**
  * Floating button that opens the scenario sidebar
@@ -261,6 +262,7 @@ function SzenarioTypeSelector({
 
 /**
  * Scenario configuration form
+ * WICHTIG: Nutzt Standardwerte aus JSON, die vom Nutzer änderbar sind
  */
 function SzenarioForm({
   szenarioTyp,
@@ -271,17 +273,13 @@ function SzenarioForm({
   onAdd: (typ: SzenarioTyp, parameter: Record<string, any>) => void
   onCancel: () => void
 }) {
+  /**
+   * Lädt Standardparameter aus JSON-Konfiguration
+   * Diese sind NUR Vorschläge und können vom Nutzer beliebig geändert werden
+   */
   const getDefaultParameter = (typ: SzenarioTyp) => {
-    switch (typ) {
-      case 'marketingaktion':
-        return { startKW: 28, dauerWochen: 4, erhoehungProzent: 20 }
-      case 'maschinenausfall':
-        return { startDatum: '2027-03-15', dauerTage: 7, reduktionProzent: 60 }
-      case 'wasserschaden':
-        return { datum: '2027-02-20', verlustMenge: 1000, betroffeneTeile: 'Gemischte Komponenten aus China' }
-      case 'schiffsverspaetung':
-        return { ursprungAnkunft: '2027-02-16', verspaetungTage: 4, neueAnkunft: '2027-02-20' }
-    }
+    const szenarioData = szenarioDefaults.szenarien[typ]
+    return szenarioData?.standardParameter || {}
   }
 
   const [parameter, setParameter] = useState<Record<string, any>>(getDefaultParameter(szenarioTyp))
@@ -290,36 +288,57 @@ function SzenarioForm({
     key: string
     label: string
     type: 'number' | 'date' | 'text'
+    min?: number | string
+    max?: number | string
   }
 
-  const szenarioFields: Record<SzenarioTyp, FieldDef[]> = {
-    marketingaktion: [
-      { key: 'startKW', label: 'Start KW', type: 'number' },
-      { key: 'dauerWochen', label: 'Dauer (Wochen)', type: 'number' },
-      { key: 'erhoehungProzent', label: 'Erhöhung (%)', type: 'number' }
-    ],
-    maschinenausfall: [
-      { key: 'startDatum', label: 'Ausfall ab', type: 'date' },
-      { key: 'dauerTage', label: 'Dauer (Tage)', type: 'number' },
-      { key: 'reduktionProzent', label: 'Reduktion (%)', type: 'number' }
-    ],
-    wasserschaden: [
-      { key: 'datum', label: 'Datum', type: 'date' },
-      { key: 'verlustMenge', label: 'Verlorene Menge', type: 'number' },
-      { key: 'betroffeneTeile', label: 'Betroffene Teile', type: 'text' }
-    ],
-    schiffsverspaetung: [
-      { key: 'ursprungAnkunft', label: 'Geplante Ankunft', type: 'date' },
-      { key: 'verspaetungTage', label: 'Verspätung (Tage)', type: 'number' },
-      { key: 'neueAnkunft', label: 'Neue Ankunft', type: 'date' }
-    ]
+  /**
+   * Lädt Feld-Definitionen aus JSON-Konfiguration
+   * Ermöglicht zentrale Verwaltung aller Szenario-Parameter
+   */
+  const getSzenarioFields = (typ: SzenarioTyp): FieldDef[] => {
+    const szenarioData = szenarioDefaults.szenarien[typ]
+    if (!szenarioData) return []
+
+    const paramDefs = szenarioData.parameterDefinitionen
+    return Object.entries(paramDefs).map(([key, def]: [string, any]) => ({
+      key,
+      label: def.label,
+      type: def.typ as 'number' | 'date' | 'text',
+      min: def.min,
+      max: def.max
+    }))
   }
 
-  const fields = szenarioFields[szenarioTyp]
+  const fields = getSzenarioFields(szenarioTyp)
+  
+  /**
+   * Lädt Beispieltext aus JSON-Konfiguration
+   */
+  const getBeispielText = (typ: SzenarioTyp): string => {
+    return szenarioDefaults.szenarien[typ]?.beispiel || ''
+  }
 
   return (
     <div className="space-y-4 border-t pt-4">
+      {/* Beispiel-Box aus JSON */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="flex items-start gap-2">
+          <Info className="h-4 w-4 text-blue-700 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-xs text-blue-900">Beispiel-Szenario</p>
+            <p className="text-xs text-blue-800 mt-1">{getBeispielText(szenarioTyp)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Parameter-Formular mit Standardwerten (änderbar) */}
       <div className="space-y-3">
+        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-200">
+          💡 Die vorausgefüllten Werte sind Vorschläge aus der JSON-Konfiguration. 
+          Sie können alle Parameter beliebig anpassen.
+        </div>
+        
         {fields.map((field) => (
           <div key={field.key} className="space-y-1">
             <Label htmlFor={field.key} className="text-xs">{field.label}</Label>
@@ -329,6 +348,8 @@ function SzenarioForm({
                 id={field.key}
                 type="number"
                 value={parameter[field.key]}
+                min={field.min as number}
+                max={field.max as number}
                 onChange={(e) => setParameter({...parameter, [field.key]: parseInt(e.target.value) || 0})}
                 className="h-8 text-sm"
               />
@@ -339,6 +360,8 @@ function SzenarioForm({
                 id={field.key}
                 type="date"
                 value={parameter[field.key]}
+                min={field.min as string}
+                max={field.max as string}
                 onChange={(e) => setParameter({...parameter, [field.key]: e.target.value})}
                 className="h-8 text-sm"
               />

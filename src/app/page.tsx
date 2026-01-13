@@ -34,6 +34,7 @@ import { useKonfiguration, STANDARD_KONFIGURATION } from '@/contexts/Konfigurati
 import { useMemo, useState } from 'react'
 import { EinstellungenPanel } from '@/components/EinstellungenPanel'
 import { formatNumber } from '@/lib/utils'
+import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 
 /**
  * Fallback-Wert für Arbeitstage wenn Konfiguration noch nicht geladen ist
@@ -109,6 +110,9 @@ export default function Dashboard() {
           {showSettings ? 'Einstellungen schließen' : 'Einstellungen öffnen'}
         </Button>
       </div>
+
+      {/* Aktive Szenarien Banner */}
+      <ActiveScenarioBanner showDetails={false} />
 
       {/* Einstellungen Panel (einklappbar) */}
       {showSettings && <EinstellungenPanel />}

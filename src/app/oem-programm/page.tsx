@@ -30,6 +30,7 @@ import { exportToCSV, exportToJSON } from '@/lib/export'
 import { showError, showSuccess } from '@/lib/notifications'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { useSzenarien } from '@/contexts/SzenarienContext'
+import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import React, { useState, useMemo } from 'react'
 import { 
   generiereAlleVariantenProduktionsplaene,
@@ -145,6 +146,9 @@ export default function OEMProgrammPage() {
           </Button>
         </div>
       </div>
+
+      {/* Aktive Szenarien Banner */}
+      <ActiveScenarioBanner showDetails={false} />
 
       {/* Szenarien-Warnung */}
       {aktiveSzenarien.length > 0 && (

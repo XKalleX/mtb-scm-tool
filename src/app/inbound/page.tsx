@@ -23,6 +23,7 @@ import { formatNumber, addDays } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
+import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { useMemo } from 'react'
 
 /**
@@ -117,6 +118,9 @@ export default function InboundPage() {
           </Button>
         </div>
       </div>
+
+      {/* Aktive Szenarien Banner */}
+      <ActiveScenarioBanner showDetails={false} />
 
       {/* Übersicht Cards */}
       <div className="grid gap-4 md:grid-cols-4">
