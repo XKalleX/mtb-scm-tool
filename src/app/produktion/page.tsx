@@ -17,6 +17,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Factory, AlertTriangle, TrendingUp, Package, Download } from 'lucide-react'
+import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { formatNumber } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
@@ -195,8 +196,11 @@ export default function ProduktionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-white rounded-lg p-4">
-            <h4 className="font-semibold text-blue-900 mb-2">FCFS-Regel (First-Come-First-Serve):</h4>
+          <CollapsibleInfo
+            title="FCFS-Regel (First-Come-First-Serve)"
+            variant="info"
+            icon={<Factory className="h-4 w-4" />}
+          >
             <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
               <li>
                 <strong>Schritt 1: ATP-Check</strong> - Prüfe für jeden Produktionsauftrag: 
@@ -212,17 +216,19 @@ export default function ProduktionPage() {
                 <strong>Keine Optimierung:</strong> Kein Solver, keine Prioritäten nach Deckungsbeitrag
               </li>
             </ol>
-          </div>
+          </CollapsibleInfo>
 
-          <div className="bg-white rounded-lg p-4">
-            <h4 className="font-semibold text-blue-900 mb-2">ATP-Check (Available-to-Promise):</h4>
+          <CollapsibleInfo
+            title="ATP-Check (Available-to-Promise)"
+            variant="info"
+          >
             <p className="text-sm text-blue-800">
               Für jede Komponente in der Stückliste wird geprüft:<br/>
               <code className="bg-blue-100 px-2 py-1 rounded">
                 Verfügbar im Lager ≥ Benötigt für Auftrag
               </code>
             </p>
-          </div>
+          </CollapsibleInfo>
         </CardContent>
       </Card>
 

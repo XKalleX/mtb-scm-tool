@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Ship, AlertTriangle, Package, Download } from 'lucide-react'
+import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { formatNumber } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
@@ -273,8 +274,10 @@ export default function InboundPage() {
           <CardTitle>Bestelllogik (Rückwärts-Berechnung)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-semibold text-blue-900 mb-2">Bedarfsdatum → Bestelldatum (Rückwärtsrechnung):</h4>
+          <CollapsibleInfo
+            title="Bedarfsdatum → Bestelldatum (Rückwärtsrechnung)"
+            variant="info"
+          >
             <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
               <li>Vom Bedarfsdatum <strong>49 Tage</strong> (Gesamtvorlaufzeit) abziehen</li>
               <li>Detailaufschlüsselung:
@@ -288,17 +291,19 @@ export default function InboundPage() {
               <li>1 Tag Puffer für Bestellverarbeitung abziehen</li>
               <li>Sicherstellen dass Bestelldatum ein Arbeitstag ist</li>
             </ol>
-          </div>
+          </CollapsibleInfo>
 
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="font-semibold text-green-900 mb-2">Losgrößen-Aufrundung:</h4>
+          <CollapsibleInfo
+            title="Losgrößen-Aufrundung"
+            variant="success"
+          >
             <p className="text-sm text-green-800">
               Jede Bestellung wird auf Vielfache von <strong>{formatNumber(lieferant.losgroesse, 0)} Stück</strong> aufgerundet.
             </p>
             <p className="text-sm text-green-800 mt-2">
               Beispiel: Bedarf 3.500 Stück → Bestellung <strong>{formatNumber(Math.ceil(3500 / lieferant.losgroesse) * lieferant.losgroesse, 0)} Stück</strong> ({Math.ceil(3500 / lieferant.losgroesse)}x Losgröße)
             </p>
-          </div>
+          </CollapsibleInfo>
         </CardContent>
       </Card>
 

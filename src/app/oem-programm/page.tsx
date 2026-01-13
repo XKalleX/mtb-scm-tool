@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { Calendar, TrendingUp, AlertCircle, Download } from 'lucide-react'
 import { formatNumber, formatDate } from '@/lib/utils'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
@@ -261,11 +262,11 @@ export default function OEMProgrammPage() {
               </div>
 
               {/* Erklärung: Saisonalität → Tagesplanung */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  Wie wird die Saisonalität auf die Tagesplanung übertragen?
-                </h4>
+              <CollapsibleInfo
+                title="Wie wird die Saisonalität auf die Tagesplanung übertragen?"
+                variant="info"
+                icon={<AlertCircle className="h-4 w-4" />}
+              >
                 {(() => {
                   const peakMonat = konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max)
                   const peakProduktion = Math.round(konfiguration.jahresproduktion * (peakMonat.anteil / 100))
@@ -291,7 +292,7 @@ export default function OEMProgrammPage() {
                     </div>
                   )
                 })()}
-              </div>
+              </CollapsibleInfo>
             </CardContent>
           </Card>
 
@@ -663,16 +664,20 @@ export default function OEMProgrammPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-900 mb-2">Problem:</h4>
+              <CollapsibleInfo
+                title="Problem: Dezimalzahlen vs. Ganzzahlige Produktion"
+                variant="info"
+              >
                 <p className="text-sm text-blue-800">
                   Die tägliche Planung arbeitet mit Dezimalzahlen (z.B. 71,61 Bikes/Tag), 
                   aber die Produktion muss in ganzen Einheiten erfolgen (71 oder 72).
                 </p>
-              </div>
+              </CollapsibleInfo>
 
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h4 className="font-semibold text-green-900 mb-2">Lösung: Kumuliertes Error-Management</h4>
+              <CollapsibleInfo
+                title="Lösung: Kumuliertes Error-Management"
+                variant="success"
+              >
                 <div className="text-sm text-green-800 space-y-2">
                   <p>
                     <strong>Tag 1:</strong> Soll 71,61 → Ist 71, Error = +0,61
@@ -687,15 +692,17 @@ export default function OEMProgrammPage() {
                     <strong>Tag 4:</strong> Soll 71,61 → Error = 1,44 → <span className="font-bold">Ist 72 ✓</span>, Error = 0,44
                   </p>
                 </div>
-              </div>
+              </CollapsibleInfo>
 
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <h4 className="font-semibold text-purple-900 mb-2">Resultat:</h4>
+              <CollapsibleInfo
+                title="Resultat: Präzise Jahressumme"
+                variant="purple"
+              >
                 <p className="text-sm text-purple-800">
                   Die Jahressumme stimmt auf <strong>±1 Bike genau</strong>! 
                   Ohne Error-Management würden sich die Rundungsfehler auf über 200 Bikes summieren.
                 </p>
-              </div>
+              </CollapsibleInfo>
             </CardContent>
           </Card>
         </TabsContent>
