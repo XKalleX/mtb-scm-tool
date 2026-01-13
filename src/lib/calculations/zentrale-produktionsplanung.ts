@@ -269,7 +269,8 @@ export function generiereTagesproduktion(
       
       // ✅ Ist-Menge: IDENTISCH mit Plan-Menge (perfekte Ausführung ohne Störungen)
       // Szenarien können später Abweichungen einführen (Maschinenausfall, etc.)
-      // Für Basis-Plan: Ist = Plan (keine unnötigen Abweichungen)
+      // Für Basis-Plan: Ist = Plan (EXAKT! Keine künstliche Varianz)
+      // WICHTIG: Durch Error Management ist planMenge bereits exakt auf Jahresproduktion abgestimmt
       istMenge = planMenge
     }
     
@@ -324,14 +325,64 @@ export function generiereTagesproduktion(
     tag.kumulativIst = kumulativIst
   })
   
-  // ✅ VALIDIERUNG
-  const summePlan = result.reduce((sum, tag) => sum + tag.planMenge, 0)
-  const summeIst = result.reduce((sum, tag) => sum + tag.istMenge, 0)
+  // ✅ VALIDIERUNG & FINALE KORREKTUR
+  let summePlan = result.reduce((sum, tag) => sum + tag.planMenge, 0)
+  let summeIst = result.reduce((sum, tag) => sum + tag.istMenge, 0)
   
-  if (Math.abs(summePlan - konfiguration.jahresproduktion) > 10) {
-    console.warn(`⚠️ WARNUNG: Plan-Menge weicht mehr als 10 Bikes von Jahresproduktion ab!`)
-    console.warn(`   Soll: ${konfiguration.jahresproduktion}, Ist: ${summePlan}, Diff: ${summePlan - konfiguration.jahresproduktion}`)
+  const differenz = summePlan - konfiguration.jahresproduktion
+  
+  if (differenz !== 0) {
+    // ⚠️ Finale Korrektur: Verteile Differenz intelligent auf Arbeitstage
+    console.warn(`⚠️ FINALE KORREKTUR: Summendifferenz ${differenz} Bikes wird korrigiert`)
+    
+    // Finde Arbeitstage mit höchster Produktion (am flexibelsten für Anpassung)
+    const arbeitstage = result.filter(t => t.istArbeitstag)
+    
+    // Sortiere nach Plan-Menge (höchste zuerst) für gleichmäßigere Verteilung
+    arbeitstage.sort((a, b) => b.planMenge - a.planMenge)
+    
+    let verbleibendeKorrektur = Math.abs(differenz)
+    const korrekturRichtung = differenz > 0 ? -1 : +1 // Zu viel → -1, zu wenig → +1
+    
+    // Verteile Korrektur auf mehrere Tage (max. 1 pro Tag für gleichmäßige Verteilung)
+    for (let i = 0; i < arbeitstage.length && verbleibendeKorrektur > 0; i++) {
+      const tag = arbeitstage[i]
+      
+      // Korrigiere sowohl Plan als auch Ist (bleiben identisch!)
+      tag.planMenge += korrekturRichtung
+      tag.istMenge += korrekturRichtung
+      tag.abweichung = 0 // Bleibt 0, da Ist = Plan
+      
+      verbleibendeKorrektur--
+      
+      // Update kumulative Werte für alle folgenden Tage
+      const tagIndex = result.findIndex(t => t.tag === tag.tag)
+      for (let j = tagIndex; j < result.length; j++) {
+        result[j].kumulativPlan += korrekturRichtung
+        result[j].kumulativIst += korrekturRichtung
+      }
+    }
+    
+    // Re-Berechnung nach Korrektur
+    summePlan = result.reduce((sum, tag) => sum + tag.planMenge, 0)
+    summeIst = result.reduce((sum, tag) => sum + tag.istMenge, 0)
+    
+    console.log(`✓ Nach Korrektur: Plan=${summePlan.toLocaleString('de-DE')}, Ist=${summeIst.toLocaleString('de-DE')} (Ziel: ${konfiguration.jahresproduktion.toLocaleString('de-DE')})`)
   }
+  
+  // ✅ FINALE VALIDIERUNG: MUSS exakt sein!
+  if (summePlan !== konfiguration.jahresproduktion) {
+    console.error(`❌ KRITISCHER FEHLER: Plan-Menge = ${summePlan}, Soll = ${konfiguration.jahresproduktion}, Differenz = ${summePlan - konfiguration.jahresproduktion} Bikes!`)
+    throw new Error(`Error Management fehlgeschlagen: Jahresproduktion weicht um ${summePlan - konfiguration.jahresproduktion} Bikes ab!`)
+  }
+  
+  if (summeIst !== konfiguration.jahresproduktion) {
+    console.error(`❌ KRITISCHER FEHLER: Ist-Menge = ${summeIst}, Soll = ${konfiguration.jahresproduktion}, Differenz = ${summeIst - konfiguration.jahresproduktion} Bikes!`)
+    throw new Error(`Ist-Produktion fehlerhaft: Weicht um ${summeIst - konfiguration.jahresproduktion} Bikes ab!`)
+  }
+  
+  console.log(`✅ VALIDIERUNG ERFOLGREICH: Plan=${summePlan.toLocaleString('de-DE')}, Ist=${summeIst.toLocaleString('de-DE')} = Jahresproduktion=${konfiguration.jahresproduktion.toLocaleString('de-DE')} Bikes (100,00% Exakt!)`)
+  
   
   return result
 }
