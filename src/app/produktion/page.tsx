@@ -22,6 +22,7 @@ import { formatNumber } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
+import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { useMemo } from 'react'
 import { 
   generiereTagesproduktion, 
@@ -126,6 +127,9 @@ export default function ProduktionPage() {
           </Button>
         </div>
       </div>
+
+      {/* Aktive Szenarien Banner */}
+      <ActiveScenarioBanner showDetails={false} />
 
       {/* Übersicht Cards */}
       <div className="grid gap-4 md:grid-cols-4">

@@ -30,6 +30,7 @@ import { exportToCSV, exportToJSON } from '@/lib/export'
 import { showError, showSuccess } from '@/lib/notifications'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { useSzenarien } from '@/contexts/SzenarienContext'
+import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import React, { useState, useMemo } from 'react'
 import { 
   generiereAlleVariantenProduktionsplaene,
@@ -145,6 +146,9 @@ export default function OEMProgrammPage() {
           </Button>
         </div>
       </div>
+
+      {/* Aktive Szenarien Banner */}
+      <ActiveScenarioBanner showDetails={false} />
 
       {/* Szenarien-Warnung */}
       {aktiveSzenarien.length > 0 && (
@@ -734,16 +738,16 @@ export default function OEMProgrammPage() {
               </div>
 
               {/* Erklärung */}
-              <CollapsibleInfo
-                title="Ansicht-Erklärung: Alle Varianten gleichzeitig"
-                variant="info"
-                className="mb-4"
-              >
-                <div className="text-sm text-blue-800 space-y-2">
-                  <p>
-                    Diese Ansicht zeigt die Tagesproduktion <strong>aller 8 MTB-Varianten</strong> in einer kompakten Tabelle.
-                  </p>
-                  <p>
+              <div className="mb-4">
+                <CollapsibleInfo
+                  title="Ansicht-Erklärung: Alle Varianten gleichzeitig"
+                  variant="info"
+                >
+                  <div className="text-sm text-blue-800 space-y-2">
+                    <p>
+                      Diese Ansicht zeigt die Tagesproduktion <strong>aller 8 MTB-Varianten</strong> in einer kompakten Tabelle.
+                    </p>
+                    <p>
                     <strong>Pro Tag sehen Sie:</strong>
                   </p>
                   <ul className="list-disc list-inside ml-2 space-y-1">
@@ -757,6 +761,7 @@ export default function OEMProgrammPage() {
                   </p>
                 </div>
               </CollapsibleInfo>
+              </div>
 
               {/* Alle-Varianten Tabelle */}
               {produktionsplaene && (() => {

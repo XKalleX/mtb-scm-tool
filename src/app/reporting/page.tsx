@@ -23,12 +23,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { TrendingUp, TrendingDown, Minus, BarChart3, Download, Filter, Maximize2, Zap } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, BarChart3, Download, Filter, Maximize2 } from 'lucide-react'
 import { formatNumber, formatPercent } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useSzenarien } from '@/contexts/SzenarienContext'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
+import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { 
   berechneGesamtMetriken,
   berechneGesamtMetrikenMitKonfig,
@@ -172,22 +173,8 @@ export default function ReportingPage() {
         </div>
       </div>
 
-      {/* Aktive Szenarien Hinweis */}
-      {aktiveSzenarien.length > 0 && (
-        <Card className="border-green-200 bg-green-50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-green-600" />
-              <CardTitle className="text-green-900 text-lg">
-                Live-Berechnung mit {aktiveSzenarien.length} aktiven Szenario(s)
-              </CardTitle>
-            </div>
-            <CardDescription className="text-green-700">
-              Alle Metriken werden dynamisch unter Berücksichtigung der Szenarien berechnet
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
+      {/* Aktive Szenarien Banner */}
+      <ActiveScenarioBanner showDetails={true} />
 
       {/* Tabs für Metriken und Charts */}
       <Tabs value={selectedView} onValueChange={(v: any) => setSelectedView(v)}>

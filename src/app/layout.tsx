@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Link from 'next/link'
-import { Package, LineChart, Download, Factory, BarChart3, Zap } from 'lucide-react'
+import { Package, LineChart, Download, Factory, BarChart3 } from 'lucide-react'
 import { SzenarienProvider } from '@/contexts/SzenarienContext'
 import { KonfigurationProvider } from '@/contexts/KonfigurationContext'
 import { SzenarienFloatingButton } from '@/components/SzenarienSidebar'
@@ -54,7 +54,7 @@ export default function RootLayout({
                 <NavLink href="/inbound" icon={<Download />} label="Inbound China" />
                 <NavLink href="/produktion" icon={<Factory />} label="Produktion" />
                 <NavLink href="/reporting" icon={<BarChart3 />} label="Reporting" />
-                <NavLink href="/szenarien" icon={<Zap />} label="Szenarien" />
+                {/* Szenarien nur über Sidebar (Floating Button) erreichbar - keine eigene Seite mehr */}
               </div>
             </div>
           </nav>

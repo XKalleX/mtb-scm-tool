@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Standard-Werte für Szenarien im MTB Supply Chain Management System. Diese Werte sind Vorschläge und können vom Nutzer beliebig angepasst werden.",
+  "version": "1.0.0",
+  "lastUpdated": "2027-01-13",
+  "szenarien": {
+    "marketingaktion": {
+      "id": "marketingaktion",
+      "name": "Marketingaktion",
+      "beschreibung": "Nachfrageerhöhung durch erfolgreiche Marketing-Kampagne",
+      "standardParameter": {
+        "startKW": 28,
+        "dauerWochen": 4,
+        "erhoehungProzent": 20
+      },
+      "parameterDefinitionen": {
+        "startKW": {
+          "label": "Start Kalenderwoche",
+          "typ": "number",
+          "einheit": "KW",
+          "min": 1,
+          "max": 52,
+          "beschreibung": "Kalenderwoche in der die Marketingaktion startet"
+        },
+        "dauerWochen": {
+          "label": "Dauer (Wochen)",
+          "typ": "number",
+          "einheit": "Wochen",
+          "min": 1,
+          "max": 12,
+          "beschreibung": "Anzahl der Wochen, die die Marketingaktion läuft"
+        },
+        "erhoehungProzent": {
+          "label": "Nachfrage-Erhöhung (%)",
+          "typ": "number",
+          "einheit": "%",
+          "min": 5,
+          "max": 50,
+          "beschreibung": "Prozentuale Erhöhung der Nachfrage während der Kampagne"
+        }
+      },
+      "beispiel": "Zeitschrift 'Mountain Biker' Sonderausgabe erhöht Nachfrage für alle MTB-Varianten um 20% über 4 Wochen"
+    },
+    "maschinenausfall": {
+      "id": "maschinenausfall",
+      "name": "China Produktionsausfall",
+      "beschreibung": "Produktionsstörung beim China-Lieferanten (alle Komponenten betroffen)",
+      "standardParameter": {
+        "startDatum": "2027-03-15",
+        "dauerTage": 7,
+        "reduktionProzent": 60
+      },
+      "parameterDefinitionen": {
+        "startDatum": {
+          "label": "Ausfall ab Datum",
+          "typ": "date",
+          "einheit": "Datum",
+          "min": "2027-01-01",
+          "max": "2027-12-31",
+          "beschreibung": "Datum an dem der Maschinenausfall beginnt"
+        },
+        "dauerTage": {
+          "label": "Dauer (Tage)",
+          "typ": "number",
+          "einheit": "Tage",
+          "min": 1,
+          "max": 30,
+          "beschreibung": "Anzahl der Tage, die die Produktion ausfällt"
+        },
+        "reduktionProzent": {
+          "label": "Produktions-Reduktion (%)",
+          "typ": "number",
+          "einheit": "%",
+          "min": 10,
+          "max": 100,
+          "beschreibung": "Prozentuale Reduktion der Produktionskapazität"
+        }
+      },
+      "beispiel": "Produktionsstörung in China - ALLE Komponenten betroffen (Rahmen, Gabeln, Sättel)"
+    },
+    "wasserschaden": {
+      "id": "wasserschaden",
+      "name": "Transport-Schaden",
+      "beschreibung": "Container-Verlust auf Seefracht von China nach Deutschland",
+      "standardParameter": {
+        "datum": "2027-02-20",
+        "verlustMenge": 1000,
+        "betroffeneTeile": "Gemischte Komponenten aus China"
+      },
+      "parameterDefinitionen": {
+        "datum": {
+          "label": "Datum des Ereignisses",
+          "typ": "date",
+          "einheit": "Datum",
+          "min": "2027-01-01",
+          "max": "2027-12-31",
+          "beschreibung": "Datum an dem der Transport-Schaden auftritt"
+        },
+        "verlustMenge": {
+          "label": "Verlorene Menge (Stück)",
+          "typ": "number",
+          "einheit": "Stück",
+          "min": 100,
+          "max": 10000,
+          "beschreibung": "Anzahl der verlorenen Komponenten"
+        },
+        "betroffeneTeile": {
+          "label": "Betroffene Teile",
+          "typ": "text",
+          "einheit": "",
+          "beschreibung": "Beschreibung welche Teile betroffen sind"
+        }
+      },
+      "beispiel": "Sturm auf See - Container geht auf Seefracht China → Deutschland verloren"
+    },
+    "schiffsverspaetung": {
+      "id": "schiffsverspaetung",
+      "name": "Schiffsverspätung",
+      "beschreibung": "Verzögerung der Seefracht China → Hamburg/Bremerhaven",
+      "standardParameter": {
+        "ursprungAnkunft": "2027-02-16",
+        "verspaetungTage": 4,
+        "neueAnkunft": "2027-02-20"
+      },
+      "parameterDefinitionen": {
+        "ursprungAnkunft": {
+          "label": "Geplante Ankunft",
+          "typ": "date",
+          "einheit": "Datum",
+          "min": "2027-01-01",
+          "max": "2027-12-31",
+          "beschreibung": "Original geplantes Ankunftsdatum des Schiffs"
+        },
+        "verspaetungTage": {
+          "label": "Verspätung (Tage)",
+          "typ": "number",
+          "einheit": "Tage",
+          "min": 1,
+          "max": 14,
+          "beschreibung": "Anzahl der Tage Verspätung"
+        },
+        "neueAnkunft": {
+          "label": "Neue Ankunft",
+          "typ": "date",
+          "einheit": "Datum",
+          "min": "2027-01-01",
+          "max": "2027-12-31",
+          "beschreibung": "Neues geschätztes Ankunftsdatum"
+        }
+      },
+      "beispiel": "Schiff verspätet sich um 4 Tage - Seefracht von China nach Hamburg/Bremerhaven"
+    }
+  },
+  "meta": {
+    "quelle": "kontext/Spezifikation_SSOT_MR.ts",
+    "anforderungen": ["A2", "A4", "A8", "A9"],
+    "team": "Pascal Wagner, Da Yeon Kang, Shauna Ré Erfurth, Taha Wischmann",
+    "projekt": "HAW Hamburg WI3 - MTB Supply Chain Management"
+  }
+}
