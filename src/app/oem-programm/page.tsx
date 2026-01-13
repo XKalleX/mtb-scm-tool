@@ -615,44 +615,68 @@ export default function OEMProgrammPage() {
                         sumable: false
                       },
                       {
-                        key: 'sollMenge',
-                        label: 'Soll Bikes',
-                        width: '110px',
+                        key: 'sollDezimal',
+                        label: 'Soll (Dezimal)',
+                        width: '120px',
                         align: 'right',
-                        formula: '(Jahresprod / AT) × Saison',
+                        formula: 'Monatsmenge / Arbeitstage',
                         format: (val) => formatNumber(val, 2),
                         sumable: true
                       },
                       {
-                        key: 'istMenge',
-                        label: 'Ist Bikes',
-                        width: '100px',
+                        key: 'planMenge',
+                        label: 'Plan (Gerundet)',
+                        width: '130px',
                         align: 'right',
-                        formula: 'RUNDEN(Soll + Error)',
+                        formula: 'RUNDEN(Soll + MonatsFehler)',
                         format: (val) => formatNumber(val, 0),
                         sumable: true
                       },
                       {
-                        key: 'sattelBedarf',
-                        label: `Sättel (${sattel?.name || 'N/A'})`,
-                        width: '140px',
-                        align: 'right',
-                        formula: 'Ist Bikes × 1',
-                        format: (val) => formatNumber(val, 0) + ' Stück',
-                        sumable: true
-                      },
-                      {
-                        key: 'kumulierterError',
-                        label: 'Kum. Error',
+                        key: 'tagesError',
+                        label: 'Tages-Error',
                         width: '110px',
                         align: 'right',
-                        formula: 'Kum. Ist - Kum. Plan',
-                        format: (val) => formatNumber(val, 2), // 2 Dezimalstellen für Bikes-Differenz
+                        formula: 'Soll(Dez) - Plan(Int)',
+                        format: (val) => {
+                          const formatted = formatNumber(val, 3)
+                          return val > 0 ? `+${formatted}` : formatted
+                        },
                         sumable: false
                       },
                       {
-                        key: 'kumulativBikes',
-                        label: 'Kumulativ',
+                        key: 'monatsFehler',
+                        label: 'Monats-Error',
+                        width: '120px',
+                        align: 'right',
+                        formula: 'Kumuliert im Monat',
+                        format: (val) => {
+                          const formatted = formatNumber(val, 3)
+                          return val > 0 ? `+${formatted}` : formatted
+                        },
+                        sumable: false
+                      },
+                      {
+                        key: 'korrektur',
+                        label: 'Korrektur',
+                        width: '90px',
+                        align: 'center',
+                        formula: 'Error-Korrektur?',
+                        format: (val) => val ? '✓' : '-',
+                        sumable: false
+                      },
+                      {
+                        key: 'sattelBedarf',
+                        label: `Sättel`,
+                        width: '100px',
+                        align: 'right',
+                        formula: 'Plan × 1',
+                        format: (val) => formatNumber(val, 0),
+                        sumable: true
+                      },
+                      {
+                        key: 'kumulativPlan',
+                        label: 'Σ Plan',
                         width: '110px',
                         align: 'right',
                         format: (val) => formatNumber(val, 0),
@@ -660,7 +684,7 @@ export default function OEMProgrammPage() {
                       }
                     ]}
                     data={(() => {
-                      let kumulativ = 0
+                      let kumulativPlan = 0
                       return produktionsplaene[selectedVariante]?.tage
                         ?.filter(t => t.istMenge > 0)
                         .map(tag => {
@@ -671,18 +695,20 @@ export default function OEMProgrammPage() {
                           const firstThursday = new Date(thursday.getFullYear(), 0, 4)
                           const weekNumber = Math.ceil(((thursday.getTime() - firstThursday.getTime()) / 86400000 + 1) / 7)
                           
-                          kumulativ += tag.istMenge
+                          kumulativPlan += tag.planMenge
                           
                           return {
                             datum: date,
                             wochentag: date,
                             kw: weekNumber,
                             monat: tag.monatName,
-                            sollMenge: tag.planMenge,
-                            istMenge: tag.istMenge,
-                            sattelBedarf: tag.istMenge, // 1:1 Verhältnis
-                            kumulierterError: tag.kumulativIst - tag.kumulativPlan, // ✅ KORREKTUR: Absoluter Fehler, nicht Prozent
-                            kumulativBikes: kumulativ
+                            sollDezimal: tag.sollProduktionDezimal,
+                            planMenge: tag.planMenge,
+                            tagesError: tag.tagesError,
+                            monatsFehler: tag.monatsFehlerNachher,
+                            korrektur: tag.errorKorrekturAngewendet,
+                            sattelBedarf: tag.planMenge, // 1:1 Verhältnis
+                            kumulativPlan: kumulativPlan
                           }
                         }) || []
                     })()}
@@ -833,11 +859,10 @@ export default function OEMProgrammPage() {
                     )
                     
                     if (tag) {
-                      row[`${v.id}_menge`] = tag.istMenge
-                      // Kumulativer Error = kumulativIst - kumulativPlan
-                      const kumError = tag.kumulativIst - tag.kumulativPlan
-                      row[`${v.id}_error`] = kumError
-                      gesamt += tag.istMenge
+                      row[`${v.id}_menge`] = tag.planMenge
+                      // ✅ KORRIGIERT: Monatlicher Error-Tracker (sollte ±0.5 bleiben!)
+                      row[`${v.id}_error`] = tag.monatsFehlerNachher
+                      gesamt += tag.planMenge
                     } else {
                       row[`${v.id}_menge`] = 0
                       row[`${v.id}_error`] = 0
@@ -853,7 +878,7 @@ export default function OEMProgrammPage() {
                   <div className="border rounded-lg overflow-hidden">
                     <div className="bg-slate-50 p-3 border-b">
                       <h4 className="font-semibold text-sm">
-                        Legende: <span className="text-muted-foreground font-normal">Menge = Ist-Produktion | Error = Kumulativer Fehler (sollte nahe 0 bleiben)</span>
+                        Legende: <span className="text-muted-foreground font-normal">Bikes = Plan-Produktion | Error = Monatlicher Error-Tracker (±0.5 = optimal)</span>
                       </h4>
                     </div>
                     <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
@@ -905,13 +930,16 @@ export default function OEMProgrammPage() {
                             <td className="p-2" colSpan={2}>JAHRESSUMME</td>
                             {konfiguration.varianten.map(v => {
                               const plan = produktionsplaene[v.id]
-                              const summe = plan?.tage.reduce((sum, t) => sum + t.istMenge, 0) || 0
-                              const finalError = plan ? plan.tage[plan.tage.length - 1].kumulativIst - plan.tage[plan.tage.length - 1].kumulativPlan : 0
+                              const summe = plan?.tage.reduce((sum, t) => sum + t.planMenge, 0) || 0
+                              // Letzter Monatsfehler des Jahres (Dezember)
+                              const finalError = plan && plan.tage.length > 0 
+                                ? plan.tage.filter(t => t.istArbeitstag).slice(-1)[0]?.monatsFehlerNachher || 0
+                                : 0
                               
                               return (
                                 <React.Fragment key={`${v.id}-sum`}>
                                   <td className="p-2 text-right border-l">{formatNumber(summe, 0)}</td>
-                                  <td className="p-2 text-right">{formatNumber(finalError, 2)}</td>
+                                  <td className="p-2 text-right">{formatNumber(finalError, 3)}</td>
                                 </React.Fragment>
                               )
                             })}
