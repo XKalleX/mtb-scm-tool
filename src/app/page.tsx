@@ -74,19 +74,6 @@ export default function Dashboard() {
 
   // Arbeitstage aus Konfiguration berechnen
   const arbeitstage = isInitialized ? getArbeitstageProJahr() : DEFAULT_ARBEITSTAGE_FALLBACK
-
-  // Spring Festival Daten aus Konfiguration
-  const springFestival = konfiguration.feiertage.filter(f => f.name.includes('Spring Festival'))
-  const springFestivalStart = springFestival.length > 0 ? springFestival[0].datum : '2027-01-28'
-  const springFestivalEnde = springFestival.length > 0 ? springFestival[springFestival.length - 1].datum : '2027-02-04'
-
-  // Vorlaufzeit aus Konfiguration (konfigurierbar durch Einstellungen)
-  // Transportsequenz: Produktion → LKW China → Schiff → LKW DE
-  // Feiertage werden berücksichtigt (siehe lib/kalender.ts)
-  const gesamtVorlaufzeit = konfiguration.lieferant.gesamtVorlaufzeitTage
-
-  // Peak-Monat aus Saisonalität ermitteln
-  const peakMonat = konfiguration.saisonalitaet.reduce((max, s) => s.anteil > max.anteil ? s : max)
   
   if (!isInitialized) {
     return <div className="text-center py-8">Lade Dashboard...</div>
@@ -153,21 +140,6 @@ export default function Dashboard() {
           trendUp={auswirkungen.materialverfuegbarkeit >= 95}
         />
       </div>
-
-      {/* Aktuelle Warnungen - dynamisch aus Konfiguration - COLLAPSIBLE */}
-      <CollapsibleInfo
-        title="Wichtige Hinweise"
-        variant="warning"
-        icon={<AlertTriangle className="h-5 w-5" />}
-        defaultOpen={false}
-      >
-        <ul className="space-y-2 text-sm text-orange-800">
-          <li>• Spring Festival China: <strong>{new Date(springFestivalStart).toLocaleDateString('de-DE')} - {new Date(springFestivalEnde).toLocaleDateString('de-DE')}</strong> ({springFestival.length} Tage Produktionsstopp)</li>
-          <li>• {peakMonat.name}-Peak: <strong>{peakMonat.anteil}%</strong> der Jahresproduktion (Kapazitätsplanung beachten)</li>
-          <li>• China-Vorlaufzeit: <strong>{gesamtVorlaufzeit} Tage ({Math.ceil(gesamtVorlaufzeit / 7)} Wochen)</strong> Sequenz: {konfiguration.lieferant.vorlaufzeitArbeitstage} AT Produktion → {konfiguration.lieferant.lkwTransportChinaArbeitstage} AT LKW → {konfiguration.lieferant.vorlaufzeitKalendertage} KT Schiff → {konfiguration.lieferant.lkwTransportDeutschlandArbeitstage} AT LKW</li>
-          <li>• Losgröße Sättel: <strong>{formatNumber(konfiguration.lieferant.losgroesse, 0)} Stück</strong> (Mindestbestellung)</li>
-        </ul>
-      </CollapsibleInfo>
 
       {/* Aktive Szenarien Status - COLLAPSIBLE */}
       {aktiveSzenarien.length > 0 && (
