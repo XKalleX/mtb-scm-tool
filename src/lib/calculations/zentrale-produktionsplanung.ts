@@ -247,19 +247,30 @@ export function generiereTagesproduktion(
         monatlicheFehlerTracker[monat] = fehler
       }
       
-      // Ist-Menge: Im Optimalfall = Plan-Menge
-      // (Kann durch Szenarien abweichen)
-      istMenge = planMenge
+      // ✅ Ist-Menge: Realistische Produktionsschwankungen
+      // Natürliche Varianz von ±0,5% bis ±1,5% (sehr klein, aber realistisch)
+      // Verwendet deterministischen Seed basierend auf Tag für Konsistenz
+      const seed = (tag * 7 + monat * 13) % 100
+      const varianzFaktor = 1.0 + (Math.sin(seed) * 0.015) // ±1,5% max
+      istMenge = Math.round(planMenge * varianzFaktor)
+      
+      // Sicherstellen dass Ist-Menge nicht negativ wird
+      istMenge = Math.max(0, istMenge)
     }
     
     const abweichung = istMenge - planMenge
     const materialVerfuegbar = istArbeitstag
-    const auslastung = planMenge > 0 ? (istMenge / planMenge) * 100 : 0
     
+    // ✅ KAPAZITÄTSAUSLASTUNG KORREKT BERECHNEN
+    // Auslastung = Ist-Produktion / Maximale Kapazität (nicht Plan!)
     const kapazitaetProSchicht = 
       konfiguration.produktion.kapazitaetProStunde * 
       konfiguration.produktion.stundenProSchicht
     const schichten = istArbeitstag ? Math.ceil(istMenge / kapazitaetProSchicht) : 0
+    
+    // Maximale Kapazität = Anzahl Schichten × Kapazität pro Schicht
+    const maxKapazitaet = schichten > 0 ? schichten * kapazitaetProSchicht : 0
+    const auslastung = maxKapazitaet > 0 ? (istMenge / maxKapazitaet) * 100 : 0
     
     result.push({
       tag,
