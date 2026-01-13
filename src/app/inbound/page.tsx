@@ -100,11 +100,19 @@ export default function InboundPage() {
       const monat = i + 1
       // Bestelldatum: 5. Tag des Monats
       const bestelldatumObj = new Date(konfiguration.planungsjahr, monat - 1, 5)
-      const bestelldatum = bestelldatumObj.toISOString().split('T')[0]
+      
+      // Validierung: Prüfe ob Datum gültig ist
+      const bestelldatum = isNaN(bestelldatumObj.getTime()) 
+        ? `${konfiguration.planungsjahr}-${String(monat).padStart(2, '0')}-05`
+        : bestelldatumObj.toISOString().split('T')[0]
       
       // Lieferdatum: Bestelldatum + Vorlaufzeit (korrekte Addition mit addDays)
       const lieferdatumObj = addDays(bestelldatumObj, gesamtVorlaufzeit)
-      const lieferdatum = lieferdatumObj.toISOString().split('T')[0]
+      
+      // Validierung: Prüfe ob Datum gültig ist
+      const lieferdatum = isNaN(lieferdatumObj.getTime())
+        ? '-'
+        : lieferdatumObj.toISOString().split('T')[0]
       
       // Menge basierend auf Saisonalität aus Konfiguration
       const saisonAnteil = konfiguration.saisonalitaet[i]?.anteil || 8.33
@@ -278,7 +286,7 @@ export default function InboundPage() {
             </p>
             <div className="space-y-2">
               <p>
-                <strong>Zeitraum:</strong> {new Date(springFestival[0]?.datum).toLocaleDateString('de-DE')} - {new Date(springFestival[springFestival.length - 1]?.datum).toLocaleDateString('de-DE')}
+                <strong>Zeitraum:</strong> {springFestival[0]?.datum ? new Date(springFestival[0].datum).toLocaleDateString('de-DE') : '-'} - {springFestival[springFestival.length - 1]?.datum ? new Date(springFestival[springFestival.length - 1].datum).toLocaleDateString('de-DE') : '-'}
               </p>
               <p>
                 <strong>Auswirkung:</strong> Keine Produktion, keine Bestellungsbearbeitung
@@ -291,11 +299,15 @@ export default function InboundPage() {
             <div>
               <h4 className="font-semibold mb-2">Betroffene Feiertage:</h4>
               <div className="grid gap-2 md:grid-cols-2">
-                {springFestival.map(f => (
-                  <div key={f.datum} className="text-sm bg-white rounded px-2 py-1 border border-orange-200">
-                    {new Date(f.datum).toLocaleDateString('de-DE')}: {f.name}
-                  </div>
-                ))}
+                {springFestival.map((f, idx) => {
+                  const datum = f.datum ? new Date(f.datum) : null
+                  const datumStr = datum && !isNaN(datum.getTime()) ? datum.toLocaleDateString('de-DE') : '-'
+                  return (
+                    <div key={`spring-${idx}-${f.name}`} className="text-sm bg-white rounded px-2 py-1 border border-orange-200">
+                      {datumStr}: {f.name}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -469,7 +481,12 @@ export default function InboundPage() {
                   label: 'Bestelldatum',
                   width: '110px',
                   align: 'center',
-                  format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE') : val,
+                  format: (val) => {
+                    if (val instanceof Date && !isNaN(val.getTime())) {
+                      return val.toLocaleDateString('de-DE')
+                    }
+                    return val || '-'
+                  },
                   sumable: false
                 },
                 {
@@ -485,7 +502,12 @@ export default function InboundPage() {
                   label: 'Bedarfsdatum',
                   width: '110px',
                   align: 'center',
-                  format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE') : val,
+                  format: (val) => {
+                    if (val instanceof Date && !isNaN(val.getTime())) {
+                      return val.toLocaleDateString('de-DE')
+                    }
+                    return val || '-'
+                  },
                   sumable: false
                 },
                 {
@@ -521,7 +543,12 @@ export default function InboundPage() {
                   label: 'Ankunft',
                   width: '110px',
                   align: 'center',
-                  format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE') : val,
+                  format: (val) => {
+                    if (val instanceof Date && !isNaN(val.getTime())) {
+                      return val.toLocaleDateString('de-DE')
+                    }
+                    return val || '-'
+                  },
                   sumable: false
                 },
                 {
@@ -538,13 +565,14 @@ export default function InboundPage() {
                 }
               ]}
               data={taeglicheBestellungen.map((b, idx) => {
-                const bestelldatum = new Date(b.bestelldatum)
-                const bedarfsdatum = new Date(b.bedarfsdatum)
-                const erwarteteAnkunft = new Date(b.erwarteteAnkunft)
+                // Sichere Date-Konvertierung mit Validierung
+                const bestelldatum = b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum)
+                const bedarfsdatum = b.bedarfsdatum instanceof Date ? b.bedarfsdatum : new Date(b.bedarfsdatum)
+                const erwarteteAnkunft = b.erwarteteAnkunft instanceof Date ? b.erwarteteAnkunft : new Date(b.erwarteteAnkunft)
                 
-                // Berechne Vorlaufzeit in Tagen
+                // Berechne Vorlaufzeit in Tagen (mit Validierung für ungültige Daten)
                 const vorlaufzeitMs = erwarteteAnkunft.getTime() - bestelldatum.getTime()
-                const vorlaufzeitTage = Math.round(vorlaufzeitMs / (1000 * 60 * 60 * 24))
+                const vorlaufzeitTage = isNaN(vorlaufzeitMs) ? 0 : Math.round(vorlaufzeitMs / (1000 * 60 * 60 * 24))
                 
                 // Berechne Gesamtmenge
                 const menge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
@@ -608,7 +636,12 @@ export default function InboundPage() {
               title="Vorlaufzeit Berechnung"
               formula={`Vorlaufzeit = ${lieferant.vorlaufzeitArbeitstage} AT (Produktion) + ${lieferant.lkwTransportChinaArbeitstage} AT (LKW China) + ${lieferant.vorlaufzeitKalendertage} KT (Seefracht) + ${lieferant.lkwTransportDeutschlandArbeitstage} AT (LKW DE) = ${gesamtVorlaufzeit} Tage (${Math.ceil(gesamtVorlaufzeit / 7)} Wochen)`}
               description={`Sequenz: 1. Produktion (${lieferant.vorlaufzeitArbeitstage} AT) → 2. LKW China→Hafen (${lieferant.lkwTransportChinaArbeitstage} AT) → 3. Seefracht (${lieferant.vorlaufzeitKalendertage} KT) → 4. LKW Hamburg→Werk (${lieferant.lkwTransportDeutschlandArbeitstage} AT). Reihenfolge wichtig für Feiertagsberechnung!`}
-              example={`Bestellung 05.01. → Lieferung ~${addDays(new Date(konfiguration.planungsjahr, 0, 5), gesamtVorlaufzeit).toLocaleDateString('de-DE')} (${gesamtVorlaufzeit} Tage später)`}
+              example={(() => {
+                const beispielDatum = new Date(konfiguration.planungsjahr, 0, 5)
+                const lieferdatum = addDays(beispielDatum, gesamtVorlaufzeit)
+                const lieferdatumStr = !isNaN(lieferdatum.getTime()) ? lieferdatum.toLocaleDateString('de-DE') : '-'
+                return `Bestellung 05.01. → Lieferung ~${lieferdatumStr} (${gesamtVorlaufzeit} Tage später)`
+              })()}
             />
             <FormulaCard
               title="Losgrößen-Aufrundung"
@@ -633,7 +666,10 @@ export default function InboundPage() {
                 label: 'Bestelldatum',
                 width: '120px',
                 align: 'center',
-                format: (val) => new Date(val).toLocaleDateString('de-DE'),
+                format: (val) => {
+                  const date = new Date(val)
+                  return !isNaN(date.getTime()) ? date.toLocaleDateString('de-DE') : val
+                },
                 sumable: false
               },
               {
@@ -651,7 +687,10 @@ export default function InboundPage() {
                 width: '120px',
                 align: 'center',
                 formula: 'Bestelldatum + Vorlaufzeit',
-                format: (val) => new Date(val).toLocaleDateString('de-DE'),
+                format: (val) => {
+                  const date = new Date(val)
+                  return !isNaN(date.getTime()) ? date.toLocaleDateString('de-DE') : val
+                },
                 sumable: false
               },
               {
