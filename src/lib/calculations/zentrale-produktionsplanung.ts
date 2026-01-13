@@ -30,9 +30,16 @@ export interface TagesProduktionEntry {
   feiertagsName?: string         // Name des Feiertags
   
   // Produktion
+  sollProduktionDezimal: number  // Dezimale Soll-Produktion (z.B. 71.61)
   planMenge: number              // Ganzzahlige Plan-Menge (mit Error Mgmt)
   istMenge: number               // Tatsächliche Ist-Menge
   abweichung: number             // Differenz Ist - Plan
+  
+  // Error Management (KERN!)
+  tagesError: number             // Fehler dieses Tags (sollDezimal - planMenge)
+  monatsFehlerVorher: number     // Monatlicher Fehler vom Vortag
+  monatsFehlerNachher: number    // Monatlicher Fehler nach diesem Tag (sollte ±0.5 bleiben!)
+  errorKorrekturAngewendet: boolean  // Wurde auf-/abgerundet wegen Error?
   
   // Saisonalität
   saisonFaktor: number           // Monatlicher Anteil (0.04 - 0.16)
@@ -221,31 +228,44 @@ export function generiereTagesproduktion(
       monatlicheFehlerTracker[monat] = 0
     }
     
+    let sollProduktionDezimal = 0
     let planMenge = 0
     let istMenge = 0
+    let tagesError = 0
+    let monatsFehlerVorher = 0
+    let monatsFehlerNachher = 0
+    let errorKorrekturAngewendet = false
     
     if (istArbeitstag) {
       // ✅ PRODUKTIONSTAG mit ERROR MANAGEMENT
       
-      // Soll-Produktion: Monatliche Bikes / Arbeitstage im Monat
-      const sollProduktion = saisonInfo.bikes / saisonInfo.arbeitstage
+      // Soll-Produktion: Monatliche Bikes / Arbeitstage im Monat (DEZIMAL!)
+      sollProduktionDezimal = saisonInfo.bikes / saisonInfo.arbeitstage
       
       // Error Management: Kumulative Fehlerkorrektur
-      const fehler = monatlicheFehlerTracker[monat] + (sollProduktion - Math.round(sollProduktion))
+      monatsFehlerVorher = monatlicheFehlerTracker[monat]
+      const tagesErrorRoh = sollProduktionDezimal - Math.round(sollProduktionDezimal)
+      const fehlerGesamt = monatsFehlerVorher + tagesErrorRoh
       
-      if (fehler >= 0.5) {
-        // Aufrunden
-        planMenge = Math.ceil(sollProduktion)
-        monatlicheFehlerTracker[monat] = fehler - 1.0
-      } else if (fehler <= -0.5) {
-        // Abrunden
-        planMenge = Math.floor(sollProduktion)
-        monatlicheFehlerTracker[monat] = fehler + 1.0
+      if (fehlerGesamt >= 0.5) {
+        // Aufrunden weil Error zu groß
+        planMenge = Math.ceil(sollProduktionDezimal)
+        monatlicheFehlerTracker[monat] = fehlerGesamt - 1.0
+        errorKorrekturAngewendet = true
+      } else if (fehlerGesamt <= -0.5) {
+        // Abrunden weil Error zu klein
+        planMenge = Math.floor(sollProduktionDezimal)
+        monatlicheFehlerTracker[monat] = fehlerGesamt + 1.0
+        errorKorrekturAngewendet = true
       } else {
         // Normal runden
-        planMenge = Math.round(sollProduktion)
-        monatlicheFehlerTracker[monat] = fehler
+        planMenge = Math.round(sollProduktionDezimal)
+        monatlicheFehlerTracker[monat] = fehlerGesamt
+        errorKorrekturAngewendet = false
       }
+      
+      monatsFehlerNachher = monatlicheFehlerTracker[monat]
+      tagesError = sollProduktionDezimal - planMenge
       
       // ✅ Ist-Menge: Realistische Produktionsschwankungen
       // Natürliche Varianz von ±1,5% (sehr klein, aber realistisch)
@@ -281,9 +301,14 @@ export function generiereTagesproduktion(
       istArbeitstag,
       istFeiertag,
       feiertagsName,
+      sollProduktionDezimal,
       planMenge,
       istMenge,
       abweichung,
+      tagesError,
+      monatsFehlerVorher,
+      monatsFehlerNachher,
+      errorKorrekturAngewendet,
       saisonFaktor: saisonInfo.anteil,
       saisonMenge: saisonInfo.bikes,
       schichten,
