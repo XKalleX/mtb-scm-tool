@@ -19,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button'
 import { Ship, AlertTriangle, Package, Download } from 'lucide-react'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
-import { formatNumber } from '@/lib/utils'
+import { formatNumber, addDays } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
@@ -51,8 +51,13 @@ export default function InboundPage() {
   const lieferplanDaten = useMemo(() => {
     return Array.from({ length: 12 }, (_, i) => {
       const monat = i + 1
-      const bestelldatum = new Date(konfiguration.planungsjahr, monat - 1, 5).toISOString().split('T')[0]
-      const lieferdatum = new Date(konfiguration.planungsjahr, monat - 1, 5 + gesamtVorlaufzeit).toISOString().split('T')[0]
+      // Bestelldatum: 5. Tag des Monats
+      const bestelldatumObj = new Date(konfiguration.planungsjahr, monat - 1, 5)
+      const bestelldatum = bestelldatumObj.toISOString().split('T')[0]
+      
+      // Lieferdatum: Bestelldatum + Vorlaufzeit (korrekte Addition mit addDays)
+      const lieferdatumObj = addDays(bestelldatumObj, gesamtVorlaufzeit)
+      const lieferdatum = lieferdatumObj.toISOString().split('T')[0]
       
       // Menge basierend auf Saisonalität aus Konfiguration
       const saisonAnteil = konfiguration.saisonalitaet[i]?.anteil || 8.33
@@ -322,7 +327,7 @@ export default function InboundPage() {
               title="Vorlaufzeit Berechnung"
               formula={`Vorlaufzeit = ${lieferant.vorlaufzeitArbeitstage} AT (Produktion) + ${lieferant.lkwTransportChinaArbeitstage} AT (LKW China) + ${lieferant.vorlaufzeitKalendertage} KT (Seefracht) + ${lieferant.lkwTransportDeutschlandArbeitstage} AT (LKW DE) = ${gesamtVorlaufzeit} Tage (${Math.ceil(gesamtVorlaufzeit / 7)} Wochen)`}
               description={`Sequenz: 1. Produktion (${lieferant.vorlaufzeitArbeitstage} AT) → 2. LKW China→Hafen (${lieferant.lkwTransportChinaArbeitstage} AT) → 3. Seefracht (${lieferant.vorlaufzeitKalendertage} KT) → 4. LKW Hamburg→Werk (${lieferant.lkwTransportDeutschlandArbeitstage} AT). Reihenfolge wichtig für Feiertagsberechnung!`}
-              example={`Bestellung 05.01. → Lieferung ~${new Date(konfiguration.planungsjahr, 0, 5 + gesamtVorlaufzeit).toLocaleDateString('de-DE')} (${gesamtVorlaufzeit} Tage später)`}
+              example={`Bestellung 05.01. → Lieferung ~${addDays(new Date(konfiguration.planungsjahr, 0, 5), gesamtVorlaufzeit).toLocaleDateString('de-DE')} (${gesamtVorlaufzeit} Tage später)`}
             />
             <FormulaCard
               title="Losgrößen-Aufrundung"
