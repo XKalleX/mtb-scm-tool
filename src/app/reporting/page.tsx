@@ -132,11 +132,13 @@ export default function ReportingPage() {
     const metricsData = [
       { Kategorie: 'Reliability', Metrik: 'Planerfüllungsgrad', Wert: scorMetriken.planerfuellungsgrad, Einheit: '%' },
       { Kategorie: 'Reliability', Metrik: 'Liefertreue China', Wert: scorMetriken.liefertreueChina, Einheit: '%' },
+      { Kategorie: 'Reliability', Metrik: 'Lieferperformance', Wert: scorMetriken.deliveryPerformance, Einheit: '%' },
       { Kategorie: 'Responsiveness', Metrik: 'Durchlaufzeit Produktion', Wert: scorMetriken.durchlaufzeitProduktion, Einheit: 'Tage' },
       { Kategorie: 'Responsiveness', Metrik: 'Lagerumschlag', Wert: scorMetriken.lagerumschlag, Einheit: 'x/Jahr' },
+      { Kategorie: 'Responsiveness', Metrik: 'Planungsgenauigkeit', Wert: scorMetriken.forecastAccuracy, Einheit: '%' },
       { Kategorie: 'Agility', Metrik: 'Produktionsflexibilität', Wert: scorMetriken.produktionsflexibilitaet, Einheit: '%' },
       { Kategorie: 'Agility', Metrik: 'Materialverfügbarkeit', Wert: scorMetriken.materialverfuegbarkeit, Einheit: '%' },
-      { Kategorie: 'Assets', Metrik: 'Lagerbestandswert', Wert: scorMetriken.lagerbestandswert, Einheit: 'EUR' },
+      { Kategorie: 'Assets', Metrik: 'Lagerreichweite', Wert: scorMetriken.lagerreichweite, Einheit: 'Tage' },
       { Kategorie: 'Assets', Metrik: 'Kapitalbindung', Wert: scorMetriken.kapitalbindung, Einheit: 'Tage' }
     ]
     
@@ -247,6 +249,12 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               description="% pünktliche Lieferungen vom Lieferanten"
               status={getStatus(metriken.liefertreueChina, 95, 85)}
             />
+            <MetricRow
+              label="Lieferperformance"
+              value={formatPercent(metriken.deliveryPerformance, 1)}
+              description="% Lieferungen innerhalb der Vorlaufzeit (49 Tage)"
+              status={getStatus(metriken.deliveryPerformance, 90, 80)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -272,6 +280,12 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               value={`${formatNumber(metriken.lagerumschlag, 1)}x pro Jahr`}
               description="Wie oft wird Lager umgeschlagen"
               status={getStatus(metriken.lagerumschlag, 4, 2)}
+            />
+            <MetricRow
+              label="Planungsgenauigkeit"
+              value={formatPercent(metriken.forecastAccuracy, 1)}
+              description="Genauigkeit zwischen Plan und Ist"
+              status={getStatus(metriken.forecastAccuracy, 95, 90)}
             />
           </div>
         </CardContent>
@@ -303,21 +317,21 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
         </CardContent>
       </Card>
 
-      {/* ASSETS (Vermögenswerte) */}
+      {/* ASSETS (Anlagenverwaltung) */}
       <Card>
         <CardHeader>
-          <CardTitle>4. ASSETS (Vermögenswerte)</CardTitle>
+          <CardTitle>4. ASSETS (Anlagenverwaltung)</CardTitle>
           <CardDescription>
-            Kapitalbindung und Lagerwerte
+            Lagerreichweite und Bindungsdauer (keine Kosten)
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <MetricRow
-              label="Lagerbestandswert"
-              value={`${formatNumber(metriken.lagerbestandswert, 0)} €`}
-              description="Wert der gebundenen Komponenten"
-              status="neutral"
+              label="Lagerreichweite"
+              value={`${formatNumber(metriken.lagerreichweite, 1)} Tage`}
+              description="Wie lange reicht der aktuelle Lagerbestand"
+              status={getStatusRange(metriken.lagerreichweite, 7, 14, 20)}
             />
             <MetricRow
               label="Kapitalbindung"
@@ -398,6 +412,12 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               example="Bei 48 von 50 pünktlichen Lieferungen: (48 / 50) × 100% = 96,0%"
             />
             <FormulaCard
+              title="Lieferperformance (NEU)"
+              formula="Liefertreue × (1 - (Ist-Durchlaufzeit - Soll-Durchlaufzeit) / 100)"
+              description="Bewertet die Lieferqualität unter Berücksichtigung von Durchlaufzeit-Abweichungen. Kombiniert Pünktlichkeit mit Durchlaufzeit-Performance."
+              example="Bei 95% Liefertreue und +4 Tage Verzögerung: 95 × (1 - 4/100) = 91,2%"
+            />
+            <FormulaCard
               title="Durchlaufzeit Produktion"
               formula="Ø (Ankunftsdatum Komponenten - Bestelldatum)"
               description="Durchschnittliche Zeit von der Bestellung in China bis zur Ankunft im Werk. Beinhaltet Produktion (5 AT) und Transport (2 AT + 30 KT + 2 AT)."
@@ -408,6 +428,12 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               formula="Jahresproduktion (Bikes) / Durchschnittlicher Lagerbestand (Komponenten)"
               description="Zeigt, wie oft der Lagerbestand pro Jahr umgeschlagen wird. Hoher Wert = effiziente Lagerhaltung, wenig gebundenes Kapital."
               example="Bei 370.000 Bikes und Ø 92.500 Sätteln im Lager: 370.000 / 92.500 = 4,0x pro Jahr"
+            />
+            <FormulaCard
+              title="Planungsgenauigkeit (NEU)"
+              formula="100% - (Σ |Abweichung Plan-Ist| / Σ Plan) × 100%"
+              description="Misst die Genauigkeit der Produktionsplanung über alle Monate. Je höher, desto besser stimmen Plan und Ist überein."
+              example="Bei 5.000 Bikes Gesamtabweichung und 370.000 Plan: 100 - (5.000 / 370.000) × 100 = 98,6%"
             />
             <FormulaCard
               title="Produktionsflexibilität"
@@ -422,10 +448,16 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               example="Wenn an 350 von 365 Tagen Material verfügbar war: (350 / 365) × 100% = 95,9%"
             />
             <FormulaCard
+              title="Lagerreichweite"
+              formula="Durchschnittlicher Lagerbestand / Täglicher Verbrauch"
+              description="Anzahl Tage, die der aktuelle Lagerbestand reicht. Optimal: 7-14 Tage für Balance zwischen Sicherheit und Kapitalbindung."
+              example="Bei 14.200 Sätteln im Lager und 1.000 Verbrauch/Tag: 14.200 / 1.000 = 14,2 Tage"
+            />
+            <FormulaCard
               title="Kapitalbindung"
-              formula="(Durchschnittlicher Lagerbestand × Wert pro Stück × 365 Tage) / (Jahresproduktion × durchschn. Wert/Bike)"
-              description="Zeigt, wie viele Tage Kapital im Lager gebunden ist. Niedrigerer Wert = besserer Cashflow."
-              example="Bei Ø 92.500 Sätteln á 150€: (92.500 × 150 × 365) / (370.000 × 1.000) = 13,7 Tage"
+              formula="Durchschnittlicher Lagerbestand / Täglicher Verbrauch"
+              description="Durchschnittliche Lagerdauer in Tagen. Zeigt, wie lange Kapital gebunden ist. Niedriger Wert = besserer Cashflow."
+              example="Gleiche Berechnung wie Lagerreichweite: 14,2 Tage Kapitalbindung"
             />
           </div>
 
@@ -501,6 +533,14 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                 status: metriken.liefertreueChina >= 95 ? 'good' : metriken.liefertreueChina >= 85 ? 'medium' : 'bad'
               },
               {
+                kategorie: 'Reliability',
+                metrik: 'Lieferperformance',
+                istwert: formatPercent(metriken.deliveryPerformance, 1),
+                zielwert: '90,0 %',
+                zielerreichung: (metriken.deliveryPerformance / 90) * 100,
+                status: metriken.deliveryPerformance >= 90 ? 'good' : metriken.deliveryPerformance >= 80 ? 'medium' : 'bad'
+              },
+              {
                 kategorie: 'Responsiveness',
                 metrik: 'Durchlaufzeit',
                 istwert: `${metriken.durchlaufzeitProduktion} Tage`,
@@ -517,6 +557,14 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                 status: metriken.lagerumschlag >= 4 ? 'good' : 'medium'
               },
               {
+                kategorie: 'Responsiveness',
+                metrik: 'Planungsgenauigkeit',
+                istwert: formatPercent(metriken.forecastAccuracy, 1),
+                zielwert: '95,0 %',
+                zielerreichung: (metriken.forecastAccuracy / 95) * 100,
+                status: metriken.forecastAccuracy >= 95 ? 'good' : metriken.forecastAccuracy >= 90 ? 'medium' : 'bad'
+              },
+              {
                 kategorie: 'Agility',
                 metrik: 'Produktionsflexibilität',
                 istwert: formatPercent(metriken.produktionsflexibilitaet, 2),
@@ -531,6 +579,16 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                 zielwert: '95,0 %',
                 zielerreichung: (metriken.materialverfuegbarkeit / 95) * 100,
                 status: metriken.materialverfuegbarkeit >= 95 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Assets',
+                metrik: 'Lagerreichweite',
+                istwert: `${formatNumber(metriken.lagerreichweite, 1)} Tage`,
+                zielwert: '7-14 Tage',
+                zielerreichung: metriken.lagerreichweite >= 7 && metriken.lagerreichweite <= 14 ? 100 : 
+                                metriken.lagerreichweite <= 20 ? 80 : 60,
+                status: metriken.lagerreichweite >= 7 && metriken.lagerreichweite <= 14 ? 'good' : 
+                        metriken.lagerreichweite <= 20 ? 'medium' : 'bad'
               },
               {
                 kategorie: 'Assets',
@@ -599,6 +657,12 @@ function getStatus(value: number, goodThreshold: number, mediumThreshold: number
 function getStatusInverted(value: number, goodThreshold: number, mediumThreshold: number): 'good' | 'medium' | 'bad' {
   if (value <= goodThreshold) return 'good'
   if (value <= mediumThreshold) return 'medium'
+  return 'bad'
+}
+
+function getStatusRange(value: number, minGood: number, maxGood: number, maxMedium: number): 'good' | 'medium' | 'bad' {
+  if (value >= minGood && value <= maxGood) return 'good'
+  if (value <= maxMedium) return 'medium'
   return 'bad'
 }
 
