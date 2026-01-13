@@ -30,6 +30,7 @@ import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useSzenarien } from '@/contexts/SzenarienContext'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
+import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { 
   berechneGesamtMetriken,
   berechneGesamtMetrikenMitKonfig,
@@ -210,27 +211,22 @@ export default function ReportingPage() {
 function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaseline: boolean }) {
   return (
     <>
-      {/* SCOR Übersicht */}
-      <Card className={istBaseline ? "border-blue-200 bg-blue-50" : "border-green-200 bg-green-50"}>
-        <CardHeader>
-          <CardTitle className={istBaseline ? "text-blue-900" : "text-green-900"}>
-            SCOR-Framework {istBaseline ? '(Baseline)' : '(Mit Szenarien)'}
-          </CardTitle>
-          <CardDescription className={istBaseline ? "text-blue-700" : "text-green-700"}>
-            {istBaseline 
-              ? 'Baseline-Werte ohne aktive Szenarien'
-              : 'Dynamisch berechnete Werte mit aktiven Szenarien'}
-            {' - '}Fokus auf <strong>Reliability, Responsiveness, Agility, Costs und Assets</strong>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className={`text-sm ${istBaseline ? "text-blue-800" : "text-green-800"}`}>
-            {istBaseline 
-              ? 'Aktivieren Sie Szenarien um die Auswirkungen auf die Supply Chain zu sehen.'
-              : 'Alle Werte werden in Echtzeit basierend auf den aktiven Szenarien berechnet.'}
-          </p>
-        </CardContent>
-      </Card>
+      {/* SCOR Übersicht - COLLAPSIBLE */}
+      <CollapsibleInfo
+        title={`SCOR-Framework ${istBaseline ? '(Baseline)' : '(Mit Szenarien)'}`}
+        variant={istBaseline ? "info" : "success"}
+        icon={<BarChart3 className="h-5 w-5" />}
+        defaultOpen={false}
+      >
+        <p className={`text-sm ${istBaseline ? "text-blue-800" : "text-green-800"}`}>
+          {istBaseline 
+            ? 'Baseline-Werte ohne aktive Szenarien. Aktivieren Sie Szenarien um die Auswirkungen auf die Supply Chain zu sehen.'
+            : 'Alle Werte werden in Echtzeit basierend auf den aktiven Szenarien berechnet.'}
+        </p>
+        <p className={`text-sm ${istBaseline ? "text-blue-800" : "text-green-800"} mt-2`}>
+          Fokus auf <strong>Reliability, Responsiveness, Agility, Costs und Assets</strong>
+        </p>
+      </CollapsibleInfo>
 
       {/* RELIABILITY (Zuverlässigkeit) */}
       <Card>

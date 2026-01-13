@@ -188,23 +188,20 @@ export default function ProduktionPage() {
         </Card>
       </div>
 
-      {/* Produktionslogik ohne Solver */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardHeader>
-          <div className="flex items-center space-x-2">
-            <Factory className="h-5 w-5 text-blue-600" />
-            <CardTitle className="text-blue-900">Produktionslogik (ohne Solver)</CardTitle>
-          </div>
-          <CardDescription className="text-blue-700">
-            Einfache First-Come-First-Serve Regel statt mathematischer Optimierung
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <CollapsibleInfo
-            title="FCFS-Regel (First-Come-First-Serve)"
-            variant="info"
-            icon={<Factory className="h-4 w-4" />}
-          >
+      {/* Produktionslogik ohne Solver - COLLAPSIBLE */}
+      <CollapsibleInfo
+        title="Produktionslogik (ohne Solver)"
+        variant="info"
+        icon={<Factory className="h-5 w-5" />}
+        defaultOpen={false}
+      >
+        <p className="text-sm text-blue-700 mb-4">
+          Einfache First-Come-First-Serve Regel statt mathematischer Optimierung
+        </p>
+        
+        <div className="space-y-4">
+          <div>
+            <h4 className="font-semibold text-blue-900 mb-2">FCFS-Regel (First-Come-First-Serve)</h4>
             <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
               <li>
                 <strong>Schritt 1: ATP-Check</strong> - Prüfe für jeden Produktionsauftrag: 
@@ -220,21 +217,19 @@ export default function ProduktionPage() {
                 <strong>Keine Optimierung:</strong> Kein Solver, keine Prioritäten nach Deckungsbeitrag
               </li>
             </ol>
-          </CollapsibleInfo>
+          </div>
 
-          <CollapsibleInfo
-            title="ATP-Check (Available-to-Promise)"
-            variant="info"
-          >
+          <div className="border-t border-blue-200 pt-4">
+            <h4 className="font-semibold text-blue-900 mb-2">ATP-Check (Available-to-Promise)</h4>
             <p className="text-sm text-blue-800">
               Für jede Komponente in der Stückliste wird geprüft:<br/>
-              <code className="bg-blue-100 px-2 py-1 rounded">
+              <code className="bg-blue-100 px-2 py-1 rounded mt-2 inline-block">
                 Verfügbar im Lager ≥ Benötigt für Auftrag
               </code>
             </p>
-          </CollapsibleInfo>
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      </CollapsibleInfo>
 
       {/* SEKTION 1: PRODUKTIONSSTEUERUNG */}
       <Card className="border-purple-200 bg-purple-50">

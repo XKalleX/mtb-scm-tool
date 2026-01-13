@@ -150,29 +150,28 @@ export default function OEMProgrammPage() {
       {/* Aktive Szenarien Banner */}
       <ActiveScenarioBanner showDetails={false} />
 
-      {/* Szenarien-Warnung */}
+      {/* Szenarien-Warnung - COLLAPSIBLE */}
       {aktiveSzenarien.length > 0 && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-orange-900">Aktive Szenarien</h3>
-                <p className="text-sm text-orange-800 mt-1">
-                  {aktiveSzenarien.length} Szenario(en) aktiv. Die Produktionsplanung berücksichtigt momentan noch keine Szenarien.
-                  Dies wird in einer zukünftigen Version implementiert.
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {aktiveSzenarien.map(s => (
-                    <span key={s.id} className="text-xs bg-orange-200 text-orange-900 px-2 py-1 rounded">
-                      {s.typ}
-                    </span>
-                  ))}
-                </div>
-              </div>
+        <CollapsibleInfo
+          title="Aktive Szenarien"
+          variant="warning"
+          icon={<AlertTriangle className="h-5 w-5" />}
+          defaultOpen={false}
+        >
+          <div className="text-sm text-orange-800">
+            <p className="mb-3">
+              {aktiveSzenarien.length} Szenario(en) aktiv. Die Produktionsplanung berücksichtigt momentan noch keine Szenarien.
+              Dies wird in einer zukünftigen Version implementiert.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {aktiveSzenarien.map(s => (
+                <span key={s.id} className="text-xs bg-orange-200 text-orange-900 px-2 py-1 rounded">
+                  {s.typ}
+                </span>
+              ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleInfo>
       )}
 
       {/* Übersicht Cards */}
