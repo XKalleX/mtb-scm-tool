@@ -44,12 +44,6 @@ export default function InboundPage() {
   // Feiertage werden bei der Berechnung in lib/kalender.ts berücksichtigt
   const gesamtVorlaufzeit = lieferant.gesamtVorlaufzeitTage
   
-  // Spring Festival aus Feiertagen filtern
-  const springFestival = useMemo(() => 
-    konfiguration.feiertage.filter(f => f.name.includes('Spring Festival') && f.land === 'China'),
-    [konfiguration.feiertage]
-  )
-  
   // ✅ NEUE BESTELLLOGIK: Tägliche Bedarfsermittlung
   // Generiere Produktionspläne für alle Varianten
   const produktionsplaene = useMemo(() => {
@@ -271,48 +265,6 @@ export default function InboundPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Spring Festival Warnung - COLLAPSIBLE */}
-      {springFestival.length > 0 && (
-        <CollapsibleInfo
-          title={`Spring Festival ${konfiguration.planungsjahr}`}
-          variant="warning"
-          icon={<AlertTriangle className="h-5 w-5" />}
-          defaultOpen={false}
-        >
-          <div className="space-y-3 text-sm text-orange-800">
-            <p className="font-semibold">
-              {springFestival.length} Tage kompletter Produktionsstopp in {lieferant.land}!
-            </p>
-            <div className="space-y-2">
-              <p>
-                <strong>Zeitraum:</strong> {springFestival[0]?.datum ? new Date(springFestival[0].datum).toLocaleDateString('de-DE') : '-'} - {springFestival[springFestival.length - 1]?.datum ? new Date(springFestival[springFestival.length - 1].datum).toLocaleDateString('de-DE') : '-'}
-              </p>
-              <p>
-                <strong>Auswirkung:</strong> Keine Produktion, keine Bestellungsbearbeitung
-              </p>
-              <p>
-                <strong>Planung:</strong> Bestellungen müssen vor oder nach dem Festival eingehen
-              </p>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold mb-2">Betroffene Feiertage:</h4>
-              <div className="grid gap-2 md:grid-cols-2">
-                {springFestival.map((f, idx) => {
-                  const datum = f.datum ? new Date(f.datum) : null
-                  const datumStr = datum && !isNaN(datum.getTime()) ? datum.toLocaleDateString('de-DE') : '-'
-                  return (
-                    <div key={`spring-${idx}-${f.name}`} className="text-sm bg-white rounded px-2 py-1 border border-orange-200">
-                      {datumStr}: {f.name}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        </CollapsibleInfo>
-      )}
 
       {/* Komponenten */}
       <Card>
