@@ -267,15 +267,10 @@ export function generiereTagesproduktion(
       monatsFehlerNachher = monatlicheFehlerTracker[monat]
       tagesError = sollProduktionDezimal - planMenge
       
-      // ✅ Ist-Menge: Realistische Produktionsschwankungen
-      // Natürliche Varianz von ±1,5% (sehr klein, aber realistisch)
-      // Verwendet deterministischen Seed basierend auf Tag für Konsistenz
-      const seed = (tag * 7 + monat * 13) % 100
-      const varianzFaktor = 1.0 + (Math.sin(seed) * 0.015) // ±1,5% max
-      istMenge = Math.round(planMenge * varianzFaktor)
-      
-      // Sicherstellen dass Ist-Menge nicht negativ wird
-      istMenge = Math.max(0, istMenge)
+      // ✅ Ist-Menge: IDENTISCH mit Plan-Menge (perfekte Ausführung ohne Störungen)
+      // Szenarien können später Abweichungen einführen (Maschinenausfall, etc.)
+      // Für Basis-Plan: Ist = Plan (keine unnötigen Abweichungen)
+      istMenge = planMenge
     }
     
     const abweichung = istMenge - planMenge
@@ -498,6 +493,162 @@ export function berechneLagerbestaende(
   })
   
   return lagerbestaende.sort((a, b) => a.komponente.localeCompare(b.komponente))
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * LAGERBESTANDS-BERECHNUNG AUF TAGESBASIS
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+export interface TagesLagerbestand {
+  tag: number
+  datum: Date
+  wochentag: string
+  monat: number
+  istArbeitstag: boolean
+  
+  // Pro Bauteil
+  bauteile: {
+    bauteilId: string
+    bauteilName: string
+    anfangsBestand: number
+    zugang: number          // Lieferungen von Zulieferer
+    verbrauch: number       // Produktion (= Bikes produziert × 1)
+    endBestand: number      // anfang + zugang - verbrauch
+    sicherheit: number
+    verfuegbar: number      // endBestand - sicherheit
+    reichweite: number      // verfuegbar / durchschnittlicher Tagesbedarf
+    status: 'ok' | 'niedrig' | 'kritisch'
+  }[]
+}
+
+/**
+ * Berechnet Lagerbestandsentwicklung über 365 Tage
+ * 
+ * Simuliert Lagerbewegungen:
+ * - Anfangsbestand am 01.01.2027
+ * - Zugänge durch Lieferungen (vereinfacht: konstante Nachlieferung)
+ * - Abgänge durch Produktion (1:1 Stückliste)
+ * 
+ * @param konfiguration - KonfigurationData aus Context
+ * @param tagesProduktion - Produktionsplan (für Verbrauch)
+ * @returns Array mit 365 Tagen Lagerbeständen
+ */
+export function berechneTagesLagerbestaende(
+  konfiguration: KonfigurationData,
+  tagesProduktion: TagesProduktionEntry[]
+): TagesLagerbestand[] {
+  // Berechne Jahresbedarfe pro Bauteil
+  const variantenProduktion: Record<string, number> = {}
+  konfiguration.varianten.forEach(v => {
+    variantenProduktion[v.id] = Math.round(konfiguration.jahresproduktion * v.anteilPrognose)
+  })
+  
+  const bauteilBedarfe: Record<string, {
+    jahresbedarf: number
+    tagesbedarf: number
+    name: string
+  }> = {}
+  
+  konfiguration.bauteile.forEach(bauteil => {
+    bauteilBedarfe[bauteil.id] = {
+      jahresbedarf: 0,
+      tagesbedarf: 0,
+      name: bauteil.name
+    }
+  })
+  
+  konfiguration.stueckliste.forEach(position => {
+    const produktion = variantenProduktion[position.mtbVariante] || 0
+    const bedarf = produktion * position.menge
+    
+    if (bauteilBedarfe[position.bauteilId]) {
+      bauteilBedarfe[position.bauteilId].jahresbedarf += bedarf
+    }
+  })
+  
+  // Tagesbedarfe berechnen
+  Object.keys(bauteilBedarfe).forEach(bauteilId => {
+    const info = bauteilBedarfe[bauteilId]
+    info.tagesbedarf = Math.round(info.jahresbedarf / 365)
+  })
+  
+  // Anfangsbestände (35% des Jahresbedarfs als Startlager)
+  const aktuelleBestaende: Record<string, number> = {}
+  Object.keys(bauteilBedarfe).forEach(bauteilId => {
+    const jahresbedarf = bauteilBedarfe[bauteilId].jahresbedarf
+    aktuelleBestaende[bauteilId] = Math.round(jahresbedarf * 0.35)
+  })
+  
+  // Simuliere Lagerbewegungen über 365 Tage
+  const result: TagesLagerbestand[] = []
+  
+  tagesProduktion.forEach((tag, index) => {
+    const bauteileStatus: TagesLagerbestand['bauteile'] = []
+    
+    konfiguration.bauteile.forEach(bauteil => {
+      const bauteilId = bauteil.id
+      const info = bauteilBedarfe[bauteilId]
+      
+      if (!info || info.jahresbedarf === 0) return
+      
+      const anfangsBestand = aktuelleBestaende[bauteilId]
+      
+      // Vereinfachte Zugangslogik: Konstante Nachlieferung (Tagesbedarf × 1.1 für Buffer)
+      // In Realität würde hier die Inbound-Logik mit Losgrößen 500 und Vorlaufzeit 49 Tage greifen
+      const zugang = tag.istArbeitstag ? Math.round(info.tagesbedarf * 1.1) : 0
+      
+      // Verbrauch = Produktion an diesem Tag × Stücklistenmenge (1:1)
+      // Berechne wie viele Bikes diese Komponente benötigen
+      let verbrauch = 0
+      konfiguration.stueckliste.forEach(position => {
+        if (position.bauteilId === bauteilId) {
+          const varianteProduktion = variantenProduktion[position.mtbVariante] || 0
+          const anteilAnTagesproduktion = tag.istMenge / konfiguration.jahresproduktion
+          verbrauch += Math.round(varianteProduktion * anteilAnTagesproduktion * position.menge)
+        }
+      })
+      
+      const endBestand = Math.max(0, anfangsBestand + zugang - verbrauch)
+      aktuelleBestaende[bauteilId] = endBestand
+      
+      const sicherheit = Math.round(info.tagesbedarf * 7) // 7 Tage Sicherheit
+      const verfuegbar = Math.max(0, endBestand - sicherheit)
+      const reichweite = info.tagesbedarf > 0 ? verfuegbar / info.tagesbedarf : 999
+      
+      let status: 'ok' | 'niedrig' | 'kritisch' = 'ok'
+      if (endBestand < sicherheit || reichweite < 7) {
+        status = 'kritisch'
+      } else if (reichweite < 14) {
+        status = 'niedrig'
+      }
+      
+      bauteileStatus.push({
+        bauteilId,
+        bauteilName: info.name,
+        anfangsBestand,
+        zugang,
+        verbrauch,
+        endBestand,
+        sicherheit,
+        verfuegbar,
+        reichweite,
+        status
+      })
+    })
+    
+    result.push({
+      tag: tag.tag,
+      datum: tag.datum,
+      wochentag: tag.wochentag,
+      monat: tag.monat,
+      istArbeitstag: tag.istArbeitstag,
+      bauteile: bauteileStatus
+    })
+  })
+  
+  return result
 }
 
 /**
