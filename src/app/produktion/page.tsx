@@ -443,23 +443,26 @@ export default function ProduktionPage() {
 
           {/* Tägliche Lagerbestände für ALLE Bauteile - Excel-Tabelle */}
           <div className="mb-6">
-            <h4 className="font-semibold text-green-900 mb-3">Tägliche Lagerbestandsentwicklung (365 Tage × 4 Sattel-Varianten)</h4>
+            <h4 className="font-semibold text-green-900 mb-3">🔍 Tägliche Lagerbestandsentwicklung (365 Tage × 4 Sattel-Varianten)</h4>
             <p className="text-sm text-green-700 mb-4">
-              Zeigt die Entwicklung der Lagerbestände über das gesamte Jahr. Jede Zeile = 1 Tag mit allen 4 Sattel-Varianten.
+              <strong>Detaillierte Lagerbewegungen pro Tag:</strong> Anfangsbestand + Zugang - Verbrauch = Endbestand. 
+              Zeigt Reichweite und Status für alle 4 Sattel-Varianten über das gesamte Jahr 2027.
             </p>
+            
+            {/* Detaillierte Tabelle: Pro Komponente alle Bewegungen */}
             <ExcelTable
               columns={[
                 {
                   key: 'tag',
                   label: 'Tag',
-                  width: '60px',
+                  width: '50px',
                   align: 'center',
                   sumable: false
                 },
                 {
                   key: 'datum',
                   label: 'Datum',
-                  width: '80px',
+                  width: '75px',
                   align: 'center',
                   format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : val,
                   sumable: false
@@ -467,122 +470,119 @@ export default function ProduktionPage() {
                 {
                   key: 'wochentag',
                   label: 'WT',
-                  width: '50px',
+                  width: '45px',
                   align: 'center',
                   sumable: false
                 },
-                // Fizik Tundra
                 {
-                  key: 'fizikTundraBestand',
-                  label: 'Fizik Tundra Bestand',
-                  width: '140px',
+                  key: 'komponente',
+                  label: 'Komponente',
+                  width: '110px',
+                  align: 'left',
+                  sumable: false
+                },
+                {
+                  key: 'anfangsBestand',
+                  label: 'Anfang',
+                  width: '85px',
                   align: 'right',
+                  formula: 'Bestand Vortag',
                   format: (val) => formatNumber(val, 0),
                   sumable: false
                 },
                 {
-                  key: 'fizikTundraReichweite',
-                  label: 'Reichweite',
-                  width: '100px',
+                  key: 'zugang',
+                  label: 'Zugang',
+                  width: '85px',
                   align: 'right',
-                  formula: 'Verfügbar / Tagesbedarf',
-                  format: (val) => formatNumber(val, 1) + ' Tage',
+                  formula: 'Lieferung',
+                  format: (val) => val > 0 ? '+' + formatNumber(val, 0) : '-',
                   sumable: false
                 },
-                // Raceline
                 {
-                  key: 'racelineBestand',
-                  label: 'Raceline Bestand',
-                  width: '130px',
+                  key: 'verbrauch',
+                  label: 'Verbrauch',
+                  width: '90px',
                   align: 'right',
+                  formula: 'Produktion',
+                  format: (val) => val > 0 ? '-' + formatNumber(val, 0) : '-',
+                  sumable: false
+                },
+                {
+                  key: 'endBestand',
+                  label: 'Endbestand',
+                  width: '100px',
+                  align: 'right',
+                  formula: 'Anfang + Zugang - Verbrauch',
                   format: (val) => formatNumber(val, 0),
                   sumable: false
                 },
                 {
-                  key: 'racelineReichweite',
-                  label: 'Reichweite',
-                  width: '100px',
+                  key: 'sicherheit',
+                  label: 'Sicherheit',
+                  width: '90px',
                   align: 'right',
-                  formula: 'Verfügbar / Tagesbedarf',
-                  format: (val) => formatNumber(val, 1) + ' Tage',
+                  formula: '7 Tage Puffer',
+                  format: (val) => formatNumber(val, 0),
                   sumable: false
                 },
-                // Spark
                 {
-                  key: 'sparkBestand',
-                  label: 'Spark Bestand',
+                  key: 'verfuegbar',
+                  label: 'Verfügbar (ATP)',
                   width: '120px',
                   align: 'right',
+                  formula: 'Endbestand - Sicherheit',
                   format: (val) => formatNumber(val, 0),
                   sumable: false
                 },
                 {
-                  key: 'sparkReichweite',
+                  key: 'reichweite',
                   label: 'Reichweite',
-                  width: '100px',
+                  width: '90px',
                   align: 'right',
                   formula: 'Verfügbar / Tagesbedarf',
                   format: (val) => formatNumber(val, 1) + ' Tage',
                   sumable: false
                 },
-                // Speedline
                 {
-                  key: 'speedlineBestand',
-                  label: 'Speedline Bestand',
-                  width: '130px',
-                  align: 'right',
-                  format: (val) => formatNumber(val, 0),
-                  sumable: false
-                },
-                {
-                  key: 'speedlineReichweite',
-                  label: 'Reichweite',
-                  width: '100px',
-                  align: 'right',
-                  formula: 'Verfügbar / Tagesbedarf',
-                  format: (val) => formatNumber(val, 1) + ' Tage',
-                  sumable: false
-                },
-                // Status
-                {
-                  key: 'kritischeKomponenten',
-                  label: 'Kritische Komponenten',
-                  width: '150px',
-                  align: 'left',
-                  format: (val) => val || '-',
+                  key: 'status',
+                  label: 'Status',
+                  width: '80px',
+                  align: 'center',
+                  format: (val) => {
+                    if (val === 'kritisch') return '🔴 Kritisch'
+                    if (val === 'niedrig') return '🟡 Niedrig'
+                    return '🟢 OK'
+                  },
                   sumable: false
                 }
               ]}
-              data={tagesLagerbestaende.map(tag => {
-                const fizikTundra = tag.bauteile.find(b => b.bauteilName === 'Fizik Tundra')
-                const raceline = tag.bauteile.find(b => b.bauteilName === 'Raceline')
-                const spark = tag.bauteile.find(b => b.bauteilName === 'Spark')
-                const speedline = tag.bauteile.find(b => b.bauteilName === 'Speedline')
-                
-                const kritisch = tag.bauteile
-                  .filter(b => b.status === 'kritisch')
-                  .map(b => b.bauteilName)
-                  .join(', ')
-                
-                return {
+              data={tagesLagerbestaende.flatMap(tag => {
+                return tag.bauteile.map(bauteil => ({
                   tag: tag.tag,
                   datum: tag.datum,
                   wochentag: tag.wochentag,
-                  fizikTundraBestand: fizikTundra?.endBestand || 0,
-                  fizikTundraReichweite: fizikTundra?.reichweite || 0,
-                  racelineBestand: raceline?.endBestand || 0,
-                  racelineReichweite: raceline?.reichweite || 0,
-                  sparkBestand: spark?.endBestand || 0,
-                  sparkReichweite: spark?.reichweite || 0,
-                  speedlineBestand: speedline?.endBestand || 0,
-                  speedlineReichweite: speedline?.reichweite || 0,
-                  kritischeKomponenten: kritisch
-                }
+                  komponente: bauteil.bauteilName,
+                  anfangsBestand: bauteil.anfangsBestand,
+                  zugang: bauteil.zugang,
+                  verbrauch: bauteil.verbrauch,
+                  endBestand: bauteil.endBestand,
+                  sicherheit: bauteil.sicherheit,
+                  verfuegbar: bauteil.verfuegbar,
+                  reichweite: bauteil.reichweite,
+                  status: bauteil.status
+                }))
               })}
-              maxHeight="500px"
+              maxHeight="600px"
               showFormulas={true}
               showSums={false}
             />
+            
+            <p className="text-xs text-green-600 mt-3">
+              💡 <strong>Hinweis:</strong> Zeigt alle 365 Tage × 4 Komponenten = 1.460 Zeilen. 
+              Zugang vereinfacht als Tagesbedarf × 1,1 (In Realität: Inbound mit Losgrößen 500 + Vorlaufzeit 49 Tage).
+              Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → berechneTagesLagerbestaende() (Zeilen 566-680)
+            </p>
           </div>
 
           {/* Übersicht: Aggregierte Lagerbestände */}
