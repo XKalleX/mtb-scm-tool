@@ -14,9 +14,23 @@
  * 
  * WICHTIG: Alle Berechnungen im Tool MÜSSEN diese Werte nutzen!
  * Speicherung erfolgt in localStorage für Persistenz.
+ * 
+ * SINGLE SOURCE OF TRUTH: JSON-Dateien in src/data/
+ * - saisonalitaet.json
+ * - stammdaten.json
+ * - feiertage-china.json
+ * - lieferant-china.json
+ * - stueckliste.json
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
+
+// Import JSON-Dateien als SINGLE SOURCE OF TRUTH
+import saisonalitaetData from '@/data/saisonalitaet.json'
+import stammdatenData from '@/data/stammdaten.json'
+import feiertageChinaData from '@/data/feiertage-china.json'
+import lieferantChinaData from '@/data/lieferant-china.json'
+import stuecklisteData from '@/data/stueckliste.json'
 
 // ========================================
 // TYPEN FÜR KONFIGURATION
@@ -153,115 +167,27 @@ interface KonfigurationContextType {
 const KonfigurationContext = createContext<KonfigurationContextType | undefined>(undefined)
 
 // ========================================
-// STANDARD-WERTE (aus JSON-Dateien)
+// STANDARD-WERTE (aus JSON-Dateien - SINGLE SOURCE OF TRUTH)
 // ========================================
 
-const STANDARD_VARIANTEN: MTBVarianteConfig[] = [
-  {
-    id: "MTBAllrounder",
-    name: "MTB Allrounder",
-    kategorie: "Allrounder",
-    verkaufspreis: 1299,
-    herstellkosten: 750,
-    gewicht: 13.5,
-    farben: ["Schwarz", "Silber", "Blau"],
-    anteilPrognose: 0.30,
-    beschreibung: "Vielseitiges Mountainbike für alle Einsatzbereiche"
-  },
-  {
-    id: "MTBCompetition",
-    name: "MTB Competition",
-    kategorie: "Competition",
-    verkaufspreis: 2499,
-    herstellkosten: 1450,
-    gewicht: 11.2,
-    farben: ["Rot", "Schwarz", "Weiß"],
-    anteilPrognose: 0.15,
-    beschreibung: "Wettkampforientiertes Racebike mit Carbonrahmen"
-  },
-  {
-    id: "MTBDownhill",
-    name: "MTB Downhill",
-    kategorie: "Downhill",
-    verkaufspreis: 3199,
-    herstellkosten: 1850,
-    gewicht: 15.8,
-    farben: ["Orange", "Schwarz", "Grün"],
-    anteilPrognose: 0.10,
-    beschreibung: "Robustes Downhill-Bike für extreme Abfahrten"
-  },
-  {
-    id: "MTBExtreme",
-    name: "MTB Extreme",
-    kategorie: "Extreme",
-    verkaufspreis: 3799,
-    herstellkosten: 2200,
-    gewicht: 14.9,
-    farben: ["Gelb", "Schwarz", "Grau"],
-    anteilPrognose: 0.07,
-    beschreibung: "Premium-Bike für extremste Anforderungen"
-  },
-  {
-    id: "MTBFreeride",
-    name: "MTB Freeride",
-    kategorie: "Freeride",
-    verkaufspreis: 2899,
-    herstellkosten: 1680,
-    gewicht: 14.3,
-    farben: ["Grün", "Schwarz", "Blau"],
-    anteilPrognose: 0.05,
-    beschreibung: "Freestyle-orientiertes Mountainbike"
-  },
-  {
-    id: "MTBMarathon",
-    name: "MTB Marathon",
-    kategorie: "Marathon",
-    verkaufspreis: 2199,
-    herstellkosten: 1270,
-    gewicht: 10.8,
-    farben: ["Blau", "Weiß", "Schwarz"],
-    anteilPrognose: 0.08,
-    beschreibung: "Leichtgewicht für Langstrecken-Rennen"
-  },
-  {
-    id: "MTBPerformance",
-    name: "MTB Performance",
-    kategorie: "Performance",
-    verkaufspreis: 1799,
-    herstellkosten: 1040,
-    gewicht: 12.4,
-    farben: ["Schwarz", "Silber", "Rot"],
-    anteilPrognose: 0.12,
-    beschreibung: "Performance-orientiertes Allround-Bike"
-  },
-  {
-    id: "MTBTrail",
-    name: "MTB Trail",
-    kategorie: "Trail",
-    verkaufspreis: 1599,
-    herstellkosten: 920,
-    gewicht: 13.1,
-    farben: ["Grau", "Schwarz", "Grün"],
-    anteilPrognose: 0.13,
-    beschreibung: "Trail-spezialisiertes Mountainbike"
-  }
-]
+/**
+ * Saisonalität aus JSON laden und in das richtige Format konvertieren
+ */
+const STANDARD_SAISONALITAET: SaisonalitaetMonatConfig[] = saisonalitaetData.saisonalitaetMonatlich.map(m => ({
+  monat: m.monat,
+  name: m.name,
+  anteil: m.anteil,
+  beschreibung: m.beschreibung
+}))
 
-const STANDARD_SAISONALITAET: SaisonalitaetMonatConfig[] = [
-  { monat: 1, name: "Januar", anteil: 4, beschreibung: "Niedriger Start ins Jahr, Winter" },
-  { monat: 2, name: "Februar", anteil: 6, beschreibung: "Vorbereitung auf Frühjahr" },
-  { monat: 3, name: "März", anteil: 10, beschreibung: "Frühjahrsbeginn, steigende Nachfrage" },
-  { monat: 4, name: "April", anteil: 16, beschreibung: "PEAK! Hauptsaison beginnt - höchste Nachfrage" },
-  { monat: 5, name: "Mai", anteil: 14, beschreibung: "Hochsaison" },
-  { monat: 6, name: "Juni", anteil: 13, beschreibung: "Sommeranfang" },
-  { monat: 7, name: "Juli", anteil: 12, beschreibung: "Sommerzeit" },
-  { monat: 8, name: "August", anteil: 9, beschreibung: "Spätsommer" },
-  { monat: 9, name: "September", anteil: 6, beschreibung: "Herbstbeginn" },
-  { monat: 10, name: "Oktober", anteil: 3, beschreibung: "Herbst, sinkende Nachfrage" },
-  { monat: 11, name: "November", anteil: 4, beschreibung: "Winter naht" },
-  { monat: 12, name: "Dezember", anteil: 3, beschreibung: "Weihnachtsgeschäft minimal" }
-]
+/**
+ * MTB-Varianten aus JSON laden
+ */
+const STANDARD_VARIANTEN: MTBVarianteConfig[] = stammdatenData.varianten as MTBVarianteConfig[]
 
+/**
+ * Feiertage aus JSON laden (Deutschland + China)
+ */
 const STANDARD_FEIERTAGE: FeiertagConfig[] = [
   // Deutschland (NRW)
   { datum: "2027-01-01", name: "Neujahr", typ: "gesetzlich", land: "Deutschland" },
@@ -274,115 +200,54 @@ const STANDARD_FEIERTAGE: FeiertagConfig[] = [
   { datum: "2027-10-03", name: "Tag der Deutschen Einheit", typ: "gesetzlich", land: "Deutschland" },
   { datum: "2027-12-25", name: "1. Weihnachtsfeiertag", typ: "gesetzlich", land: "Deutschland" },
   { datum: "2027-12-26", name: "2. Weihnachtsfeiertag", typ: "gesetzlich", land: "Deutschland" },
-  // China - Spring Festival
-  { datum: "2027-01-28", name: "Spring Festival (Tag 1) - Chinesisches Neujahr", typ: "Festival", land: "China" },
-  { datum: "2027-01-29", name: "Spring Festival (Tag 2)", typ: "Festival", land: "China" },
-  { datum: "2027-01-30", name: "Spring Festival (Tag 3)", typ: "Festival", land: "China" },
-  { datum: "2027-01-31", name: "Spring Festival (Tag 4)", typ: "Festival", land: "China" },
-  { datum: "2027-02-01", name: "Spring Festival (Tag 5)", typ: "Festival", land: "China" },
-  { datum: "2027-02-02", name: "Spring Festival (Tag 6)", typ: "Festival", land: "China" },
-  { datum: "2027-02-03", name: "Spring Festival (Tag 7)", typ: "Festival", land: "China" },
-  { datum: "2027-02-04", name: "Spring Festival (Tag 8)", typ: "Festival", land: "China" },
-  // China - Weitere Feiertage
-  { datum: "2027-04-04", name: "Qingming Festival (Tomb-Sweeping Day)", typ: "gesetzlich", land: "China" },
-  { datum: "2027-05-01", name: "Labour Day", typ: "gesetzlich", land: "China" },
-  { datum: "2027-06-14", name: "Dragon Boat Festival", typ: "gesetzlich", land: "China" },
-  { datum: "2027-09-21", name: "Mid-Autumn Festival", typ: "gesetzlich", land: "China" },
-  { datum: "2027-10-01", name: "National Day (Tag 1)", typ: "gesetzlich", land: "China" },
-  { datum: "2027-10-02", name: "National Day (Tag 2)", typ: "gesetzlich", land: "China" },
-  { datum: "2027-10-03", name: "National Day (Tag 3)", typ: "gesetzlich", land: "China" }
+  // China - aus JSON laden
+  ...feiertageChinaData.feiertage2027.map(f => ({
+    datum: f.datum,
+    name: f.name,
+    typ: (f.typ === 'gesetzlich' ? 'gesetzlich' : 'Festival') as 'gesetzlich' | 'Festival',
+    land: 'China' as const
+  }))
 ]
 
-const STANDARD_LIEFERANT: LieferantConfig = {
-  id: "CHN",
-  name: "Dengwong Manufacturing Ltd.",
-  land: "China",
-  vorlaufzeitKalendertage: 30,  // Seefracht: Shanghai → Hamburg (24/7)
-  vorlaufzeitArbeitstage: 5,    // Produktion beim Zulieferer
-  lkwTransportArbeitstage: 4,   // 2 AT China→Hafen + 2 AT Hamburg→Dortmund
-  lkwTransportChinaArbeitstage: 2,  // China → Hafen Shanghai
-  lkwTransportDeutschlandArbeitstage: 2,  // Hamburg → Dortmund
-  gesamtVorlaufzeitTage: 49,    // Total lead time (configurable)
-  transportSequenz: [
-    {
-      schritt: 1,
-      typ: 'Produktion',
-      dauer: 5,
-      einheit: 'AT',
-      von: 'Dengwong',
-      nach: 'Dengwong',
-      beschreibung: 'Produktion beim Zulieferer (Mo-Fr ohne Feiertage)'
-    },
-    {
-      schritt: 2,
-      typ: 'LKW',
-      dauer: 2,
-      einheit: 'AT',
-      von: 'Dengwong',
-      nach: 'Hafen Shanghai',
-      beschreibung: 'LKW-Transport zum Hafen (Mo-Fr)'
-    },
-    {
-      schritt: 3,
-      typ: 'Seefracht',
-      dauer: 30,
-      einheit: 'KT',
-      von: 'Hafen Shanghai',
-      nach: 'Hafen Hamburg',
-      beschreibung: 'Seefracht (24/7 unterwegs)'
-    },
-    {
-      schritt: 4,
-      typ: 'LKW',
-      dauer: 2,
-      einheit: 'AT',
-      von: 'Hafen Hamburg',
-      nach: 'Werk Dortmund',
-      beschreibung: 'LKW-Transport zum Werk (Mo-Fr)'
-    }
-  ],
-  losgroesse: 500,
-  kapazitaet: 50000,
-  lieferintervall: 14,
-  besonderheiten: [
-    "Einziger Lieferant für Sättel",
-    "Spring Festival: 28. Jan - 4. Feb 2027 (8 Tage Produktionsstopp)",
-    "Seefracht: 30 Kalendertage (Shanghai → Hamburg, 24/7 unterwegs)",
-    "LKW-Transport: 2 AT (China → Hafen) + 2 AT (Hamburg → Dortmund) = 4 AT",
-    "Produktion: 5 Arbeitstage (Mo-Fr ohne Feiertage)",
-    "Gesamte Vorlaufzeit: 49 Tage (7 Wochen) = 5 AT + 2 AT + 30 KT + 2 AT",
-    "Mindestbestellung: 500 Stück Sättel (Losgröße)",
-    "Lieferintervall: Alle 14 Tage"
-  ]
-}
+/**
+ * Lieferant aus JSON laden
+ */
+const STANDARD_LIEFERANT: LieferantConfig = lieferantChinaData.lieferant as LieferantConfig
 
+/**
+ * Produktion aus stammdaten.json
+ */
 const STANDARD_PRODUKTION: ProduktionConfig = {
-  kapazitaetProStunde: 130,
-  stundenProSchicht: 8,
-  durchlaufzeitMontageMinuten: 325
+  kapazitaetProStunde: (stammdatenData as any).produktion?.kapazitaetProStunde || 130,
+  stundenProSchicht: (stammdatenData as any).produktion?.stundenProSchicht || 8,
+  durchlaufzeitMontageMinuten: (stammdatenData as any).produktion?.durchlaufzeitMontageMinuten || 325
 }
 
-const STANDARD_BAUTEILE: BauteilConfig[] = [
-  { id: "SAT_FT", name: "Fizik Tundra", kategorie: "Sattel", beschreibung: "Premium Sattel für Langstrecken" },
-  { id: "SAT_RL", name: "Raceline", kategorie: "Sattel", beschreibung: "Sportlicher Sattel für Wettkampf" },
-  { id: "SAT_SP", name: "Spark", kategorie: "Sattel", beschreibung: "Leichter Performance-Sattel" },
-  { id: "SAT_SL", name: "Speedline", kategorie: "Sattel", beschreibung: "Aerodynamischer Sattel für Speed" }
-]
+/**
+ * Bauteile aus lieferant-china.json extrahieren
+ */
+const STANDARD_BAUTEILE: BauteilConfig[] = Object.entries(lieferantChinaData.komponentenDetails).map(([id, details]: [string, any]) => ({
+  id: details.id,
+  name: details.name,
+  kategorie: details.kategorie,
+  beschreibung: details.beschreibung
+}))
 
-const STANDARD_STUECKLISTE: StuecklistenPosition[] = [
-  { mtbVariante: "MTBAllrounder", bauteilId: "SAT_SP", bauteilName: "Spark", menge: 1 },
-  { mtbVariante: "MTBCompetition", bauteilId: "SAT_SL", bauteilName: "Speedline", menge: 1 },
-  { mtbVariante: "MTBDownhill", bauteilId: "SAT_FT", bauteilName: "Fizik Tundra", menge: 1 },
-  { mtbVariante: "MTBExtreme", bauteilId: "SAT_SP", bauteilName: "Spark", menge: 1 },
-  { mtbVariante: "MTBFreeride", bauteilId: "SAT_FT", bauteilName: "Fizik Tundra", menge: 1 },
-  { mtbVariante: "MTBMarathon", bauteilId: "SAT_RL", bauteilName: "Raceline", menge: 1 },
-  { mtbVariante: "MTBPerformance", bauteilId: "SAT_FT", bauteilName: "Fizik Tundra", menge: 1 },
-  { mtbVariante: "MTBTrail", bauteilId: "SAT_SL", bauteilName: "Speedline", menge: 1 }
-]
+/**
+ * Stückliste aus stueckliste.json transformieren
+ */
+const STANDARD_STUECKLISTE: StuecklistenPosition[] = Object.entries(stuecklisteData.stuecklisten).flatMap(([varianteId, data]: [string, any]) => 
+  Object.entries(data.komponenten).map(([bauteilId, bauteilData]: [string, any]) => ({
+    mtbVariante: varianteId,
+    bauteilId: bauteilId,
+    bauteilName: bauteilData.name,
+    menge: bauteilData.menge
+  }))
+)
 
 const STANDARD_KONFIGURATION: KonfigurationData = {
-  jahresproduktion: 370000,
-  planungsjahr: 2027,
+  jahresproduktion: (stammdatenData as any).jahresproduktion?.gesamt || 370000,
+  planungsjahr: stammdatenData.projekt.planungsjahr,
   varianten: STANDARD_VARIANTEN,
   saisonalitaet: STANDARD_SAISONALITAET,
   feiertage: STANDARD_FEIERTAGE,
