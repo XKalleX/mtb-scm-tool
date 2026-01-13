@@ -150,7 +150,7 @@ export function EinstellungenPanel() {
                   <Input
                     id="jahresproduktion"
                     type="number"
-                    value={konfiguration.jahresproduktion}
+                    value={konfiguration.jahresproduktion ?? 0}
                     onChange={(e) => setJahresproduktion(parseInt(e.target.value) || 0)}
                     min={0}
                     step={1000}
@@ -164,7 +164,7 @@ export function EinstellungenPanel() {
                   <Label>Produktionskapazität (Bikes/Stunde)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.produktion.kapazitaetProStunde}
+                    value={konfiguration.produktion.kapazitaetProStunde ?? 0}
                     onChange={(e) => updateProduktion({ kapazitaetProStunde: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
@@ -174,7 +174,7 @@ export function EinstellungenPanel() {
                   <Label>Stunden pro Schicht</Label>
                   <Input
                     type="number"
-                    value={konfiguration.produktion.stundenProSchicht}
+                    value={konfiguration.produktion.stundenProSchicht ?? 0}
                     onChange={(e) => updateProduktion({ stundenProSchicht: parseInt(e.target.value) || 0 })}
                     min={1}
                     max={24}
@@ -313,7 +313,7 @@ export function EinstellungenPanel() {
                 <div className="space-y-2">
                   <Label>Lieferant Name</Label>
                   <Input
-                    value={konfiguration.lieferant.name}
+                    value={konfiguration.lieferant.name ?? ''}
                     onChange={(e) => updateLieferant({ name: e.target.value })}
                   />
                 </div>
@@ -322,7 +322,7 @@ export function EinstellungenPanel() {
                   <Label>Vorlaufzeit Arbeitstage (Produktion)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.vorlaufzeitArbeitstage}
+                    value={konfiguration.lieferant.vorlaufzeitArbeitstage ?? 0}
                     onChange={(e) => updateLieferant({ vorlaufzeitArbeitstage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
@@ -333,7 +333,7 @@ export function EinstellungenPanel() {
                   <Label>Vorlaufzeit Kalendertage (Seefracht Shanghai → Hamburg)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.vorlaufzeitKalendertage}
+                    value={konfiguration.lieferant.vorlaufzeitKalendertage ?? 0}
                     onChange={(e) => updateLieferant({ vorlaufzeitKalendertage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
@@ -344,7 +344,7 @@ export function EinstellungenPanel() {
                   <Label>LKW-Transport China → Hafen (Arbeitstage)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.lkwTransportChinaArbeitstage}
+                    value={konfiguration.lieferant.lkwTransportChinaArbeitstage ?? 0}
                     onChange={(e) => updateLieferant({ lkwTransportChinaArbeitstage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
@@ -355,7 +355,7 @@ export function EinstellungenPanel() {
                   <Label>LKW-Transport Hamburg → Werk (Arbeitstage)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.lkwTransportDeutschlandArbeitstage}
+                    value={konfiguration.lieferant.lkwTransportDeutschlandArbeitstage ?? 0}
                     onChange={(e) => updateLieferant({ lkwTransportDeutschlandArbeitstage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
@@ -366,7 +366,7 @@ export function EinstellungenPanel() {
                   <Label>Gesamte Vorlaufzeit (Kalendertage)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.gesamtVorlaufzeitTage}
+                    value={konfiguration.lieferant.gesamtVorlaufzeitTage ?? 0}
                     onChange={(e) => updateLieferant({ gesamtVorlaufzeitTage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
@@ -379,7 +379,7 @@ export function EinstellungenPanel() {
                   <Label>Losgröße (Mindestbestellung)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.losgroesse}
+                    value={konfiguration.lieferant.losgroesse ?? 0}
                     onChange={(e) => updateLieferant({ losgroesse: parseInt(e.target.value) || 0 })}
                     min={1}
                     step={100}
@@ -391,7 +391,7 @@ export function EinstellungenPanel() {
                   <Label>Lieferintervall (Tage)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.lieferintervall}
+                    value={konfiguration.lieferant.lieferintervall ?? 0}
                     onChange={(e) => updateLieferant({ lieferintervall: parseInt(e.target.value) || 0 })}
                     min={1}
                   />
@@ -401,7 +401,7 @@ export function EinstellungenPanel() {
                   <Label>Kapazität (Stück/Tag)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.kapazitaet}
+                    value={konfiguration.lieferant.kapazitaet ?? 0}
                     onChange={(e) => updateLieferant({ kapazitaet: parseInt(e.target.value) || 0 })}
                     min={0}
                     step={1000}
