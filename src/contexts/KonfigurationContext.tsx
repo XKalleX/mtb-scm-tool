@@ -249,16 +249,16 @@ const STANDARD_VARIANTEN: MTBVarianteConfig[] = [
 
 const STANDARD_SAISONALITAET: SaisonalitaetMonatConfig[] = [
   { monat: 1, name: "Januar", anteil: 4, beschreibung: "Niedriger Start ins Jahr, Winter" },
-  { monat: 2, name: "Februar", anteil: 5, beschreibung: "Vorbereitung auf Frühjahr" },
+  { monat: 2, name: "Februar", anteil: 6, beschreibung: "Vorbereitung auf Frühjahr" },
   { monat: 3, name: "März", anteil: 10, beschreibung: "Frühjahrsbeginn, steigende Nachfrage" },
   { monat: 4, name: "April", anteil: 16, beschreibung: "PEAK! Hauptsaison beginnt - höchste Nachfrage" },
   { monat: 5, name: "Mai", anteil: 14, beschreibung: "Hochsaison" },
-  { monat: 6, name: "Juni", anteil: 12, beschreibung: "Sommeranfang" },
-  { monat: 7, name: "Juli", anteil: 10, beschreibung: "Sommerzeit" },
-  { monat: 8, name: "August", anteil: 8, beschreibung: "Spätsommer" },
-  { monat: 9, name: "September", anteil: 9, beschreibung: "Herbstbeginn" },
-  { monat: 10, name: "Oktober", anteil: 6, beschreibung: "Herbst, sinkende Nachfrage" },
-  { monat: 11, name: "November", anteil: 3, beschreibung: "Winter naht" },
+  { monat: 6, name: "Juni", anteil: 13, beschreibung: "Sommeranfang" },
+  { monat: 7, name: "Juli", anteil: 12, beschreibung: "Sommerzeit" },
+  { monat: 8, name: "August", anteil: 9, beschreibung: "Spätsommer" },
+  { monat: 9, name: "September", anteil: 6, beschreibung: "Herbstbeginn" },
+  { monat: 10, name: "Oktober", anteil: 3, beschreibung: "Herbst, sinkende Nachfrage" },
+  { monat: 11, name: "November", anteil: 4, beschreibung: "Winter naht" },
   { monat: 12, name: "Dezember", anteil: 3, beschreibung: "Weihnachtsgeschäft minimal" }
 ]
 
