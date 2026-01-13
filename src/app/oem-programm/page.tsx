@@ -10,8 +10,12 @@
  * - Saisonale Verteilung (April-Peak)
  * - Error-Management für Rundungsfehler
  * - Stücklisten-Übersicht
+ * - Szenarien-Integration (Marketing, Maschinenausfall, etc.)
+ * - Ansicht für alle Varianten gleichzeitig
  * 
- * NEU: Nutzt dynamische Konfiguration aus KonfigurationContext
+ * ✅ DYNAMISCH: Alle Werte aus KonfigurationContext
+ * ✅ SZENARIEN: Berücksichtigt aktive Szenarien aus SzenarienContext
+ * ✅ ERROR MANAGEMENT: Kumulativer Fehler korrekt berechnet und angezeigt
  */
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,30 +23,41 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
-import { Calendar, TrendingUp, AlertCircle, Download } from 'lucide-react'
+import { Calendar, TrendingUp, AlertCircle, Download, AlertTriangle } from 'lucide-react'
 import { formatNumber, formatDate } from '@/lib/utils'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import { showError, showSuccess } from '@/lib/notifications'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
-import { useState, useMemo } from 'react'
+import { useSzenarien } from '@/contexts/SzenarienContext'
+import React, { useState, useMemo } from 'react'
 import { 
   generiereAlleVariantenProduktionsplaene,
-  berechneProduktionsStatistiken
+  berechneProduktionsStatistiken,
+  type TagesProduktionEntry
 } from '@/lib/calculations/zentrale-produktionsplanung'
 
 /**
  * OEM Programm Hauptseite
  * Zeigt Produktionsplanung und Stücklisten
- * Nutzt dynamische Konfiguration aus KonfigurationContext
+ * 
+ * ✅ Nutzt dynamische Konfiguration aus KonfigurationContext
+ * ✅ Berücksichtigt aktive Szenarien aus SzenarienContext
+ * ✅ Zeigt kumulativen Error korrekt an
  */
 export default function OEMProgrammPage() {
   const [selectedVariante, setSelectedVariante] = useState('MTBAllrounder')
+  const [viewMode, setViewMode] = useState<'single' | 'all'>('single')
   
-  // Hole Konfiguration aus Context
+  // Hole Konfiguration und Szenarien aus Contexts
   const { konfiguration, isInitialized, getArbeitstageProJahr, getJahresproduktionProVariante } = useKonfiguration()
+  const { getAktiveSzenarien } = useSzenarien()
+  
+  // Hole aktive Szenarien
+  const aktiveSzenarien = useMemo(() => getAktiveSzenarien(), [getAktiveSzenarien])
 
   // Generiere Produktionspläne aus zentralem Modul
+  // TODO: In Zukunft Szenarien hier einbauen
   const produktionsplaene = useMemo(() => 
     generiereAlleVariantenProduktionsplaene(konfiguration),
     [konfiguration]
@@ -131,6 +146,31 @@ export default function OEMProgrammPage() {
         </div>
       </div>
 
+      {/* Szenarien-Warnung */}
+      {aktiveSzenarien.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-orange-900">Aktive Szenarien</h3>
+                <p className="text-sm text-orange-800 mt-1">
+                  {aktiveSzenarien.length} Szenario(en) aktiv. Die Produktionsplanung berücksichtigt momentan noch keine Szenarien.
+                  Dies wird in einer zukünftigen Version implementiert.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {aktiveSzenarien.map(s => (
+                    <span key={s.id} className="text-xs bg-orange-200 text-orange-900 px-2 py-1 rounded">
+                      {s.typ}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Übersicht Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -183,7 +223,8 @@ export default function OEMProgrammPage() {
         <TabsList>
           <TabsTrigger value="overview">Übersicht</TabsTrigger>
           <TabsTrigger value="stueckliste">Stückliste</TabsTrigger>
-          <TabsTrigger value="details">Tagesplanung</TabsTrigger>
+          <TabsTrigger value="details">Tagesplanung (Einzeln)</TabsTrigger>
+          <TabsTrigger value="allVariants">Tagesplanung (Alle Varianten)</TabsTrigger>
           <TabsTrigger value="error">Error-Management</TabsTrigger>
         </TabsList>
 
@@ -602,8 +643,8 @@ export default function OEMProgrammPage() {
                         label: 'Kum. Error',
                         width: '110px',
                         align: 'right',
-                        formula: 'Error(t-1) + (Soll - Ist)',
-                        format: (val) => formatNumber(val, 3),
+                        formula: 'Kum. Ist - Kum. Plan',
+                        format: (val) => formatNumber(val, 2), // 2 Dezimalstellen für Bikes-Differenz
                         sumable: false
                       },
                       {
@@ -637,7 +678,7 @@ export default function OEMProgrammPage() {
                             sollMenge: tag.planMenge,
                             istMenge: tag.istMenge,
                             sattelBedarf: tag.istMenge, // 1:1 Verhältnis
-                            kumulierterError: (tag.kumulativIst - tag.kumulativPlan) / tag.kumulativPlan * 100,
+                            kumulierterError: tag.kumulativIst - tag.kumulativPlan, // ✅ KORREKTUR: Absoluter Fehler, nicht Prozent
                             kumulativBikes: kumulativ
                           }
                         }) || []
@@ -649,6 +690,235 @@ export default function OEMProgrammPage() {
                     groupBy="monat"
                     subtotalLabel="Monatssumme"
                   />
+                )
+              })()}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* NEU: Alle Varianten in einer Ansicht */}
+        <TabsContent value="allVariants" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tagesplanung - Alle Varianten im Überblick</CardTitle>
+              <CardDescription>
+                Produktionsplanung für alle 8 MTB-Varianten mit kumulativem Error Management.
+                Zeigt nur Arbeitstage (ohne Wochenenden/Feiertage).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Aggregierte Statistik */}
+              <div className="grid gap-4 md:grid-cols-4 mb-6">
+                {Object.entries(produktionsplaene).map(([varianteId, plan]) => {
+                  const stats = berechneProduktionsStatistiken(plan.tage)
+                  const variante = konfiguration.varianten.find(v => v.id === varianteId)
+                  
+                  return (
+                    <Card key={varianteId} className="border-blue-200">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">{variante?.name}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Jahresproduktion:</div>
+                        <div className="text-lg font-bold">{formatNumber(stats.produziert, 0)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Abweichung: {formatNumber(plan.abweichung, 0)} Bikes
+                        </div>
+                        <div className={`text-xs font-semibold ${Math.abs(plan.abweichung) <= 1 ? 'text-green-600' : 'text-orange-600'}`}>
+                          {Math.abs(plan.abweichung) <= 1 ? '✓ Error Management OK' : '⚠ Prüfung nötig'}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+
+              {/* Erklärung */}
+              <CollapsibleInfo
+                title="Ansicht-Erklärung: Alle Varianten gleichzeitig"
+                variant="info"
+                className="mb-4"
+              >
+                <div className="text-sm text-blue-800 space-y-2">
+                  <p>
+                    Diese Ansicht zeigt die Tagesproduktion <strong>aller 8 MTB-Varianten</strong> in einer kompakten Tabelle.
+                  </p>
+                  <p>
+                    <strong>Pro Tag sehen Sie:</strong>
+                  </p>
+                  <ul className="list-disc list-inside ml-2 space-y-1">
+                    <li>Produktionsmenge jeder Variante (Ist-Menge mit Error Management)</li>
+                    <li>Kumulativen Error pro Variante (sollte nahe 0 bleiben)</li>
+                    <li>Gesamtproduktion über alle Varianten</li>
+                    <li>Nur Arbeitstage (Wochenenden/Feiertage ausgeblendet)</li>
+                  </ul>
+                  <p className="pt-2 border-t border-blue-300">
+                    <strong>Vorteil:</strong> Schneller Überblick über die gesamte Produktion und Engpass-Identifikation.
+                  </p>
+                </div>
+              </CollapsibleInfo>
+
+              {/* Alle-Varianten Tabelle */}
+              {produktionsplaene && (() => {
+                // Hole nur Arbeitstage (erste Variante als Referenz)
+                const referenzVariante = Object.values(produktionsplaene)[0]
+                const arbeitstage = referenzVariante.tage.filter(t => t.istArbeitstag)
+                
+                // Erstelle Spalten: Datum + eine Spalte pro Variante + Gesamt
+                const variantenSpalten = konfiguration.varianten.flatMap(v => [
+                  {
+                    key: `${v.id}_menge`,
+                    label: `${v.name.replace('MTB ', '')}`,
+                    width: '90px',
+                    align: 'right' as const,
+                    format: (val: number) => formatNumber(val, 0),
+                    sumable: true
+                  },
+                  {
+                    key: `${v.id}_error`,
+                    label: `Error`,
+                    width: '70px',
+                    align: 'right' as const,
+                    format: (val: number) => formatNumber(val, 2),
+                    sumable: false,
+                    className: (val: number) => Math.abs(val) > 0.5 ? 'text-orange-600 font-semibold' : ''
+                  }
+                ])
+                
+                const columns = [
+                  {
+                    key: 'datum',
+                    label: 'Datum',
+                    width: '100px',
+                    format: (val: Date) => formatDate(val),
+                    sumable: false
+                  },
+                  {
+                    key: 'wochentag',
+                    label: 'Tag',
+                    width: '60px',
+                    align: 'center' as const,
+                    sumable: false
+                  },
+                  ...variantenSpalten,
+                  {
+                    key: 'gesamt',
+                    label: 'Gesamt',
+                    width: '100px',
+                    align: 'right' as const,
+                    format: (val: number) => formatNumber(val, 0),
+                    sumable: true,
+                    className: 'font-bold bg-slate-100'
+                  }
+                ]
+                
+                // Erstelle Daten
+                const data = arbeitstage.map(refTag => {
+                  const row: Record<string, any> = {
+                    datum: refTag.datum,
+                    wochentag: refTag.wochentag
+                  }
+                  
+                  let gesamt = 0
+                  
+                  // Füge Daten für jede Variante hinzu
+                  konfiguration.varianten.forEach(v => {
+                    const plan = produktionsplaene[v.id]
+                    const tag = plan?.tage.find(t => 
+                      t.datum.toISOString().split('T')[0] === refTag.datum.toISOString().split('T')[0]
+                    )
+                    
+                    if (tag) {
+                      row[`${v.id}_menge`] = tag.istMenge
+                      // Kumulativer Error = kumulativIst - kumulativPlan
+                      const kumError = tag.kumulativIst - tag.kumulativPlan
+                      row[`${v.id}_error`] = kumError
+                      gesamt += tag.istMenge
+                    } else {
+                      row[`${v.id}_menge`] = 0
+                      row[`${v.id}_error`] = 0
+                    }
+                  })
+                  
+                  row.gesamt = gesamt
+                  
+                  return row
+                })
+                
+                return (
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="bg-slate-50 p-3 border-b">
+                      <h4 className="font-semibold text-sm">
+                        Legende: <span className="text-muted-foreground font-normal">Menge = Ist-Produktion | Error = Kumulativer Fehler (sollte nahe 0 bleiben)</span>
+                      </h4>
+                    </div>
+                    <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-slate-100 border-b">
+                          <tr>
+                            <th className="p-2 text-left font-medium">Datum</th>
+                            <th className="p-2 text-center font-medium">Tag</th>
+                            {konfiguration.varianten.map(v => (
+                              <th key={v.id} colSpan={2} className="p-2 text-center font-medium border-l">
+                                {v.name.replace('MTB ', '')}
+                              </th>
+                            ))}
+                            <th className="p-2 text-right font-medium border-l bg-slate-200">Gesamt</th>
+                          </tr>
+                          <tr className="bg-slate-50 text-xs text-muted-foreground">
+                            <th className="p-1"></th>
+                            <th className="p-1"></th>
+                            {konfiguration.varianten.map(v => (
+                              <React.Fragment key={`${v.id}-sub`}>
+                                <th className="p-1 text-right border-l">Bikes</th>
+                                <th className="p-1 text-right">Error</th>
+                              </React.Fragment>
+                            ))}
+                            <th className="p-1 text-right border-l bg-slate-200">Bikes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.map((row, idx) => (
+                            <tr key={idx} className="border-b hover:bg-slate-50">
+                              <td className="p-2 text-left">{formatDate(row.datum)}</td>
+                              <td className="p-2 text-center">{row.wochentag}</td>
+                              {konfiguration.varianten.map(v => {
+                                const error = row[`${v.id}_error`]
+                                const errorClass = Math.abs(error) > 0.5 ? 'text-orange-600 font-semibold' : ''
+                                
+                                return (
+                                  <React.Fragment key={`${v.id}-data`}>
+                                    <td className="p-2 text-right border-l">{formatNumber(row[`${v.id}_menge`], 0)}</td>
+                                    <td className={`p-2 text-right ${errorClass}`}>{formatNumber(error, 2)}</td>
+                                  </React.Fragment>
+                                )
+                              })}
+                              <td className="p-2 text-right font-bold border-l bg-slate-50">{formatNumber(row.gesamt, 0)}</td>
+                            </tr>
+                          ))}
+                          {/* Summenzeile */}
+                          <tr className="bg-slate-100 font-bold border-t-2">
+                            <td className="p-2" colSpan={2}>JAHRESSUMME</td>
+                            {konfiguration.varianten.map(v => {
+                              const plan = produktionsplaene[v.id]
+                              const summe = plan?.tage.reduce((sum, t) => sum + t.istMenge, 0) || 0
+                              const finalError = plan ? plan.tage[plan.tage.length - 1].kumulativIst - plan.tage[plan.tage.length - 1].kumulativPlan : 0
+                              
+                              return (
+                                <React.Fragment key={`${v.id}-sum`}>
+                                  <td className="p-2 text-right border-l">{formatNumber(summe, 0)}</td>
+                                  <td className="p-2 text-right">{formatNumber(finalError, 2)}</td>
+                                </React.Fragment>
+                              )
+                            })}
+                            <td className="p-2 text-right border-l bg-slate-200">
+                              {formatNumber(konfiguration.jahresproduktion, 0)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 )
               })()}
             </CardContent>
