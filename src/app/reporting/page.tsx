@@ -110,8 +110,7 @@ export default function ReportingPage() {
     varianten: konfiguration.varianten.map(v => ({
       id: v.id,
       name: v.name,
-      anteilPrognose: v.anteilPrognose,
-      herstellkosten: v.herstellkosten
+      anteilPrognose: v.anteilPrognose
     }))
   }), [konfiguration, isInitialized, getArbeitstageProJahr])
   
@@ -137,8 +136,6 @@ export default function ReportingPage() {
       { Kategorie: 'Responsiveness', Metrik: 'Lagerumschlag', Wert: scorMetriken.lagerumschlag, Einheit: 'x/Jahr' },
       { Kategorie: 'Agility', Metrik: 'Produktionsflexibilität', Wert: scorMetriken.produktionsflexibilitaet, Einheit: '%' },
       { Kategorie: 'Agility', Metrik: 'Materialverfügbarkeit', Wert: scorMetriken.materialverfuegbarkeit, Einheit: '%' },
-      { Kategorie: 'Costs', Metrik: 'Gesamtkosten', Wert: scorMetriken.gesamtkosten, Einheit: 'EUR' },
-      { Kategorie: 'Costs', Metrik: 'Herstellkosten', Wert: scorMetriken.herstellkosten, Einheit: 'EUR' },
       { Kategorie: 'Assets', Metrik: 'Lagerbestandswert', Wert: scorMetriken.lagerbestandswert, Einheit: 'EUR' },
       { Kategorie: 'Assets', Metrik: 'Kapitalbindung', Wert: scorMetriken.kapitalbindung, Einheit: 'Tage' }
     ]
@@ -224,7 +221,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
             : 'Alle Werte werden in Echtzeit basierend auf den aktiven Szenarien berechnet.'}
         </p>
         <p className={`text-sm ${istBaseline ? "text-blue-800" : "text-green-800"} mt-2`}>
-          Fokus auf <strong>Reliability, Responsiveness, Agility, Costs und Assets</strong>
+          Fokus auf <strong>Reliability, Responsiveness, Agility und Assets</strong>
         </p>
       </CollapsibleInfo>
 
@@ -306,67 +303,10 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
         </CardContent>
       </Card>
 
-      {/* COSTS (Kosten) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>4. COSTS (Kosten)</CardTitle>
-          <CardDescription>
-            Kosten-Übersicht der Supply Chain
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Kostenart</TableHead>
-                <TableHead className="text-right">Betrag (EUR)</TableHead>
-                <TableHead className="text-right">Anteil</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">Herstellkosten</TableCell>
-                <TableCell className="text-right">
-                  {formatNumber(metriken.herstellkosten, 0)} €
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatPercent((metriken.herstellkosten / metriken.gesamtkosten) * 100, 1)}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Beschaffungskosten</TableCell>
-                <TableCell className="text-right">
-                  {formatNumber(metriken.beschaffungskosten, 0)} €
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatPercent((metriken.beschaffungskosten / metriken.gesamtkosten) * 100, 1)}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Lagerkosten</TableCell>
-                <TableCell className="text-right">
-                  {formatNumber(metriken.lagerkosten, 0)} €
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatPercent((metriken.lagerkosten / metriken.gesamtkosten) * 100, 1)}
-                </TableCell>
-              </TableRow>
-              <TableRow className="font-bold bg-slate-50">
-                <TableCell>GESAMT</TableCell>
-                <TableCell className="text-right">
-                  {formatNumber(metriken.gesamtkosten, 0)} €
-                </TableCell>
-                <TableCell className="text-right">100,0 %</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
       {/* ASSETS (Vermögenswerte) */}
       <Card>
         <CardHeader>
-          <CardTitle>5. ASSETS (Vermögenswerte)</CardTitle>
+          <CardTitle>4. ASSETS (Vermögenswerte)</CardTitle>
           <CardDescription>
             Kapitalbindung und Lagerwerte
           </CardDescription>
@@ -482,16 +422,10 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               example="Wenn an 350 von 365 Tagen Material verfügbar war: (350 / 365) × 100% = 95,9%"
             />
             <FormulaCard
-              title="Gesamtkosten"
-              formula="Herstellkosten + Beschaffungskosten + Lagerkosten"
-              description="Summe aller Supply Chain Kosten. Herstellkosten dominieren (~98%), aber Beschaffung und Lager sind optimierbar."
-              example="185M € (Herstellung) + 1,25M € (Beschaffung) + 1,25M € (Lager) = 187,5M € gesamt"
-            />
-            <FormulaCard
               title="Kapitalbindung"
-              formula="(Durchschnittlicher Lagerbestand × Kosten pro Stück × 365 Tage) / (Jahresproduktion × 1.000 €/Bike)"
+              formula="(Durchschnittlicher Lagerbestand × Wert pro Stück × 365 Tage) / (Jahresproduktion × durchschn. Wert/Bike)"
               description="Zeigt, wie viele Tage Kapital im Lager gebunden ist. Niedrigerer Wert = besserer Cashflow."
-              example="Bei Ø 92.500 Sätteln á 100€: (92.500 × 100 × 365) / (370.000 × 1.000) = 9,1 Tage"
+              example="Bei Ø 92.500 Sätteln á 150€: (92.500 × 150 × 365) / (370.000 × 1.000) = 13,7 Tage"
             />
           </div>
 
@@ -597,14 +531,6 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                 zielwert: '95,0 %',
                 zielerreichung: (metriken.materialverfuegbarkeit / 95) * 100,
                 status: metriken.materialverfuegbarkeit >= 95 ? 'good' : 'medium'
-              },
-              {
-                kategorie: 'Costs',
-                metrik: 'Gesamtkosten',
-                istwert: formatNumber(metriken.gesamtkosten, 0) + ' €',
-                zielwert: '≤ 190M €',
-                zielerreichung: (190000000 / metriken.gesamtkosten) * 100,
-                status: metriken.gesamtkosten <= 190000000 ? 'good' : 'medium'
               },
               {
                 kategorie: 'Assets',
@@ -1292,48 +1218,8 @@ function VisualisierungenView({
         </Card>
       </div>
 
-      {/* Zusätzliche Visualisierungen - zweite Reihe */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Kostenverteilung Pie Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Kostenverteilung 2027</CardTitle>
-            <CardDescription>Aufschlüsselung nach Kostenarten</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: 'Herstellkosten', value: 185000000 },
-                    { name: 'Beschaffungskosten', value: 1250000 },
-                    { name: 'Lagerkosten', value: 1250000 }
-                  ]}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={(entry) => `${entry.name}: ${((entry.value / 187500000) * 100).toFixed(1)}%`}
-                  outerRadius={110}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  <Cell fill={COLORS.primary} />
-                  <Cell fill={COLORS.warning} />
-                  <Cell fill={COLORS.info} />
-                </Pie>
-                <Tooltip
-                  formatter={(value: any) => {
-                    if (typeof value === 'number') {
-                      return formatNumber(value, 0) + ' €'
-                    }
-                    return String(value)
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
+      {/* Zusätzliche Visualisierungen */}
+      <div className="grid grid-cols-1 gap-6">
         {/* Wöchentlicher Durchsatz - UNABHÄNGIG von Zeitfiltern */}
         <Card>
           <CardHeader>
