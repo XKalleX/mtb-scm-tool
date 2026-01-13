@@ -9,13 +9,13 @@
  * - Fokus auf Produktions- und Lager-KPIs
  * - Keine Liefertreue an Märkte (da kein Outbound)
  * - Stattdessen: Planerfüllungsgrad, Lagerumschlag, etc.
+ * - KEINE KOSTEN (gemäß Anforderungen)
  * 
  * SCOR Level 1 Kategorien:
  * 1. RELIABILITY (Zuverlässigkeit)
  * 2. RESPONSIVENESS (Reaktionsfähigkeit)
  * 3. AGILITY (Flexibilität)
- * 4. COSTS (Kosten)
- * 5. ASSETS (Vermögenswerte)
+ * 4. ASSETS (Vermögenswerte)
  */
 
 import { SCORMetriken, Produktionsauftrag, Lagerbestand, Bestellung } from '@/types'
@@ -91,22 +91,6 @@ export function berechneSCORMetriken(
   const materialverfuegbarkeit = (materialVerfuegbarTage / produktionsauftraege.length) * 100
   
   // ==========================================
-  // COSTS (Kosten)
-  // ==========================================
-  
-  // Vereinfachte Kostenberechnung
-  // Pro Bike: ca. 1.000 € Herstellkosten
-  const herstellkosten = jahresproduktion * 1000
-  
-  // Beschaffungskosten: Bestellungen * Durchschnitt
-  const beschaffungskosten = bestellungen.length * 50000 // Schätzung
-  
-  // Lagerkosten: 10% des Lagerwertes pro Jahr
-  const lagerkosten = lagerbestandswert * 100 * 0.1 // 100€ pro Stück, 10% Lagerkostensatz
-  
-  const gesamtkosten = herstellkosten + beschaffungskosten + lagerkosten
-  
-  // ==========================================
   // ASSETS (Vermögenswerte)
   // ==========================================
   
@@ -135,12 +119,6 @@ export function berechneSCORMetriken(
     // AGILITY
     produktionsflexibilitaet,
     materialverfuegbarkeit,
-    
-    // COSTS
-    gesamtkosten,
-    herstellkosten,
-    lagerkosten,
-    beschaffungskosten,
     
     // ASSETS
     lagerbestandswert,

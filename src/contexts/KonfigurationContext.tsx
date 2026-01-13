@@ -40,8 +40,6 @@ export interface MTBVarianteConfig {
   id: string
   name: string
   kategorie: string
-  verkaufspreis: number
-  herstellkosten: number
   gewicht: number
   farben: string[]
   anteilPrognose: number // 0.0 - 1.0

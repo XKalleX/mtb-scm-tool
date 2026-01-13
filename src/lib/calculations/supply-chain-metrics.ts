@@ -65,26 +65,6 @@ export const DURCHSCHNITT_TAGE_PRO_MONAT = 30.4
 export const GLEICHMAESSIGER_MONATSANTEIL = 100 / 12 // ≈ 8.33%
 
 /**
- * Herstellkosten pro Bike in EUR (Durchschnitt aller Varianten)
- */
-export const HERSTELLKOSTEN_PRO_BIKE = 1000
-
-/**
- * Beschaffungskosten pro Sattel in EUR
- */
-export const BESCHAFFUNGSKOSTEN_PRO_SATTEL = 50
-
-/**
- * Lagerkostensatz (10% des Lagerwertes pro Jahr)
- */
-export const LAGERKOSTENSATZ = 0.1
-
-/**
- * Wert pro Sattel-Set in EUR für Lagerbestandsberechnung
- */
-export const WERT_PRO_SATTEL_SET = 150
-
-/**
  * Wasserschaden: Maximaler relativer Verlusteffekt
  */
 export const WASSERSCHADEN_MAX_VERLUST_EFFEKT = 0.3
@@ -102,7 +82,7 @@ export interface DynamicConfig {
   jahresproduktion: number
   arbeitstage: number
   saisonalitaet: Array<{ monat: number; anteil: number }>
-  varianten: Array<{ id: string; name: string; anteilPrognose: number; herstellkosten: number }>
+  varianten: Array<{ id: string; name: string; anteilPrognose: number }>
 }
 
 // ========================================
@@ -372,12 +352,6 @@ export interface SCORMetrikenBerechnet {
   produktionsflexibilitaet: number
   materialverfuegbarkeit: number
   
-  // COSTS (Kosten)
-  gesamtkosten: number
-  herstellkosten: number
-  lagerkosten: number
-  beschaffungskosten: number
-  
   // ASSETS (Vermögenswerte)
   lagerbestandswert: number
   kapitalbindung: number
@@ -398,22 +372,13 @@ export interface SCORMetrikenBerechnet {
 export function berechneSCORMetriken(aktiveSzenarien: SzenarioConfig[]): SCORMetrikenBerechnet {
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
   
-  // Berechne Kosten basierend auf Produktion
-  // Pro Bike: Herstellkosten aus Konstante (Durchschnitt aller Varianten)
-  const herstellkosten = auswirkungen.produktionsmenge * HERSTELLKOSTEN_PRO_BIKE
-  
-  // Beschaffungskosten pro Sattel * Anzahl Sättel (1 Sattel pro Bike)
-  const beschaffungskosten = auswirkungen.produktionsmenge * BESCHAFFUNGSKOSTEN_PRO_SATTEL
-  
-  // Lagerkosten: Lagerkostensatz des durchschnittlichen Lagerwertes
+  // Lagerbestandswert berechnen für ASSETS Kategorie
   // Durchschnittlicher Lagerbestand: ca. 2 Wochen Produktion (52 Wochen / 2 = 26)
   const WOCHEN_PRO_JAHR = 52
   const LAGERBESTAND_WOCHEN = 2
+  const WERT_PRO_SATTEL_SET = 150 // EUR
   const durchschnittlicherLagerbestand = Math.round(auswirkungen.produktionsmenge / (WOCHEN_PRO_JAHR / LAGERBESTAND_WOCHEN))
   const lagerbestandswert = durchschnittlicherLagerbestand * WERT_PRO_SATTEL_SET
-  const lagerkosten = Math.round(lagerbestandswert * LAGERKOSTENSATZ)
-  
-  const gesamtkosten = herstellkosten + beschaffungskosten + lagerkosten
   
   // Kapitalbindung: Durchschnittliche Lagerdauer
   const kapitalbindung = Math.round((durchschnittlicherLagerbestand / auswirkungen.durchschnittProTag) * 10) / 10
@@ -430,12 +395,6 @@ export function berechneSCORMetriken(aktiveSzenarien: SzenarioConfig[]): SCORMet
     // AGILITY
     produktionsflexibilitaet: auswirkungen.planerfuellungsgrad, // Gleich wie Planerfüllung
     materialverfuegbarkeit: auswirkungen.materialverfuegbarkeit,
-    
-    // COSTS
-    gesamtkosten,
-    herstellkosten,
-    lagerkosten,
-    beschaffungskosten,
     
     // ASSETS
     lagerbestandswert,
@@ -739,15 +698,12 @@ export function berechneGesamtMetrikenMitKonfig(
 ): GesamtMetriken {
   const auswirkungen = berechneSzenarioAuswirkungenMitKonfig(aktiveSzenarien, dynamicConfig)
   
-  // Berechne SCOR-Metriken basierend auf den Auswirkungen
-  const herstellkosten = auswirkungen.produktionsmenge * HERSTELLKOSTEN_PRO_BIKE
-  const beschaffungskosten = auswirkungen.produktionsmenge * BESCHAFFUNGSKOSTEN_PRO_SATTEL
+  // Berechne SCOR-Metriken basierend auf den Auswirkungen (ohne Kosten)
   const WOCHEN_PRO_JAHR = 52
   const LAGERBESTAND_WOCHEN = 2
+  const WERT_PRO_SATTEL_SET = 150 // EUR
   const durchschnittlicherLagerbestand = Math.round(auswirkungen.produktionsmenge / (WOCHEN_PRO_JAHR / LAGERBESTAND_WOCHEN))
   const lagerbestandswert = durchschnittlicherLagerbestand * WERT_PRO_SATTEL_SET
-  const lagerkosten = Math.round(lagerbestandswert * LAGERKOSTENSATZ)
-  const gesamtkosten = herstellkosten + beschaffungskosten + lagerkosten
   const kapitalbindung = Math.round((durchschnittlicherLagerbestand / auswirkungen.durchschnittProTag) * 10) / 10
 
   const scor: SCORMetrikenBerechnet = {
@@ -757,10 +713,6 @@ export function berechneGesamtMetrikenMitKonfig(
     lagerumschlag: auswirkungen.lagerumschlag,
     produktionsflexibilitaet: auswirkungen.planerfuellungsgrad,
     materialverfuegbarkeit: auswirkungen.materialverfuegbarkeit,
-    gesamtkosten,
-    herstellkosten,
-    lagerkosten,
-    beschaffungskosten,
     lagerbestandswert,
     kapitalbindung,
     gesamtproduktion: auswirkungen.produktionsmenge,

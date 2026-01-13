@@ -1471,19 +1471,18 @@ export const SZENARIEN: Szenario[] = [
 /**
  * SCOR (Supply Chain Operations Reference) Metriken
  * 
- * 5 Hauptkategorien:
+ * 4 Hauptkategorien (KEINE KOSTEN gemäß Anforderungen):
  * 1. Reliability (Zuverlässigkeit)
  * 2. Responsiveness (Reaktionsfähigkeit)
  * 3. Agility (Agilität)
- * 4. Costs (Kosten)
- * 5. Asset Management (Anlagennutzung)
+ * 4. Asset Management (Anlagennutzung)
  * 
- * Anforderung: Minimum 5 KPIs (mindestens 1 pro Kategorie empfohlen)
+ * Anforderung: Minimum 5 KPIs aus den 4 Kategorien
  */
 
 export interface SCORMetrik {
   id: string;
-  kategorie: "Reliability" | "Responsiveness" | "Agility" | "Costs" | "Asset Management";
+  kategorie: "Reliability" | "Responsiveness" | "Agility" | "Asset Management";
   name: string;
   nameDE: string;
   beschreibung: string;
@@ -1566,31 +1565,7 @@ export const SCOR_METRIKEN: SCORMetrik[] = [
     interpretation: "Niedriger = Besser. Zeigt Reaktionsfähigkeit auf Marktänderungen."
   },
   
-  // 4. COSTS (Kosten)
-  {
-    id: "CO.1.1",
-    kategorie: "Costs",
-    name: "Supply Chain Management Cost",
-    nameDE: "Supply Chain Kosten",
-    beschreibung: "Gesamtkosten für SCM-Aktivitäten pro produziertes Bike",
-    formel: "(Gesamt SCM-Kosten) / (Anzahl produzierte Bikes)",
-    einheit: "Euro/Bike",
-    zielwert: "Minimierung bei gleichbleibender Qualität",
-    interpretation: "Niedriger = Besser. Beinhaltet: Transport, Lager, Administration."
-  },
-  {
-    id: "CO.2.1",
-    kategorie: "Costs",
-    name: "Inventory Carrying Cost",
-    nameDE: "Lagerhaltungskosten",
-    beschreibung: "Kosten für Lagerung von Bauteilen (Zinsen, Schwund, Lager-Miete)",
-    formel: "(Durchschnittlicher Lagerbestand × Kapitalbindungssatz × Tage) / 365",
-    einheit: "Euro",
-    zielwert: "Minimierung",
-    interpretation: "Niedriger = Besser. Hohe Bestände = Hohe Kosten."
-  },
-  
-  // 5. ASSET MANAGEMENT (Anlagennutzung)
+  // 4. ASSET MANAGEMENT (Anlagennutzung)
   {
     id: "AM.1.1",
     kategorie: "Asset Management",
@@ -1633,7 +1608,6 @@ export const SCOR_STATISTIK = {
     reliability: SCOR_METRIKEN.filter(m => m.kategorie === "Reliability").length,
     responsiveness: SCOR_METRIKEN.filter(m => m.kategorie === "Responsiveness").length,
     agility: SCOR_METRIKEN.filter(m => m.kategorie === "Agility").length,
-    costs: SCOR_METRIKEN.filter(m => m.kategorie === "Costs").length,
     assetManagement: SCOR_METRIKEN.filter(m => m.kategorie === "Asset Management").length
   },
   erfuelltMindestanforderung: SCOR_METRIKEN.length >= 5 // Muss true sein

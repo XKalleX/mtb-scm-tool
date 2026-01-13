@@ -22,8 +22,6 @@ export interface MTBVariante {
   id: string;                    // z.B. "MTBAllrounder"
   name: string;                  // Vollständiger Name
   kategorie: string;             // z.B. "Allrounder", "Competition"
-  verkaufspreis: number;         // in EUR
-  herstellkosten: number;        // in EUR
   gewicht: number;               // in kg
   farben: string[];              // Verfügbare Farben
 }
@@ -205,12 +203,6 @@ export interface SCORMetriken {
   // AGILITY (Flexibilität)
   produktionsflexibilitaet: number;      // % Mehrproduktion möglich
   materialverfuegbarkeit: number;        // % der Zeit genug Material
-  
-  // COSTS (Kosten)
-  gesamtkosten: number;                  // in EUR
-  herstellkosten: number;                // in EUR
-  lagerkosten: number;                   // in EUR
-  beschaffungskosten: number;            // in EUR
   
   // ASSETS (Vermögenswerte)
   lagerbestandswert: number;             // in EUR

@@ -200,9 +200,6 @@ function MTBVariantenCard() {
                   </div>
                   <p className="text-sm text-muted-foreground">{v.beschreibung}</p>
                   <div className="flex flex-wrap gap-4 text-sm">
-                    <span><strong>VK:</strong> {formatNumber(v.verkaufspreis, 0)} €</span>
-                    <span><strong>HK:</strong> {formatNumber(v.herstellkosten, 0)} €</span>
-                    <span><strong>DB:</strong> {formatNumber(v.verkaufspreis - v.herstellkosten, 0)} €</span>
                     <span><strong>Gewicht:</strong> {v.gewicht} kg</span>
                     <span><strong>Jahresproduktion:</strong> {formatNumber(data.jahresproduktion.proVariante[v.id], 0)} Bikes</span>
                   </div>

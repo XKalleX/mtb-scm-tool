@@ -276,8 +276,6 @@ export function EinstellungenPanel() {
                   <TableHead>Kategorie</TableHead>
                   <TableHead>Anteil (%)</TableHead>
                   <TableHead className="text-right">Jahresproduktion</TableHead>
-                  <TableHead className="text-right">VK-Preis (€)</TableHead>
-                  <TableHead className="text-right">Herstellkosten (€)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -297,26 +295,6 @@ export function EinstellungenPanel() {
                       />
                     </TableCell>
                     <TableCell className="text-right">{formatNumber(produktionProVariante[v.id], 0)}</TableCell>
-                    <TableCell className="text-right">
-                      <Input
-                        type="number"
-                        value={v.verkaufspreis}
-                        onChange={(e) => updateVariante(v.id, { verkaufspreis: parseInt(e.target.value) || 0 })}
-                        min={0}
-                        step={100}
-                        className="w-24"
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Input
-                        type="number"
-                        value={v.herstellkosten}
-                        onChange={(e) => updateVariante(v.id, { herstellkosten: parseInt(e.target.value) || 0 })}
-                        min={0}
-                        step={50}
-                        className="w-24"
-                      />
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
