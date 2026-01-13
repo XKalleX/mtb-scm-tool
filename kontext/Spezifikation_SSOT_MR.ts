@@ -419,33 +419,33 @@ export interface StuecklistenPosition {
 }
 
 export const STUECKLISTE: StuecklistenPosition[] = [
-  // MTB Allrounder → Fizik Tundra
+  // MTB Allrounder → Spark
   {
     mtbVariante: "ALLR",
-    bauteilId: "SAT_FT",
-    menge: 1,
-    bauteilName: "Fizik Tundra"
-  },
-  // MTB Competition → Raceline
-  {
-    mtbVariante: "COMP",
-    bauteilId: "SAT_RL",
-    menge: 1,
-    bauteilName: "Raceline"
-  },
-  // MTB Downhill → Spark
-  {
-    mtbVariante: "DOWN",
     bauteilId: "SAT_SP",
     menge: 1,
     bauteilName: "Spark"
   },
-  // MTB Extreme → Speedline
+  // MTB Competition → Speedline
   {
-    mtbVariante: "EXTR",
+    mtbVariante: "COMP",
     bauteilId: "SAT_SL",
     menge: 1,
     bauteilName: "Speedline"
+  },
+  // MTB Downhill → Fizik Tundra
+  {
+    mtbVariante: "DOWN",
+    bauteilId: "SAT_FT",
+    menge: 1,
+    bauteilName: "Fizik Tundra"
+  },
+  // MTB Extreme → Spark
+  {
+    mtbVariante: "EXTR",
+    bauteilId: "SAT_SP",
+    menge: 1,
+    bauteilName: "Spark"
   },
   // MTB Freeride → Fizik Tundra
   {
@@ -454,26 +454,26 @@ export const STUECKLISTE: StuecklistenPosition[] = [
     menge: 1,
     bauteilName: "Fizik Tundra"
   },
-  // MTB Marathon → Speedline (leicht!)
+  // MTB Marathon → Raceline
   {
     mtbVariante: "MARA",
-    bauteilId: "SAT_SL",
-    menge: 1,
-    bauteilName: "Speedline"
-  },
-  // MTB Performance → Raceline
-  {
-    mtbVariante: "PERF",
     bauteilId: "SAT_RL",
     menge: 1,
     bauteilName: "Raceline"
   },
-  // MTB Trail → Spark
+  // MTB Performance → Fizik Tundra
+  {
+    mtbVariante: "PERF",
+    bauteilId: "SAT_FT",
+    menge: 1,
+    bauteilName: "Fizik Tundra"
+  },
+  // MTB Trail → Speedline
   {
     mtbVariante: "TRAI",
-    bauteilId: "SAT_SP",
+    bauteilId: "SAT_SL",
     menge: 1,
-    bauteilName: "Spark"
+    bauteilName: "Speedline"
   }
 ];
 
