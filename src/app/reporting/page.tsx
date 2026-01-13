@@ -23,12 +23,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { TrendingUp, TrendingDown, Minus, BarChart3, Download, Filter, Maximize2, Zap } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, BarChart3, Download, Filter, Maximize2 } from 'lucide-react'
 import { formatNumber, formatPercent } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useSzenarien } from '@/contexts/SzenarienContext'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
+import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
+import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { 
   berechneGesamtMetriken,
   berechneGesamtMetrikenMitKonfig,
@@ -108,8 +110,7 @@ export default function ReportingPage() {
     varianten: konfiguration.varianten.map(v => ({
       id: v.id,
       name: v.name,
-      anteilPrognose: v.anteilPrognose,
-      herstellkosten: v.herstellkosten
+      anteilPrognose: v.anteilPrognose
     }))
   }), [konfiguration, isInitialized, getArbeitstageProJahr])
   
@@ -131,13 +132,13 @@ export default function ReportingPage() {
     const metricsData = [
       { Kategorie: 'Reliability', Metrik: 'Planerfüllungsgrad', Wert: scorMetriken.planerfuellungsgrad, Einheit: '%' },
       { Kategorie: 'Reliability', Metrik: 'Liefertreue China', Wert: scorMetriken.liefertreueChina, Einheit: '%' },
+      { Kategorie: 'Reliability', Metrik: 'Lieferperformance', Wert: scorMetriken.deliveryPerformance, Einheit: '%' },
       { Kategorie: 'Responsiveness', Metrik: 'Durchlaufzeit Produktion', Wert: scorMetriken.durchlaufzeitProduktion, Einheit: 'Tage' },
       { Kategorie: 'Responsiveness', Metrik: 'Lagerumschlag', Wert: scorMetriken.lagerumschlag, Einheit: 'x/Jahr' },
+      { Kategorie: 'Responsiveness', Metrik: 'Planungsgenauigkeit', Wert: scorMetriken.forecastAccuracy, Einheit: '%' },
       { Kategorie: 'Agility', Metrik: 'Produktionsflexibilität', Wert: scorMetriken.produktionsflexibilitaet, Einheit: '%' },
       { Kategorie: 'Agility', Metrik: 'Materialverfügbarkeit', Wert: scorMetriken.materialverfuegbarkeit, Einheit: '%' },
-      { Kategorie: 'Costs', Metrik: 'Gesamtkosten', Wert: scorMetriken.gesamtkosten, Einheit: 'EUR' },
-      { Kategorie: 'Costs', Metrik: 'Herstellkosten', Wert: scorMetriken.herstellkosten, Einheit: 'EUR' },
-      { Kategorie: 'Assets', Metrik: 'Lagerbestandswert', Wert: scorMetriken.lagerbestandswert, Einheit: 'EUR' },
+      { Kategorie: 'Assets', Metrik: 'Lagerreichweite', Wert: scorMetriken.lagerreichweite, Einheit: 'Tage' },
       { Kategorie: 'Assets', Metrik: 'Kapitalbindung', Wert: scorMetriken.kapitalbindung, Einheit: 'Tage' }
     ]
     
@@ -172,22 +173,8 @@ export default function ReportingPage() {
         </div>
       </div>
 
-      {/* Aktive Szenarien Hinweis */}
-      {aktiveSzenarien.length > 0 && (
-        <Card className="border-green-200 bg-green-50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-green-600" />
-              <CardTitle className="text-green-900 text-lg">
-                Live-Berechnung mit {aktiveSzenarien.length} aktiven Szenario(s)
-              </CardTitle>
-            </div>
-            <CardDescription className="text-green-700">
-              Alle Metriken werden dynamisch unter Berücksichtigung der Szenarien berechnet
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
+      {/* Aktive Szenarien Banner */}
+      <ActiveScenarioBanner showDetails={true} />
 
       {/* Tabs für Metriken und Charts */}
       <Tabs value={selectedView} onValueChange={(v: any) => setSelectedView(v)}>
@@ -223,27 +210,22 @@ export default function ReportingPage() {
 function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaseline: boolean }) {
   return (
     <>
-      {/* SCOR Übersicht */}
-      <Card className={istBaseline ? "border-blue-200 bg-blue-50" : "border-green-200 bg-green-50"}>
-        <CardHeader>
-          <CardTitle className={istBaseline ? "text-blue-900" : "text-green-900"}>
-            SCOR-Framework {istBaseline ? '(Baseline)' : '(Mit Szenarien)'}
-          </CardTitle>
-          <CardDescription className={istBaseline ? "text-blue-700" : "text-green-700"}>
-            {istBaseline 
-              ? 'Baseline-Werte ohne aktive Szenarien'
-              : 'Dynamisch berechnete Werte mit aktiven Szenarien'}
-            {' - '}Fokus auf <strong>Reliability, Responsiveness, Agility, Costs und Assets</strong>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className={`text-sm ${istBaseline ? "text-blue-800" : "text-green-800"}`}>
-            {istBaseline 
-              ? 'Aktivieren Sie Szenarien um die Auswirkungen auf die Supply Chain zu sehen.'
-              : 'Alle Werte werden in Echtzeit basierend auf den aktiven Szenarien berechnet.'}
-          </p>
-        </CardContent>
-      </Card>
+      {/* SCOR Übersicht - COLLAPSIBLE */}
+      <CollapsibleInfo
+        title={`SCOR-Framework ${istBaseline ? '(Baseline)' : '(Mit Szenarien)'}`}
+        variant={istBaseline ? "info" : "success"}
+        icon={<BarChart3 className="h-5 w-5" />}
+        defaultOpen={false}
+      >
+        <p className={`text-sm ${istBaseline ? "text-blue-800" : "text-green-800"}`}>
+          {istBaseline 
+            ? 'Baseline-Werte ohne aktive Szenarien. Aktivieren Sie Szenarien um die Auswirkungen auf die Supply Chain zu sehen.'
+            : 'Alle Werte werden in Echtzeit basierend auf den aktiven Szenarien berechnet.'}
+        </p>
+        <p className={`text-sm ${istBaseline ? "text-blue-800" : "text-green-800"} mt-2`}>
+          Fokus auf <strong>Reliability, Responsiveness, Agility und Assets</strong>
+        </p>
+      </CollapsibleInfo>
 
       {/* RELIABILITY (Zuverlässigkeit) */}
       <Card>
@@ -266,6 +248,12 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               value={formatPercent(metriken.liefertreueChina, 1)}
               description="% pünktliche Lieferungen vom Lieferanten"
               status={getStatus(metriken.liefertreueChina, 95, 85)}
+            />
+            <MetricRow
+              label="Lieferperformance"
+              value={formatPercent(metriken.deliveryPerformance, 1)}
+              description="% Lieferungen innerhalb der Vorlaufzeit (49 Tage)"
+              status={getStatus(metriken.deliveryPerformance, 90, 80)}
             />
           </div>
         </CardContent>
@@ -292,6 +280,12 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               value={`${formatNumber(metriken.lagerumschlag, 1)}x pro Jahr`}
               description="Wie oft wird Lager umgeschlagen"
               status={getStatus(metriken.lagerumschlag, 4, 2)}
+            />
+            <MetricRow
+              label="Planungsgenauigkeit"
+              value={formatPercent(metriken.forecastAccuracy, 1)}
+              description="Genauigkeit zwischen Plan und Ist"
+              status={getStatus(metriken.forecastAccuracy, 95, 90)}
             />
           </div>
         </CardContent>
@@ -323,78 +317,21 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
         </CardContent>
       </Card>
 
-      {/* COSTS (Kosten) */}
+      {/* ASSETS (Anlagenverwaltung) */}
       <Card>
         <CardHeader>
-          <CardTitle>4. COSTS (Kosten)</CardTitle>
+          <CardTitle>4. ASSETS (Anlagenverwaltung)</CardTitle>
           <CardDescription>
-            Kosten-Übersicht der Supply Chain
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Kostenart</TableHead>
-                <TableHead className="text-right">Betrag (EUR)</TableHead>
-                <TableHead className="text-right">Anteil</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">Herstellkosten</TableCell>
-                <TableCell className="text-right">
-                  {formatNumber(metriken.herstellkosten, 0)} €
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatPercent((metriken.herstellkosten / metriken.gesamtkosten) * 100, 1)}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Beschaffungskosten</TableCell>
-                <TableCell className="text-right">
-                  {formatNumber(metriken.beschaffungskosten, 0)} €
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatPercent((metriken.beschaffungskosten / metriken.gesamtkosten) * 100, 1)}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Lagerkosten</TableCell>
-                <TableCell className="text-right">
-                  {formatNumber(metriken.lagerkosten, 0)} €
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatPercent((metriken.lagerkosten / metriken.gesamtkosten) * 100, 1)}
-                </TableCell>
-              </TableRow>
-              <TableRow className="font-bold bg-slate-50">
-                <TableCell>GESAMT</TableCell>
-                <TableCell className="text-right">
-                  {formatNumber(metriken.gesamtkosten, 0)} €
-                </TableCell>
-                <TableCell className="text-right">100,0 %</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* ASSETS (Vermögenswerte) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>5. ASSETS (Vermögenswerte)</CardTitle>
-          <CardDescription>
-            Kapitalbindung und Lagerwerte
+            Lagerreichweite und Bindungsdauer (keine Kosten)
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <MetricRow
-              label="Lagerbestandswert"
-              value={`${formatNumber(metriken.lagerbestandswert, 0)} €`}
-              description="Wert der gebundenen Komponenten"
-              status="neutral"
+              label="Lagerreichweite"
+              value={`${formatNumber(metriken.lagerreichweite, 1)} Tage`}
+              description="Wie lange reicht der aktuelle Lagerbestand"
+              status={getStatusRange(metriken.lagerreichweite, 7, 14, 20)}
             />
             <MetricRow
               label="Kapitalbindung"
@@ -475,16 +412,28 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               example="Bei 48 von 50 pünktlichen Lieferungen: (48 / 50) × 100% = 96,0%"
             />
             <FormulaCard
+              title="Lieferperformance (NEU)"
+              formula="Liefertreue × (1 - (Ist-Durchlaufzeit - Soll-Durchlaufzeit) / 100)"
+              description="Bewertet die Lieferqualität unter Berücksichtigung von Durchlaufzeit-Abweichungen. Kombiniert Pünktlichkeit mit Durchlaufzeit-Performance."
+              example="Bei 95% Liefertreue und +4 Tage Verzögerung: 95 × (1 - 4/100) = 91,2%"
+            />
+            <FormulaCard
               title="Durchlaufzeit Produktion"
               formula="Ø (Ankunftsdatum Komponenten - Bestelldatum)"
-              description="Durchschnittliche Zeit von der Bestellung in China bis zur Ankunft im Werk. Beinhaltet Produktion (49 Tage) und Transport."
-              example="Bei 49 Tage Vorlaufzeit + 14 Tage Seetransport: ~63 Tage Durchlaufzeit"
+              description="Durchschnittliche Zeit von der Bestellung in China bis zur Ankunft im Werk. Beinhaltet Produktion (5 AT) und Transport (2 AT + 30 KT + 2 AT)."
+              example="Bei 49 Tage Vorlaufzeit: Bestellung 01.01. → Ankunft ~19.02. (49 Tage später)"
             />
             <FormulaCard
               title="Lagerumschlag"
               formula="Jahresproduktion (Bikes) / Durchschnittlicher Lagerbestand (Komponenten)"
               description="Zeigt, wie oft der Lagerbestand pro Jahr umgeschlagen wird. Hoher Wert = effiziente Lagerhaltung, wenig gebundenes Kapital."
               example="Bei 370.000 Bikes und Ø 92.500 Sätteln im Lager: 370.000 / 92.500 = 4,0x pro Jahr"
+            />
+            <FormulaCard
+              title="Planungsgenauigkeit (NEU)"
+              formula="100% - (Σ |Abweichung Plan-Ist| / Σ Plan) × 100%"
+              description="Misst die Genauigkeit der Produktionsplanung über alle Monate. Je höher, desto besser stimmen Plan und Ist überein."
+              example="Bei 5.000 Bikes Gesamtabweichung und 370.000 Plan: 100 - (5.000 / 370.000) × 100 = 98,6%"
             />
             <FormulaCard
               title="Produktionsflexibilität"
@@ -499,16 +448,16 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               example="Wenn an 350 von 365 Tagen Material verfügbar war: (350 / 365) × 100% = 95,9%"
             />
             <FormulaCard
-              title="Gesamtkosten"
-              formula="Herstellkosten + Beschaffungskosten + Lagerkosten"
-              description="Summe aller Supply Chain Kosten. Herstellkosten dominieren (~98%), aber Beschaffung und Lager sind optimierbar."
-              example="185M € (Herstellung) + 1,25M € (Beschaffung) + 1,25M € (Lager) = 187,5M € gesamt"
+              title="Lagerreichweite"
+              formula="Durchschnittlicher Lagerbestand / Täglicher Verbrauch"
+              description="Anzahl Tage, die der aktuelle Lagerbestand reicht. Optimal: 7-14 Tage für Balance zwischen Sicherheit und Kapitalbindung."
+              example="Bei 14.200 Sätteln im Lager und 1.000 Verbrauch/Tag: 14.200 / 1.000 = 14,2 Tage"
             />
             <FormulaCard
               title="Kapitalbindung"
-              formula="(Durchschnittlicher Lagerbestand × Kosten pro Stück × 365 Tage) / (Jahresproduktion × 1.000 €/Bike)"
-              description="Zeigt, wie viele Tage Kapital im Lager gebunden ist. Niedrigerer Wert = besserer Cashflow."
-              example="Bei Ø 92.500 Sätteln á 100€: (92.500 × 100 × 365) / (370.000 × 1.000) = 9,1 Tage"
+              formula="Durchschnittlicher Lagerbestand / Täglicher Verbrauch"
+              description="Durchschnittliche Lagerdauer in Tagen. Zeigt, wie lange Kapital gebunden ist. Niedriger Wert = besserer Cashflow."
+              example="Gleiche Berechnung wie Lagerreichweite: 14,2 Tage Kapitalbindung"
             />
           </div>
 
@@ -584,6 +533,14 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                 status: metriken.liefertreueChina >= 95 ? 'good' : metriken.liefertreueChina >= 85 ? 'medium' : 'bad'
               },
               {
+                kategorie: 'Reliability',
+                metrik: 'Lieferperformance',
+                istwert: formatPercent(metriken.deliveryPerformance, 1),
+                zielwert: '90,0 %',
+                zielerreichung: (metriken.deliveryPerformance / 90) * 100,
+                status: metriken.deliveryPerformance >= 90 ? 'good' : metriken.deliveryPerformance >= 80 ? 'medium' : 'bad'
+              },
+              {
                 kategorie: 'Responsiveness',
                 metrik: 'Durchlaufzeit',
                 istwert: `${metriken.durchlaufzeitProduktion} Tage`,
@@ -598,6 +555,14 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                 zielwert: '4,0x',
                 zielerreichung: (metriken.lagerumschlag / 4) * 100,
                 status: metriken.lagerumschlag >= 4 ? 'good' : 'medium'
+              },
+              {
+                kategorie: 'Responsiveness',
+                metrik: 'Planungsgenauigkeit',
+                istwert: formatPercent(metriken.forecastAccuracy, 1),
+                zielwert: '95,0 %',
+                zielerreichung: (metriken.forecastAccuracy / 95) * 100,
+                status: metriken.forecastAccuracy >= 95 ? 'good' : metriken.forecastAccuracy >= 90 ? 'medium' : 'bad'
               },
               {
                 kategorie: 'Agility',
@@ -616,12 +581,14 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                 status: metriken.materialverfuegbarkeit >= 95 ? 'good' : 'medium'
               },
               {
-                kategorie: 'Costs',
-                metrik: 'Gesamtkosten',
-                istwert: formatNumber(metriken.gesamtkosten, 0) + ' €',
-                zielwert: '≤ 190M €',
-                zielerreichung: (190000000 / metriken.gesamtkosten) * 100,
-                status: metriken.gesamtkosten <= 190000000 ? 'good' : 'medium'
+                kategorie: 'Assets',
+                metrik: 'Lagerreichweite',
+                istwert: `${formatNumber(metriken.lagerreichweite, 1)} Tage`,
+                zielwert: '7-14 Tage',
+                zielerreichung: metriken.lagerreichweite >= 7 && metriken.lagerreichweite <= 14 ? 100 : 
+                                metriken.lagerreichweite <= 20 ? 80 : 60,
+                status: metriken.lagerreichweite >= 7 && metriken.lagerreichweite <= 14 ? 'good' : 
+                        metriken.lagerreichweite <= 20 ? 'medium' : 'bad'
               },
               {
                 kategorie: 'Assets',
@@ -690,6 +657,12 @@ function getStatus(value: number, goodThreshold: number, mediumThreshold: number
 function getStatusInverted(value: number, goodThreshold: number, mediumThreshold: number): 'good' | 'medium' | 'bad' {
   if (value <= goodThreshold) return 'good'
   if (value <= mediumThreshold) return 'medium'
+  return 'bad'
+}
+
+function getStatusRange(value: number, minGood: number, maxGood: number, maxMedium: number): 'good' | 'medium' | 'bad' {
+  if (value >= minGood && value <= maxGood) return 'good'
+  if (value <= maxMedium) return 'medium'
   return 'bad'
 }
 
@@ -1309,48 +1282,8 @@ function VisualisierungenView({
         </Card>
       </div>
 
-      {/* Zusätzliche Visualisierungen - zweite Reihe */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Kostenverteilung Pie Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Kostenverteilung 2027</CardTitle>
-            <CardDescription>Aufschlüsselung nach Kostenarten</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: 'Herstellkosten', value: 185000000 },
-                    { name: 'Beschaffungskosten', value: 1250000 },
-                    { name: 'Lagerkosten', value: 1250000 }
-                  ]}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={(entry) => `${entry.name}: ${((entry.value / 187500000) * 100).toFixed(1)}%`}
-                  outerRadius={110}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  <Cell fill={COLORS.primary} />
-                  <Cell fill={COLORS.warning} />
-                  <Cell fill={COLORS.info} />
-                </Pie>
-                <Tooltip
-                  formatter={(value: any) => {
-                    if (typeof value === 'number') {
-                      return formatNumber(value, 0) + ' €'
-                    }
-                    return String(value)
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
+      {/* Zusätzliche Visualisierungen */}
+      <div className="grid grid-cols-1 gap-6">
         {/* Wöchentlicher Durchsatz - UNABHÄNGIG von Zeitfiltern */}
         <Card>
           <CardHeader>

@@ -24,7 +24,7 @@ import stammdatenData from '@/data/stammdaten.json'
  * 
  * Verwendet die Saisonalitäts-Daten aus JSON:
  * - Januar: 4%
- * - Februar: 5%
+ * - Februar: 6%
  * - März: 10%
  * - April: 16% ← PEAK!
  * - ...

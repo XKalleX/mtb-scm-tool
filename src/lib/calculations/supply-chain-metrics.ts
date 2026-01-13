@@ -65,26 +65,6 @@ export const DURCHSCHNITT_TAGE_PRO_MONAT = 30.4
 export const GLEICHMAESSIGER_MONATSANTEIL = 100 / 12 // ≈ 8.33%
 
 /**
- * Herstellkosten pro Bike in EUR (Durchschnitt aller Varianten)
- */
-export const HERSTELLKOSTEN_PRO_BIKE = 1000
-
-/**
- * Beschaffungskosten pro Sattel in EUR
- */
-export const BESCHAFFUNGSKOSTEN_PRO_SATTEL = 50
-
-/**
- * Lagerkostensatz (10% des Lagerwertes pro Jahr)
- */
-export const LAGERKOSTENSATZ = 0.1
-
-/**
- * Wert pro Sattel-Set in EUR für Lagerbestandsberechnung
- */
-export const WERT_PRO_SATTEL_SET = 150
-
-/**
  * Wasserschaden: Maximaler relativer Verlusteffekt
  */
 export const WASSERSCHADEN_MAX_VERLUST_EFFEKT = 0.3
@@ -94,6 +74,12 @@ export const WASSERSCHADEN_MAX_VERLUST_EFFEKT = 0.3
  */
 export const WASSERSCHADEN_VERLUST_DIVISOR = 10000
 
+/**
+ * Durchlaufzeit Penalty Factor für Delivery Performance
+ * 1 Tag Verzögerung = 1% Penalty auf Lieferperformance
+ */
+export const DURCHLAUFZEIT_PENALTY_FAKTOR = 100
+
 // ========================================
 // KONFIGURATION INTERFACE (für dynamische Werte)
 // ========================================
@@ -102,7 +88,7 @@ export interface DynamicConfig {
   jahresproduktion: number
   arbeitstage: number
   saisonalitaet: Array<{ monat: number; anteil: number }>
-  varianten: Array<{ id: string; name: string; anteilPrognose: number; herstellkosten: number }>
+  varianten: Array<{ id: string; name: string; anteilPrognose: number }>
 }
 
 // ========================================
@@ -363,24 +349,20 @@ export interface SCORMetrikenBerechnet {
   // RELIABILITY (Zuverlässigkeit)
   planerfuellungsgrad: number
   liefertreueChina: number
+  deliveryPerformance: number        // NEU: % Lieferungen innerhalb Vorlaufzeit
   
   // RESPONSIVENESS (Reaktionsfähigkeit)
   durchlaufzeitProduktion: number
   lagerumschlag: number
+  forecastAccuracy: number           // NEU: % Genauigkeit Plan vs. Ist
   
   // AGILITY (Flexibilität)
   produktionsflexibilitaet: number
   materialverfuegbarkeit: number
   
-  // COSTS (Kosten)
-  gesamtkosten: number
-  herstellkosten: number
-  lagerkosten: number
-  beschaffungskosten: number
-  
-  // ASSETS (Vermögenswerte)
-  lagerbestandswert: number
-  kapitalbindung: number
+  // ASSETS (Anlagenverwaltung - KEINE KOSTEN!)
+  lagerreichweite: number            // Lagerbestand in Tagen Reichweite
+  kapitalbindung: number             // Durchschnittliche Lagerdauer in Tagen
   
   // PRODUKTIONS-KPIs
   gesamtproduktion: number
@@ -398,47 +380,55 @@ export interface SCORMetrikenBerechnet {
 export function berechneSCORMetriken(aktiveSzenarien: SzenarioConfig[]): SCORMetrikenBerechnet {
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
   
-  // Berechne Kosten basierend auf Produktion
-  // Pro Bike: Herstellkosten aus Konstante (Durchschnitt aller Varianten)
-  const herstellkosten = auswirkungen.produktionsmenge * HERSTELLKOSTEN_PRO_BIKE
-  
-  // Beschaffungskosten pro Sattel * Anzahl Sättel (1 Sattel pro Bike)
-  const beschaffungskosten = auswirkungen.produktionsmenge * BESCHAFFUNGSKOSTEN_PRO_SATTEL
-  
-  // Lagerkosten: Lagerkostensatz des durchschnittlichen Lagerwertes
+  // Lagerreichweite berechnen (in Tagen)
   // Durchschnittlicher Lagerbestand: ca. 2 Wochen Produktion (52 Wochen / 2 = 26)
   const WOCHEN_PRO_JAHR = 52
   const LAGERBESTAND_WOCHEN = 2
   const durchschnittlicherLagerbestand = Math.round(auswirkungen.produktionsmenge / (WOCHEN_PRO_JAHR / LAGERBESTAND_WOCHEN))
-  const lagerbestandswert = durchschnittlicherLagerbestand * WERT_PRO_SATTEL_SET
-  const lagerkosten = Math.round(lagerbestandswert * LAGERKOSTENSATZ)
+  const lagerreichweite = Math.round((durchschnittlicherLagerbestand / auswirkungen.durchschnittProTag) * 10) / 10
   
-  const gesamtkosten = herstellkosten + beschaffungskosten + lagerkosten
+  // Kapitalbindung: Durchschnittliche Lagerdauer in Tagen
+  // HINWEIS: Identisch mit Lagerreichweite, da beide die durchschnittliche Verweildauer
+  // von Komponenten im Lager messen. Keine Kosten-Komponente mehr!
+  const kapitalbindung = lagerreichweite
   
-  // Kapitalbindung: Durchschnittliche Lagerdauer
-  const kapitalbindung = Math.round((durchschnittlicherLagerbestand / auswirkungen.durchschnittProTag) * 10) / 10
+  // NEU: Delivery Performance - % Lieferungen innerhalb der Vorlaufzeit (49 Tage)
+  // Basis: Liefertreue mit Toleranz für Durchlaufzeit-Verzögerungen
+  const DURCHLAUFZEIT_PENALTY_FAKTOR = 100 // Divisor für Verzögerungsberechnung (1 Tag = 1% Penalty)
+  const deliveryPerformance = Math.max(
+    0,
+    Math.min(
+      100,
+      auswirkungen.liefertreue * (1 - (auswirkungen.durchlaufzeit - BASELINE.durchlaufzeit) / DURCHLAUFZEIT_PENALTY_FAKTOR)
+    )
+  )
+  
+  // NEU: Forecast Accuracy - Genauigkeit der Planerfüllung
+  // Berechnet aus der Abweichung zwischen Plan und Ist über alle Monate
+  const monatlicheProduktion = berechneMonatlicheProduktion(auswirkungen.produktionsmenge)
+  const gesamtAbweichung = monatlicheProduktion.reduce((sum, m) => sum + Math.abs(m.abweichung), 0)
+  const gesamtPlan = monatlicheProduktion.reduce((sum, m) => sum + m.plan, 0)
+  const forecastAccuracy = gesamtPlan > 0 
+    ? Math.max(0, Math.min(100, 100 - (gesamtAbweichung / gesamtPlan) * 100))
+    : 100
   
   return {
     // RELIABILITY
     planerfuellungsgrad: auswirkungen.planerfuellungsgrad,
     liefertreueChina: auswirkungen.liefertreue,
+    deliveryPerformance: Math.round(deliveryPerformance * 10) / 10,
     
     // RESPONSIVENESS
     durchlaufzeitProduktion: auswirkungen.durchlaufzeit,
     lagerumschlag: auswirkungen.lagerumschlag,
+    forecastAccuracy: Math.round(forecastAccuracy * 10) / 10,
     
     // AGILITY
     produktionsflexibilitaet: auswirkungen.planerfuellungsgrad, // Gleich wie Planerfüllung
     materialverfuegbarkeit: auswirkungen.materialverfuegbarkeit,
     
-    // COSTS
-    gesamtkosten,
-    herstellkosten,
-    lagerkosten,
-    beschaffungskosten,
-    
-    // ASSETS
-    lagerbestandswert,
+    // ASSETS (KEINE KOSTEN!)
+    lagerreichweite,
     kapitalbindung,
     
     // PRODUKTIONS-KPIs
@@ -738,41 +728,59 @@ export function berechneGesamtMetrikenMitKonfig(
   dynamicConfig: DynamicConfig
 ): GesamtMetriken {
   const auswirkungen = berechneSzenarioAuswirkungenMitKonfig(aktiveSzenarien, dynamicConfig)
+  const baseline = createDynamicBaseline(dynamicConfig)
   
-  // Berechne SCOR-Metriken basierend auf den Auswirkungen
-  const herstellkosten = auswirkungen.produktionsmenge * HERSTELLKOSTEN_PRO_BIKE
-  const beschaffungskosten = auswirkungen.produktionsmenge * BESCHAFFUNGSKOSTEN_PRO_SATTEL
+  // Berechne SCOR-Metriken basierend auf den Auswirkungen (KEINE KOSTEN!)
   const WOCHEN_PRO_JAHR = 52
   const LAGERBESTAND_WOCHEN = 2
   const durchschnittlicherLagerbestand = Math.round(auswirkungen.produktionsmenge / (WOCHEN_PRO_JAHR / LAGERBESTAND_WOCHEN))
-  const lagerbestandswert = durchschnittlicherLagerbestand * WERT_PRO_SATTEL_SET
-  const lagerkosten = Math.round(lagerbestandswert * LAGERKOSTENSATZ)
-  const gesamtkosten = herstellkosten + beschaffungskosten + lagerkosten
-  const kapitalbindung = Math.round((durchschnittlicherLagerbestand / auswirkungen.durchschnittProTag) * 10) / 10
+  const lagerreichweite = Math.round((durchschnittlicherLagerbestand / auswirkungen.durchschnittProTag) * 10) / 10
+  
+  // HINWEIS: Kapitalbindung = Lagerreichweite (beide messen Verweildauer im Lager)
+  const kapitalbindung = lagerreichweite
+  
+  // NEU: Delivery Performance - % Lieferungen innerhalb der Vorlaufzeit
+  const deliveryPerformance = Math.max(
+    0,
+    Math.min(
+      100,
+      auswirkungen.liefertreue * (1 - (auswirkungen.durchlaufzeit - baseline.durchlaufzeit) / DURCHLAUFZEIT_PENALTY_FAKTOR)
+    )
+  )
+  
+  // NEU: Forecast Accuracy - Genauigkeit der Planerfüllung
+  const monatlicheProduktion = berechneMonatlicheProduktionMitKonfig(
+    auswirkungen.produktionsmenge, 
+    dynamicConfig.saisonalitaet
+  )
+  const gesamtAbweichung = monatlicheProduktion.reduce((sum, m) => sum + Math.abs(m.abweichung), 0)
+  const gesamtPlan = monatlicheProduktion.reduce((sum, m) => sum + m.plan, 0)
+  const forecastAccuracy = gesamtPlan > 0 
+    ? Math.max(0, Math.min(100, 100 - (gesamtAbweichung / gesamtPlan) * 100))
+    : 100
 
   const scor: SCORMetrikenBerechnet = {
+    // RELIABILITY
     planerfuellungsgrad: auswirkungen.planerfuellungsgrad,
     liefertreueChina: auswirkungen.liefertreue,
+    deliveryPerformance: Math.round(deliveryPerformance * 10) / 10,
+    // RESPONSIVENESS
     durchlaufzeitProduktion: auswirkungen.durchlaufzeit,
     lagerumschlag: auswirkungen.lagerumschlag,
+    forecastAccuracy: Math.round(forecastAccuracy * 10) / 10,
+    // AGILITY
     produktionsflexibilitaet: auswirkungen.planerfuellungsgrad,
     materialverfuegbarkeit: auswirkungen.materialverfuegbarkeit,
-    gesamtkosten,
-    herstellkosten,
-    lagerkosten,
-    beschaffungskosten,
-    lagerbestandswert,
+    // ASSETS (KEINE KOSTEN!)
+    lagerreichweite,
     kapitalbindung,
+    // PRODUKTIONS-KPIs
     gesamtproduktion: auswirkungen.produktionsmenge,
     produktionstage: auswirkungen.produktionstage,
     durchschnittProTag: auswirkungen.durchschnittProTag,
     auslastung: auswirkungen.auslastung
   }
   
-  const monatlicheProduktion = berechneMonatlicheProduktionMitKonfig(
-    auswirkungen.produktionsmenge, 
-    dynamicConfig.saisonalitaet
-  )
   const variantenProduktion = berechneVariantenProduktionMitKonfig(
     auswirkungen.produktionsmenge,
     dynamicConfig.varianten

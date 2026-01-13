@@ -5,13 +5,55 @@
     "land": "China",
     "vorlaufzeitKalendertage": 30,
     "vorlaufzeitArbeitstage": 5,
+    "lkwTransportArbeitstage": 4,
+    "lkwTransportChinaArbeitstage": 2,
+    "lkwTransportDeutschlandArbeitstage": 2,
+    "gesamtVorlaufzeitTage": 49,
+    "transportSequenz": [
+      {
+        "schritt": 1,
+        "typ": "Produktion",
+        "dauer": 5,
+        "einheit": "AT",
+        "von": "Dengwong",
+        "nach": "Dengwong",
+        "beschreibung": "Produktion beim Zulieferer (Mo-Fr ohne Feiertage)"
+      },
+      {
+        "schritt": 2,
+        "typ": "LKW",
+        "dauer": 2,
+        "einheit": "AT",
+        "von": "Dengwong",
+        "nach": "Hafen Shanghai",
+        "beschreibung": "LKW-Transport zum Hafen (Mo-Fr)"
+      },
+      {
+        "schritt": 3,
+        "typ": "Seefracht",
+        "dauer": 30,
+        "einheit": "KT",
+        "von": "Hafen Shanghai",
+        "nach": "Hafen Hamburg",
+        "beschreibung": "Seefracht (24/7 unterwegs)"
+      },
+      {
+        "schritt": 4,
+        "typ": "LKW",
+        "dauer": 2,
+        "einheit": "AT",
+        "von": "Hafen Hamburg",
+        "nach": "Werk Dortmund",
+        "beschreibung": "LKW-Transport zum Werk (Mo-Fr)"
+      }
+    ],
     "losgroesse": 500,
     "kapazitaet": 50000,
     "lieferintervall": 14,
     "besonderheiten": [
       "Einziger Lieferant für Sättel",
-      "Spring Festival: 05. Feb - 12. Feb 2027 (8 Tage Produktionsstopp)",
-      "Schiff-Transport: 30 Kalendertage (24/7 unterwegs)", 
+      "Spring Festival: 28. Jan - 4. Feb 2027 (8 Tage Produktionsstopp)",
+      "Schiff-Transport: 44 Kalendertage (24/7 unterwegs)",
       "Bearbeitung: 5 Arbeitstage (Mo-Fr ohne Feiertage)",
       "Gesamte Vorlaufzeit: 49 Tage (7 Wochen)",
       "Mindestbestellung: 500 Stück Sättel (Losgröße)",

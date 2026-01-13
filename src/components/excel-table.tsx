@@ -17,6 +17,7 @@
 import React, { useState } from 'react'
 import { Info } from 'lucide-react'
 import { formatNumber } from '@/lib/utils'
+import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 
 interface ExcelTableColumn {
   key: string
@@ -266,7 +267,7 @@ export default function ExcelTable({
 
 /**
  * Formel-Karte Komponente
- * Zeigt wichtige Formeln mit Erklärung
+ * Zeigt wichtige Formeln mit Erklärung - COLLAPSIBLE by default
  */
 export function FormulaCard({ 
   title, 
@@ -280,24 +281,23 @@ export function FormulaCard({
   example?: string
 }) {
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
-      <div className="flex items-start gap-3">
-        <div className="bg-blue-600 text-white rounded-full p-2">
-          <Info className="h-5 w-5" />
+    <CollapsibleInfo
+      title={title}
+      variant="info"
+      icon={<Info className="h-4 w-4" />}
+      defaultOpen={false}
+    >
+      <div className="space-y-3">
+        <div className="bg-white rounded px-3 py-2 font-mono text-sm text-blue-800 border border-blue-200">
+          {formula}
         </div>
-        <div className="flex-1">
-          <h4 className="font-semibold text-blue-900 mb-2">{title}</h4>
-          <div className="bg-white rounded px-3 py-2 mb-2 font-mono text-sm text-blue-800 border border-blue-200">
-            {formula}
+        <p className="text-sm text-blue-800">{description}</p>
+        {example && (
+          <div className="bg-green-50 border border-green-200 rounded px-3 py-2 text-sm text-green-800">
+            <strong>Beispiel:</strong> {example}
           </div>
-          <p className="text-sm text-blue-800 mb-2">{description}</p>
-          {example && (
-            <div className="bg-green-50 border border-green-200 rounded px-3 py-2 text-sm text-green-800">
-              <strong>Beispiel:</strong> {example}
-            </div>
-          )}
-        </div>
+        )}
       </div>
-    </div>
+    </CollapsibleInfo>
   )
 }

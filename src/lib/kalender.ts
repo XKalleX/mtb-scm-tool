@@ -199,23 +199,36 @@ export function subtractArbeitstage(zielDatum: Date, arbeitstage: number): Date 
  * @returns Bestelldatum bei China
  */
 export function berechneBestelldatum(bedarfsdatum: Date): Date {
-  // China-spezifische Vorlaufzeiten gemäß SSOT-Spezifikation
+  // China-spezifische Vorlaufzeiten gemäß SSOT-Spezifikation und Anforderungen
   // TOTAL: 49 Tage = 7 Wochen Vorlaufzeit
-  const TRANSPORT_KALENDERTAGE = 44  // Schiff-Transport (statt 35)
-  const BEARBEITUNG_ARBEITSTAGE = 5  // Produktion in China (statt 21)
+  // Aufschlüsselung gemäß Anforderungen (Bild):
+  // - 5 AT Produktion in China
+  // - 2 AT LKW-Transport China → Hafen Shanghai
+  // - 30 KT Seefracht Shanghai → Hamburg
+  // - 2 AT LKW-Transport Hamburg → Dortmund
+  const SEEFRACHT_KALENDERTAGE = 30  // Schiff-Transport (24/7)
+  const BEARBEITUNG_ARBEITSTAGE = 5  // Produktion in China
+  const LKW_CHINA_ARBEITSTAGE = 2    // LKW China → Hafen
+  const LKW_DEUTSCHLAND_ARBEITSTAGE = 2  // LKW Hamburg → Dortmund
   
-  // Schritt 1: Vom Bedarfsdatum die Transportzeit (Kalendertage) abziehen
+  // Schritt 1: Vom Bedarfsdatum die Seefracht-Zeit (Kalendertage) abziehen
   // Transport läuft 24/7, also einfach Kalendertage subtrahieren
-  let datumNachTransport = addDays(bedarfsdatum, -TRANSPORT_KALENDERTAGE)
+  let datumNachSeefracht = addDays(bedarfsdatum, -SEEFRACHT_KALENDERTAGE)
   
-  // Schritt 2: Von diesem Datum die Bearbeitungszeit (Arbeitstage) abziehen
+  // Schritt 2: LKW-Transport Deutschland (2 AT) abziehen
+  datumNachSeefracht = subtractArbeitstage(datumNachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE)
+  
+  // Schritt 3: Von diesem Datum die Bearbeitungszeit (5 AT) abziehen
   // Dies berücksichtigt Wochenenden und chinesische Feiertage
-  let bestelldatum = subtractArbeitstage(datumNachTransport, BEARBEITUNG_ARBEITSTAGE)
+  let nachProduktion = subtractArbeitstage(datumNachSeefracht, BEARBEITUNG_ARBEITSTAGE)
   
-  // Schritt 3: Einen zusätzlichen Tag Puffer (Best Practice)
+  // Schritt 4: LKW-Transport China (2 AT) abziehen
+  let bestelldatum = subtractArbeitstage(nachProduktion, LKW_CHINA_ARBEITSTAGE)
+  
+  // Schritt 5: Einen zusätzlichen Tag Puffer (Best Practice)
   bestelldatum = addDays(bestelldatum, -1)
   
-  // Schritt 4: Sicherstellen dass Bestelldatum ein Arbeitstag ist
+  // Schritt 6: Sicherstellen dass Bestelldatum ein Arbeitstag ist
   // Falls Wochenende/Feiertag -> vorheriger Arbeitstag
   while (!istArbeitstag(bestelldatum)) {
     bestelldatum = addDays(bestelldatum, -1)
@@ -230,15 +243,24 @@ export function berechneBestelldatum(bedarfsdatum: Date): Date {
  * @returns Ankunftsdatum in Deutschland
  */
 export function berechneAnkunftsdatum(bestelldatum: Date): Date {
-  // Vorlaufzeit gemäß SSOT: 49 Tage = 5 AT Produktion + 44 KT Transport
-  const TRANSPORT_KALENDERTAGE = 44
+  // Vorlaufzeit gemäß SSOT: 49 Tage
+  // Aufschlüsselung: 5 AT Produktion + 2 AT + 30 KT + 2 AT Transport
+  const SEEFRACHT_KALENDERTAGE = 30
   const BEARBEITUNG_ARBEITSTAGE = 5
+  const LKW_CHINA_ARBEITSTAGE = 2
+  const LKW_DEUTSCHLAND_ARBEITSTAGE = 2
   
-  // Schritt 1: Bearbeitung in China (Arbeitstage)
+  // Schritt 1: Bearbeitung in China (5 AT)
   let nachBearbeitung = addArbeitstage(bestelldatum, BEARBEITUNG_ARBEITSTAGE)
   
-  // Schritt 2: Transport (Kalendertage)
-  let ankunftsdatum = addDays(nachBearbeitung, TRANSPORT_KALENDERTAGE)
+  // Schritt 2: LKW-Transport China zum Hafen (2 AT)
+  let nachLKWChina = addArbeitstage(nachBearbeitung, LKW_CHINA_ARBEITSTAGE)
+  
+  // Schritt 3: Seefracht (30 KT)
+  let nachSeefracht = addDays(nachLKWChina, SEEFRACHT_KALENDERTAGE)
+  
+  // Schritt 4: LKW-Transport Hamburg nach Dortmund (2 AT)
+  let ankunftsdatum = addArbeitstage(nachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE)
   
   return ankunftsdatum
 }

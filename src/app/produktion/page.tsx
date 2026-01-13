@@ -16,11 +16,13 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Factory, AlertTriangle, TrendingUp, Package, Download } from 'lucide-react'
+import { Factory, AlertTriangle, TrendingUp, Package, Download } from 'lucide-react'
+import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { formatNumber } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
+import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { useMemo } from 'react'
 import { 
   generiereTagesproduktion, 
@@ -126,6 +128,9 @@ export default function ProduktionPage() {
         </div>
       </div>
 
+      {/* Aktive Szenarien Banner */}
+      <ActiveScenarioBanner showDetails={false} />
+
       {/* Übersicht Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -183,20 +188,20 @@ export default function ProduktionPage() {
         </Card>
       </div>
 
-      {/* Produktionslogik ohne Solver */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardHeader>
-          <div className="flex items-center space-x-2">
-            <Factory className="h-5 w-5 text-blue-600" />
-            <CardTitle className="text-blue-900">Produktionslogik (ohne Solver)</CardTitle>
-          </div>
-          <CardDescription className="text-blue-700">
-            Einfache First-Come-First-Serve Regel statt mathematischer Optimierung
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="bg-white rounded-lg p-4">
-            <h4 className="font-semibold text-blue-900 mb-2">FCFS-Regel (First-Come-First-Serve):</h4>
+      {/* Produktionslogik ohne Solver - COLLAPSIBLE */}
+      <CollapsibleInfo
+        title="Produktionslogik (ohne Solver)"
+        variant="info"
+        icon={<Factory className="h-5 w-5" />}
+        defaultOpen={false}
+      >
+        <p className="text-sm text-blue-700 mb-4">
+          Einfache First-Come-First-Serve Regel statt mathematischer Optimierung
+        </p>
+        
+        <div className="space-y-4">
+          <div>
+            <h4 className="font-semibold text-blue-900 mb-2">FCFS-Regel (First-Come-First-Serve)</h4>
             <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
               <li>
                 <strong>Schritt 1: ATP-Check</strong> - Prüfe für jeden Produktionsauftrag: 
@@ -214,17 +219,17 @@ export default function ProduktionPage() {
             </ol>
           </div>
 
-          <div className="bg-white rounded-lg p-4">
-            <h4 className="font-semibold text-blue-900 mb-2">ATP-Check (Available-to-Promise):</h4>
+          <div className="border-t border-blue-200 pt-4">
+            <h4 className="font-semibold text-blue-900 mb-2">ATP-Check (Available-to-Promise)</h4>
             <p className="text-sm text-blue-800">
               Für jede Komponente in der Stückliste wird geprüft:<br/>
-              <code className="bg-blue-100 px-2 py-1 rounded">
+              <code className="bg-blue-100 px-2 py-1 rounded mt-2 inline-block">
                 Verfügbar im Lager ≥ Benötigt für Auftrag
               </code>
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </CollapsibleInfo>
 
       {/* SEKTION 1: PRODUKTIONSSTEUERUNG */}
       <Card className="border-purple-200 bg-purple-50">
@@ -553,31 +558,6 @@ export default function ProduktionPage() {
         </CardContent>
       </Card>
 
-      {/* Erfüllte Anforderungen */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Erfüllte Anforderungen</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 md:grid-cols-2">
-            <RequirementItem text="ATP-Check (Available-to-Promise)" />
-            <RequirementItem text="First-Come-First-Serve Regel" />
-            <RequirementItem text="Lagerbestand-Management" />
-            <RequirementItem text="Sicherheitsbestände" />
-            <RequirementItem text="Materialbuchung (Ein-/Ausgang)" />
-            <RequirementItem text="Planerfüllungsgrad-Tracking" />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function RequirementItem({ text }: { text: string }) {
-  return (
-    <div className="flex items-center space-x-2 text-sm">
-      <CheckCircle2 className="h-4 w-4 text-green-600" />
-      <span>{text}</span>
     </div>
   )
 }

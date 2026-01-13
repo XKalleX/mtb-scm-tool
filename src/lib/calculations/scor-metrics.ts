@@ -9,17 +9,20 @@
  * - Fokus auf Produktions- und Lager-KPIs
  * - Keine Liefertreue an Märkte (da kein Outbound)
  * - Stattdessen: Planerfüllungsgrad, Lagerumschlag, etc.
+ * - KEINE KOSTEN (gemäß Anforderungen)
  * 
  * SCOR Level 1 Kategorien:
- * 1. RELIABILITY (Zuverlässigkeit)
- * 2. RESPONSIVENESS (Reaktionsfähigkeit)
- * 3. AGILITY (Flexibilität)
- * 4. COSTS (Kosten)
- * 5. ASSETS (Vermögenswerte)
+ * 1. RELIABILITY (Zuverlässigkeit) - 3 Metriken
+ * 2. RESPONSIVENESS (Reaktionsfähigkeit) - 3 Metriken
+ * 3. AGILITY (Flexibilität) - 2 Metriken
+ * 4. ASSETS (Anlagenverwaltung - KEINE KOSTEN!) - 2 Metriken
+ * 
+ * GESAMT: 10 Metriken (> 5 gefordert) ✓
  */
 
 import { SCORMetriken, Produktionsauftrag, Lagerbestand, Bestellung } from '@/types'
 import { daysBetween } from '@/lib/utils'
+import { CHINA_VORLAUFZEIT_TAGE } from '@/lib/calculations/supply-chain-metrics'
 
 /**
  * Berechnet alle SCOR-Metriken
@@ -42,14 +45,31 @@ export function berechneSCORMetriken(
     a => a.tatsaechlicheMenge === a.geplanteMenge
   ).length
   
-  const planerfuellungsgrad = (vollstaendigeAuftraege / produktionsauftraege.length) * 100
+  const planerfuellungsgrad = produktionsauftraege.length > 0
+    ? (vollstaendigeAuftraege / produktionsauftraege.length) * 100
+    : 100
   
   const puenktlicheBestellungen = bestellungen.filter(b => {
     if (!b.tatsaechlicheAnkunft) return true
     return b.tatsaechlicheAnkunft <= b.erwarteteAnkunft
   }).length
   
-  const liefertreueChina = (puenktlicheBestellungen / bestellungen.length) * 100
+  const liefertreueChina = bestellungen.length > 0
+    ? (puenktlicheBestellungen / bestellungen.length) * 100
+    : 100
+  
+  // NEU: Delivery Performance - Lieferungen innerhalb Vorlaufzeit
+  // Verwendet CHINA_VORLAUFZEIT_TAGE aus dem shared constants
+  const TOLERANZ_TAGE = 2 // +2 Tage Toleranz
+  const lieferungenInVorlaufzeit = bestellungen.filter(b => {
+    if (!b.tatsaechlicheAnkunft) return true
+    const tatsaechlicheDauer = daysBetween(b.bestelldatum, b.tatsaechlicheAnkunft)
+    return tatsaechlicheDauer <= CHINA_VORLAUFZEIT_TAGE + TOLERANZ_TAGE
+  }).length
+  
+  const deliveryPerformance = bestellungen.length > 0
+    ? (lieferungenInVorlaufzeit / bestellungen.length) * 100
+    : 100
   
   // ==========================================
   // RESPONSIVENESS (Reaktionsfähigkeit)
@@ -76,6 +96,16 @@ export function berechneSCORMetriken(
   
   const lagerumschlag = lagerbestandswert > 0 ? jahresproduktion / lagerbestandswert : 0
   
+  // NEU: Forecast Accuracy - Planungsgenauigkeit
+  const gesamtAbweichung = produktionsauftraege.reduce(
+    (sum, a) => sum + Math.abs(a.tatsaechlicheMenge - a.geplanteMenge), 
+    0
+  )
+  const gesamtPlan = produktionsauftraege.reduce((sum, a) => sum + a.geplanteMenge, 0)
+  const forecastAccuracy = gesamtPlan > 0
+    ? Math.max(0, 100 - (gesamtAbweichung / gesamtPlan) * 100)
+    : 100
+  
   // ==========================================
   // AGILITY (Flexibilität)
   // ==========================================
@@ -88,31 +118,25 @@ export function berechneSCORMetriken(
     a => !a.materialmangel || a.materialmangel.length === 0
   ).length
   
-  const materialverfuegbarkeit = (materialVerfuegbarTage / produktionsauftraege.length) * 100
+  const materialverfuegbarkeit = produktionsauftraege.length > 0
+    ? (materialVerfuegbarTage / produktionsauftraege.length) * 100
+    : 100
   
   // ==========================================
-  // COSTS (Kosten)
+  // ASSETS (Anlagenverwaltung - KEINE KOSTEN!)
   // ==========================================
   
-  // Vereinfachte Kostenberechnung
-  // Pro Bike: ca. 1.000 € Herstellkosten
-  const herstellkosten = jahresproduktion * 1000
-  
-  // Beschaffungskosten: Bestellungen * Durchschnitt
-  const beschaffungskosten = bestellungen.length * 50000 // Schätzung
-  
-  // Lagerkosten: 10% des Lagerwertes pro Jahr
-  const lagerkosten = lagerbestandswert * 100 * 0.1 // 100€ pro Stück, 10% Lagerkostensatz
-  
-  const gesamtkosten = herstellkosten + beschaffungskosten + lagerkosten
-  
-  // ==========================================
-  // ASSETS (Vermögenswerte)
-  // ==========================================
-  
-  const kapitalbindung = lagerbestandswert > 0
-    ? (lagerbestandswert * 100 * 365) / jahresproduktion / 1000
+  const durchschnittProTag = produktionsauftraege.length > 0
+    ? jahresproduktion / produktionsauftraege.length
     : 0
+  
+  // Lagerreichweite in Tagen
+  const lagerreichweite = durchschnittProTag > 0
+    ? lagerbestandswert / durchschnittProTag
+    : 0
+  
+  // Kapitalbindung = Lagerreichweite (in Tagen, KEINE €-Werte!)
+  const kapitalbindung = lagerreichweite
   
   // ==========================================
   // PRODUKTIONS-KPIs
@@ -120,30 +144,25 @@ export function berechneSCORMetriken(
   
   const gesamtproduktion = jahresproduktion
   const produktionstage = produktionsauftraege.filter(a => a.tatsaechlicheMenge > 0).length
-  const durchschnittProTag = produktionstage > 0 ? gesamtproduktion / produktionstage : 0
   const auslastung = planerfuellungsgrad
   
   return {
-    // RELIABILITY
+    // RELIABILITY (3 Metriken)
     planerfuellungsgrad,
     liefertreueChina,
+    deliveryPerformance,
     
-    // RESPONSIVENESS
+    // RESPONSIVENESS (3 Metriken)
     durchlaufzeitProduktion,
     lagerumschlag,
+    forecastAccuracy,
     
-    // AGILITY
+    // AGILITY (2 Metriken)
     produktionsflexibilitaet,
     materialverfuegbarkeit,
     
-    // COSTS
-    gesamtkosten,
-    herstellkosten,
-    lagerkosten,
-    beschaffungskosten,
-    
-    // ASSETS
-    lagerbestandswert,
+    // ASSETS (2 Metriken - KEINE KOSTEN!)
+    lagerreichweite,
     kapitalbindung,
     
     // PRODUKTIONS-KPIs
@@ -167,6 +186,12 @@ export function bewerteSCORMetriken(metriken: SCORMetriken): Record<string, stri
     
     liefertreueChina: metriken.liefertreueChina >= 95 ? 'gut' :
                       metriken.liefertreueChina >= 85 ? 'mittel' : 'schlecht',
+    
+    deliveryPerformance: metriken.deliveryPerformance >= 90 ? 'gut' :
+                         metriken.deliveryPerformance >= 80 ? 'mittel' : 'schlecht',
+    
+    forecastAccuracy: metriken.forecastAccuracy >= 95 ? 'gut' :
+                      metriken.forecastAccuracy >= 90 ? 'mittel' : 'schlecht',
     
     materialverfuegbarkeit: metriken.materialverfuegbarkeit >= 95 ? 'gut' :
                            metriken.materialverfuegbarkeit >= 85 ? 'mittel' : 'schlecht',

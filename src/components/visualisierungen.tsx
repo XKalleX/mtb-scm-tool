@@ -714,7 +714,7 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
   // Lieferanten-Performance
   // ERMÄSSIGUNG: Nur China als Zulieferer
   const lieferantenDaten = [
-    { lieferant: 'China (Sättel)', liefertreue: 96, durchlaufzeit: 49, kosten: 85000 }
+    { lieferant: 'China (Sättel)', liefertreue: 96, durchlaufzeit: 49, volumen: 370000 }
   ]
 
   // Filter/Aggregiere Lagerdaten basierend auf timeRange
@@ -830,7 +830,7 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
         <CardHeader>
           <CardTitle>Lieferanten-Performance</CardTitle>
           <CardDescription>
-            Liefertreue, Durchlaufzeit und Kosten
+            Liefertreue und Durchlaufzeit
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -866,7 +866,7 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
                   </div>
                   <div>
                     <p className="text-xs text-gray-600">Jahresvolumen</p>
-                    <p className="text-xl font-bold mt-1">€{(lieferant.kosten / 1000).toFixed(0)}k</p>
+                    <p className="text-xl font-bold mt-1">{(lieferant.volumen / 1000).toFixed(0)}k Sättel</p>
                   </div>
                 </div>
               </div>
@@ -905,14 +905,6 @@ function SCORDashboard() {
       metriken: [
         { name: 'Supply Chain Flexibility', wert: 87, ziel: 85, einheit: '%' },
         { name: 'Upside Adaptability', wert: 21, ziel: 20, einheit: 'Tage' }
-      ]
-    },
-    {
-      kategorie: 'Cost (Kosten)',
-      farbe: COLORS.warning,
-      metriken: [
-        { name: 'Total SC Cost', wert: 12.5, ziel: 13, einheit: '% Umsatz' },
-        { name: 'Cost of Goods Sold', wert: 67, ziel: 70, einheit: '% Umsatz' }
       ]
     },
     {

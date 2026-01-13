@@ -66,8 +66,11 @@ export function EinstellungenPanel() {
   }
 
   const handleReset = () => {
-    zuruecksetzenAufStandard()
+    // Reset UI state BEFORE calling context update to avoid race condition
+    // When zuruecksetzenAufStandard() updates the context, it causes this component
+    // to re-render, which could interfere with the state update if done afterwards
     setShowConfirmReset(false)
+    zuruecksetzenAufStandard()
   }
 
   const arbeitstage = getArbeitstageProJahr()
@@ -147,7 +150,7 @@ export function EinstellungenPanel() {
                   <Input
                     id="jahresproduktion"
                     type="number"
-                    value={konfiguration.jahresproduktion}
+                    value={konfiguration.jahresproduktion ?? 0}
                     onChange={(e) => setJahresproduktion(parseInt(e.target.value) || 0)}
                     min={0}
                     step={1000}
@@ -161,7 +164,7 @@ export function EinstellungenPanel() {
                   <Label>Produktionskapazität (Bikes/Stunde)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.produktion.kapazitaetProStunde}
+                    value={konfiguration.produktion.kapazitaetProStunde ?? 0}
                     onChange={(e) => updateProduktion({ kapazitaetProStunde: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
@@ -171,7 +174,7 @@ export function EinstellungenPanel() {
                   <Label>Stunden pro Schicht</Label>
                   <Input
                     type="number"
-                    value={konfiguration.produktion.stundenProSchicht}
+                    value={konfiguration.produktion.stundenProSchicht ?? 0}
                     onChange={(e) => updateProduktion({ stundenProSchicht: parseInt(e.target.value) || 0 })}
                     min={1}
                     max={24}
@@ -273,8 +276,6 @@ export function EinstellungenPanel() {
                   <TableHead>Kategorie</TableHead>
                   <TableHead>Anteil (%)</TableHead>
                   <TableHead className="text-right">Jahresproduktion</TableHead>
-                  <TableHead className="text-right">VK-Preis (€)</TableHead>
-                  <TableHead className="text-right">Herstellkosten (€)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -294,26 +295,6 @@ export function EinstellungenPanel() {
                       />
                     </TableCell>
                     <TableCell className="text-right">{formatNumber(produktionProVariante[v.id], 0)}</TableCell>
-                    <TableCell className="text-right">
-                      <Input
-                        type="number"
-                        value={v.verkaufspreis}
-                        onChange={(e) => updateVariante(v.id, { verkaufspreis: parseInt(e.target.value) || 0 })}
-                        min={0}
-                        step={100}
-                        className="w-24"
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Input
-                        type="number"
-                        value={v.herstellkosten}
-                        onChange={(e) => updateVariante(v.id, { herstellkosten: parseInt(e.target.value) || 0 })}
-                        min={0}
-                        step={50}
-                        className="w-24"
-                      />
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -332,7 +313,7 @@ export function EinstellungenPanel() {
                 <div className="space-y-2">
                   <Label>Lieferant Name</Label>
                   <Input
-                    value={konfiguration.lieferant.name}
+                    value={konfiguration.lieferant.name ?? ''}
                     onChange={(e) => updateLieferant({ name: e.target.value })}
                   />
                 </div>
@@ -341,7 +322,7 @@ export function EinstellungenPanel() {
                   <Label>Vorlaufzeit Arbeitstage (Produktion)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.vorlaufzeitArbeitstage}
+                    value={konfiguration.lieferant.vorlaufzeitArbeitstage ?? 0}
                     onChange={(e) => updateLieferant({ vorlaufzeitArbeitstage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
@@ -349,14 +330,47 @@ export function EinstellungenPanel() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Vorlaufzeit Kalendertage (Transport/Schiff)</Label>
+                  <Label>Vorlaufzeit Kalendertage (Seefracht Shanghai → Hamburg)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.vorlaufzeitKalendertage}
+                    value={konfiguration.lieferant.vorlaufzeitKalendertage ?? 0}
                     onChange={(e) => updateLieferant({ vorlaufzeitKalendertage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
-                  <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.vorlaufzeitKalendertage} Tage</p>
+                  <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.vorlaufzeitKalendertage} KT (24/7 Seefracht)</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>LKW-Transport China → Hafen (Arbeitstage)</Label>
+                  <Input
+                    type="number"
+                    value={konfiguration.lieferant.lkwTransportChinaArbeitstage ?? 0}
+                    onChange={(e) => updateLieferant({ lkwTransportChinaArbeitstage: parseInt(e.target.value) || 0 })}
+                    min={0}
+                  />
+                  <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.lkwTransportChinaArbeitstage} AT (Mo-Fr)</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>LKW-Transport Hamburg → Werk (Arbeitstage)</Label>
+                  <Input
+                    type="number"
+                    value={konfiguration.lieferant.lkwTransportDeutschlandArbeitstage ?? 0}
+                    onChange={(e) => updateLieferant({ lkwTransportDeutschlandArbeitstage: parseInt(e.target.value) || 0 })}
+                    min={0}
+                  />
+                  <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.lkwTransportDeutschlandArbeitstage} AT (Mo-Fr)</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Gesamte Vorlaufzeit (Kalendertage)</Label>
+                  <Input
+                    type="number"
+                    value={konfiguration.lieferant.gesamtVorlaufzeitTage ?? 0}
+                    onChange={(e) => updateLieferant({ gesamtVorlaufzeitTage: parseInt(e.target.value) || 0 })}
+                    min={0}
+                  />
+                  <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.gesamtVorlaufzeitTage} Tage ({Math.ceil(STANDARD_KONFIGURATION.lieferant.gesamtVorlaufzeitTage / 7)} Wochen)</p>
                 </div>
               </div>
 
@@ -365,7 +379,7 @@ export function EinstellungenPanel() {
                   <Label>Losgröße (Mindestbestellung)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.losgroesse}
+                    value={konfiguration.lieferant.losgroesse ?? 0}
                     onChange={(e) => updateLieferant({ losgroesse: parseInt(e.target.value) || 0 })}
                     min={1}
                     step={100}
@@ -377,7 +391,7 @@ export function EinstellungenPanel() {
                   <Label>Lieferintervall (Tage)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.lieferintervall}
+                    value={konfiguration.lieferant.lieferintervall ?? 0}
                     onChange={(e) => updateLieferant({ lieferintervall: parseInt(e.target.value) || 0 })}
                     min={1}
                   />
@@ -387,7 +401,7 @@ export function EinstellungenPanel() {
                   <Label>Kapazität (Stück/Tag)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.kapazitaet}
+                    value={konfiguration.lieferant.kapazitaet ?? 0}
                     onChange={(e) => updateLieferant({ kapazitaet: parseInt(e.target.value) || 0 })}
                     min={0}
                     step={1000}
@@ -397,11 +411,18 @@ export function EinstellungenPanel() {
             </div>
 
             <div className="bg-blue-50 rounded-lg p-4 mt-4">
-              <h4 className="font-semibold text-blue-900 mb-2">Berechnete Gesamtvorlaufzeit:</h4>
-              <p className="text-blue-800">
-                {konfiguration.lieferant.vorlaufzeitArbeitstage} Arbeitstage (Produktion) + {konfiguration.lieferant.vorlaufzeitKalendertage} Kalendertage (Transport) 
-                = <strong>{konfiguration.lieferant.vorlaufzeitArbeitstage + konfiguration.lieferant.vorlaufzeitKalendertage} Tage gesamt</strong>
-                {' '}(ca. {Math.ceil((konfiguration.lieferant.vorlaufzeitArbeitstage + konfiguration.lieferant.vorlaufzeitKalendertage) / 7)} Wochen)
+              <h4 className="font-semibold text-blue-900 mb-2">Transport-Sequenz (Reihenfolge wichtig!):</h4>
+              <ol className="list-decimal list-inside text-blue-800 text-sm space-y-1">
+                <li>Produktion: {konfiguration.lieferant.vorlaufzeitArbeitstage} AT (Mo-Fr ohne Feiertage)</li>
+                <li>LKW China → Hafen: {konfiguration.lieferant.lkwTransportChinaArbeitstage} AT (Mo-Fr)</li>
+                <li>Seefracht: {konfiguration.lieferant.vorlaufzeitKalendertage} KT (24/7 unterwegs)</li>
+                <li>LKW Hamburg → Werk: {konfiguration.lieferant.lkwTransportDeutschlandArbeitstage} AT (Mo-Fr)</li>
+              </ol>
+              <p className="text-blue-900 font-bold mt-3">
+                Gesamt: {konfiguration.lieferant.gesamtVorlaufzeitTage} Tage ({Math.ceil(konfiguration.lieferant.gesamtVorlaufzeitTage / 7)} Wochen)
+              </p>
+              <p className="text-xs text-blue-600 mt-2 italic">
+                Hinweis: Reihenfolge ist wichtig für Feiertagsberechnung. AT = Arbeitstage (Mo-Fr), KT = Kalendertage (24/7)
               </p>
             </div>
           </TabsContent>

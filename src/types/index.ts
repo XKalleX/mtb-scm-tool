@@ -22,8 +22,6 @@ export interface MTBVariante {
   id: string;                    // z.B. "MTBAllrounder"
   name: string;                  // Vollständiger Name
   kategorie: string;             // z.B. "Allrounder", "Competition"
-  verkaufspreis: number;         // in EUR
-  herstellkosten: number;        // in EUR
   gewicht: number;               // in kg
   farben: string[];              // Verfügbare Farben
 }
@@ -112,13 +110,18 @@ export interface MarketingAuftrag {
 
 /**
  * China-Lieferant (einziger Lieferant)
+ * WICHTIG: Alle Werte sind über Einstellungen konfigurierbar!
  */
 export interface LieferantChina {
   id: 'CHN';
   name: string;
   land: 'China';
-  vorlaufzeitKalendertage: number;  // 44 Tage Schiff-Transport
-  vorlaufzeitArbeitstage: number;   // 5 Arbeitstage Bearbeitung
+  vorlaufzeitKalendertage: number;  // 30 Tage Seefracht (Shanghai → Hamburg, 24/7)
+  vorlaufzeitArbeitstage: number;   // 5 Arbeitstage Produktion
+  lkwTransportArbeitstage: number;  // 4 AT gesamt (2 AT China→Hafen + 2 AT Hamburg→Dortmund)
+  lkwTransportChinaArbeitstage: number;  // 2 AT China → Hafen
+  lkwTransportDeutschlandArbeitstage: number;  // 2 AT Hamburg → Dortmund
+  gesamtVorlaufzeitTage: number;    // Total: 49 Tage (konfigurierbar)
   losgroesse: number;               // 500 Stück Sättel Mindestbestellung
   kapazitaet: number;               // Max. Produktion pro Tag
   lieferintervall: number;          // Alle 14 Tage
@@ -192,24 +195,20 @@ export interface SCORMetriken {
   // RELIABILITY (Zuverlässigkeit)
   planerfuellungsgrad: number;           // % der geplanten Produktion erreicht
   liefertreueChina: number;              // % pünktliche Lieferungen aus China
+  deliveryPerformance: number;           // % Lieferungen innerhalb der Vorlaufzeit (NEU)
   
   // RESPONSIVENESS (Reaktionsfähigkeit)
   durchlaufzeitProduktion: number;       // in Tagen (Bestellung → Produktion)
   lagerumschlag: number;                 // Wie oft pro Jahr wird Lager umgeschlagen
+  forecastAccuracy: number;              // % Genauigkeit Plan vs. Ist (NEU)
   
   // AGILITY (Flexibilität)
   produktionsflexibilitaet: number;      // % Mehrproduktion möglich
   materialverfuegbarkeit: number;        // % der Zeit genug Material
   
-  // COSTS (Kosten)
-  gesamtkosten: number;                  // in EUR
-  herstellkosten: number;                // in EUR
-  lagerkosten: number;                   // in EUR
-  beschaffungskosten: number;            // in EUR
-  
-  // ASSETS (Vermögenswerte)
-  lagerbestandswert: number;             // in EUR
-  kapitalbindung: number;                // in Tagen
+  // ASSETS (Anlagenverwaltung - KEINE KOSTEN)
+  lagerreichweite: number;               // Lagerbestand in Tagen Reichweite
+  kapitalbindung: number;                // Durchschnittliche Lagerdauer in Tagen
   
   // PRODUKTIONS-KPIs
   gesamtproduktion: number;              // Anzahl Bikes
