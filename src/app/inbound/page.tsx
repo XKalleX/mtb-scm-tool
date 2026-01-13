@@ -218,43 +218,42 @@ export default function InboundPage() {
         </CardContent>
       </Card>
 
-      {/* Spring Festival Warnung */}
+      {/* Spring Festival Warnung - COLLAPSIBLE */}
       {springFestival.length > 0 && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardHeader>
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-5 w-5 text-orange-600" />
-              <CardTitle className="text-orange-900">Spring Festival {konfiguration.planungsjahr}</CardTitle>
-            </div>
-            <CardDescription className="text-orange-700">
+        <CollapsibleInfo
+          title={`Spring Festival ${konfiguration.planungsjahr}`}
+          variant="warning"
+          icon={<AlertTriangle className="h-5 w-5" />}
+          defaultOpen={false}
+        >
+          <div className="space-y-3 text-sm text-orange-800">
+            <p className="font-semibold">
               {springFestival.length} Tage kompletter Produktionsstopp in {lieferant.land}!
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
             <div className="space-y-2">
-              <p className="text-sm text-orange-800">
+              <p>
                 <strong>Zeitraum:</strong> {new Date(springFestival[0]?.datum).toLocaleDateString('de-DE')} - {new Date(springFestival[springFestival.length - 1]?.datum).toLocaleDateString('de-DE')}
               </p>
-              <p className="text-sm text-orange-800">
+              <p>
                 <strong>Auswirkung:</strong> Keine Produktion, keine Bestellungsbearbeitung
               </p>
-              <p className="text-sm text-orange-800">
+              <p>
                 <strong>Planung:</strong> Bestellungen müssen vor oder nach dem Festival eingehen
               </p>
             </div>
             
-            <div className="mt-4">
-              <h4 className="font-semibold text-orange-900 mb-2">Betroffene Feiertage:</h4>
+            <div>
+              <h4 className="font-semibold mb-2">Betroffene Feiertage:</h4>
               <div className="grid gap-2 md:grid-cols-2">
                 {springFestival.map(f => (
-                  <div key={f.datum} className="text-sm bg-white rounded px-2 py-1">
+                  <div key={f.datum} className="text-sm bg-white rounded px-2 py-1 border border-orange-200">
                     {new Date(f.datum).toLocaleDateString('de-DE')}: {f.name}
                   </div>
                 ))}
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleInfo>
       )}
 
       {/* Komponenten */}
