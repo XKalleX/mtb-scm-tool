@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { CheckCircle2, Calendar, TrendingUp, AlertCircle, Download } from 'lucide-react'
+import { Calendar, TrendingUp, AlertCircle, Download } from 'lucide-react'
 import { formatNumber, formatDate } from '@/lib/utils'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { exportToCSV, exportToJSON } from '@/lib/export'
@@ -701,38 +701,6 @@ export default function OEMProgrammPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Erfüllte Anforderungen */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Erfüllte Anforderungen</CardTitle>
-          <CardDescription>
-            Fokus auf Kernkonzepte mit vereinfachter Stückliste
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 md:grid-cols-2">
-            <RequirementItem text="✓ 365 Tage tagesgenaue Planung" />
-            <RequirementItem text="✓ 8 MTB-Varianten parallel" />
-            <RequirementItem text="✓ Saisonale Nachfrage (April-Peak 16%)" />
-            <RequirementItem text="✓ Error-Management (Rundungsfehler)" />
-            <RequirementItem text="✓ Nur Sättel (4 Varianten, 1:1)" />
-            <RequirementItem text="✓ Sattel-Bedarf = Bike-Produktion" />
-            <RequirementItem text="✓ Wochenenden & Feiertage berücksichtigt" />
-            <RequirementItem text="✓ Roter Faden: Saison → Tagesplanung" />
-            <RequirementItem text="✓ Marketing-Zusatzaufträge möglich" />
-            <RequirementItem text="✓ China-Zulieferer (49 Tage Vorlauf)" />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function RequirementItem({ text }: { text: string }) {
-  return (
-    <div className="flex items-center space-x-2 text-sm">
-      <CheckCircle2 className="h-4 w-4 text-green-600" />
-      <span>{text}</span>
     </div>
   )
 }

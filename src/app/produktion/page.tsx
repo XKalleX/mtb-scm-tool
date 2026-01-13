@@ -16,7 +16,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Factory, AlertTriangle, TrendingUp, Package, Download } from 'lucide-react'
+import { Factory, AlertTriangle, TrendingUp, Package, Download } from 'lucide-react'
 import { formatNumber } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
@@ -553,31 +553,6 @@ export default function ProduktionPage() {
         </CardContent>
       </Card>
 
-      {/* Erfüllte Anforderungen */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Erfüllte Anforderungen</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 md:grid-cols-2">
-            <RequirementItem text="ATP-Check (Available-to-Promise)" />
-            <RequirementItem text="First-Come-First-Serve Regel" />
-            <RequirementItem text="Lagerbestand-Management" />
-            <RequirementItem text="Sicherheitsbestände" />
-            <RequirementItem text="Materialbuchung (Ein-/Ausgang)" />
-            <RequirementItem text="Planerfüllungsgrad-Tracking" />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function RequirementItem({ text }: { text: string }) {
-  return (
-    <div className="flex items-center space-x-2 text-sm">
-      <CheckCircle2 className="h-4 w-4 text-green-600" />
-      <span>{text}</span>
     </div>
   )
 }

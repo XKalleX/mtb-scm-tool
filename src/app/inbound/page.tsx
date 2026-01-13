@@ -17,7 +17,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Ship, AlertTriangle, Package, Download } from 'lucide-react'
+import { Ship, AlertTriangle, Package, Download } from 'lucide-react'
 import { formatNumber } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
@@ -413,34 +413,6 @@ export default function InboundPage() {
         </CardContent>
       </Card>
 
-      {/* Erfüllte Anforderungen */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Erfüllte Anforderungen</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 md:grid-cols-2">
-            <RequirementItem text="Rückwärts-Berechnung Bestelldatum" />
-            <RequirementItem text={`${lieferant.vorlaufzeitArbeitstage} Arbeitstage Produktion`} />
-            <RequirementItem text={`${lieferant.vorlaufzeitKalendertage} Kalendertage Seefracht (Shanghai → Hamburg)`} />
-            <RequirementItem text={`${lieferant.lkwTransportArbeitstage} AT LKW-Transport (2 AT China + 2 AT DE)`} />
-            <RequirementItem text={`Gesamtvorlaufzeit: ${gesamtVorlaufzeit} Tage (7 Wochen)`} />
-            <RequirementItem text={`Losgrößen-Optimierung (${formatNumber(lieferant.losgroesse, 0)} Stück)`} />
-            <RequirementItem text="Spring Festival Berücksichtigung" />
-            <RequirementItem text="Chinesische Feiertage integriert" />
-            <RequirementItem text="Dynamische Konfiguration" />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function RequirementItem({ text }: { text: string }) {
-  return (
-    <div className="flex items-center space-x-2 text-sm">
-      <CheckCircle2 className="h-4 w-4 text-green-600" />
-      <span>{text}</span>
     </div>
   )
 }
