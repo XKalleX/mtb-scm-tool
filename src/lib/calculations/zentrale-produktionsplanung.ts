@@ -248,7 +248,7 @@ export function generiereTagesproduktion(
       }
       
       // ✅ Ist-Menge: Realistische Produktionsschwankungen
-      // Natürliche Varianz von ±0,5% bis ±1,5% (sehr klein, aber realistisch)
+      // Natürliche Varianz von ±1,5% (sehr klein, aber realistisch)
       // Verwendet deterministischen Seed basierend auf Tag für Konsistenz
       const seed = (tag * 7 + monat * 13) % 100
       const varianzFaktor = 1.0 + (Math.sin(seed) * 0.015) // ±1,5% max

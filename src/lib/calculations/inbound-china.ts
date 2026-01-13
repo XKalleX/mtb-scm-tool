@@ -411,18 +411,21 @@ export function generiereTaeglicheBestellungen(
     
     // Prüfe ob Bestellung ausgelöst werden muss
     let sollBestellen = false
+    let bestellGrund: 'losgroesse' | 'sicherheitsbestand' | 'initial' = 'sicherheitsbestand'
     const bestellKomponenten: Record<string, number> = {}
     
     alleKomponenten.forEach(kompId => {
       // Grund 1: Losgröße erreicht
       if (offeneMengen[kompId] >= LOSGROESSE) {
         sollBestellen = true
+        bestellGrund = 'losgroesse'
         bestellKomponenten[kompId] = rundeAufLosgroesse(offeneMengen[kompId])
         offeneMengen[kompId] = 0 // Reset nach Bestellung
       }
       // Grund 2: Sicherheitsbestand kritisch (alle 2 Wochen prüfen)
       else if (tagIndexImJahr % 14 === 0 && offeneMengen[kompId] > 0) {
         sollBestellen = true
+        // bestellGrund bleibt 'sicherheitsbestand' wenn nicht schon 'losgroesse'
         bestellKomponenten[kompId] = rundeAufLosgroesse(offeneMengen[kompId])
         offeneMengen[kompId] = 0
       }
@@ -441,8 +444,7 @@ export function generiereTaeglicheBestellungen(
         status: bestelldatum.getFullYear() < planungsjahr ? 'geliefert' : 
                 bestelldatum.getMonth() < 3 ? 'unterwegs' : 'bestellt',
         istVorjahr: bestelldatum.getFullYear() < planungsjahr,
-        grund: offeneMengen[Object.keys(bestellKomponenten)[0]] >= LOSGROESSE 
-          ? 'losgroesse' : 'sicherheitsbestand'
+        grund: bestellGrund
       })
     }
     
