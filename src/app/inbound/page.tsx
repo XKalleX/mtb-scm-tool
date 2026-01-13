@@ -17,7 +17,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Ship, AlertTriangle, Package, Download } from 'lucide-react'
+import { Ship, AlertTriangle, Package, Download, Calendar } from 'lucide-react'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { formatNumber, addDays } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
@@ -25,6 +25,8 @@ import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { useMemo } from 'react'
+import { generiereAlleVariantenProduktionsplaene } from '@/lib/calculations/zentrale-produktionsplanung'
+import { generiereTaeglicheBestellungen, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
 
 /**
  * Inbound Logistik Hauptseite
@@ -47,6 +49,50 @@ export default function InboundPage() {
     konfiguration.feiertage.filter(f => f.name.includes('Spring Festival') && f.land === 'China'),
     [konfiguration.feiertage]
   )
+  
+  // ✅ NEUE BESTELLLOGIK: Tägliche Bedarfsermittlung
+  // Generiere Produktionspläne für alle Varianten
+  const produktionsplaene = useMemo(() => {
+    return generiereAlleVariantenProduktionsplaene(konfiguration)
+  }, [konfiguration])
+  
+  // Konvertiere zu TagesProduktionsplan Format für Inbound-Berechnung
+  const produktionsplaeneFormatiert = useMemo(() => {
+    const result: Record<string, any[]> = {}
+    Object.entries(produktionsplaene).forEach(([varianteId, plan]) => {
+      result[varianteId] = plan.tage.map(tag => ({
+        datum: tag.datum,
+        varianteId: varianteId,
+        istMenge: tag.istMenge,
+        planMenge: tag.planMenge
+      }))
+    })
+    return result
+  }, [produktionsplaene])
+  
+  // Berechne tägliche Bestellungen (inkl. Vorjahr!)
+  const taeglicheBestellungen = useMemo(() => {
+    return generiereTaeglicheBestellungen(produktionsplaeneFormatiert, konfiguration.planungsjahr)
+  }, [produktionsplaeneFormatiert, konfiguration.planungsjahr])
+  
+  // Statistiken über Bestellungen
+  const bestellStatistik = useMemo(() => {
+    const gesamt = taeglicheBestellungen.length
+    const vorjahr = taeglicheBestellungen.filter(b => b.istVorjahr).length
+    const planungsjahr = gesamt - vorjahr
+    
+    const gesamtMenge = taeglicheBestellungen.reduce((sum, b) => {
+      return sum + Object.values(b.komponenten).reduce((s, m) => s + m, 0)
+    }, 0)
+    
+    return {
+      gesamt,
+      vorjahr,
+      planungsjahr,
+      gesamtMenge,
+      durchschnittProBestellung: gesamt > 0 ? gesamtMenge / gesamt : 0
+    }
+  }, [taeglicheBestellungen])
   
   // Lieferplan-Daten für Excel-Tabelle (deterministisch, basierend auf Konfiguration)
   const lieferplanDaten = useMemo(() => {
@@ -315,7 +361,239 @@ export default function InboundPage() {
         </CardContent>
       </Card>
 
-      {/* Lieferplan mit Excel-Tabelle */}
+      {/* ✅ NEUE SEKTION: TÄGLICHE BESTELLUNGEN */}
+      <Card className="border-orange-200 bg-orange-50">
+        <CardHeader>
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-6 w-6 text-orange-600" />
+            <CardTitle className="text-orange-900 text-xl">
+              TÄGLICHE BESTELLLOGIK (Daily Ordering)
+            </CardTitle>
+          </div>
+          <CardDescription className="text-orange-700">
+            Gemäß PDF-Anforderung: Tägliche Bedarfsermittlung + Bestellung bei Losgröße 500 oder Sicherheitsbestand
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Statistik-Karten */}
+          <div className="grid gap-4 md:grid-cols-4 mb-6">
+            <Card className="bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Gesamt Bestellungen</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{bestellStatistik.gesamt}</div>
+                <p className="text-xs text-muted-foreground">Über gesamten Zeitraum</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Vorjahr (2026)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">{bestellStatistik.vorjahr}</div>
+                <p className="text-xs text-muted-foreground">Vorlauf-Bestellungen</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Planungsjahr {konfiguration.planungsjahr}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{bestellStatistik.planungsjahr}</div>
+                <p className="text-xs text-muted-foreground">Laufende Bestellungen</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Gesamt-Menge</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatNumber(bestellStatistik.gesamtMenge, 0)}</div>
+                <p className="text-xs text-muted-foreground">Sättel bestellt</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Info-Box */}
+          <CollapsibleInfo
+            title="Wichtige Konzepte der täglichen Bestelllogik"
+            variant="info"
+            icon={<Calendar className="h-5 w-5" />}
+            defaultOpen={true}
+          >
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-semibold text-blue-900 mb-2">1. Tägliche Bedarfsermittlung</h4>
+                <p className="text-sm text-blue-800">
+                  Jeden Tag wird der Bedarf aus dem Produktionsplan ermittelt und akkumuliert.
+                  Losgröße {lieferant.losgroesse} muss erreicht werden.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-blue-900 mb-2">2. Bestellung bei Losgröße ODER Sicherheitsbestand</h4>
+                <p className="text-sm text-blue-800">
+                  Bestellung erfolgt wenn:<br/>
+                  • Akkumulierter Bedarf ≥ {lieferant.losgroesse} Stück ODER<br/>
+                  • Alle 14 Tage (Sicherheitsbestand-Prüfung)
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-blue-900 mb-2">3. ✅ Bestellungen müssen VOR 2027 beginnen!</h4>
+                <p className="text-sm text-blue-800 font-bold">
+                  49 Tage Vorlaufzeit → Erste Bestellung: ~12. November 2026<br/>
+                  Damit am 01.01.2027 Material für Produktionsstart verfügbar ist.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-blue-900 mb-2">4. Aggregation über alle 4 Sattel-Varianten</h4>
+                <p className="text-sm text-blue-800">
+                  Bedarf wird über alle Sattel-Typen summiert (Fizik Tundra, Raceline, Spark, Speedline).
+                </p>
+              </div>
+            </div>
+          </CollapsibleInfo>
+
+          {/* Excel-Tabelle mit täglichen Bestellungen */}
+          <div className="mt-6">
+            <ExcelTable
+              columns={[
+                {
+                  key: 'bestelldatum',
+                  label: 'Bestelldatum',
+                  width: '110px',
+                  align: 'center',
+                  format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE') : val,
+                  sumable: false
+                },
+                {
+                  key: 'istVorjahr',
+                  label: 'Jahr',
+                  width: '60px',
+                  align: 'center',
+                  format: (val) => val ? '2026' : '2027',
+                  sumable: false
+                },
+                {
+                  key: 'bedarfsdatum',
+                  label: 'Bedarfsdatum',
+                  width: '110px',
+                  align: 'center',
+                  format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE') : val,
+                  sumable: false
+                },
+                {
+                  key: 'vorlaufzeit',
+                  label: 'Vorlaufzeit',
+                  width: '90px',
+                  align: 'center',
+                  format: (val) => `${val} Tage`,
+                  sumable: false
+                },
+                {
+                  key: 'menge',
+                  label: 'Bestellmenge',
+                  width: '120px',
+                  align: 'right',
+                  format: (val) => formatNumber(val, 0) + ' Stk',
+                  sumable: true
+                },
+                {
+                  key: 'grund',
+                  label: 'Grund',
+                  width: '130px',
+                  align: 'center',
+                  format: (val) => {
+                    if (val === 'initial') return '🎯 Initial'
+                    if (val === 'losgroesse') return '📦 Losgröße'
+                    return '⚠️ Sicherheit'
+                  },
+                  sumable: false
+                },
+                {
+                  key: 'erwarteteAnkunft',
+                  label: 'Ankunft',
+                  width: '110px',
+                  align: 'center',
+                  format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE') : val,
+                  sumable: false
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  width: '100px',
+                  align: 'center',
+                  format: (val) => {
+                    if (val === 'geliefert') return '✅ Geliefert'
+                    if (val === 'unterwegs') return '🚢 Unterwegs'
+                    return '📋 Bestellt'
+                  },
+                  sumable: false
+                }
+              ]}
+              data={taeglicheBestellungen.map((b, idx) => {
+                const bestelldatum = new Date(b.bestelldatum)
+                const bedarfsdatum = new Date(b.bedarfsdatum)
+                const erwarteteAnkunft = new Date(b.erwarteteAnkunft)
+                
+                // Berechne Vorlaufzeit in Tagen
+                const vorlaufzeitMs = erwarteteAnkunft.getTime() - bestelldatum.getTime()
+                const vorlaufzeitTage = Math.round(vorlaufzeitMs / (1000 * 60 * 60 * 24))
+                
+                // Berechne Gesamtmenge
+                const menge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
+                
+                return {
+                  bestelldatum,
+                  istVorjahr: b.istVorjahr,
+                  bedarfsdatum,
+                  vorlaufzeit: vorlaufzeitTage,
+                  menge,
+                  grund: b.grund,
+                  erwarteteAnkunft,
+                  status: b.status
+                }
+              })}
+              maxHeight="400px"
+              showFormulas={false}
+              showSums={true}
+              sumRowLabel={`GESAMT (${bestellStatistik.gesamt} Bestellungen, davon ${bestellStatistik.vorjahr} aus 2026)`}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Lieferplan mit Excel-Tabelle (ALTE monatliche Ansicht als Referenz) */}
+      <Card className="border-gray-300">
+        <CardHeader>
+          <CardTitle>📅 Monatlicher Lieferplan (Referenz-Ansicht)</CardTitle>
+          <CardDescription>
+            Vereinfachte monatliche Darstellung - Die tägliche Bestelllogik oben ist die korrekte Implementierung!
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CollapsibleInfo
+            title="Hinweis: Monatliche vs. Tägliche Bestellungen"
+            variant="warning"
+            icon={<AlertTriangle className="h-5 w-5" />}
+            defaultOpen={false}
+          >
+            <p className="text-sm text-orange-800">
+              Diese monatliche Ansicht dient nur als Übersicht. Die korrekte Implementierung gemäß PDF-Anforderungen
+              ist die <strong>tägliche Bestelllogik</strong> oben, die täglich den Bedarf ermittelt und bei Erreichen
+              der Losgröße oder Unterschreiten des Sicherheitsbestands bestellt.
+            </p>
+          </CollapsibleInfo>
+        </CardContent>
+      </Card>
+
+      {/* Alte monatliche Lieferplan-Tabelle - jetzt als Referenz */}
       <Card>
         <CardHeader>
           <CardTitle>Lieferplan {konfiguration.planungsjahr} - {lieferant.land} Komponenten</CardTitle>
