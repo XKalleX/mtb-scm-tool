@@ -299,11 +299,11 @@ export default function InboundPage() {
             <div>
               <h4 className="font-semibold mb-2">Betroffene Feiertage:</h4>
               <div className="grid gap-2 md:grid-cols-2">
-                {springFestival.map(f => {
+                {springFestival.map((f, idx) => {
                   const datum = f.datum ? new Date(f.datum) : null
                   const datumStr = datum && !isNaN(datum.getTime()) ? datum.toLocaleDateString('de-DE') : '-'
                   return (
-                    <div key={f.datum || f.name} className="text-sm bg-white rounded px-2 py-1 border border-orange-200">
+                    <div key={`spring-${idx}-${f.name}`} className="text-sm bg-white rounded px-2 py-1 border border-orange-200">
                       {datumStr}: {f.name}
                     </div>
                   )
