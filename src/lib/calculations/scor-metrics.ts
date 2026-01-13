@@ -22,6 +22,7 @@
 
 import { SCORMetriken, Produktionsauftrag, Lagerbestand, Bestellung } from '@/types'
 import { daysBetween } from '@/lib/utils'
+import { CHINA_VORLAUFZEIT_TAGE } from '@/lib/calculations/supply-chain-metrics'
 
 /**
  * Berechnet alle SCOR-Metriken
@@ -58,11 +59,12 @@ export function berechneSCORMetriken(
     : 100
   
   // NEU: Delivery Performance - Lieferungen innerhalb Vorlaufzeit
-  const SOLL_VORLAUFZEIT = 49 // 7 Wochen
+  // Verwendet CHINA_VORLAUFZEIT_TAGE aus dem shared constants
+  const TOLERANZ_TAGE = 2 // +2 Tage Toleranz
   const lieferungenInVorlaufzeit = bestellungen.filter(b => {
     if (!b.tatsaechlicheAnkunft) return true
     const tatsaechlicheDauer = daysBetween(b.bestelldatum, b.tatsaechlicheAnkunft)
-    return tatsaechlicheDauer <= SOLL_VORLAUFZEIT + 2 // +2 Tage Toleranz
+    return tatsaechlicheDauer <= CHINA_VORLAUFZEIT_TAGE + TOLERANZ_TAGE
   }).length
   
   const deliveryPerformance = bestellungen.length > 0

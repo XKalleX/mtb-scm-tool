@@ -74,6 +74,12 @@ export const WASSERSCHADEN_MAX_VERLUST_EFFEKT = 0.3
  */
 export const WASSERSCHADEN_VERLUST_DIVISOR = 10000
 
+/**
+ * Durchlaufzeit Penalty Factor für Delivery Performance
+ * 1 Tag Verzögerung = 1% Penalty auf Lieferperformance
+ */
+export const DURCHLAUFZEIT_PENALTY_FAKTOR = 100
+
 // ========================================
 // KONFIGURATION INTERFACE (für dynamische Werte)
 // ========================================
@@ -382,15 +388,18 @@ export function berechneSCORMetriken(aktiveSzenarien: SzenarioConfig[]): SCORMet
   const lagerreichweite = Math.round((durchschnittlicherLagerbestand / auswirkungen.durchschnittProTag) * 10) / 10
   
   // Kapitalbindung: Durchschnittliche Lagerdauer in Tagen
-  const kapitalbindung = lagerreichweite // Gleicher Wert wie Lagerreichweite
+  // HINWEIS: Identisch mit Lagerreichweite, da beide die durchschnittliche Verweildauer
+  // von Komponenten im Lager messen. Keine Kosten-Komponente mehr!
+  const kapitalbindung = lagerreichweite
   
   // NEU: Delivery Performance - % Lieferungen innerhalb der Vorlaufzeit (49 Tage)
   // Basis: Liefertreue mit Toleranz für Durchlaufzeit-Verzögerungen
+  const DURCHLAUFZEIT_PENALTY_FAKTOR = 100 // Divisor für Verzögerungsberechnung (1 Tag = 1% Penalty)
   const deliveryPerformance = Math.max(
     0,
     Math.min(
       100,
-      auswirkungen.liefertreue * (1 - (auswirkungen.durchlaufzeit - BASELINE.durchlaufzeit) / 100)
+      auswirkungen.liefertreue * (1 - (auswirkungen.durchlaufzeit - BASELINE.durchlaufzeit) / DURCHLAUFZEIT_PENALTY_FAKTOR)
     )
   )
   
@@ -726,6 +735,8 @@ export function berechneGesamtMetrikenMitKonfig(
   const LAGERBESTAND_WOCHEN = 2
   const durchschnittlicherLagerbestand = Math.round(auswirkungen.produktionsmenge / (WOCHEN_PRO_JAHR / LAGERBESTAND_WOCHEN))
   const lagerreichweite = Math.round((durchschnittlicherLagerbestand / auswirkungen.durchschnittProTag) * 10) / 10
+  
+  // HINWEIS: Kapitalbindung = Lagerreichweite (beide messen Verweildauer im Lager)
   const kapitalbindung = lagerreichweite
   
   // NEU: Delivery Performance - % Lieferungen innerhalb der Vorlaufzeit
@@ -733,7 +744,7 @@ export function berechneGesamtMetrikenMitKonfig(
     0,
     Math.min(
       100,
-      auswirkungen.liefertreue * (1 - (auswirkungen.durchlaufzeit - baseline.durchlaufzeit) / 100)
+      auswirkungen.liefertreue * (1 - (auswirkungen.durchlaufzeit - baseline.durchlaufzeit) / DURCHLAUFZEIT_PENALTY_FAKTOR)
     )
   )
   
