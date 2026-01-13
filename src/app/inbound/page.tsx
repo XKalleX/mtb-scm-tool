@@ -35,8 +35,10 @@ export default function InboundPage() {
   // Lieferant aus Konfiguration
   const lieferant = konfiguration.lieferant
   
-  // Gesamtvorlaufzeit berechnen
-  const gesamtVorlaufzeit = lieferant.vorlaufzeitArbeitstage + lieferant.vorlaufzeitKalendertage
+  // Gesamtvorlaufzeit aus Konfiguration (konfigurierbar durch Einstellungen)
+  // Die Transportsequenz zeigt die Reihenfolge: Produktion → LKW China → Schiff → LKW DE
+  // Feiertage werden bei der Berechnung in lib/kalender.ts berücksichtigt
+  const gesamtVorlaufzeit = lieferant.gesamtVorlaufzeitTage
   
   // Spring Festival aus Feiertagen filtern
   const springFestival = useMemo(() => 
@@ -128,13 +130,26 @@ export default function InboundPage() {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Transportzeit</CardTitle>
+              <CardTitle className="text-sm font-medium">Seefracht</CardTitle>
               <Ship className="h-4 w-4 text-muted-foreground" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{lieferant.vorlaufzeitKalendertage}</div>
-            <p className="text-xs text-muted-foreground">Kalendertage Schiff</p>
+            <p className="text-xs text-muted-foreground">Kalendertage Schiff (24/7)</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">LKW-Transport</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{lieferant.lkwTransportArbeitstage}</div>
+            <p className="text-xs text-muted-foreground">AT (2 China + 2 DE)</p>
           </CardContent>
         </Card>
 
@@ -150,19 +165,6 @@ export default function InboundPage() {
             <p className="text-xs text-muted-foreground">Stück Mindestbestellung</p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Lieferintervall</CardTitle>
-              <Ship className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{lieferant.lieferintervall}</div>
-            <p className="text-xs text-muted-foreground">Tage zwischen Lieferungen</p>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Lieferanten-Details */}
@@ -176,11 +178,21 @@ export default function InboundPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <h4 className="font-semibold mb-2">Vorlaufzeiten (aus Konfiguration):</h4>
+              <h4 className="font-semibold mb-2">Transport-Sequenz (Reihenfolge wichtig für Feiertage!):</h4>
               <ul className="space-y-1 text-sm">
-                <li>✓ Produktion: <strong>{lieferant.vorlaufzeitArbeitstage} Arbeitstage</strong></li>
-                <li>✓ Schiff-Transport: <strong>{lieferant.vorlaufzeitKalendertage} Kalendertage (24/7)</strong></li>
-                <li>✓ Gesamt: <strong>{gesamtVorlaufzeit} Tage ({Math.ceil(gesamtVorlaufzeit / 7)} Wochen)</strong></li>
+                {lieferant.transportSequenz && lieferant.transportSequenz.map((step, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="font-bold text-blue-600">{step.schritt}.</span>
+                    <span>
+                      <strong>{step.typ}:</strong> {step.dauer} {step.einheit} 
+                      {step.von !== step.nach && ` (${step.von} → ${step.nach})`}
+                      <span className="text-muted-foreground text-xs ml-1">- {step.beschreibung}</span>
+                    </span>
+                  </li>
+                ))}
+                <li className="pt-2 border-t">
+                  <strong>Gesamt: {gesamtVorlaufzeit} Tage ({Math.ceil(gesamtVorlaufzeit / 7)} Wochen)</strong>
+                </li>
               </ul>
             </div>
             
@@ -262,11 +274,18 @@ export default function InboundPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-semibold text-blue-900 mb-2">Bedarfsdatum → Bestelldatum:</h4>
+            <h4 className="font-semibold text-blue-900 mb-2">Bedarfsdatum → Bestelldatum (Rückwärtsrechnung):</h4>
             <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
-              <li>Vom Bedarfsdatum <strong>{lieferant.vorlaufzeitKalendertage} Kalendertage</strong> (Transport) abziehen</li>
-              <li>Dann <strong>{lieferant.vorlaufzeitArbeitstage} Arbeitstage</strong> (Produktion) abziehen</li>
-              <li>1 Tag Puffer abziehen</li>
+              <li>Vom Bedarfsdatum <strong>49 Tage</strong> (Gesamtvorlaufzeit) abziehen</li>
+              <li>Detailaufschlüsselung:
+                <ul className="list-disc list-inside ml-4 mt-1">
+                  <li>2 AT LKW-Transport (Hamburg → Dortmund)</li>
+                  <li>{lieferant.vorlaufzeitKalendertage} KT Seefracht (Shanghai → Hamburg)</li>
+                  <li>2 AT LKW-Transport (China → Hafen Shanghai)</li>
+                  <li>{lieferant.vorlaufzeitArbeitstage} AT Produktion beim Zulieferer</li>
+                </ul>
+              </li>
+              <li>1 Tag Puffer für Bestellverarbeitung abziehen</li>
               <li>Sicherstellen dass Bestelldatum ein Arbeitstag ist</li>
             </ol>
           </div>
@@ -296,8 +315,8 @@ export default function InboundPage() {
           <div className="grid gap-4 md:grid-cols-2 mb-6">
             <FormulaCard
               title="Vorlaufzeit Berechnung"
-              formula={`Vorlaufzeit = ${lieferant.vorlaufzeitArbeitstage} AT (Produktion) + ${lieferant.vorlaufzeitKalendertage} KT (Transport) = ${gesamtVorlaufzeit} Tage (${Math.ceil(gesamtVorlaufzeit / 7)} Wochen)`}
-              description="Gesamte Durchlaufzeit von Bestellung bis Ankunft in Deutschland (aus Konfiguration)"
+              formula={`Vorlaufzeit = ${lieferant.vorlaufzeitArbeitstage} AT (Produktion) + ${lieferant.lkwTransportChinaArbeitstage} AT (LKW China) + ${lieferant.vorlaufzeitKalendertage} KT (Seefracht) + ${lieferant.lkwTransportDeutschlandArbeitstage} AT (LKW DE) = ${gesamtVorlaufzeit} Tage (${Math.ceil(gesamtVorlaufzeit / 7)} Wochen)`}
+              description={`Sequenz: 1. Produktion (${lieferant.vorlaufzeitArbeitstage} AT) → 2. LKW China→Hafen (${lieferant.lkwTransportChinaArbeitstage} AT) → 3. Seefracht (${lieferant.vorlaufzeitKalendertage} KT) → 4. LKW Hamburg→Werk (${lieferant.lkwTransportDeutschlandArbeitstage} AT). Reihenfolge wichtig für Feiertagsberechnung!`}
               example={`Bestellung 05.01. → Lieferung ~${new Date(konfiguration.planungsjahr, 0, 5 + gesamtVorlaufzeit).toLocaleDateString('de-DE')} (${gesamtVorlaufzeit} Tage später)`}
             />
             <FormulaCard
@@ -402,8 +421,10 @@ export default function InboundPage() {
         <CardContent>
           <div className="grid gap-2 md:grid-cols-2">
             <RequirementItem text="Rückwärts-Berechnung Bestelldatum" />
-            <RequirementItem text={`${lieferant.vorlaufzeitArbeitstage} Arbeitstage Bearbeitungszeit`} />
-            <RequirementItem text={`${lieferant.vorlaufzeitKalendertage} Kalendertage Schiff-Transport`} />
+            <RequirementItem text={`${lieferant.vorlaufzeitArbeitstage} Arbeitstage Produktion`} />
+            <RequirementItem text={`${lieferant.vorlaufzeitKalendertage} Kalendertage Seefracht (Shanghai → Hamburg)`} />
+            <RequirementItem text={`${lieferant.lkwTransportArbeitstage} AT LKW-Transport (2 AT China + 2 AT DE)`} />
+            <RequirementItem text={`Gesamtvorlaufzeit: ${gesamtVorlaufzeit} Tage (7 Wochen)`} />
             <RequirementItem text={`Losgrößen-Optimierung (${formatNumber(lieferant.losgroesse, 0)} Stück)`} />
             <RequirementItem text="Spring Festival Berücksichtigung" />
             <RequirementItem text="Chinesische Feiertage integriert" />

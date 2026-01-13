@@ -48,12 +48,27 @@ export interface FeiertagConfig {
   land: 'Deutschland' | 'China'
 }
 
+export interface TransportSequenzConfig {
+  schritt: number
+  typ: 'Produktion' | 'LKW' | 'Seefracht'
+  dauer: number
+  einheit: 'AT' | 'KT'
+  von: string
+  nach: string
+  beschreibung: string
+}
+
 export interface LieferantConfig {
   id: string
   name: string
   land: string
-  vorlaufzeitKalendertage: number
-  vorlaufzeitArbeitstage: number
+  vorlaufzeitKalendertage: number  // Seefracht: 30 KT (Shanghai → Hamburg, 24/7)
+  vorlaufzeitArbeitstage: number   // Produktion: 5 AT
+  lkwTransportArbeitstage: number  // LKW: 4 AT gesamt (2 AT China + 2 AT Deutschland)
+  lkwTransportChinaArbeitstage: number  // 2 AT China → Hafen
+  lkwTransportDeutschlandArbeitstage: number  // 2 AT Hamburg → Dortmund
+  gesamtVorlaufzeitTage: number    // Total: 49 Tage (berechenbar, aber konfigurierbar)
+  transportSequenz: TransportSequenzConfig[]  // Sequenz der Transportschritte
   losgroesse: number
   kapazitaet: number
   lieferintervall: number
@@ -282,17 +297,60 @@ const STANDARD_LIEFERANT: LieferantConfig = {
   id: "CHN",
   name: "Dengwong Manufacturing Ltd.",
   land: "China",
-  vorlaufzeitKalendertage: 44,
-  vorlaufzeitArbeitstage: 5,
+  vorlaufzeitKalendertage: 30,  // Seefracht: Shanghai → Hamburg (24/7)
+  vorlaufzeitArbeitstage: 5,    // Produktion beim Zulieferer
+  lkwTransportArbeitstage: 4,   // 2 AT China→Hafen + 2 AT Hamburg→Dortmund
+  lkwTransportChinaArbeitstage: 2,  // China → Hafen Shanghai
+  lkwTransportDeutschlandArbeitstage: 2,  // Hamburg → Dortmund
+  gesamtVorlaufzeitTage: 49,    // Total lead time (configurable)
+  transportSequenz: [
+    {
+      schritt: 1,
+      typ: 'Produktion',
+      dauer: 5,
+      einheit: 'AT',
+      von: 'Dengwong',
+      nach: 'Dengwong',
+      beschreibung: 'Produktion beim Zulieferer (Mo-Fr ohne Feiertage)'
+    },
+    {
+      schritt: 2,
+      typ: 'LKW',
+      dauer: 2,
+      einheit: 'AT',
+      von: 'Dengwong',
+      nach: 'Hafen Shanghai',
+      beschreibung: 'LKW-Transport zum Hafen (Mo-Fr)'
+    },
+    {
+      schritt: 3,
+      typ: 'Seefracht',
+      dauer: 30,
+      einheit: 'KT',
+      von: 'Hafen Shanghai',
+      nach: 'Hafen Hamburg',
+      beschreibung: 'Seefracht (24/7 unterwegs)'
+    },
+    {
+      schritt: 4,
+      typ: 'LKW',
+      dauer: 2,
+      einheit: 'AT',
+      von: 'Hafen Hamburg',
+      nach: 'Werk Dortmund',
+      beschreibung: 'LKW-Transport zum Werk (Mo-Fr)'
+    }
+  ],
   losgroesse: 500,
   kapazitaet: 50000,
   lieferintervall: 14,
   besonderheiten: [
     "Einziger Lieferant für Sättel",
     "Spring Festival: 28. Jan - 4. Feb 2027 (8 Tage Produktionsstopp)",
-    "Transport: 2 AT LKW + 30 KT Seefracht + 2 AT LKW (24/7 unterwegs)",
-    "Bearbeitung: 5 Arbeitstage (Mo-Fr ohne Feiertage)",
-    "Gesamte Vorlaufzeit: 49 Tage (7 Wochen)",
+    "Seefracht: 30 Kalendertage (Shanghai → Hamburg, 24/7 unterwegs)",
+    "LKW-Transport: 2 AT (China → Hafen) + 2 AT (Hamburg → Dortmund) = 4 AT",
+    "Produktion: 5 Arbeitstage (Mo-Fr ohne Feiertage)",
+    "Gesamte Vorlaufzeit: 49 Tage (7 Wochen) = 5 AT + 2 AT + 30 KT + 2 AT",
     "Mindestbestellung: 500 Stück Sättel (Losgröße)",
     "Lieferintervall: Alle 14 Tage"
   ]
