@@ -370,14 +370,14 @@ const STANDARD_BAUTEILE: BauteilConfig[] = [
 ]
 
 const STANDARD_STUECKLISTE: StuecklistenPosition[] = [
-  { mtbVariante: "MTBAllrounder", bauteilId: "SAT_FT", bauteilName: "Fizik Tundra", menge: 1 },
-  { mtbVariante: "MTBCompetition", bauteilId: "SAT_RL", bauteilName: "Raceline", menge: 1 },
-  { mtbVariante: "MTBDownhill", bauteilId: "SAT_SP", bauteilName: "Spark", menge: 1 },
-  { mtbVariante: "MTBExtreme", bauteilId: "SAT_SL", bauteilName: "Speedline", menge: 1 },
+  { mtbVariante: "MTBAllrounder", bauteilId: "SAT_SP", bauteilName: "Spark", menge: 1 },
+  { mtbVariante: "MTBCompetition", bauteilId: "SAT_SL", bauteilName: "Speedline", menge: 1 },
+  { mtbVariante: "MTBDownhill", bauteilId: "SAT_FT", bauteilName: "Fizik Tundra", menge: 1 },
+  { mtbVariante: "MTBExtreme", bauteilId: "SAT_SP", bauteilName: "Spark", menge: 1 },
   { mtbVariante: "MTBFreeride", bauteilId: "SAT_FT", bauteilName: "Fizik Tundra", menge: 1 },
-  { mtbVariante: "MTBMarathon", bauteilId: "SAT_SL", bauteilName: "Speedline", menge: 1 },
-  { mtbVariante: "MTBPerformance", bauteilId: "SAT_RL", bauteilName: "Raceline", menge: 1 },
-  { mtbVariante: "MTBTrail", bauteilId: "SAT_SP", bauteilName: "Spark", menge: 1 }
+  { mtbVariante: "MTBMarathon", bauteilId: "SAT_RL", bauteilName: "Raceline", menge: 1 },
+  { mtbVariante: "MTBPerformance", bauteilId: "SAT_FT", bauteilName: "Fizik Tundra", menge: 1 },
+  { mtbVariante: "MTBTrail", bauteilId: "SAT_SL", bauteilName: "Speedline", menge: 1 }
 ]
 
 const STANDARD_KONFIGURATION: KonfigurationData = {
