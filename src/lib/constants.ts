@@ -42,13 +42,20 @@ export function isValidDate(date: Date): boolean {
  * Parst einen Datums-String und gibt ein garantiert gültiges Date zurück
  * @param dateString - ISO Format YYYY-MM-DD
  * @param fallback - Fallback-Datum bei ungültigem Input (default: DEFAULT_HEUTE_DATUM)
- * @returns Gültiges Date-Objekt
+ * @returns Gültiges Date-Objekt (garantiert)
  */
 export function parseDateSafe(dateString: string, fallback: string = DEFAULT_HEUTE_DATUM): Date {
   const date = new Date(dateString)
   if (!isValidDate(date)) {
     console.warn(`Ungültiges Datum '${dateString}', verwende Fallback: ${fallback}`)
-    return new Date(fallback)
+    
+    // Validiere auch den Fallback - wenn auch der ungültig ist, nutze hardcoded default
+    const fallbackDate = new Date(fallback)
+    if (!isValidDate(fallbackDate)) {
+      console.error(`KRITISCH: Auch Fallback '${fallback}' ist ungültig! Nutze hardcoded DEFAULT_HEUTE_DATUM.`)
+      return new Date(DEFAULT_HEUTE_DATUM) // Hardcoded constant ist garantiert gültig
+    }
+    return fallbackDate
   }
   return date
 }

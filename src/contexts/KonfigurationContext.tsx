@@ -324,11 +324,11 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
    * @param value - ISO Format YYYY-MM-DD
    */
   const setHeuteDatum = useCallback((value: string) => {
-    // Validierung: Datum muss gültig sein
-    const datum = new Date(value)
+    // Nutze parseDateSafe für Validierung (vermeidet Code-Duplikation)
+    const datum = parseDateSafe(value, value) // Fallback = value selbst für Prüfung
     
-    // Prüfe ob Datum gültig ist (shared utility)
-    if (!isValidDate(datum)) {
+    // Falls parseDateSafe einen Fallback verwendet hat, war das Original ungültig
+    if (datum.toISOString().split('T')[0] !== value) {
       console.error('Fehler: Ungültiges Datumsformat:', value)
       return // Nicht speichern bei ungültigem Datum
     }
