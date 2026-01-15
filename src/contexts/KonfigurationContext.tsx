@@ -32,6 +32,7 @@ import feiertageChinaData from '@/data/feiertage-china.json'
 import feiertageDeutschlandData from '@/data/feiertage-deutschland.json'
 import lieferantChinaData from '@/data/lieferant-china.json'
 import stuecklisteData from '@/data/stueckliste.json'
+import { DEFAULT_HEUTE_DATUM, PLANUNGSJAHR } from '@/lib/constants'
 
 // ========================================
 // TYPEN FÜR KONFIGURATION
@@ -261,7 +262,7 @@ const STANDARD_STUECKLISTE: StuecklistenPosition[] = Object.entries(stuecklisteD
 const STANDARD_KONFIGURATION: KonfigurationData = {
   jahresproduktion: (stammdatenData as any).jahresproduktion?.gesamt || 370000,
   planungsjahr: stammdatenData.projekt.planungsjahr,
-  heuteDatum: (stammdatenData.projekt as any).heuteDatum || '2027-04-15',  // Standard 'Heute'-Datum aus stammdaten.json
+  heuteDatum: (stammdatenData.projekt as any).heuteDatum || DEFAULT_HEUTE_DATUM,  // Standard 'Heute'-Datum aus constants
   varianten: STANDARD_VARIANTEN,
   saisonalitaet: STANDARD_SAISONALITAET,
   feiertage: STANDARD_FEIERTAGE,
@@ -322,20 +323,36 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
    * @param value - ISO Format YYYY-MM-DD
    */
   const setHeuteDatum = useCallback((value: string) => {
-    // Validierung: Datum muss in 2027 liegen
+    // Validierung: Datum muss gültig und in 2027 liegen
     const datum = new Date(value)
-    if (datum.getFullYear() !== 2027) {
-      console.warn('Warnung: Datum sollte im Planungsjahr 2027 liegen!')
+    
+    // Prüfe ob Datum gültig ist
+    if (isNaN(datum.getTime())) {
+      console.error('Fehler: Ungültiges Datumsformat:', value)
+      return // Nicht speichern bei ungültigem Datum
     }
+    
+    // Prüfe ob Datum im Planungsjahr liegt
+    if (datum.getFullYear() !== PLANUNGSJAHR) {
+      console.warn(`Warnung: Datum sollte im Planungsjahr ${PLANUNGSJAHR} liegen! Aktuell: ${datum.getFullYear()}`)
+    }
+    
     setKonfiguration(prev => ({ ...prev, heuteDatum: value }))
   }, [])
 
   /**
    * Gibt das 'Heute'-Datum als Date-Objekt zurück
    * Wichtig für Frozen Zone Berechnungen
+   * @returns Date-Objekt, garantiert gültig (Fallback auf DEFAULT_HEUTE_DATUM)
    */
   const getHeuteDatumAsDate = useCallback((): Date => {
-    return new Date(konfiguration.heuteDatum)
+    const datum = new Date(konfiguration.heuteDatum)
+    // Validierung: Falls ungültig, Fallback verwenden
+    if (isNaN(datum.getTime())) {
+      console.warn('Ungültiges Heute-Datum in Konfiguration, verwende Fallback')
+      return new Date(DEFAULT_HEUTE_DATUM)
+    }
+    return datum
   }, [konfiguration.heuteDatum])
 
   const updateVariante = useCallback((id: string, updates: Partial<MTBVarianteConfig>) => {

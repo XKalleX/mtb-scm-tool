@@ -20,16 +20,17 @@
 import { Kalendertag, Feiertag } from '@/types'
 import { addDays, isWeekend, getDayOfYear, getWeekNumber } from './utils'
 import feiertagsData from '@/data/feiertage-china.json'
+import { DEFAULT_HEUTE_DATUM } from './constants'
 
 /**
  * Liest das 'Heute'-Datum aus der globalen Konfiguration
- * Fallback: 2027-04-15 falls nicht gesetzt
- * @returns Date-Objekt des 'Heute'-Datums
+ * Fallback: DEFAULT_HEUTE_DATUM falls nicht gesetzt oder ungültig
+ * @returns Date-Objekt des 'Heute'-Datums (garantiert gültig)
  */
 export function getHeuteDatum(): Date {
   if (typeof window === 'undefined') {
     // Server-Side: Standard-Datum
-    return new Date('2027-04-15')
+    return new Date(DEFAULT_HEUTE_DATUM)
   }
   
   try {
@@ -37,7 +38,12 @@ export function getHeuteDatum(): Date {
     if (konfigString) {
       const konfiguration = JSON.parse(konfigString)
       if (konfiguration.heuteDatum) {
-        return new Date(konfiguration.heuteDatum)
+        const datum = new Date(konfiguration.heuteDatum)
+        // Validierung: Prüfe ob Datum gültig ist
+        if (!isNaN(datum.getTime())) {
+          return datum
+        }
+        console.warn('Ungültiges Heute-Datum in Konfiguration:', konfiguration.heuteDatum)
       }
     }
   } catch (error) {
@@ -45,7 +51,7 @@ export function getHeuteDatum(): Date {
   }
   
   // Fallback: Standard-Datum
-  return new Date('2027-04-15')
+  return new Date(DEFAULT_HEUTE_DATUM)
 }
 
 /**
