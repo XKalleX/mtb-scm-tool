@@ -13,7 +13,7 @@
  *   - 2 Arbeitstage LKW Hamburg → Dortmund
  * - Losgröße: 500 Stück Sättel (Mindestbestellung)
  * - Lieferintervall: Alle 14 Tage
- * - Spring Festival: 28.1.-4.2.2027 = 8 Tage Produktionsstopp!
+ * - Spring Festival: 5.2.-12.2.2027 = 8 Tage Produktionsstopp!
  * - Nur 4 Sattel-Varianten (Ermäßigung Code-Lösung)
  * 
  * BERECHNUNGSLOGIK:

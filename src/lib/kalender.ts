@@ -66,14 +66,14 @@ export function istArbeitstag(datum: Date): boolean {
 }
 
 /**
- * Prüft ob Datum im Spring Festival liegt (28.1.-4.2.2027)
- * WICHTIG: 7 Tage kompletter Produktionsstopp in China!
+ * Prüft ob Datum im Spring Festival liegt (5.2.-12.2.2027)
+ * WICHTIG: 8 Tage kompletter Produktionsstopp in China!
  * @param datum - Zu prüfendes Datum
  * @returns True wenn Spring Festival
  */
 export function istSpringFestival(datum: Date): boolean {
-  const springStart = new Date(2027, 0, 28) // 28. Januar
-  const springEnd = new Date(2027, 1, 3)    // 3. Februar
+  const springStart = new Date(2027, 1, 5) // 5. Februar
+  const springEnd = new Date(2027, 1, 12)    // 12. Februar
   
   return datum >= springStart && datum <= springEnd
 }
