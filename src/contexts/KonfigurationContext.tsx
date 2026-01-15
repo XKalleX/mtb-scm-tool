@@ -32,7 +32,7 @@ import feiertageChinaData from '@/data/feiertage-china.json'
 import feiertageDeutschlandData from '@/data/feiertage-deutschland.json'
 import lieferantChinaData from '@/data/lieferant-china.json'
 import stuecklisteData from '@/data/stueckliste.json'
-import { DEFAULT_HEUTE_DATUM, PLANUNGSJAHR } from '@/lib/constants'
+import { DEFAULT_HEUTE_DATUM, PLANUNGSJAHR, KONFIGURATION_STORAGE_KEY, isValidDate, parseDateSafe } from '@/lib/constants'
 
 // ========================================
 // TYPEN FÜR KONFIGURATION
@@ -283,7 +283,7 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
   // Lade Konfiguration aus localStorage beim Start
   useEffect(() => {
     try {
-      const gespeicherteKonfiguration = localStorage.getItem('mtb-konfiguration')
+      const gespeicherteKonfiguration = localStorage.getItem(KONFIGURATION_STORAGE_KEY)
       if (gespeicherteKonfiguration) {
         const parsed = JSON.parse(gespeicherteKonfiguration) as KonfigurationData
         setKonfiguration(parsed)
@@ -299,7 +299,7 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isInitialized) {
       try {
-        localStorage.setItem('mtb-konfiguration', JSON.stringify(konfiguration))
+        localStorage.setItem(KONFIGURATION_STORAGE_KEY, JSON.stringify(konfiguration))
       } catch (error) {
         console.error('Fehler beim Speichern der Konfiguration:', error)
       }
@@ -320,21 +320,23 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
 
   /**
    * Setzt das 'Heute'-Datum für Frozen Zone Konzept
+   * Validiert Datum und speichert nur gültige Werte
    * @param value - ISO Format YYYY-MM-DD
    */
   const setHeuteDatum = useCallback((value: string) => {
-    // Validierung: Datum muss gültig und in 2027 liegen
+    // Validierung: Datum muss gültig sein
     const datum = new Date(value)
     
-    // Prüfe ob Datum gültig ist
-    if (isNaN(datum.getTime())) {
+    // Prüfe ob Datum gültig ist (shared utility)
+    if (!isValidDate(datum)) {
       console.error('Fehler: Ungültiges Datumsformat:', value)
       return // Nicht speichern bei ungültigem Datum
     }
     
-    // Prüfe ob Datum im Planungsjahr liegt
+    // Prüfe ob Datum im Planungsjahr liegt (Warnung, aber erlauben)
     if (datum.getFullYear() !== PLANUNGSJAHR) {
-      console.warn(`Warnung: Datum sollte im Planungsjahr ${PLANUNGSJAHR} liegen! Aktuell: ${datum.getFullYear()}`)
+      console.warn(`⚠️ Datum außerhalb des Planungsjahres ${PLANUNGSJAHR}: ${value}`)
+      console.warn('Dies kann zu inkonsistentem Verhalten führen. Bitte wählen Sie ein Datum in 2027.')
     }
     
     setKonfiguration(prev => ({ ...prev, heuteDatum: value }))
@@ -343,16 +345,11 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
   /**
    * Gibt das 'Heute'-Datum als Date-Objekt zurück
    * Wichtig für Frozen Zone Berechnungen
-   * @returns Date-Objekt, garantiert gültig (Fallback auf DEFAULT_HEUTE_DATUM)
+   * @returns Date-Objekt, garantiert gültig (verwendet shared utility)
    */
   const getHeuteDatumAsDate = useCallback((): Date => {
-    const datum = new Date(konfiguration.heuteDatum)
-    // Validierung: Falls ungültig, Fallback verwenden
-    if (isNaN(datum.getTime())) {
-      console.warn('Ungültiges Heute-Datum in Konfiguration, verwende Fallback')
-      return new Date(DEFAULT_HEUTE_DATUM)
-    }
-    return datum
+    // Verwendet shared utility für sichere Datums-Validierung
+    return parseDateSafe(konfiguration.heuteDatum)
   }, [konfiguration.heuteDatum])
 
   const updateVariante = useCallback((id: string, updates: Partial<MTBVarianteConfig>) => {

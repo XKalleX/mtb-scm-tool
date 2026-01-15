@@ -20,7 +20,7 @@
 import { Kalendertag, Feiertag } from '@/types'
 import { addDays, isWeekend, getDayOfYear, getWeekNumber } from './utils'
 import feiertagsData from '@/data/feiertage-china.json'
-import { DEFAULT_HEUTE_DATUM } from './constants'
+import { DEFAULT_HEUTE_DATUM, KONFIGURATION_STORAGE_KEY, parseDateSafe } from './constants'
 
 /**
  * Liest das 'Heute'-Datum aus der globalen Konfiguration
@@ -34,16 +34,12 @@ export function getHeuteDatum(): Date {
   }
   
   try {
-    const konfigString = localStorage.getItem('mtb-konfiguration')
+    const konfigString = localStorage.getItem(KONFIGURATION_STORAGE_KEY)
     if (konfigString) {
       const konfiguration = JSON.parse(konfigString)
       if (konfiguration.heuteDatum) {
-        const datum = new Date(konfiguration.heuteDatum)
-        // Validierung: Prüfe ob Datum gültig ist
-        if (!isNaN(datum.getTime())) {
-          return datum
-        }
-        console.warn('Ungültiges Heute-Datum in Konfiguration:', konfiguration.heuteDatum)
+        // Verwendet shared utility für sichere Datums-Validierung
+        return parseDateSafe(konfiguration.heuteDatum)
       }
     }
   } catch (error) {
