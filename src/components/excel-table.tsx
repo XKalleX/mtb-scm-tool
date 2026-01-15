@@ -189,12 +189,12 @@ export default function ExcelTable({
                     let bgClasses = rowCounter % 2 === 0 ? 'bg-slate-50' : 'bg-white'
                     let tooltipText: string | undefined = undefined
                     
-                    if (dateColumnKey && row[dateColumnKey]) {
+                    if (dateColumnKey && row[dateColumnKey] != null) {
                       const date = row[dateColumnKey] instanceof Date 
                         ? row[dateColumnKey] 
                         : new Date(row[dateColumnKey])
                       
-                      if (!isNaN(date.getTime())) {
+                      if (date instanceof Date && !isNaN(date.getTime())) {
                         const dateClasses = getDateRowBackgroundClasses(date)
                         if (dateClasses) {
                           bgClasses = dateClasses

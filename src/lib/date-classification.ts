@@ -103,11 +103,9 @@ export function istWochenende(date: Date): boolean {
  * @returns Feiertag-Objekt oder undefined
  */
 export function istDeutscherFeiertag(date: Date): Feiertag | undefined {
-  const dateStr = date.toISOString().split('T')[0]
-  return FEIERTAGE_DEUTSCHLAND_2027.find(f => {
-    const feiertagStr = f.datum.toISOString().split('T')[0]
-    return feiertagStr === dateStr
-  })
+  return FEIERTAGE_DEUTSCHLAND_2027.find(f => 
+    f.datum.toDateString() === date.toDateString()
+  )
 }
 
 /**
@@ -117,11 +115,9 @@ export function istDeutscherFeiertag(date: Date): Feiertag | undefined {
  */
 export function istChinesischerFeiertag(date: Date): Feiertag | undefined {
   const feiertage = ladeChinaFeiertage()
-  const dateStr = date.toISOString().split('T')[0]
-  return feiertage.find(f => {
-    const feiertagStr = f.datum.toISOString().split('T')[0]
-    return feiertagStr === dateStr
-  })
+  return feiertage.find(f => 
+    f.datum.toDateString() === date.toDateString()
+  )
 }
 
 /**
@@ -160,7 +156,7 @@ export function getDateRowBackgroundClasses(date: Date): string {
   }
   
   if (classification.isWeekend) {
-    return 'bg-gray-100 hover:bg-gray-150'
+    return 'bg-gray-100 hover:bg-gray-200'
   }
   
   return '' // Default: keine spezielle Färbung
