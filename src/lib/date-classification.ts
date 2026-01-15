@@ -5,14 +5,19 @@
  * 
  * Utility-Funktionen zur Klassifizierung von Daten:
  * - Wochenenden (Samstag/Sonntag)
- * - Deutsche Feiertage (NRW)
- * - Chinesische Feiertage
+ * - Deutsche Feiertage (NRW) - aus JSON geladen
+ * - Chinesische Feiertage - aus JSON geladen
  * 
  * Wird verwendet für farbliche Markierung in Tabellen
+ * 
+ * WICHTIG: Feiertage werden aus den JSON-Dateien geladen:
+ * - feiertage-deutschland.json
+ * - feiertage-china.json
  */
 
 import { Feiertag } from '@/types'
-import { ladeChinaFeiertage } from './kalender'
+import feiertageDeutschlandData from '@/data/feiertage-deutschland.json'
+import feiertageChinaData from '@/data/feiertage-china.json'
 
 /**
  * Klassifizierung eines Datums
@@ -26,66 +31,40 @@ export type DateClassification = {
 }
 
 /**
- * Deutsche Feiertage für NRW 2027
- * Quelle: Spezifikation und Anforderung A3
+ * Lädt deutsche Feiertage aus JSON (beide Jahre 2026 + 2027)
  */
-const FEIERTAGE_DEUTSCHLAND_2027: Feiertag[] = [
-  {
-    datum: new Date('2027-01-01'),
-    name: 'Neujahr',
-    typ: 'gesetzlich'
-  },
-  {
-    datum: new Date('2027-04-02'),
-    name: 'Karfreitag',
-    typ: 'gesetzlich'
-  },
-  {
-    datum: new Date('2027-04-05'),
-    name: 'Ostermontag',
-    typ: 'gesetzlich'
-  },
-  {
-    datum: new Date('2027-05-01'),
-    name: 'Tag der Arbeit',
-    typ: 'gesetzlich'
-  },
-  {
-    datum: new Date('2027-05-13'),
-    name: 'Christi Himmelfahrt',
-    typ: 'gesetzlich'
-  },
-  {
-    datum: new Date('2027-05-24'),
-    name: 'Pfingstmontag',
-    typ: 'gesetzlich'
-  },
-  {
-    datum: new Date('2027-06-03'),
-    name: 'Fronleichnam',
-    typ: 'gesetzlich'
-  },
-  {
-    datum: new Date('2027-10-03'),
-    name: 'Tag der Deutschen Einheit',
-    typ: 'gesetzlich'
-  },
-  {
-    datum: new Date('2027-11-01'),
-    name: 'Allerheiligen',
-    typ: 'gesetzlich'
-  },
-  {
-    datum: new Date('2027-12-25'),
-    name: '1. Weihnachtstag',
-    typ: 'gesetzlich'
-  },
-  {
-    datum: new Date('2027-12-26'),
-    name: '2. Weihnachtstag',
-    typ: 'gesetzlich'
-  }
-]
+function ladeDeutscheFeiertage(): Feiertag[] {
+  return [
+    ...feiertageDeutschlandData.feiertage2026.map(f => ({
+      ...f,
+      datum: new Date(f.datum),
+      typ: f.typ as 'gesetzlich'
+    })),
+    ...feiertageDeutschlandData.feiertage2027.map(f => ({
+      ...f,
+      datum: new Date(f.datum),
+      typ: f.typ as 'gesetzlich'
+    }))
+  ]
+}
+
+/**
+ * Lädt chinesische Feiertage aus JSON (beide Jahre 2026 + 2027)
+ */
+function ladeChinaFeiertage(): Feiertag[] {
+  return [
+    ...feiertageChinaData.feiertage2026.map(f => ({
+      ...f,
+      datum: new Date(f.datum),
+      typ: f.typ as 'gesetzlich'
+    })),
+    ...feiertageChinaData.feiertage2027.map(f => ({
+      ...f,
+      datum: new Date(f.datum),
+      typ: f.typ as 'gesetzlich'
+    }))
+  ]
+}
 
 /**
  * Prüft ob ein Datum ein Wochenende ist (Samstag oder Sonntag)
@@ -103,7 +82,8 @@ export function istWochenende(date: Date): boolean {
  * @returns Feiertag-Objekt oder undefined
  */
 export function istDeutscherFeiertag(date: Date): Feiertag | undefined {
-  return FEIERTAGE_DEUTSCHLAND_2027.find(f => 
+  const feiertage = ladeDeutscheFeiertage()
+  return feiertage.find(f => 
     f.datum.toDateString() === date.toDateString()
   )
 }
@@ -187,8 +167,17 @@ export function getDateTooltip(date: Date): string | undefined {
 }
 
 /**
- * Exportiert deutsche Feiertage für externe Verwendung
+ * Exportiert alle deutschen Feiertage für externe Verwendung
+ * @returns Array von deutschen Feiertagen (beide Jahre)
  */
 export function getDeutscheFeiertage(): Feiertag[] {
-  return FEIERTAGE_DEUTSCHLAND_2027
+  return ladeDeutscheFeiertage()
+}
+
+/**
+ * Exportiert alle chinesischen Feiertage für externe Verwendung
+ * @returns Array von chinesischen Feiertagen (beide Jahre)
+ */
+export function getChinesischeFeiertage(): Feiertag[] {
+  return ladeChinaFeiertage()
 }

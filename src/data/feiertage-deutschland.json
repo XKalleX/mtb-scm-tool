@@ -1,0 +1,141 @@
+{
+  "feiertage2026": [
+    {
+      "datum": "2026-01-01",
+      "name": "Neujahr",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2026-04-03",
+      "name": "Karfreitag",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2026-04-06",
+      "name": "Ostermontag",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2026-05-01",
+      "name": "Tag der Arbeit",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2026-05-14",
+      "name": "Christi Himmelfahrt",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2026-05-25",
+      "name": "Pfingstmontag",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2026-06-04",
+      "name": "Fronleichnam",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2026-10-03",
+      "name": "Tag der Deutschen Einheit",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2026-11-01",
+      "name": "Allerheiligen",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2026-12-25",
+      "name": "1. Weihnachtsfeiertag",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2026-12-26",
+      "name": "2. Weihnachtsfeiertag",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    }
+  ],
+  "feiertage2027": [
+    {
+      "datum": "2027-01-01",
+      "name": "Neujahr",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2027-04-02",
+      "name": "Karfreitag",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2027-04-05",
+      "name": "Ostermontag",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2027-05-01",
+      "name": "Tag der Arbeit",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2027-05-13",
+      "name": "Christi Himmelfahrt",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2027-05-24",
+      "name": "Pfingstmontag",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2027-06-03",
+      "name": "Fronleichnam",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2027-10-03",
+      "name": "Tag der Deutschen Einheit",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2027-11-01",
+      "name": "Allerheiligen",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2027-12-25",
+      "name": "1. Weihnachtsfeiertag",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    },
+    {
+      "datum": "2027-12-26",
+      "name": "2. Weihnachtsfeiertag",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    }
+  ],
+  "quelle": "https://www.feiertage-deutschland.de/nordrhein-westfalen/",
+  "hinweis": "Gesetzliche Feiertage für Nordrhein-Westfalen (NRW)",
+  "wichtig": "NRW hat 11 gesetzliche Feiertage inkl. Fronleichnam und Allerheiligen"
+}

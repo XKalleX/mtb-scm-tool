@@ -29,6 +29,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import saisonalitaetData from '@/data/saisonalitaet.json'
 import stammdatenData from '@/data/stammdaten.json'
 import feiertageChinaData from '@/data/feiertage-china.json'
+import feiertageDeutschlandData from '@/data/feiertage-deutschland.json'
 import lieferantChinaData from '@/data/lieferant-china.json'
 import stuecklisteData from '@/data/stueckliste.json'
 
@@ -185,20 +186,31 @@ const STANDARD_VARIANTEN: MTBVarianteConfig[] = stammdatenData.varianten as MTBV
 
 /**
  * Feiertage aus JSON laden (Deutschland + China)
+ * Lädt für beide Jahre 2026 und 2027 zur Berücksichtigung von Vorlaufzeiten
  */
 const STANDARD_FEIERTAGE: FeiertagConfig[] = [
-  // Deutschland (NRW)
-  { datum: "2027-01-01", name: "Neujahr", typ: "gesetzlich", land: "Deutschland" },
-  { datum: "2027-04-02", name: "Karfreitag", typ: "gesetzlich", land: "Deutschland" },
-  { datum: "2027-04-05", name: "Ostermontag", typ: "gesetzlich", land: "Deutschland" },
-  { datum: "2027-05-01", name: "Tag der Arbeit", typ: "gesetzlich", land: "Deutschland" },
-  { datum: "2027-05-13", name: "Christi Himmelfahrt", typ: "gesetzlich", land: "Deutschland" },
-  { datum: "2027-05-24", name: "Pfingstmontag", typ: "gesetzlich", land: "Deutschland" },
-  { datum: "2027-06-03", name: "Fronleichnam", typ: "gesetzlich", land: "Deutschland" },
-  { datum: "2027-10-03", name: "Tag der Deutschen Einheit", typ: "gesetzlich", land: "Deutschland" },
-  { datum: "2027-12-25", name: "1. Weihnachtsfeiertag", typ: "gesetzlich", land: "Deutschland" },
-  { datum: "2027-12-26", name: "2. Weihnachtsfeiertag", typ: "gesetzlich", land: "Deutschland" },
-  // China - aus JSON laden
+  // Deutschland (NRW) - 2026
+  ...feiertageDeutschlandData.feiertage2026.map(f => ({
+    datum: f.datum,
+    name: f.name,
+    typ: f.typ as 'gesetzlich',
+    land: 'Deutschland' as const
+  })),
+  // Deutschland (NRW) - 2027
+  ...feiertageDeutschlandData.feiertage2027.map(f => ({
+    datum: f.datum,
+    name: f.name,
+    typ: f.typ as 'gesetzlich',
+    land: 'Deutschland' as const
+  })),
+  // China - 2026
+  ...feiertageChinaData.feiertage2026.map(f => ({
+    datum: f.datum,
+    name: f.name,
+    typ: (f.typ === 'gesetzlich' ? 'gesetzlich' : 'Festival') as 'gesetzlich' | 'Festival',
+    land: 'China' as const
+  })),
+  // China - 2027
   ...feiertageChinaData.feiertage2027.map(f => ({
     datum: f.datum,
     name: f.name,

@@ -1,4 +1,131 @@
 {
+  "feiertage2026": [
+    {
+      "datum": "2026-01-01",
+      "name": "New Year's Day",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-02-16",
+      "name": "Spring Festival (Tag 1)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-02-17",
+      "name": "Spring Festival (Tag 2) - Chinesischer Neujahrstag",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-02-18",
+      "name": "Spring Festival (Tag 3)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-02-19",
+      "name": "Spring Festival (Tag 4)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-02-20",
+      "name": "Spring Festival (Tag 5)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-02-21",
+      "name": "Spring Festival (Tag 6)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-02-22",
+      "name": "Spring Festival (Tag 7)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-04-05",
+      "name": "Qingming Festival (Tomb-Sweeping Day)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-04-06",
+      "name": "Qingming Festival",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-04-07",
+      "name": "Qingming Festival",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-05-01",
+      "name": "Labour Day",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-05-02",
+      "name": "Labour Day",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-05-03",
+      "name": "Labour Day",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-05-04",
+      "name": "Labour Day",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-05-05",
+      "name": "Labour Day",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-06-19",
+      "name": "Dragon Boat Festival",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-09-25",
+      "name": "Mid-Autumn Festival",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-10-01",
+      "name": "National Day (Tag 1)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-10-02",
+      "name": "National Day (Tag 2)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-10-03",
+      "name": "National Day (Tag 3)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-10-04",
+      "name": "National Day (Tag 4)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-10-05",
+      "name": "National Day (Tag 5)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-10-06",
+      "name": "National Day (Tag 6)",
+      "typ": "gesetzlich"
+    },
+    {
+      "datum": "2026-10-07",
+      "name": "National Day (Tag 7)",
+      "typ": "gesetzlich"
+    }
+  ],
   "feiertage2027": [
     {
       "datum": "2027-01-01",
@@ -134,5 +261,6 @@
   ],
   "quelle": "https://www.chinahighlights.com/festivals/china-public-holiday.htm",
   "hinweis": "Nur chinesische Feiertage relevant, da einziger Lieferant",
-  "wichtig": "Spring Festival (05.2.-12.2.2027) = 7 Tage Produktionsstopp!"
+  "wichtig2026": "Spring Festival (16.2.-22.2.2026) = 7 Tage Produktionsstopp!",
+  "wichtig2027": "Spring Festival (05.2.-12.2.2027) = 8 Tage Produktionsstopp!"
 }
