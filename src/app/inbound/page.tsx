@@ -544,6 +544,7 @@ export default function InboundPage() {
               showFormulas={false}
               showSums={true}
               sumRowLabel={`GESAMT (${bestellStatistik.gesamt} Bestellungen, davon ${bestellStatistik.vorjahr} aus 2026)`}
+              dateColumnKey="bestelldatum"
             />
           </div>
         </CardContent>

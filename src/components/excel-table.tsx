@@ -18,6 +18,7 @@ import React, { useState } from 'react'
 import { Info } from 'lucide-react'
 import { formatNumber } from '@/lib/utils'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
+import { getDateRowBackgroundClasses, getDateTooltip } from '@/lib/date-classification'
 
 interface ExcelTableColumn {
   key: string
@@ -42,6 +43,7 @@ interface ExcelTableProps {
   groupBy?: string // Optional: Gruppiere nach Spalte für Zwischensummen
   subtotalLabel?: string // Label für Zwischensummen (Standard: "Zwischensumme")
   useAverage?: boolean // Verwende Durchschnitt statt Summe (Standard: false)
+  dateColumnKey?: string // Optional: Key der Datum-Spalte für farbliche Markierung von Wochenenden/Feiertagen
 }
 
 /**
@@ -58,7 +60,8 @@ export default function ExcelTable({
   sumRowLabel = 'SUMME',
   groupBy,
   subtotalLabel = 'Zwischensumme',
-  useAverage = false
+  useAverage = false,
+  dateColumnKey
 }: ExcelTableProps) {
   const [selectedFormula, setSelectedFormula] = useState<string | null>(null)
   
@@ -181,12 +184,30 @@ export default function ExcelTable({
                   {/* Datenzeilen der Gruppe */}
                   {group.items.map((row, rowIdx) => {
                     rowCounter++
+                    
+                    // Bestimme Hintergrundfarbe basierend auf Datum (falls dateColumnKey angegeben)
+                    let bgClasses = rowCounter % 2 === 0 ? 'bg-slate-50' : 'bg-white'
+                    let tooltipText: string | undefined = undefined
+                    
+                    if (dateColumnKey && row[dateColumnKey] != null) {
+                      const date = row[dateColumnKey] instanceof Date 
+                        ? row[dateColumnKey] 
+                        : new Date(row[dateColumnKey])
+                      
+                      if (date instanceof Date && !isNaN(date.getTime())) {
+                        const dateClasses = getDateRowBackgroundClasses(date)
+                        if (dateClasses) {
+                          bgClasses = dateClasses
+                        }
+                        tooltipText = getDateTooltip(date)
+                      }
+                    }
+                    
                     return (
                       <tr 
                         key={`${groupIdx}-${rowIdx}`}
-                        className={`border-b border-slate-200 hover:bg-slate-50 transition-colors ${
-                          rowCounter % 2 === 0 ? 'bg-slate-50' : 'bg-white'
-                        }`}
+                        className={`border-b border-slate-200 transition-colors ${bgClasses}`}
+                        title={tooltipText}
                       >
                         {columns.map((col) => (
                           <td
@@ -258,8 +279,26 @@ export default function ExcelTable({
       </div>
 
       {/* Statistik Footer */}
-      <div className="text-sm text-muted-foreground">
-        Zeigt {data.length} von {data.length} Einträgen
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>Zeigt {data.length} von {data.length} Einträgen</span>
+        
+        {/* Legende für Farbkodierung (nur wenn dateColumnKey gesetzt ist) */}
+        {dateColumnKey && (
+          <div className="flex items-center gap-4 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 bg-gray-100 border border-gray-300 rounded"></div>
+              <span>Wochenende</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 bg-blue-50 border border-blue-200 rounded"></div>
+              <span>Deutscher Feiertag</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 bg-orange-50 border border-orange-200 rounded"></div>
+              <span>Chinesischer Feiertag</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

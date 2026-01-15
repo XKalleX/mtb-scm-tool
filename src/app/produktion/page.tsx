@@ -390,6 +390,7 @@ export default function ProduktionPage() {
             showFormulas={true}
             showSums={true}
             sumRowLabel={`SUMME (365 Tage, ${getArbeitstageProJahr()} Arbeitstage)`}
+            dateColumnKey="datum"
           />
         </CardContent>
       </Card>
@@ -576,6 +577,7 @@ export default function ProduktionPage() {
               maxHeight="600px"
               showFormulas={true}
               showSums={false}
+              dateColumnKey="datum"
             />
             
             <p className="text-xs text-green-600 mt-3">

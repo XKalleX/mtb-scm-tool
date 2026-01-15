@@ -29,6 +29,7 @@ import saisonalitaetData from '@/data/saisonalitaet.json'
 import stuecklisteData from '@/data/stueckliste.json'
 import lieferantChinaData from '@/data/lieferant-china.json'
 import feiertageChina from '@/data/feiertage-china.json'
+import feiertageDeutschland from '@/data/feiertage-deutschland.json'
 import szenarioDefaults from '@/data/szenario-defaults.json'
 
 export default function StammdatenPage() {
@@ -425,66 +426,176 @@ function LieferantChinaCard() {
 /**
  * 6. Feiertage China
  */
+/**
+ * 6. Feiertage (Deutschland + China)
+ */
 function FeiertageCard() {
-  const data = feiertageChina as any
-  const feiertage = data.feiertage2027
-  const springFestival = feiertage.filter((f: any) => f.name.includes('Spring Festival'))
+  const chinaData = feiertageChina as any
+  const deutschlandData = feiertageDeutschland as any
+  
+  // Deutschland
+  const feiertage2026DE = deutschlandData.feiertage2026
+  const feiertage2027DE = deutschlandData.feiertage2027
+  
+  // China
+  const feiertage2026CN = chinaData.feiertage2026
+  const feiertage2027CN = chinaData.feiertage2027
+  
+  const springFestival2026 = feiertage2026CN.filter((f: any) => f.name.includes('Spring Festival'))
+  const springFestival2027 = feiertage2027CN.filter((f: any) => f.name.includes('Spring Festival'))
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-5 w-5" />
-          Chinesische Feiertage 2027
-        </CardTitle>
-        <CardDescription>feiertage-china.json - Relevant für Produktion und Transport</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Wichtiger Hinweis */}
-        <div className="p-4 bg-red-50 border border-red-200 rounded">
-          <h4 className="font-semibold text-red-900 mb-2">⚠️ {data.wichtig}</h4>
-          <p className="text-sm text-red-800">{data.hinweis}</p>
-        </div>
-
-        {/* Spring Festival hervorheben */}
-        <div className="border-t pt-4">
-          <h4 className="font-semibold mb-3">Spring Festival ({springFestival.length} Tage)</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {springFestival.map((f: any) => (
-              <div key={f.datum} className="border border-red-300 bg-red-50 rounded p-2">
-                <div className="text-sm font-medium">{new Date(f.datum).toLocaleDateString('de-DE')}</div>
-                <div className="text-xs text-red-700">{f.name}</div>
-              </div>
-            ))}
+    <div className="space-y-6">
+      {/* Deutschland Feiertage */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Deutsche Feiertage (NRW)
+          </CardTitle>
+          <CardDescription>feiertage-deutschland.json - Gesetzliche Feiertage für NRW (11 Tage)</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Wichtiger Hinweis */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded">
+            <h4 className="font-semibold text-blue-900 mb-2">ℹ️ {deutschlandData.wichtig}</h4>
+            <p className="text-sm text-blue-800">{deutschlandData.hinweis}</p>
           </div>
-        </div>
 
-        {/* Alle Feiertage */}
-        <div className="border-t pt-4">
-          <h4 className="font-semibold mb-3">Alle Feiertage ({feiertage.length})</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {feiertage.map((f: any) => (
-              <div 
-                key={f.datum} 
-                className={`border rounded p-2 ${
-                  f.name.includes('Spring Festival') 
-                    ? 'bg-red-50 border-red-200' 
-                    : 'bg-slate-50'
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="font-medium text-sm">{f.name}</div>
-                    <div className="text-xs text-muted-foreground">{new Date(f.datum).toLocaleDateString('de-DE')}</div>
+          {/* Feiertage 2026 */}
+          <div className="border-t pt-4">
+            <h4 className="font-semibold mb-3">Jahr 2026 ({feiertage2026DE.length} Feiertage)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {feiertage2026DE.map((f: any) => (
+                <div key={f.datum} className="border rounded p-2 bg-blue-50">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="font-medium text-sm">{f.name}</div>
+                      <div className="text-xs text-muted-foreground">{new Date(f.datum).toLocaleDateString('de-DE')}</div>
+                    </div>
+                    <Badge variant="outline" className="text-xs bg-blue-100">{f.typ}</Badge>
                   </div>
-                  <Badge variant="outline" className="text-xs">{f.typ}</Badge>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+
+          {/* Feiertage 2027 */}
+          <div className="border-t pt-4">
+            <h4 className="font-semibold mb-3">Jahr 2027 ({feiertage2027DE.length} Feiertage)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {feiertage2027DE.map((f: any) => (
+                <div key={f.datum} className="border rounded p-2 bg-blue-50">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="font-medium text-sm">{f.name}</div>
+                      <div className="text-xs text-muted-foreground">{new Date(f.datum).toLocaleDateString('de-DE')}</div>
+                    </div>
+                    <Badge variant="outline" className="text-xs bg-blue-100">{f.typ}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* China Feiertage */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Chinesische Feiertage
+          </CardTitle>
+          <CardDescription>feiertage-china.json - Relevant für Produktion und Transport</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Wichtiger Hinweis */}
+          <div className="p-4 bg-orange-50 border border-orange-200 rounded">
+            <h4 className="font-semibold text-orange-900 mb-2">⚠️ Wichtig: Spring Festival</h4>
+            <p className="text-sm text-orange-800 mb-1">• 2026: {chinaData.wichtig2026}</p>
+            <p className="text-sm text-orange-800">• 2027: {chinaData.wichtig2027}</p>
+            <p className="text-sm text-orange-800 mt-2">{chinaData.hinweis}</p>
+          </div>
+
+          {/* Spring Festival 2026 hervorheben */}
+          <div className="border-t pt-4">
+            <h4 className="font-semibold mb-3">Spring Festival 2026 ({springFestival2026.length} Tage)</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+              {springFestival2026.map((f: any) => (
+                <div key={f.datum} className="border border-orange-300 bg-orange-50 rounded p-2">
+                  <div className="text-sm font-medium">{new Date(f.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</div>
+                  <div className="text-xs text-orange-700 line-clamp-2">{f.name.replace('Spring Festival ', '')}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Spring Festival 2027 hervorheben */}
+          <div className="border-t pt-4">
+            <h4 className="font-semibold mb-3">Spring Festival 2027 ({springFestival2027.length} Tage)</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+              {springFestival2027.map((f: any) => (
+                <div key={f.datum} className="border border-orange-300 bg-orange-50 rounded p-2">
+                  <div className="text-sm font-medium">{new Date(f.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</div>
+                  <div className="text-xs text-orange-700 line-clamp-2">{f.name.replace('Spring Festival ', '')}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Alle Feiertage 2026 */}
+          <div className="border-t pt-4">
+            <h4 className="font-semibold mb-3">Alle Feiertage 2026 ({feiertage2026CN.length})</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {feiertage2026CN.map((f: any) => (
+                <div 
+                  key={f.datum} 
+                  className={`border rounded p-2 ${
+                    f.name.includes('Spring Festival') 
+                      ? 'bg-orange-50 border-orange-200' 
+                      : 'bg-slate-50'
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm line-clamp-1">{f.name}</div>
+                      <div className="text-xs text-muted-foreground">{new Date(f.datum).toLocaleDateString('de-DE')}</div>
+                    </div>
+                    <Badge variant="outline" className="text-xs ml-2">{f.typ}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Alle Feiertage 2027 */}
+          <div className="border-t pt-4">
+            <h4 className="font-semibold mb-3">Alle Feiertage 2027 ({feiertage2027CN.length})</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {feiertage2027CN.map((f: any) => (
+                <div 
+                  key={f.datum} 
+                  className={`border rounded p-2 ${
+                    f.name.includes('Spring Festival') 
+                      ? 'bg-orange-50 border-orange-200' 
+                      : 'bg-slate-50'
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm line-clamp-1">{f.name}</div>
+                      <div className="text-xs text-muted-foreground">{new Date(f.datum).toLocaleDateString('de-DE')}</div>
+                    </div>
+                    <Badge variant="outline" className="text-xs ml-2">{f.typ}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 

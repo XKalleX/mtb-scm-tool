@@ -20,15 +20,23 @@ import { addDays, isWeekend, getDayOfYear, getWeekNumber } from './utils'
 import feiertagsData from '@/data/feiertage-china.json'
 
 /**
- * Lädt alle chinesischen Feiertage für 2027
+ * Lädt alle chinesischen Feiertage für beide Jahre (2026 + 2027)
+ * Wichtig für Vorlaufzeit-Berechnungen (49 Tage können bis 2026 zurückreichen)
  * @returns Array von Feiertagen
  */
 export function ladeChinaFeiertage(): Feiertag[] {
-  return feiertagsData.feiertage2027.map(f => ({
-    ...f,
-    datum: new Date(f.datum),
-    typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
-  }))
+  return [
+    ...feiertagsData.feiertage2026.map(f => ({
+      ...f,
+      datum: new Date(f.datum),
+      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
+    })),
+    ...feiertagsData.feiertage2027.map(f => ({
+      ...f,
+      datum: new Date(f.datum),
+      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
+    }))
+  ]
 }
 
 /**

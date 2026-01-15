@@ -37,6 +37,7 @@ import {
   berechneProduktionsStatistiken,
   type TagesProduktionEntry
 } from '@/lib/calculations/zentrale-produktionsplanung'
+import { getDateRowBackgroundClasses, getDateTooltip } from '@/lib/date-classification'
 
 /**
  * OEM Programm Hauptseite
@@ -718,6 +719,7 @@ export default function OEMProgrammPage() {
                     sumRowLabel="JAHRESSUMME"
                     groupBy="monat"
                     subtotalLabel="Monatssumme"
+                    dateColumnKey="datum"
                   />
                 )
               })()}
@@ -907,24 +909,31 @@ export default function OEMProgrammPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {data.map((row, idx) => (
-                            <tr key={idx} className="border-b hover:bg-slate-50">
-                              <td className="p-2 text-left">{formatDate(row.datum)}</td>
-                              <td className="p-2 text-center">{row.wochentag}</td>
-                              {konfiguration.varianten.map(v => {
-                                const error = row[`${v.id}_error`]
-                                const errorClass = Math.abs(error) > 0.5 ? 'text-orange-600 font-semibold' : ''
-                                
-                                return (
-                                  <React.Fragment key={`${v.id}-data`}>
-                                    <td className="p-2 text-right border-l">{formatNumber(row[`${v.id}_menge`], 0)}</td>
-                                    <td className={`p-2 text-right ${errorClass}`}>{formatNumber(error, 2)}</td>
-                                  </React.Fragment>
-                                )
-                              })}
-                              <td className="p-2 text-right font-bold border-l bg-slate-50">{formatNumber(row.gesamt, 0)}</td>
-                            </tr>
-                          ))}
+                          {data.map((row, idx) => {
+                            // Bestimme Hintergrundfarbe basierend auf Datum
+                            const date = row.datum
+                            const dateClasses = getDateRowBackgroundClasses(date) || 'hover:bg-slate-50'
+                            const tooltip = getDateTooltip(date)
+                            
+                            return (
+                              <tr key={idx} className={`border-b ${dateClasses}`} title={tooltip}>
+                                <td className="p-2 text-left">{formatDate(row.datum)}</td>
+                                <td className="p-2 text-center">{row.wochentag}</td>
+                                {konfiguration.varianten.map(v => {
+                                  const error = row[`${v.id}_error`]
+                                  const errorClass = Math.abs(error) > 0.5 ? 'text-orange-600 font-semibold' : ''
+                                  
+                                  return (
+                                    <React.Fragment key={`${v.id}-data`}>
+                                      <td className="p-2 text-right border-l">{formatNumber(row[`${v.id}_menge`], 0)}</td>
+                                      <td className={`p-2 text-right ${errorClass}`}>{formatNumber(error, 2)}</td>
+                                    </React.Fragment>
+                                  )
+                                })}
+                                <td className="p-2 text-right font-bold border-l bg-slate-50">{formatNumber(row.gesamt, 0)}</td>
+                              </tr>
+                            )
+                          })}
                           {/* Summenzeile */}
                           <tr className="bg-slate-100 font-bold border-t-2">
                             <td className="p-2" colSpan={2}>JAHRESSUMME</td>
