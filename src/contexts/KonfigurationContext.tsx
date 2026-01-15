@@ -112,6 +112,7 @@ export interface KonfigurationData {
   // Grundeinstellungen
   jahresproduktion: number
   planungsjahr: number
+  heuteDatum: string  // 'Heute'-Datum für Frozen Zone Konzept (ISO Format YYYY-MM-DD)
   
   // Stammdaten
   varianten: MTBVarianteConfig[]
@@ -130,6 +131,8 @@ interface KonfigurationContextType {
   // Update Methoden
   setJahresproduktion: (value: number) => void
   setPlanungsjahr: (value: number) => void
+  setHeuteDatum: (value: string) => void  // 'Heute'-Datum setzen (ISO Format YYYY-MM-DD)
+  getHeuteDatumAsDate: () => Date  // 'Heute'-Datum als Date-Objekt zurückgeben
   
   // Varianten
   updateVariante: (id: string, updates: Partial<MTBVarianteConfig>) => void
@@ -258,6 +261,7 @@ const STANDARD_STUECKLISTE: StuecklistenPosition[] = Object.entries(stuecklisteD
 const STANDARD_KONFIGURATION: KonfigurationData = {
   jahresproduktion: (stammdatenData as any).jahresproduktion?.gesamt || 370000,
   planungsjahr: stammdatenData.projekt.planungsjahr,
+  heuteDatum: (stammdatenData.projekt as any).heuteDatum || '2027-04-15',  // Standard 'Heute'-Datum aus stammdaten.json
   varianten: STANDARD_VARIANTEN,
   saisonalitaet: STANDARD_SAISONALITAET,
   feiertage: STANDARD_FEIERTAGE,
@@ -312,6 +316,27 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
   const setPlanungsjahr = useCallback((value: number) => {
     setKonfiguration(prev => ({ ...prev, planungsjahr: value }))
   }, [])
+
+  /**
+   * Setzt das 'Heute'-Datum für Frozen Zone Konzept
+   * @param value - ISO Format YYYY-MM-DD
+   */
+  const setHeuteDatum = useCallback((value: string) => {
+    // Validierung: Datum muss in 2027 liegen
+    const datum = new Date(value)
+    if (datum.getFullYear() !== 2027) {
+      console.warn('Warnung: Datum sollte im Planungsjahr 2027 liegen!')
+    }
+    setKonfiguration(prev => ({ ...prev, heuteDatum: value }))
+  }, [])
+
+  /**
+   * Gibt das 'Heute'-Datum als Date-Objekt zurück
+   * Wichtig für Frozen Zone Berechnungen
+   */
+  const getHeuteDatumAsDate = useCallback((): Date => {
+    return new Date(konfiguration.heuteDatum)
+  }, [konfiguration.heuteDatum])
 
   const updateVariante = useCallback((id: string, updates: Partial<MTBVarianteConfig>) => {
     setKonfiguration(prev => ({
@@ -456,6 +481,8 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
         isInitialized,
         setJahresproduktion,
         setPlanungsjahr,
+        setHeuteDatum,
+        getHeuteDatumAsDate,
         updateVariante,
         updateVariantenAnteile,
         updateSaisonalitaet,

@@ -8,16 +8,45 @@
  * - Chinesische Feiertage (einziger Lieferant!)
  * - Arbeitstagen vs. Kalendertagen
  * - Vorlaufzeiten-Berechnungen
+ * - 'Heute'-Datum für Frozen Zone Konzept
  * 
  * WICHTIG: 
  * - Transport nutzt Kalendertage (24/7, Schiff fährt immer)
  * - Produktion nutzt Arbeitstage (Mo-Fr ohne Feiertage)
  * - Nur chinesische Feiertage relevant!
+ * - 'Heute'-Datum wird aus globaler Konfiguration gelesen
  */
 
 import { Kalendertag, Feiertag } from '@/types'
 import { addDays, isWeekend, getDayOfYear, getWeekNumber } from './utils'
 import feiertagsData from '@/data/feiertage-china.json'
+
+/**
+ * Liest das 'Heute'-Datum aus der globalen Konfiguration
+ * Fallback: 2027-04-15 falls nicht gesetzt
+ * @returns Date-Objekt des 'Heute'-Datums
+ */
+export function getHeuteDatum(): Date {
+  if (typeof window === 'undefined') {
+    // Server-Side: Standard-Datum
+    return new Date('2027-04-15')
+  }
+  
+  try {
+    const konfigString = localStorage.getItem('mtb-konfiguration')
+    if (konfigString) {
+      const konfiguration = JSON.parse(konfigString)
+      if (konfiguration.heuteDatum) {
+        return new Date(konfiguration.heuteDatum)
+      }
+    }
+  } catch (error) {
+    console.warn('Fehler beim Laden des Heute-Datums aus Konfiguration:', error)
+  }
+  
+  // Fallback: Standard-Datum
+  return new Date('2027-04-15')
+}
 
 /**
  * Lädt alle chinesischen Feiertage für beide Jahre (2026 + 2027)
@@ -322,4 +351,15 @@ export function kalenderStatistik(jahr: number = 2027) {
 export function istBestellungRechtzeitig(bedarfsdatum: Date, heute: Date): boolean {
   const bestelldatum = berechneBestelldatum(bedarfsdatum)
   return bestelldatum >= heute
+}
+
+/**
+ * Prüft ob genug Vorlaufzeit für Bestellung vorhanden ist (mit globalem 'Heute')
+ * Verwendet das 'Heute'-Datum aus der globalen Konfiguration
+ * @param bedarfsdatum - Wann wird Material gebraucht
+ * @returns True wenn Bestellung noch rechtzeitig möglich
+ */
+export function istBestellungRechtzeitigGlobal(bedarfsdatum: Date): boolean {
+  const heute = getHeuteDatum()
+  return istBestellungRechtzeitig(bedarfsdatum, heute)
 }

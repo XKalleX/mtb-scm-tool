@@ -46,6 +46,7 @@ export function EinstellungenPanel() {
     konfiguration, 
     isInitialized,
     setJahresproduktion,
+    setHeuteDatum,
     updateSaisonalitaet,
     updateVariante,
     addFeiertag,
@@ -157,6 +158,21 @@ export function EinstellungenPanel() {
                   />
                   <p className="text-xs text-muted-foreground">
                     Standard: {formatNumber(STANDARD_KONFIGURATION.jahresproduktion, 0)} Bikes
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="heuteDatum">'Heute'-Datum (Frozen Zone)</Label>
+                  <Input
+                    id="heuteDatum"
+                    type="date"
+                    value={konfiguration.heuteDatum ?? '2027-04-15'}
+                    onChange={(e) => setHeuteDatum(e.target.value)}
+                    min="2027-01-01"
+                    max="2027-12-31"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Standard: {STANDARD_KONFIGURATION.heuteDatum} - Trennt Vergangenheit (Frozen Zone) von Zukunft (Planning Zone)
                   </p>
                 </div>
 
