@@ -983,27 +983,39 @@ export default function OEMProgrammPage() {
                             )
                           })}
                           {/* Summenzeile */}
-                          <tr className="bg-slate-100 font-bold border-t-2">
-                            <td className="p-2" colSpan={2}>JAHRESSUMME</td>
-                            {konfiguration.varianten.map(v => {
+                          {(() => {
+                            // ✅ SZENARIO-AWARE: Berechne Gesamtsumme aus allen Varianten-Plänen
+                            // Damit die Tabelle die Szenarien-Auswirkungen korrekt widerspiegelt
+                            const gesamtSumme = konfiguration.varianten.reduce((total, v) => {
                               const plan = produktionsplaene[v.id]
-                              const summe = plan?.tage.reduce((sum, t) => sum + t.planMenge, 0) || 0
-                              // Letzter Monatsfehler des Jahres (Dezember)
-                              const finalError = plan && plan.tage.length > 0 
-                                ? plan.tage.filter(t => t.istArbeitstag).slice(-1)[0]?.monatsFehlerNachher || 0
-                                : 0
-                              
-                              return (
-                                <React.Fragment key={`${v.id}-sum`}>
-                                  <td className="p-2 text-right border-l">{formatNumber(summe, 0)}</td>
-                                  <td className="p-2 text-right">{formatNumber(finalError, 3)}</td>
-                                </React.Fragment>
-                              )
-                            })}
-                            <td className="p-2 text-right border-l bg-slate-200">
-                              {formatNumber(konfiguration.jahresproduktion, 0)}
-                            </td>
-                          </tr>
+                              const varianteSumme = plan?.tage.reduce((sum, t) => sum + t.planMenge, 0) || 0
+                              return total + varianteSumme
+                            }, 0)
+                            
+                            return (
+                              <tr className="bg-slate-100 font-bold border-t-2">
+                                <td className="p-2" colSpan={2}>JAHRESSUMME</td>
+                                {konfiguration.varianten.map(v => {
+                                  const plan = produktionsplaene[v.id]
+                                  const summe = plan?.tage.reduce((sum, t) => sum + t.planMenge, 0) || 0
+                                  // Letzter Monatsfehler des Jahres (Dezember)
+                                  const finalError = plan && plan.tage.length > 0 
+                                    ? plan.tage.filter(t => t.istArbeitstag).slice(-1)[0]?.monatsFehlerNachher || 0
+                                    : 0
+                                  
+                                  return (
+                                    <React.Fragment key={`${v.id}-sum`}>
+                                      <td className="p-2 text-right border-l">{formatNumber(summe, 0)}</td>
+                                      <td className="p-2 text-right">{formatNumber(finalError, 3)}</td>
+                                    </React.Fragment>
+                                  )
+                                })}
+                                <td className="p-2 text-right border-l bg-slate-200">
+                                  {formatNumber(gesamtSumme, 0)}
+                                </td>
+                              </tr>
+                            )
+                          })()}
                         </tbody>
                       </table>
                     </div>

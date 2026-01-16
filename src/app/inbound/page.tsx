@@ -137,9 +137,11 @@ export default function InboundPage() {
           ? '-'
           : lieferdatumObj.toISOString().split('T')[0]
         
-        // Menge basierend auf Saisonalität aus Konfiguration
+        // ✅ SZENARIO-AWARE: Menge basierend auf Saisonalität + Szenario-Produktionsfaktor
+        // Berücksichtigt Marketing-Kampagnen (+25%) oder Ausfälle (reduzierte Produktion)
         const saisonAnteil = konfiguration.saisonalitaet[monat - 1]?.anteil || 8.33
-        const menge = Math.round(konfiguration.jahresproduktion * (saisonAnteil / 100) * 1.1) // 10% Buffer
+        const szenarioAdjustedProduktion = konfiguration.jahresproduktion * modifikation.produktionsFaktor
+        const menge = Math.round(szenarioAdjustedProduktion * (saisonAnteil / 100) * 1.1) // 10% Buffer
         
         // Status abhängig von Jahr und Monat
         let status = 'Geplant'
@@ -164,7 +166,7 @@ export default function InboundPage() {
     }
     
     return result
-  }, [konfiguration, lieferant, gesamtVorlaufzeit])
+  }, [konfiguration, lieferant, gesamtVorlaufzeit, modifikation.produktionsFaktor])
   
   /**
    * Exportiert Lieferanten-Daten als JSON
@@ -227,11 +229,25 @@ export default function InboundPage() {
                 <DeltaBadge delta={vorlaufzeitDelta} suffix=" Tage" inverseLogic={true} />
               </div>
               <div>
-                <div className="text-xs text-green-600">Material-Faktor</div>
-                <span className="text-sm font-medium">
-                  {formatNumber(modifikation.materialverfuegbarkeitFaktor * 100, 1)}%
+                <div className="text-xs text-green-600">Bedarf-Faktor</div>
+                <span className={`text-sm font-medium ${modifikation.produktionsFaktor !== 1.0 ? 'text-orange-600' : ''}`}>
+                  {formatNumber(modifikation.produktionsFaktor * 100, 1)}%
+                  {modifikation.produktionsFaktor > 1.0 && (
+                    <span className="text-xs text-orange-500 ml-1">↑ +{formatNumber((modifikation.produktionsFaktor - 1) * 100, 0)}%</span>
+                  )}
+                  {modifikation.produktionsFaktor < 1.0 && (
+                    <span className="text-xs text-red-500 ml-1">↓ {formatNumber((modifikation.produktionsFaktor - 1) * 100, 0)}%</span>
+                  )}
                 </span>
               </div>
+              {modifikation.materialverfuegbarkeitFaktor !== 1.0 && (
+                <div>
+                  <div className="text-xs text-orange-600">Material-Verfügbarkeit</div>
+                  <span className="text-sm font-medium text-orange-700">
+                    {formatNumber(modifikation.materialverfuegbarkeitFaktor * 100, 1)}%
+                  </span>
+                </div>
+              )}
               {modifikation.materialVerlust > 0 && (
                 <div>
                   <div className="text-xs text-red-600">Material-Verlust</div>
