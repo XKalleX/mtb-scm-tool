@@ -26,13 +26,11 @@ import {
   TrendingUp,
   Calendar,
   ArrowRight,
-  Zap,
-  Settings
+  Zap
 } from 'lucide-react'
 import { useSzenarien, berechneGlobaleAuswirkungen, BASELINE_WERTE } from '@/contexts/SzenarienContext'
 import { useKonfiguration, STANDARD_KONFIGURATION } from '@/contexts/KonfigurationContext'
-import { useMemo, useState } from 'react'
-import { EinstellungenPanel } from '@/components/EinstellungenPanel'
+import { useMemo } from 'react'
 import { formatNumber } from '@/lib/utils'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
@@ -50,7 +48,6 @@ export default function Dashboard() {
   const { szenarien, getAktiveSzenarien } = useSzenarien()
   const { konfiguration, isInitialized, getArbeitstageProJahr } = useKonfiguration()
   const aktiveSzenarien = getAktiveSzenarien()
-  const [showSettings, setShowSettings] = useState(false)
   
   // Berechne Auswirkungen der aktiven Szenarien in Echtzeit
   const auswirkungen = useMemo(() => {
@@ -81,29 +78,20 @@ export default function Dashboard() {
   
   return (
     <div className="space-y-6">
-      {/* Willkommens-Bereich mit Settings Toggle */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Supply Chain Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Übersicht über alle wichtigen Kennzahlen und Funktionen
-            {aktiveSzenarien.length > 0 && ' - Live-Berechnung mit aktiven Szenarien'}
-          </p>
-        </div>
-        <Button
-          variant={showSettings ? 'default' : 'outline'}
-          onClick={() => setShowSettings(!showSettings)}
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          {showSettings ? 'Einstellungen schließen' : 'Einstellungen öffnen'}
-        </Button>
+      {/* Willkommens-Bereich */}
+      <div>
+        <h1 className="text-3xl font-bold">Supply Chain Dashboard</h1>
+        <p className="text-muted-foreground mt-1">
+          Übersicht über alle wichtigen Kennzahlen und Funktionen
+          {aktiveSzenarien.length > 0 && ' - Live-Berechnung mit aktiven Szenarien'}
+        </p>
+        <p className="text-sm text-blue-600 mt-2">
+          💡 Tipp: Öffnen Sie die Einstellungen über das blaue ⚙️ Icon rechts unten
+        </p>
       </div>
 
       {/* Aktive Szenarien Banner */}
       <ActiveScenarioBanner showDetails={false} />
-
-      {/* Einstellungen Panel (einklappbar) */}
-      {showSettings && <EinstellungenPanel />}
 
       {/* KPI Cards - Wichtigste Kennzahlen mit Live-Updates */}
       <div className="grid gap-4 md:grid-cols-4">
