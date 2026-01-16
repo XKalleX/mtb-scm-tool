@@ -11,38 +11,51 @@
  * - Losgrößen-Optimierung
  * - Bestellplanung
  * 
- * NEU: Nutzt dynamische Konfiguration aus KonfigurationContext
+ * ✅ NEU: Szenarien-Integration global wirksam!
+ * ✅ Zeigt Deltas (+X / -X) bei Schiffsverspätungen etc.
  */
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Ship, AlertTriangle, Package, Download, Calendar } from 'lucide-react'
+import { Ship, AlertTriangle, Package, Download, Calendar, Zap } from 'lucide-react'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { formatNumber, addDays } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
+import { DeltaCell, DeltaBadge } from '@/components/DeltaCell'
 import { useMemo } from 'react'
 import { generiereAlleVariantenProduktionsplaene } from '@/lib/calculations/zentrale-produktionsplanung'
 import { generiereTaeglicheBestellungen, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
+import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 
 /**
  * Inbound Logistik Hauptseite
  * Zeigt Lieferanteninformationen und Logistikdetails mit Excel-Tabellen
- * Nutzt dynamische Konfiguration aus KonfigurationContext
+ * ✅ Nutzt szenario-aware Berechnungen
  */
 export default function InboundPage() {
   const { konfiguration, isInitialized } = useKonfiguration()
   
+  // ✅ SZENARIO-AWARE: Nutze neuen Hook
+  const {
+    hasSzenarien,
+    aktiveSzenarienCount,
+    aktiveSzenarien,
+    modifikation,
+    formatDelta
+  } = useSzenarioBerechnung()
+  
   // Lieferant aus Konfiguration
   const lieferant = konfiguration.lieferant
   
-  // Gesamtvorlaufzeit aus Konfiguration (konfigurierbar durch Einstellungen)
-  // Die Transportsequenz zeigt die Reihenfolge: Produktion → LKW China → Schiff → LKW DE
-  // Feiertage werden bei der Berechnung in lib/kalender.ts berücksichtigt
-  const gesamtVorlaufzeit = lieferant.gesamtVorlaufzeitTage
+  // Gesamtvorlaufzeit aus Konfiguration + Szenario-Modifikation
+  // Bei Schiffsverspätung erhöht sich die Vorlaufzeit
+  const baseVorlaufzeit = lieferant.gesamtVorlaufzeitTage
+  const gesamtVorlaufzeit = baseVorlaufzeit + modifikation.vorlaufzeitAenderung
+  const vorlaufzeitDelta = modifikation.vorlaufzeitAenderung
   
   // ✅ NEUE BESTELLLOGIK: Tägliche Bedarfsermittlung
   // Generiere Produktionspläne für alle Varianten
@@ -170,7 +183,43 @@ export default function InboundPage() {
       {/* Aktive Szenarien Banner */}
       <ActiveScenarioBanner showDetails={false} />
 
-      {/* Übersicht Cards */}
+      {/* ✅ SZENARIEN AKTIV: Zeige Auswirkungen auf Inbound */}
+      {hasSzenarien && (
+        <CollapsibleInfo
+          title={`Szenarien aktiv (${aktiveSzenarienCount})`}
+          variant="success"
+          icon={<Zap className="h-5 w-5" />}
+          defaultOpen={true}
+        >
+          <div className="text-sm text-green-800">
+            <p className="mb-3">
+              <strong>✅ Szenarien wirken sich auf die Inbound-Logistik aus!</strong>
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t border-green-300">
+              <div>
+                <div className="text-xs text-green-600">Vorlaufzeit Delta</div>
+                <DeltaBadge delta={vorlaufzeitDelta} suffix=" Tage" inverseLogic={true} />
+              </div>
+              <div>
+                <div className="text-xs text-green-600">Material-Faktor</div>
+                <span className="text-sm font-medium">
+                  {formatNumber(modifikation.materialverfuegbarkeitFaktor * 100, 1)}%
+                </span>
+              </div>
+              {modifikation.materialVerlust > 0 && (
+                <div>
+                  <div className="text-xs text-red-600">Material-Verlust</div>
+                  <span className="text-sm font-medium text-red-700">
+                    -{formatNumber(modifikation.materialVerlust, 0)} Teile
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </CollapsibleInfo>
+      )}
+
+      {/* Übersicht Cards - MIT SZENARIO-DELTAS */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-3">
@@ -185,15 +234,22 @@ export default function InboundPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={vorlaufzeitDelta > 0 ? 'border-orange-200' : ''}>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Seefracht</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Seefracht
+                {vorlaufzeitDelta > 0 && <Zap className="h-3 w-3 inline ml-1 text-orange-600" />}
+              </CardTitle>
               <Ship className="h-4 w-4 text-muted-foreground" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{lieferant.vorlaufzeitKalendertage}</div>
+            <DeltaCell 
+              value={lieferant.vorlaufzeitKalendertage + vorlaufzeitDelta}
+              delta={vorlaufzeitDelta}
+              inverseLogic={true}
+            />
             <p className="text-xs text-muted-foreground">Kalendertage Schiff (24/7)</p>
           </CardContent>
         </Card>
