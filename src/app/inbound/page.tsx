@@ -46,6 +46,7 @@ export default function InboundPage() {
     aktiveSzenarienCount,
     aktiveSzenarien,
     modifikation,
+    variantenPlaene,
     formatDelta
   } = useSzenarioBerechnung()
   
@@ -58,11 +59,20 @@ export default function InboundPage() {
   const gesamtVorlaufzeit = baseVorlaufzeit + modifikation.vorlaufzeitAenderung
   const vorlaufzeitDelta = modifikation.vorlaufzeitAenderung
   
-  // ✅ NEUE BESTELLLOGIK: Tägliche Bedarfsermittlung
-  // Generiere Produktionspläne für alle Varianten
-  const produktionsplaene = useMemo(() => {
+  // ✅ SZENARIO-AWARE Produktionspläne für Bedarfsermittlung
+  // Generiere Baseline-Produktionspläne für alle Varianten
+  const baselineProduktionsplaene = useMemo(() => {
     return generiereAlleVariantenProduktionsplaene(konfiguration)
   }, [konfiguration])
+  
+  // ✅ WICHTIG: Nutze Szenario-Pläne wenn Szenarien aktiv, sonst Baseline
+  // Das stellt sicher, dass Bestellmengen die Szenarien-Auswirkungen berücksichtigen!
+  const produktionsplaene = useMemo(() => {
+    if (hasSzenarien && Object.keys(variantenPlaene).length > 0) {
+      return variantenPlaene
+    }
+    return baselineProduktionsplaene
+  }, [hasSzenarien, variantenPlaene, baselineProduktionsplaene])
   
   // Konvertiere zu TagesProduktionsplan Format für Inbound-Berechnung
   const produktionsplaeneFormatiert = useMemo(() => {

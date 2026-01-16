@@ -66,11 +66,20 @@ export default function OEMProgrammPage() {
     getDeltaColorClass
   } = useSzenarioBerechnung()
 
-  // Baseline-Produktionspläne (für Vergleich)
-  const produktionsplaene = useMemo(() => 
+  // Baseline-Produktionspläne (für Vergleich wenn keine Szenarien aktiv)
+  const baselineProduktionsplaene = useMemo(() => 
     generiereAlleVariantenProduktionsplaene(konfiguration),
     [konfiguration]
   )
+  
+  // ✅ WICHTIG: Nutze Szenario-Pläne wenn Szenarien aktiv, sonst Baseline
+  // Das stellt sicher, dass ALLE Tabellen die Szenarien-Auswirkungen anzeigen!
+  const produktionsplaene = useMemo(() => {
+    if (hasSzenarien && Object.keys(variantenPlaene).length > 0) {
+      return variantenPlaene
+    }
+    return baselineProduktionsplaene
+  }, [hasSzenarien, variantenPlaene, baselineProduktionsplaene])
 
   // Berechne Statistiken aus Konfiguration
   const arbeitstage = isInitialized ? getArbeitstageProJahr() : 252
