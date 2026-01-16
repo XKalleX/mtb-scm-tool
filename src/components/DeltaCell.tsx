@@ -89,17 +89,25 @@ export function DeltaCell({
 }: DeltaCellProps) {
   const { decimals = 0, suffix = '', prefix = '' } = format
   
+  // Validierung: Prüfe ob value eine gültige Zahl ist
+  if (typeof value !== 'number' || isNaN(value)) {
+    return <span className={cn('text-muted-foreground', className)}>N/A</span>
+  }
+  
   // Formatiere den Hauptwert
   const formattedValue = decimals > 0
     ? value.toLocaleString('de-DE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
     : value.toLocaleString('de-DE')
   
-  // Prüfe ob Delta signifikant ist
-  const isDeltaSignificant = Math.abs(delta) > threshold
+  // Validierung für Delta
+  const safeDelta = typeof delta === 'number' && !isNaN(delta) ? delta : 0
   
-  // Bestimme Farbe basierend auf Delta und Logik
-  const isPositiveDelta = inverseLogic ? delta < 0 : delta > 0
-  const isNegativeDelta = inverseLogic ? delta > 0 : delta < 0
+  // Prüfe ob Delta signifikant ist
+  const isDeltaSignificant = Math.abs(safeDelta) > threshold
+  
+  // Bestimme Farbe basierend auf Delta und Logik (verwende safeDelta)
+  const isPositiveDelta = inverseLogic ? safeDelta < 0 : safeDelta > 0
+  const isNegativeDelta = inverseLogic ? safeDelta > 0 : safeDelta < 0
   
   // Formatiere Delta
   const formatDelta = (d: number): string => {
@@ -131,7 +139,7 @@ export function DeltaCell({
   if (compact) {
     return (
       <span className={cn(alignClasses[align], deltaColorClass, 'font-mono text-xs', className)}>
-        {isDeltaSignificant ? formatDelta(delta) : '—'}
+        {isDeltaSignificant ? formatDelta(safeDelta) : '—'}
       </span>
     )
   }
@@ -148,7 +156,7 @@ export function DeltaCell({
         <span className={cn('text-xs font-mono flex items-center gap-0.5', deltaColorClass, align === 'right' && 'justify-end')}>
           {isPositiveDelta && <ArrowUp className="h-3 w-3" />}
           {isNegativeDelta && <ArrowDown className="h-3 w-3" />}
-          {formatDelta(delta)}
+          {formatDelta(safeDelta)}
         </span>
       )}
     </div>

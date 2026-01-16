@@ -31,6 +31,29 @@ import {
 } from './zentrale-produktionsplanung'
 
 // ========================================
+// KONSTANTEN FÜR SZENARIO-BERECHNUNGEN
+// ========================================
+
+/**
+ * Faktor für Materialverfügbarkeits-Impact pro Tag Schiffsverspätung
+ * Beispiel: 4 Tage Verspätung * 0.012 = 4.8% weniger Materialverfügbarkeit
+ * Begründung: Ca. 1.2% pro Tag basierend auf 30 Tage Schifffahrt-Vorlaufzeit
+ */
+const SHIP_DELAY_MATERIAL_IMPACT_FACTOR = 0.012
+
+/**
+ * Produktionsrate bei Maschinenausfall (30% = 70% Ausfall)
+ * Begründung: Bei schwerem Ausfall wird nur mit manuellen/Backup-Prozessen produziert
+ */
+const MACHINE_FAILURE_PRODUCTION_RATE = 0.3
+
+/**
+ * Produktionsrate bei Materialmangel (85% = 15% Reduktion)
+ * Begründung: Teilproduktion möglich, aber nicht alle Varianten vollständig lieferbar
+ */
+const MATERIAL_SHORTAGE_PRODUCTION_RATE = 0.85
+
+// ========================================
 // TYPEN FÜR SZENARIO-BERECHNUNGEN
 // ========================================
 
@@ -212,8 +235,8 @@ export function berechneSzenarioModifikation(
         const verspaetungTage = szenario.parameter.verspaetungTage || 4
         vorlaufzeitAenderung += verspaetungTage
         
-        // Materialverfügbarkeit sinkt temporär
-        materialverfuegbarkeitFaktor *= (1 - verspaetungTage * 0.012)
+        // Materialverfügbarkeit sinkt temporär (ca. 1.2% pro Verspätungstag)
+        materialverfuegbarkeitFaktor *= (1 - verspaetungTage * SHIP_DELAY_MATERIAL_IMPACT_FACTOR)
         
         beschreibungen.push(`Schiffsverspätung: +${verspaetungTage} Tage Vorlaufzeit`)
         break
@@ -302,19 +325,21 @@ export function generiereTagesproduktionMitSzenarien(
     let szenarioNotiz: string | undefined
     
     if (istAusfallTag && szenarioTag.istArbeitstag) {
-      // Produktionsausfall: Reduziere Ist-Menge drastisch
-      modifizierteIstMenge = Math.round(szenarioTag.istMenge * 0.3) // 70% Ausfall
+      // Produktionsausfall: Reduziere Ist-Menge drastisch (70% Ausfall)
+      modifizierteIstMenge = Math.round(szenarioTag.istMenge * MACHINE_FAILURE_PRODUCTION_RATE)
       szenarioTyp = 'maschinenausfall'
       szenarioNotiz = 'Produktionsausfall China'
     }
     
-    // Materialverfügbarkeit beeinflussen
+    // Materialverfügbarkeit beeinflussen (deterministisch basierend auf Tagesnummer)
+    // Verwendet den Materialverfügbarkeitsfaktor zusammen mit einer deterministischen Schwelle
+    const materialSchwelle = 0.1 + (tagNummer % 10) / 10 // Wert zwischen 0.1 und 1.0 basierend auf Tag
     const materialOk = szenarioTag.materialVerfuegbar && 
-                       Math.random() < modifikation.materialverfuegbarkeitFaktor
+                       materialSchwelle < modifikation.materialverfuegbarkeitFaktor
     
     if (!materialOk && szenarioTag.istArbeitstag && !istAusfallTag) {
-      // Reduzierte Produktion wegen Materialmangel
-      modifizierteIstMenge = Math.round(szenarioTag.istMenge * 0.85)
+      // Reduzierte Produktion wegen Materialmangel (15% Reduktion)
+      modifizierteIstMenge = Math.round(szenarioTag.istMenge * MATERIAL_SHORTAGE_PRODUCTION_RATE)
       szenarioTyp = szenarioTyp || 'materialmangel'
       szenarioNotiz = szenarioNotiz || 'Reduzierte Materialverfügbarkeit'
     }
@@ -452,10 +477,13 @@ export function berechneLagerbestaendeMitSzenarien(
   // Szenario-Modifikation
   const modifikation = berechneSzenarioModifikation(aktiveSzenarien, konfiguration.planungsjahr)
   
-  // Berechne Szenario-Lagerbestände
+  // Berechne Szenario-Lagerbestände (mit Guard gegen Division durch 0)
   const result: LagerbestandMitDelta[] = baseline.map(baselineLager => {
     // Bestand reduziert durch Materialverlust und Verfügbarkeitsfaktor
-    const verlustAnteil = modifikation.materialVerlust / (konfiguration.jahresproduktion / baseline.length)
+    // Guard: baseline.length > 0 ist garantiert (sonst wäre map leer), aber expliziter Schutz
+    const verlustAnteil = baseline.length > 0 
+      ? modifikation.materialVerlust / (konfiguration.jahresproduktion / baseline.length)
+      : 0
     const szenarioBestand = Math.max(
       0, 
       Math.round(baselineLager.bestand * modifikation.materialverfuegbarkeitFaktor - verlustAnteil * baselineLager.bestand)
