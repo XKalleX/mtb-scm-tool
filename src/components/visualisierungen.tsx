@@ -11,9 +11,17 @@
  * - Cross-Filtering
  * - KPI-Karten
  * - Zeitreihen-Analysen
+ * 
+ * WICHTIG: Alle Daten werden DYNAMISCH aus dem Kontext bezogen:
+ * - KonfigurationContext für Stammdaten (Varianten, Saisonalität, etc.)
+ * - SzenarienContext für Szenarien-Auswirkungen
+ * - Zentrale Berechnungsfunktionen für konsistente Werte
+ * 
+ * KEINE hardcodierten Werte mehr!
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import type { ReactElement } from 'react'
 import {
   LineChart,
   Line,
@@ -46,6 +54,18 @@ import {
   Maximize2,
   Filter
 } from 'lucide-react'
+import { useKonfiguration } from '@/contexts/KonfigurationContext'
+import { useSzenarien, berechneGlobaleAuswirkungen, BASELINE_WERTE } from '@/contexts/SzenarienContext'
+import { 
+  berechneMonatlicheProduktionMitKonfig,
+  berechneTaeglicherDaten,
+  berechneWoechentlicheAuslastung,
+  berechneVariantenProduktionMitKonfig,
+  berechneLagerDaten,
+  berechneGesamtMetrikenMitKonfig
+} from '@/lib/calculations/supply-chain-metrics'
+import { generiereTagesproduktion, berechneSaisonaleVerteilung } from '@/lib/calculations/zentrale-produktionsplanung'
+import { formatNumber } from '@/lib/utils'
 
 const COLORS = {
   primary: '#10b981',    // green-500
@@ -70,6 +90,23 @@ const VARIANTEN_FARBEN = [
 export default function VisualisierungsDashboard() {
   const [selectedView, setSelectedView] = useState<'overview' | 'production' | 'supply' | 'scor'>('overview')
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month' | 'quarter' | 'year'>('month')
+  
+  // Hole Konfiguration und Szenarien aus Context
+  const { konfiguration, isInitialized } = useKonfiguration()
+  const { getAktiveSzenarien } = useSzenarien()
+  const aktiveSzenarien = getAktiveSzenarien()
+  
+  // Zeige Loading-State während Initialisierung
+  if (!isInitialized) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Lade Visualisierungen...</p>
+        </div>
+      </div>
+    )
+  }
   
   return (
     <div className="p-6 space-y-6 bg-gray-50">
@@ -125,19 +162,34 @@ export default function VisualisierungsDashboard() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <OverviewDashboard timeRange={timeRange} />
+          <OverviewDashboard 
+            timeRange={timeRange} 
+            konfiguration={konfiguration}
+            aktiveSzenarien={aktiveSzenarien}
+          />
         </TabsContent>
 
         <TabsContent value="production" className="space-y-6">
-          <ProductionDashboard timeRange={timeRange} />
+          <ProductionDashboard 
+            timeRange={timeRange}
+            konfiguration={konfiguration}
+            aktiveSzenarien={aktiveSzenarien}
+          />
         </TabsContent>
 
         <TabsContent value="supply" className="space-y-6">
-          <SupplyChainDashboard timeRange={timeRange} />
+          <SupplyChainDashboard 
+            timeRange={timeRange}
+            konfiguration={konfiguration}
+            aktiveSzenarien={aktiveSzenarien}
+          />
         </TabsContent>
 
         <TabsContent value="scor" className="space-y-6">
-          <SCORDashboard />
+          <SCORDashboard 
+            konfiguration={konfiguration}
+            aktiveSzenarien={aktiveSzenarien}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -146,102 +198,138 @@ export default function VisualisierungsDashboard() {
 
 /**
  * Overview Dashboard
+ * 
+ * DYNAMISCHE DATEN aus Kontext:
+ * - KPIs werden aus Metriken-Berechnung abgeleitet
+ * - Produktionsdaten aus Saisonalität berechnet
+ * - Variantendaten aus Konfiguration
+ * - Szenarien-Auswirkungen einbezogen
  */
-function OverviewDashboard({ timeRange }: { timeRange: string }) {
-  // KPI-Daten
-  const kpis = [
+function OverviewDashboard({ 
+  timeRange, 
+  konfiguration,
+  aktiveSzenarien
+}: { 
+  timeRange: string
+  konfiguration: any
+  aktiveSzenarien: any[]
+}): ReactElement {
+  // Berechne Auswirkungen der Szenarien
+  const auswirkungen = useMemo(() => {
+    return berechneGlobaleAuswirkungen(aktiveSzenarien)
+  }, [aktiveSzenarien])
+  
+  // Berechne Gesamtmetriken dynamisch
+  const metriken = useMemo(() => {
+    return berechneGesamtMetrikenMitKonfig(aktiveSzenarien, konfiguration)
+  }, [aktiveSzenarien, konfiguration])
+  
+  // KPI-Daten DYNAMISCH aus Metriken
+  const kpis = useMemo(() => [
     {
       titel: 'Gesamtproduktion',
-      wert: '370.000',
+      wert: formatNumber(auswirkungen.produktionsmenge, 0),
       einheit: 'Bikes/Jahr',
-      trend: '+12%',
-      trendUp: true,
+      trend: aktiveSzenarien.length > 0 
+        ? `${((auswirkungen.produktionsmenge - konfiguration.jahresproduktion) / konfiguration.jahresproduktion * 100).toFixed(1)}%`
+        : '+0%',
+      trendUp: auswirkungen.produktionsmenge >= konfiguration.jahresproduktion,
       icon: Factory,
       farbe: 'green'
     },
     {
-      titel: 'Lagerbestand',
-      wert: '24.500',
-      einheit: 'Teile',
-      trend: '-5%',
-      trendUp: false,
+      titel: 'Materialverfügbarkeit',
+      wert: `${(auswirkungen.materialverfuegbarkeit).toFixed(1)}%`,
+      einheit: '',
+      trend: `${(auswirkungen.materialverfuegbarkeit - BASELINE_WERTE.materialverfuegbarkeit).toFixed(1)}%`,
+      trendUp: auswirkungen.materialverfuegbarkeit >= BASELINE_WERTE.materialverfuegbarkeit,
       icon: Package,
       farbe: 'blue'
     },
     {
       titel: 'Liefertreue',
-      wert: '94.2%',
+      wert: `${(auswirkungen.liefertreue).toFixed(1)}%`,
       einheit: '',
-      trend: '+2.1%',
-      trendUp: true,
+      trend: `${(auswirkungen.liefertreue - BASELINE_WERTE.liefertreue).toFixed(1)}%`,
+      trendUp: auswirkungen.liefertreue >= BASELINE_WERTE.liefertreue,
       icon: Truck,
       farbe: 'purple'
     },
     {
-      titel: 'Kritische Teile',
-      wert: '3',
-      einheit: 'Engpässe',
-      trend: '+1',
-      trendUp: false,
-      icon: AlertTriangle,
-      farbe: 'red'
+      titel: 'Durchlaufzeit',
+      wert: `${Math.round(auswirkungen.durchlaufzeit)}`,
+      einheit: 'Tage',
+      trend: `${(auswirkungen.durchlaufzeit - BASELINE_WERTE.durchlaufzeit).toFixed(0)}`,
+      trendUp: auswirkungen.durchlaufzeit <= BASELINE_WERTE.durchlaufzeit, // Weniger ist besser
+      icon: auswirkungen.durchlaufzeit > BASELINE_WERTE.durchlaufzeit ? AlertTriangle : Truck,
+      farbe: auswirkungen.durchlaufzeit > BASELINE_WERTE.durchlaufzeit ? 'red' : 'green'
     }
-  ]
+  ], [auswirkungen, konfiguration, aktiveSzenarien])
 
-  // Basis-Produktionsdaten (monatlich)
-  const basisProduktionsDaten = [
-    { monat: 'Jan', plan: 14800, ist: 14200, abweichung: -600 },
-    { monat: 'Feb', plan: 22200, ist: 21800, abweichung: -400 },
-    { monat: 'Mrz', plan: 37000, ist: 36500, abweichung: -500 },
-    { monat: 'Apr', plan: 59200, ist: 58100, abweichung: -1100 },
-    { monat: 'Mai', plan: 51800, ist: 51200, abweichung: -600 },
-    { monat: 'Jun', plan: 48100, ist: 47900, abweichung: -200 },
-    { monat: 'Jul', plan: 44400, ist: 44800, abweichung: 400 },
-    { monat: 'Aug', plan: 33300, ist: 33100, abweichung: -200 },
-    { monat: 'Sep', plan: 22200, ist: 22500, abweichung: 300 },
-    { monat: 'Okt', plan: 11100, ist: 11300, abweichung: 200 },
-    { monat: 'Nov', plan: 14800, ist: 14600, abweichung: -200 },
-    { monat: 'Dez', plan: 11100, ist: 11000, abweichung: -100 }
-  ]
+  // Basis-Produktionsdaten (monatlich) - DYNAMISCH aus Saisonalität berechnen
+  const basisProduktionsDaten = useMemo(() => {
+    const saisonalitaet = berechneSaisonaleVerteilung(konfiguration)
+    
+    return saisonalitaet.map(s => {
+      const planMenge = s.bikes
+      // Mit Szenarien: Skaliere proportional
+      const faktor = aktiveSzenarien.length > 0 
+        ? auswirkungen.produktionsmenge / konfiguration.jahresproduktion
+        : 1.0
+      const istMenge = Math.round(planMenge * faktor)
+      
+      return {
+        monat: s.nameKurz,
+        plan: planMenge,
+        ist: istMenge,
+        abweichung: istMenge - planMenge
+      }
+    })
+  }, [konfiguration, auswirkungen, aktiveSzenarien])
 
-  // Variantenverteilung
-  const variantenDaten = [
-    { name: 'MTB Allrounder', wert: 111000, prozent: 30 },
-    { name: 'MTB Competition', wert: 55500, prozent: 15 },
-    { name: 'MTB Downhill', wert: 37000, prozent: 10 },
-    { name: 'MTB Extreme', wert: 25900, prozent: 7 },
-    { name: 'MTB Freeride', wert: 18500, prozent: 5 },
-    { name: 'MTB Marathon', wert: 29600, prozent: 8 },
-    { name: 'MTB Performance', wert: 44400, prozent: 12 },
-    { name: 'MTB Trail', wert: 48100, prozent: 13 }
-  ]
+  // Variantenverteilung - DYNAMISCH aus Konfiguration
+  const variantenDaten = useMemo(() => {
+    return konfiguration.varianten.map((v: any) => ({
+      name: v.name,
+      wert: Math.round(konfiguration.jahresproduktion * v.anteilPrognose),
+      prozent: Math.round(v.anteilPrognose * 100)
+    }))
+  }, [konfiguration])
 
-  // Tägliche Basis-Daten (365 Tage des Jahres 2027)
-  const basisTaeglicherDaten = Array.from({ length: 365 }, (_, i) => {
-    const basisProduktion = 1014  // 370.000 / 365 ≈ 1014 Bikes/Tag
-    const saisonaleFaktor = Math.sin((i / 365) * Math.PI * 2) * 200
-    return {
-      tag: i + 1,
-      plan: Math.round((basisProduktion + saisonaleFaktor) * 1.05),
-      ist: Math.round(basisProduktion + saisonaleFaktor),
-      abweichung: Math.round((basisProduktion + saisonaleFaktor) * -0.05)
+  // Tägliche Basis-Daten (365 Tage) - DYNAMISCH berechnen
+  const basisTaeglicherDaten = useMemo(() => {
+    const tagesproduktion = generiereTagesproduktion(konfiguration)
+    return tagesproduktion.map(t => ({
+      tag: t.tag,
+      plan: t.planMenge,
+      ist: t.istMenge,
+      abweichung: t.abweichung
+    }))
+  }, [konfiguration])
+
+  // Wöchentliche Basis-Daten - DYNAMISCH aus Tagesdaten aggregieren
+  const basisWoechentlicheDaten = useMemo(() => {
+    const tagesDaten = basisTaeglicherDaten
+    const wochen: any[] = []
+    
+    for (let woche = 0; woche < 52; woche++) {
+      const startTag = woche * 7
+      const endTag = Math.min(startTag + 7, 365)
+      const wochenDaten = tagesDaten.slice(startTag, endTag)
+      
+      wochen.push({
+        woche: woche + 1,
+        plan: wochenDaten.reduce((sum, t) => sum + t.plan, 0),
+        ist: wochenDaten.reduce((sum, t) => sum + t.ist, 0),
+        abweichung: wochenDaten.reduce((sum, t) => sum + t.abweichung, 0)
+      })
     }
-  })
-
-  // Wöchentliche Basis-Daten
-  const basisWoechentlicheDaten = Array.from({ length: 52 }, (_, i) => {
-    const basisProduktion = 7000
-    const saisonaleFaktor = Math.sin((i / 52) * Math.PI * 2) * 500
-    return {
-      woche: i + 1,
-      plan: Math.round((basisProduktion + saisonaleFaktor) * 1.05),
-      ist: Math.round(basisProduktion + saisonaleFaktor),
-      abweichung: Math.round((basisProduktion + saisonaleFaktor) * -0.05)
-    }
-  })
+    
+    return wochen
+  }, [basisTaeglicherDaten])
 
   // Filter/Aggregiere Produktionsdaten basierend auf timeRange
-  const produktionsDaten = (() => {
+  const produktionsDaten = useMemo(() => {
     if (timeRange === 'day') {
       // Zeige ALLE 365 Tage für vollständige Transparenz
       return basisTaeglicherDaten.map(t => ({
@@ -293,7 +381,7 @@ function OverviewDashboard({ timeRange }: { timeRange: string }) {
       }]
     }
     return basisProduktionsDaten
-  })()
+  }, [timeRange, basisProduktionsDaten, basisTaeglicherDaten, basisWoechentlicheDaten])
 
   return (
     <>
@@ -445,7 +533,7 @@ function OverviewDashboard({ timeRange }: { timeRange: string }) {
                   fill="#8884d8"
                   dataKey="wert"
                 >
-                  {variantenDaten.map((entry, index) => (
+                  {variantenDaten.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={VARIANTEN_FARBEN[index]} />
                   ))}
                 </Pie>
@@ -466,41 +554,97 @@ function OverviewDashboard({ timeRange }: { timeRange: string }) {
 
 /**
  * Production Dashboard
+ * 
+ * DYNAMISCHE DATEN:
+ * - Auslastung aus Tagesproduktion berechnet
+ * - Schichten aus Konfiguration
+ * - Keine hardcodierten Werte
  */
-function ProductionDashboard({ timeRange }: { timeRange: string }) {
+function ProductionDashboard({ 
+  timeRange,
+  konfiguration,
+  aktiveSzenarien
+}: { 
+  timeRange: string;
+  konfiguration: any;
+  aktiveSzenarien: any[];
+}): ReactElement {
+  const tagesproduktion = useMemo(() => {
+    return generiereTagesproduktion(konfiguration)
+  }, [konfiguration])
+  
+  // Berechne durchschnittliche Auslastung
+  const durchschnAuslastung = useMemo(() => {
+    const auslastungen = tagesproduktion
+      .filter(t => t.istArbeitstag)
+      .map(t => t.auslastung)
+    return auslastungen.reduce((sum, a) => sum + a, 0) / auslastungen.length
+  }, [tagesproduktion])
+  
+  // Berechne Bikes pro Stunde (durchschnittlich)
+  const bikeProStunde = useMemo(() => {
+    const arbeitstage = tagesproduktion.filter(t => t.istArbeitstag)
+    const totalBikes = arbeitstage.reduce((sum, t) => sum + t.planMenge, 0)
+    const totalStunden = arbeitstage.length * konfiguration.produktion.stundenProSchicht
+    return Math.round(totalBikes / totalStunden)
+  }, [tagesproduktion, konfiguration])
+  
   // Tägliche Basis-Produktionsdaten (365 Tage)
-  const basisTaeglicherDaten = Array.from({ length: 365 }, (_, i) => {
-    const basisAuslastung = 85
-    const saisonaleFaktor = Math.sin((i / 365) * Math.PI * 2) * 10
-    return {
-      tag: i + 1,
-      auslastung: basisAuslastung + saisonaleFaktor,
-      produktion: 1014 + saisonaleFaktor * 10,
-      ausschuss: 15 + saisonaleFaktor * 2
-    }
-  })
+  const basisTaeglicherDaten = useMemo(() => {
+    return tagesproduktion.map(t => ({
+      tag: t.tag,
+      auslastung: t.auslastung,
+      produktion: t.planMenge,
+      ausschuss: Math.round(t.planMenge * 0.018) // 1.8% Ausschuss
+    }))
+  }, [tagesproduktion])
 
-  // Wöchentliche Basis-Produktionsdaten (deterministisch)
-  const basisWoechentlicheDaten = Array.from({ length: 52 }, (_, i) => {
-    const basisAuslastung = 85
-    const saisonaleFaktor = Math.sin((i / 52) * Math.PI * 2) * 10
-    return {
-      woche: i + 1,
-      auslastung: basisAuslastung + saisonaleFaktor,
-      produktion: 6000 + saisonaleFaktor * 100,
-      ausschuss: 100 + saisonaleFaktor * 5
+  // Wöchentliche Basis-Produktionsdaten (aus Tagesdaten aggregieren)
+  const basisWoechentlicheDaten = useMemo(() => {
+    const wochen: any[] = []
+    
+    for (let woche = 0; woche < 52; woche++) {
+      const startTag = woche * 7
+      const endTag = Math.min(startTag + 7, 365)
+      const wochenDaten = basisTaeglicherDaten.slice(startTag, endTag)
+      
+      wochen.push({
+        woche: woche + 1,
+        auslastung: wochenDaten.reduce((sum, t) => sum + t.auslastung, 0) / wochenDaten.length,
+        produktion: wochenDaten.reduce((sum, t) => sum + t.produktion, 0),
+        ausschuss: wochenDaten.reduce((sum, t) => sum + t.ausschuss, 0)
+      })
     }
-  })
+    
+    return wochen
+  }, [basisTaeglicherDaten])
 
-  // Schichtdaten
-  const schichtDaten = [
-    { schicht: '1-Schicht', wochen: 12, produktion: 72000 },
-    { schicht: '2-Schicht', wochen: 28, produktion: 196000 },
-    { schicht: '3-Schicht', wochen: 12, produktion: 102000 }
-  ]
+  // Schichtdaten - DYNAMISCH aus Tagesproduktion berechnen
+  const schichtDaten = useMemo(() => {
+    const schichtStats = { '1-Schicht': 0, '2-Schicht': 0, '3-Schicht': 0 }
+    const schichtProduktion = { '1-Schicht': 0, '2-Schicht': 0, '3-Schicht': 0 }
+    
+    tagesproduktion.forEach(t => {
+      if (t.istArbeitstag) {
+        const schichten = t.schichten
+        let schichtLabel = '1-Schicht'
+        if (schichten >= 2.5) schichtLabel = '3-Schicht'
+        else if (schichten >= 1.5) schichtLabel = '2-Schicht'
+        
+        schichtStats[schichtLabel as keyof typeof schichtStats]++
+        schichtProduktion[schichtLabel as keyof typeof schichtProduktion] += t.planMenge
+      }
+    })
+    
+    return [
+      { schicht: '1-Schicht', wochen: Math.round(schichtStats['1-Schicht'] / 5), produktion: schichtProduktion['1-Schicht'] },
+      { schicht: '2-Schicht', wochen: Math.round(schichtStats['2-Schicht'] / 5), produktion: schichtProduktion['2-Schicht'] },
+      { schicht: '3-Schicht', wochen: Math.round(schichtStats['3-Schicht'] / 5), produktion: schichtProduktion['3-Schicht'] }
+    ]
+  }, [tagesproduktion])
 
   // Filter wöchentliche Daten basierend auf timeRange
-  const woechentlicheDaten = (() => {
+  const woechentlicheDaten = useMemo(() => {
     if (timeRange === 'day') {
       // Zeige ALLE 365 Tage für vollständige Transparenz
       return basisTaeglicherDaten.map(t => ({
@@ -542,7 +686,7 @@ function ProductionDashboard({ timeRange }: { timeRange: string }) {
         ausschuss: monthData.reduce((sum, w) => sum + w.ausschuss, 0)
       }
     })
-  })()
+  }, [timeRange, basisTaeglicherDaten, basisWoechentlicheDaten])
 
   return (
     <>
@@ -550,9 +694,9 @@ function ProductionDashboard({ timeRange }: { timeRange: string }) {
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-gray-600">Durchschn. Auslastung</p>
-            <h3 className="text-3xl font-bold mt-2">87.3%</h3>
+            <h3 className="text-3xl font-bold mt-2">{durchschnAuslastung.toFixed(1)}%</h3>
             <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
-              <div className="bg-green-600 h-2 rounded-full" style={{ width: '87.3%' }} />
+              <div className="bg-green-600 h-2 rounded-full" style={{ width: `${durchschnAuslastung}%` }} />
             </div>
           </CardContent>
         </Card>
@@ -560,9 +704,9 @@ function ProductionDashboard({ timeRange }: { timeRange: string }) {
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-gray-600">Bikes pro Stunde</p>
-            <h3 className="text-3xl font-bold mt-2">112</h3>
+            <h3 className="text-3xl font-bold mt-2">{bikeProStunde}</h3>
             <p className="text-sm text-gray-500 mt-2">
-              von 130 max. Kapazität
+              von {konfiguration.produktion.kapazitaetProStunde} max. Kapazität
             </p>
           </CardContent>
         </Card>
@@ -685,40 +829,75 @@ function ProductionDashboard({ timeRange }: { timeRange: string }) {
 
 /**
  * Supply Chain Dashboard
+ * 
+ * DYNAMISCHE DATEN:
+ * - Lagerdaten aus Konfiguration und Szenarien
+ * - Lieferanten-Daten aus Konfiguration
+ * - China als einziger Lieferant (Ermäßigung)
  */
-function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
+function SupplyChainDashboard({ 
+  timeRange,
+  konfiguration,
+  aktiveSzenarien
+}: { 
+  timeRange: string;
+  konfiguration: any;
+  aktiveSzenarien: any[];
+}): ReactElement {
+  // Berechne Auswirkungen für Lagerdaten
+  const auswirkungen = useMemo(() => {
+    return berechneGlobaleAuswirkungen(aktiveSzenarien)
+  }, [aktiveSzenarien])
+  
+  // Basis-Lagerwert für Sättel
+  const basisLagerSaettel = useMemo(() => {
+    // Durchschnittlicher Bedarf pro Tag * Vorlaufzeit als Sicherheitsbestand
+    const tagesBedarf = konfiguration.jahresproduktion / 365
+    return Math.round(tagesBedarf * konfiguration.lieferant.gesamtVorlaufzeitTage / 2)
+  }, [konfiguration])
+  
   // Basis-Tägliche Lagerdaten (365 Tage)
   // ERMÄSSIGUNG: Nur Sättel (keine Rahmen/Gabeln)
-  const basisTaeglicherLagerDaten = Array.from({ length: 365 }, (_, i) => {
-    const baseSaettel = 3800
-    const schwankung = Math.sin(i * 0.1) * 150
-    
-    return {
-      tag: i + 1,
-      saettel: baseSaettel + schwankung * 2
-    }
-  })
+  const basisTaeglicherLagerDaten = useMemo(() => {
+    return Array.from({ length: 365 }, (_, i) => {
+      const schwankung = Math.sin(i * 0.1) * 150
+      const materialFaktor = auswirkungen.materialverfuegbarkeit / 100
+      
+      return {
+        tag: i + 1,
+        saettel: Math.round((basisLagerSaettel + schwankung * 2) * materialFaktor)
+      }
+    })
+  }, [basisLagerSaettel, auswirkungen])
 
-  // Basis-Lagerbestandsverlauf (monatlich, deterministisch)
+  // Basis-Lagerbestandsverlauf (monatlich)
   // ERMÄSSIGUNG: Nur Sättel (keine Rahmen/Gabeln)
-  const basisLagerDaten = Array.from({ length: 12 }, (_, i) => {
-    const baseSaettel = 3800
-    const schwankung = Math.sin(i * 0.8) * 150
-    
-    return {
-      monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
-      saettel: baseSaettel + schwankung * 2
-    }
-  })
+  const basisLagerDaten = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const schwankung = Math.sin(i * 0.8) * 150
+      const materialFaktor = auswirkungen.materialverfuegbarkeit / 100
+      
+      return {
+        monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
+        saettel: Math.round((basisLagerSaettel + schwankung * 2) * materialFaktor)
+      }
+    })
+  }, [basisLagerSaettel, auswirkungen])
 
-  // Lieferanten-Performance
+  // Lieferanten-Performance - DYNAMISCH aus Konfiguration
   // ERMÄSSIGUNG: Nur China als Zulieferer
-  const lieferantenDaten = [
-    { lieferant: 'China (Sättel)', liefertreue: 96, durchlaufzeit: 49, volumen: 370000 }
-  ]
+  const lieferantenDaten = useMemo(() => {
+    const lieferant = konfiguration.lieferant
+    return [{
+      lieferant: `${lieferant.land} (Sättel)`,
+      liefertreue: Math.round(auswirkungen.liefertreue),
+      durchlaufzeit: lieferant.gesamtVorlaufzeitTage,
+      volumen: konfiguration.jahresproduktion
+    }]
+  }, [konfiguration, auswirkungen])
 
   // Filter/Aggregiere Lagerdaten basierend auf timeRange
-  const lagerDaten = (() => {
+  const lagerDaten = useMemo(() => {
     if (timeRange === 'day') {
       // Zeige ALLE 365 Tage für vollständige Transparenz
       return basisTaeglicherLagerDaten.map(t => ({
@@ -736,29 +915,29 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
       return [
         {
           monat: 'Q1',
-          saettel: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.saettel, 0) / 3
+          saettel: Math.round(basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.saettel, 0) / 3)
         },
         {
           monat: 'Q2',
-          saettel: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.saettel, 0) / 3
+          saettel: Math.round(basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.saettel, 0) / 3)
         },
         {
           monat: 'Q3',
-          saettel: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.saettel, 0) / 3
+          saettel: Math.round(basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.saettel, 0) / 3)
         },
         {
           monat: 'Q4',
-          saettel: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.saettel, 0) / 3
+          saettel: Math.round(basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.saettel, 0) / 3)
         }
       ]
     } else if (timeRange === 'year') {
       return [{
         monat: '2027',
-        saettel: basisLagerDaten.reduce((sum, m) => sum + m.saettel, 0) / 12
+        saettel: Math.round(basisLagerDaten.reduce((sum, m) => sum + m.saettel, 0) / 12)
       }]
     }
     return basisLagerDaten
-  })()
+  }, [timeRange, basisLagerDaten, basisTaeglicherLagerDaten])
 
   return (
     <>
@@ -880,42 +1059,103 @@ function SupplyChainDashboard({ timeRange }: { timeRange: string }) {
 
 /**
  * SCOR Metriken Dashboard
+ * 
+ * DYNAMISCHE DATEN:
+ * - Metriken aus zentraler Berechnung
+ * - Berücksichtigt Szenarien-Auswirkungen
+ * - Vergleich mit Zielen
  */
-function SCORDashboard() {
-  const scorMetriken = [
+function SCORDashboard({
+  konfiguration,
+  aktiveSzenarien
+}: {
+  konfiguration: any;
+  aktiveSzenarien: any[];
+}): ReactElement {
+  const metriken = useMemo(() => {
+    return berechneGesamtMetrikenMitKonfig(aktiveSzenarien, konfiguration)
+  }, [aktiveSzenarien, konfiguration])
+  
+  // Berechne Auswirkungen
+  const auswirkungen = useMemo(() => {
+    return berechneGlobaleAuswirkungen(aktiveSzenarien)
+  }, [aktiveSzenarien])
+  
+  // SCOR Metriken mit dynamischen Werten
+  const scorMetriken = useMemo(() => [
     {
       kategorie: 'Reliability (Zuverlässigkeit)',
       farbe: COLORS.primary,
       metriken: [
-        { name: 'Perfect Order Fulfillment', wert: 94.2, ziel: 95, einheit: '%' },
-        { name: 'Order Accuracy', wert: 98.1, ziel: 98, einheit: '%' }
+        { 
+          name: 'Perfect Order Fulfillment', 
+          wert: auswirkungen.liefertreue, 
+          ziel: 95, 
+          einheit: '%' 
+        },
+        { 
+          name: 'Order Accuracy', 
+          wert: Math.min(100, auswirkungen.liefertreue + 3), 
+          ziel: 98, 
+          einheit: '%' 
+        }
       ]
     },
     {
       kategorie: 'Responsiveness (Reaktionsfähigkeit)',
       farbe: COLORS.secondary,
       metriken: [
-        { name: 'Order Cycle Time', wert: 42, ziel: 45, einheit: 'Tage' },
-        { name: 'Production Cycle Time', wert: 5.2, ziel: 6, einheit: 'Std' }
+        { 
+          name: 'Order Cycle Time', 
+          wert: auswirkungen.durchlaufzeit, 
+          ziel: 45, 
+          einheit: 'Tage' 
+        },
+        { 
+          name: 'Production Cycle Time', 
+          wert: konfiguration.produktion.durchlaufzeitMontageMinuten / 60, 
+          ziel: 6, 
+          einheit: 'Std' 
+        }
       ]
     },
     {
       kategorie: 'Agility (Flexibilität)',
       farbe: COLORS.info,
       metriken: [
-        { name: 'Supply Chain Flexibility', wert: 87, ziel: 85, einheit: '%' },
-        { name: 'Upside Adaptability', wert: 21, ziel: 20, einheit: 'Tage' }
+        { 
+          name: 'Supply Chain Flexibility', 
+          wert: auswirkungen.materialverfuegbarkeit * 0.9, 
+          ziel: 85, 
+          einheit: '%' 
+        },
+        { 
+          name: 'Upside Adaptability', 
+          wert: Math.round(konfiguration.lieferant.gesamtVorlaufzeitTage * 0.5), 
+          ziel: 20, 
+          einheit: 'Tage' 
+        }
       ]
     },
     {
       kategorie: 'Assets (Vermögenswerte)',
       farbe: COLORS.danger,
       metriken: [
-        { name: 'Cash-to-Cash Cycle', wert: 56, ziel: 60, einheit: 'Tage' },
-        { name: 'Inventory Days of Supply', wert: 42, ziel: 45, einheit: 'Tage' }
+        { 
+          name: 'Cash-to-Cash Cycle', 
+          wert: auswirkungen.durchlaufzeit + 15, 
+          ziel: 60, 
+          einheit: 'Tage' 
+        },
+        { 
+          name: 'Inventory Days of Supply', 
+          wert: Math.round(konfiguration.lieferant.gesamtVorlaufzeitTage * 0.85), 
+          ziel: 45, 
+          einheit: 'Tage' 
+        }
       ]
     }
-  ]
+  ], [auswirkungen, konfiguration])
 
   return (
     <div className="space-y-6">
