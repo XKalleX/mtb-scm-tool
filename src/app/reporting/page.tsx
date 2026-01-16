@@ -138,8 +138,7 @@ export default function ReportingPage() {
       { Kategorie: 'Responsiveness', Metrik: 'Planungsgenauigkeit', Wert: scorMetriken.forecastAccuracy, Einheit: '%' },
       { Kategorie: 'Agility', Metrik: 'Produktionsflexibilität', Wert: scorMetriken.produktionsflexibilitaet, Einheit: '%' },
       { Kategorie: 'Agility', Metrik: 'Materialverfügbarkeit', Wert: scorMetriken.materialverfuegbarkeit, Einheit: '%' },
-      { Kategorie: 'Assets', Metrik: 'Lagerreichweite', Wert: scorMetriken.lagerreichweite, Einheit: 'Tage' },
-      { Kategorie: 'Assets', Metrik: 'Kapitalbindung', Wert: scorMetriken.kapitalbindung, Einheit: 'Tage' }
+      { Kategorie: 'Assets', Metrik: 'Lagerreichweite', Wert: scorMetriken.lagerreichweite, Einheit: 'Tage' }
     ]
     
     exportToCSV(metricsData, 'scor_metriken_2027')
@@ -237,23 +236,35 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <MetricRow
+            <MetricCardWithDetails
               label="Planerfüllungsgrad"
               value={formatPercent(metriken.planerfuellungsgrad, 2)}
               description="% der geplanten Produktion erreicht"
               status={getStatus(metriken.planerfuellungsgrad, 95, 85)}
+              zielwert="≥ 95,0 %"
+              formel="(Vollständig produzierte Aufträge / Gesamt Aufträge) × 100%"
+              herleitung="Misst, wie viele Produktionsaufträge die geplante Menge vollständig erreicht haben. Ein hoher Wert zeigt zuverlässige Planung und Ausführung."
+              beispiel="Wenn 355 von 365 Tagesaufträgen vollständig erfüllt wurden: (355 / 365) × 100% = 97,3%"
             />
-            <MetricRow
+            <MetricCardWithDetails
               label="Liefertreue China"
               value={formatPercent(metriken.liefertreueChina, 1)}
               description="% pünktliche Lieferungen vom Lieferanten"
               status={getStatus(metriken.liefertreueChina, 95, 85)}
+              zielwert="≥ 95,0 %"
+              formel="(Pünktliche Bestellungen / Gesamt Bestellungen) × 100%"
+              herleitung="Gibt an, wie viele Bestellungen vom China-Lieferanten termingerecht ankommen. Wichtig für Just-in-Time Produktion."
+              beispiel="Bei 48 von 50 pünktlichen Lieferungen: (48 / 50) × 100% = 96,0%"
             />
-            <MetricRow
+            <MetricCardWithDetails
               label="Lieferperformance"
               value={formatPercent(metriken.deliveryPerformance, 1)}
               description="% Lieferungen innerhalb der Vorlaufzeit (49 Tage)"
               status={getStatus(metriken.deliveryPerformance, 90, 80)}
+              zielwert="≥ 90,0 %"
+              formel="Liefertreue × (1 - (Ist-Durchlaufzeit - Soll-Durchlaufzeit) / 100)"
+              herleitung="Bewertet die Lieferqualität unter Berücksichtigung von Durchlaufzeit-Abweichungen. Kombiniert Pünktlichkeit mit Durchlaufzeit-Performance."
+              beispiel="Bei 95% Liefertreue und +4 Tage Verzögerung: 95 × (1 - 4/100) = 91,2%"
             />
           </div>
         </CardContent>
@@ -269,23 +280,35 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <MetricRow
+            <MetricCardWithDetails
               label="Durchlaufzeit Produktion"
               value={`${metriken.durchlaufzeitProduktion} Tage`}
               description="Bestellung China → Fertige Produktion"
               status="neutral"
+              zielwert="≤ 60 Tage"
+              formel="Ø (Ankunftsdatum Komponenten - Bestelldatum)"
+              herleitung="Durchschnittliche Zeit von der Bestellung in China bis zur Ankunft im Werk. Beinhaltet Produktion (5 AT) und Transport (2 AT + 30 KT + 2 AT)."
+              beispiel="Bei 49 Tage Vorlaufzeit: Bestellung 01.01. → Ankunft ~19.02. (49 Tage später)"
             />
-            <MetricRow
+            <MetricCardWithDetails
               label="Lagerumschlag"
               value={`${formatNumber(metriken.lagerumschlag, 1)}x pro Jahr`}
               description="Wie oft wird Lager umgeschlagen"
               status={getStatus(metriken.lagerumschlag, 4, 2)}
+              zielwert="≥ 4,0x pro Jahr"
+              formel="Jahresproduktion (Bikes) / Durchschnittlicher Lagerbestand (Komponenten)"
+              herleitung="Zeigt, wie oft der Lagerbestand pro Jahr umgeschlagen wird. Hoher Wert = effiziente Lagerhaltung, wenig gebundenes Kapital."
+              beispiel="Bei 370.000 Bikes und Ø 92.500 Sätteln im Lager: 370.000 / 92.500 = 4,0x pro Jahr"
             />
-            <MetricRow
+            <MetricCardWithDetails
               label="Planungsgenauigkeit"
               value={formatPercent(metriken.forecastAccuracy, 1)}
               description="Genauigkeit zwischen Plan und Ist"
               status={getStatus(metriken.forecastAccuracy, 95, 90)}
+              zielwert="≥ 95,0 %"
+              formel="100% - (Σ |Abweichung Plan-Ist| / Σ Plan) × 100%"
+              herleitung="Misst die Genauigkeit der Produktionsplanung über alle Monate. Je höher, desto besser stimmen Plan und Ist überein."
+              beispiel="Bei 5.000 Bikes Gesamtabweichung und 370.000 Plan: 100 - (5.000 / 370.000) × 100 = 98,6%"
             />
           </div>
         </CardContent>
@@ -301,17 +324,25 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <MetricRow
+            <MetricCardWithDetails
               label="Produktionsflexibilität"
               value={formatPercent(metriken.produktionsflexibilitaet, 2)}
               description="% Aufträge vollständig produziert"
               status={getStatus(metriken.produktionsflexibilitaet, 95, 85)}
+              zielwert="≥ 95,0 %"
+              formel="(Tage mit vollständiger Produktion / Gesamt Produktionstage) × 100%"
+              herleitung="Misst die Fähigkeit, geplante Mengen auch bei Störungen zu produzieren. Identisch mit Planerfüllungsgrad für Produktionsperspektive."
+              beispiel="Bei 340 von 365 Tagen ohne Materialmangel: (340 / 365) × 100% = 93,2%"
             />
-            <MetricRow
+            <MetricCardWithDetails
               label="Materialverfügbarkeit"
               value={formatPercent(metriken.materialverfuegbarkeit, 1)}
               description="% der Zeit genug Material vorhanden"
               status={getStatus(metriken.materialverfuegbarkeit, 95, 85)}
+              zielwert="≥ 95,0 %"
+              formel="(Produktionstage ohne Materialmangel / Gesamt Produktionstage) × 100%"
+              herleitung="Prozentsatz der Tage, an denen alle benötigten Komponenten verfügbar waren. Schlüssel-KPI für Beschaffungsplanung."
+              beispiel="Wenn an 350 von 365 Tagen Material verfügbar war: (350 / 365) × 100% = 95,9%"
             />
           </div>
         </CardContent>
@@ -322,22 +353,20 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
         <CardHeader>
           <CardTitle>4. ASSETS (Anlagenverwaltung)</CardTitle>
           <CardDescription>
-            Lagerreichweite und Bindungsdauer (keine Kosten)
+            Lagerreichweite (keine Kosten)
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <MetricRow
+            <MetricCardWithDetails
               label="Lagerreichweite"
               value={`${formatNumber(metriken.lagerreichweite, 1)} Tage`}
               description="Wie lange reicht der aktuelle Lagerbestand"
               status={getStatusRange(metriken.lagerreichweite, 7, 14, 20)}
-            />
-            <MetricRow
-              label="Kapitalbindung"
-              value={`${formatNumber(metriken.kapitalbindung, 1)} Tage`}
-              description="Durchschnittliche Lagerdauer"
-              status={getStatusInverted(metriken.kapitalbindung, 30, 45)}
+              zielwert="7-14 Tage"
+              formel="Durchschnittlicher Lagerbestand / Täglicher Verbrauch"
+              herleitung="Anzahl Tage, die der aktuelle Lagerbestand reicht. Optimal: 7-14 Tage für Balance zwischen Sicherheit und Kapitalbindung."
+              beispiel="Bei 14.200 Sätteln im Lager und 1.000 Verbrauch/Tag: 14.200 / 1.000 = 14,2 Tage"
             />
           </div>
         </CardContent>
@@ -387,228 +416,6 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
           </div>
         </CardContent>
       </Card>
-
-      {/* SCOR Metriken Excel-Tabelle */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Alle SCOR-Metriken im Überblick</CardTitle>
-          <CardDescription>
-            Vollständige Übersicht aller KPIs mit Zielwerten, Status und Formel-Erklärungen (Excel-Darstellung)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Formel-Erklärungen */}
-          <div className="grid gap-4 mb-6">
-            <FormulaCard
-              title="Planerfüllungsgrad"
-              formula="(Vollständig produzierte Aufträge / Gesamt Aufträge) × 100%"
-              description="Misst, wie viele Produktionsaufträge die geplante Menge vollständig erreicht haben. Ein hoher Wert zeigt zuverlässige Planung und Ausführung."
-              example="Wenn 355 von 365 Tagesaufträgen vollständig erfüllt wurden: (355 / 365) × 100% = 97,3%"
-            />
-            <FormulaCard
-              title="Liefertreue China"
-              formula="(Pünktliche Bestellungen / Gesamt Bestellungen) × 100%"
-              description="Gibt an, wie viele Bestellungen vom China-Lieferanten termingerecht ankommen. Wichtig für Just-in-Time Produktion."
-              example="Bei 48 von 50 pünktlichen Lieferungen: (48 / 50) × 100% = 96,0%"
-            />
-            <FormulaCard
-              title="Lieferperformance (NEU)"
-              formula="Liefertreue × (1 - (Ist-Durchlaufzeit - Soll-Durchlaufzeit) / 100)"
-              description="Bewertet die Lieferqualität unter Berücksichtigung von Durchlaufzeit-Abweichungen. Kombiniert Pünktlichkeit mit Durchlaufzeit-Performance."
-              example="Bei 95% Liefertreue und +4 Tage Verzögerung: 95 × (1 - 4/100) = 91,2%"
-            />
-            <FormulaCard
-              title="Durchlaufzeit Produktion"
-              formula="Ø (Ankunftsdatum Komponenten - Bestelldatum)"
-              description="Durchschnittliche Zeit von der Bestellung in China bis zur Ankunft im Werk. Beinhaltet Produktion (5 AT) und Transport (2 AT + 30 KT + 2 AT)."
-              example="Bei 49 Tage Vorlaufzeit: Bestellung 01.01. → Ankunft ~19.02. (49 Tage später)"
-            />
-            <FormulaCard
-              title="Lagerumschlag"
-              formula="Jahresproduktion (Bikes) / Durchschnittlicher Lagerbestand (Komponenten)"
-              description="Zeigt, wie oft der Lagerbestand pro Jahr umgeschlagen wird. Hoher Wert = effiziente Lagerhaltung, wenig gebundenes Kapital."
-              example="Bei 370.000 Bikes und Ø 92.500 Sätteln im Lager: 370.000 / 92.500 = 4,0x pro Jahr"
-            />
-            <FormulaCard
-              title="Planungsgenauigkeit (NEU)"
-              formula="100% - (Σ |Abweichung Plan-Ist| / Σ Plan) × 100%"
-              description="Misst die Genauigkeit der Produktionsplanung über alle Monate. Je höher, desto besser stimmen Plan und Ist überein."
-              example="Bei 5.000 Bikes Gesamtabweichung und 370.000 Plan: 100 - (5.000 / 370.000) × 100 = 98,6%"
-            />
-            <FormulaCard
-              title="Produktionsflexibilität"
-              formula="(Tage mit vollständiger Produktion / Gesamt Produktionstage) × 100%"
-              description="Misst die Fähigkeit, geplante Mengen auch bei Störungen zu produzieren. Identisch mit Planerfüllungsgrad für Produktionsperspektive."
-              example="Bei 340 von 365 Tagen ohne Materialmangel: (340 / 365) × 100% = 93,2%"
-            />
-            <FormulaCard
-              title="Materialverfügbarkeit"
-              formula="(Produktionstage ohne Materialmangel / Gesamt Produktionstage) × 100%"
-              description="Prozentsatz der Tage, an denen alle benötigten Komponenten verfügbar waren. Schlüssel-KPI für Beschaffungsplanung."
-              example="Wenn an 350 von 365 Tagen Material verfügbar war: (350 / 365) × 100% = 95,9%"
-            />
-            <FormulaCard
-              title="Lagerreichweite"
-              formula="Durchschnittlicher Lagerbestand / Täglicher Verbrauch"
-              description="Anzahl Tage, die der aktuelle Lagerbestand reicht. Optimal: 7-14 Tage für Balance zwischen Sicherheit und Kapitalbindung."
-              example="Bei 14.200 Sätteln im Lager und 1.000 Verbrauch/Tag: 14.200 / 1.000 = 14,2 Tage"
-            />
-            <FormulaCard
-              title="Kapitalbindung"
-              formula="Durchschnittlicher Lagerbestand / Täglicher Verbrauch"
-              description="Durchschnittliche Lagerdauer in Tagen. Zeigt, wie lange Kapital gebunden ist. Niedriger Wert = besserer Cashflow."
-              example="Gleiche Berechnung wie Lagerreichweite: 14,2 Tage Kapitalbindung"
-            />
-          </div>
-
-          <ExcelTable
-            columns={[
-              {
-                key: 'kategorie',
-                label: 'SCOR Kategorie',
-                width: '150px',
-                align: 'left',
-                sumable: false
-              },
-              {
-                key: 'metrik',
-                label: 'Metrik',
-                width: '200px',
-                align: 'left',
-                sumable: false
-              },
-              {
-                key: 'istwert',
-                label: 'Ist-Wert',
-                width: '120px',
-                align: 'right',
-                format: (val) => val,
-                sumable: false
-              },
-              {
-                key: 'zielwert',
-                label: 'Ziel-Wert',
-                width: '120px',
-                align: 'right',
-                format: (val) => val,
-                sumable: false
-              },
-              {
-                key: 'zielerreichung',
-                label: 'Zielerreichung',
-                width: '130px',
-                align: 'right',
-                formula: '(Ist / Ziel) × 100%',
-                format: (val) => formatPercent(val, 1),
-                sumable: true
-              },
-              {
-                key: 'status',
-                label: 'Status',
-                width: '100px',
-                align: 'center',
-                format: (val) => {
-                  if (val === 'good') return '✓ Gut'
-                  if (val === 'medium') return '◐ Mittel'
-                  return '✗ Schwach'
-                },
-                sumable: false
-              }
-            ]}
-            data={[
-              {
-                kategorie: 'Reliability',
-                metrik: 'Planerfüllungsgrad',
-                istwert: formatPercent(metriken.planerfuellungsgrad, 2),
-                zielwert: '95,0 %',
-                zielerreichung: (metriken.planerfuellungsgrad / 95) * 100,
-                status: metriken.planerfuellungsgrad >= 95 ? 'good' : 'medium'
-              },
-              {
-                kategorie: 'Reliability',
-                metrik: 'Liefertreue China',
-                istwert: formatPercent(metriken.liefertreueChina, 1),
-                zielwert: '95,0 %',
-                zielerreichung: (metriken.liefertreueChina / 95) * 100,
-                status: metriken.liefertreueChina >= 95 ? 'good' : metriken.liefertreueChina >= 85 ? 'medium' : 'bad'
-              },
-              {
-                kategorie: 'Reliability',
-                metrik: 'Lieferperformance',
-                istwert: formatPercent(metriken.deliveryPerformance, 1),
-                zielwert: '90,0 %',
-                zielerreichung: (metriken.deliveryPerformance / 90) * 100,
-                status: metriken.deliveryPerformance >= 90 ? 'good' : metriken.deliveryPerformance >= 80 ? 'medium' : 'bad'
-              },
-              {
-                kategorie: 'Responsiveness',
-                metrik: 'Durchlaufzeit',
-                istwert: `${metriken.durchlaufzeitProduktion} Tage`,
-                zielwert: '60 Tage',
-                zielerreichung: (60 / metriken.durchlaufzeitProduktion) * 100,
-                status: metriken.durchlaufzeitProduktion <= 60 ? 'good' : 'medium'
-              },
-              {
-                kategorie: 'Responsiveness',
-                metrik: 'Lagerumschlag',
-                istwert: `${formatNumber(metriken.lagerumschlag, 1)}x`,
-                zielwert: '4,0x',
-                zielerreichung: (metriken.lagerumschlag / 4) * 100,
-                status: metriken.lagerumschlag >= 4 ? 'good' : 'medium'
-              },
-              {
-                kategorie: 'Responsiveness',
-                metrik: 'Planungsgenauigkeit',
-                istwert: formatPercent(metriken.forecastAccuracy, 1),
-                zielwert: '95,0 %',
-                zielerreichung: (metriken.forecastAccuracy / 95) * 100,
-                status: metriken.forecastAccuracy >= 95 ? 'good' : metriken.forecastAccuracy >= 90 ? 'medium' : 'bad'
-              },
-              {
-                kategorie: 'Agility',
-                metrik: 'Produktionsflexibilität',
-                istwert: formatPercent(metriken.produktionsflexibilitaet, 2),
-                zielwert: '95,0 %',
-                zielerreichung: (metriken.produktionsflexibilitaet / 95) * 100,
-                status: metriken.produktionsflexibilitaet >= 95 ? 'good' : 'medium'
-              },
-              {
-                kategorie: 'Agility',
-                metrik: 'Materialverfügbarkeit',
-                istwert: formatPercent(metriken.materialverfuegbarkeit, 1),
-                zielwert: '95,0 %',
-                zielerreichung: (metriken.materialverfuegbarkeit / 95) * 100,
-                status: metriken.materialverfuegbarkeit >= 95 ? 'good' : 'medium'
-              },
-              {
-                kategorie: 'Assets',
-                metrik: 'Lagerreichweite',
-                istwert: `${formatNumber(metriken.lagerreichweite, 1)} Tage`,
-                zielwert: '7-14 Tage',
-                zielerreichung: metriken.lagerreichweite >= 7 && metriken.lagerreichweite <= 14 ? 100 : 
-                                metriken.lagerreichweite <= 20 ? 80 : 60,
-                status: metriken.lagerreichweite >= 7 && metriken.lagerreichweite <= 14 ? 'good' : 
-                        metriken.lagerreichweite <= 20 ? 'medium' : 'bad'
-              },
-              {
-                kategorie: 'Assets',
-                metrik: 'Kapitalbindung',
-                istwert: `${formatNumber(metriken.kapitalbindung, 1)} Tage`,
-                zielwert: '≤ 30 Tage',
-                zielerreichung: (30 / metriken.kapitalbindung) * 100,
-                status: metriken.kapitalbindung <= 30 ? 'good' : 'medium'
-              }
-            ]}
-            maxHeight="600px"
-            showFormulas={true}
-            showSums={true}
-            sumRowLabel="DURCHSCHNITT Zielerreichung"
-            groupBy="kategorie"
-            subtotalLabel="Kategorie-Durchschnitt"
-            useAverage={true}
-          />
-        </CardContent>
-      </Card>
     </>
   )
 }
@@ -645,6 +452,77 @@ function MetricRow({
         <Icon className={`h-5 w-5 ${config.color}`} />
       </div>
     </div>
+  )
+}
+
+/**
+ * Erweiterte Metrik-Karte mit ausklappbaren Details
+ */
+function MetricCardWithDetails({
+  label,
+  value,
+  description,
+  status,
+  zielwert,
+  formel,
+  herleitung,
+  beispiel
+}: {
+  label: string
+  value: string
+  description: string
+  status: 'good' | 'medium' | 'bad' | 'neutral'
+  zielwert: string
+  formel: string
+  herleitung: string
+  beispiel: string
+}) {
+  const statusConfig = {
+    good: { icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50', badgeColor: 'bg-green-100 text-green-800' },
+    medium: { icon: Minus, color: 'text-orange-600', bg: 'bg-orange-50', badgeColor: 'bg-orange-100 text-orange-800' },
+    bad: { icon: TrendingDown, color: 'text-red-600', bg: 'bg-red-50', badgeColor: 'bg-red-100 text-red-800' },
+    neutral: { icon: Minus, color: 'text-slate-600', bg: 'bg-slate-50', badgeColor: 'bg-slate-100 text-slate-800' }
+  }
+
+  const config = statusConfig[status]
+  const Icon = config.icon
+
+  return (
+    <CollapsibleInfo
+      title={
+        <div className="flex items-center justify-between w-full">
+          <div className="flex-1">
+            <div className="font-medium text-base">{label}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{description}</div>
+          </div>
+          <div className="flex items-center space-x-3 ml-4">
+            <div className="text-right">
+              <div className="text-xl font-bold">{value}</div>
+              <div className="text-xs text-muted-foreground">Ziel: {zielwert}</div>
+            </div>
+            <Icon className={`h-5 w-5 ${config.color} flex-shrink-0`} />
+          </div>
+        </div>
+      }
+      variant={status === 'good' ? 'success' : status === 'bad' ? 'destructive' : 'default'}
+      defaultOpen={false}
+      className={config.bg}
+    >
+      <div className="space-y-3 pt-2">
+        <div>
+          <div className="text-xs font-semibold text-muted-foreground mb-1">FORMEL:</div>
+          <code className="text-sm bg-slate-100 px-2 py-1 rounded block">{formel}</code>
+        </div>
+        <div>
+          <div className="text-xs font-semibold text-muted-foreground mb-1">HERLEITUNG:</div>
+          <p className="text-sm text-slate-700">{herleitung}</p>
+        </div>
+        <div>
+          <div className="text-xs font-semibold text-muted-foreground mb-1">BEISPIEL:</div>
+          <p className="text-sm text-slate-700 italic">{beispiel}</p>
+        </div>
+      </div>
+    </CollapsibleInfo>
   )
 }
 
