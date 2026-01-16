@@ -14,14 +14,13 @@
  */
 
 import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
-  Settings, 
   Save, 
   RotateCcw, 
   Plus, 
@@ -41,6 +40,7 @@ import { DEFAULT_HEUTE_DATUM } from '@/lib/constants'
 
 /**
  * Hauptkomponente für Einstellungen
+ * Kann sowohl standalone als auch in einem Sidebar verwendet werden
  */
 export function EinstellungenPanel() {
   const { 
@@ -87,61 +87,51 @@ export function EinstellungenPanel() {
   const variantenValid = Math.abs(variantenSumme - 100) < 0.1
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            <CardTitle>Einstellungen & Konfiguration</CardTitle>
-          </div>
-          <div className="flex gap-2">
-            {showConfirmReset ? (
-              <>
-                <Button variant="destructive" size="sm" onClick={handleReset}>
-                  <Check className="h-4 w-4 mr-1" />
-                  Bestätigen
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setShowConfirmReset(false)}>
-                  <X className="h-4 w-4 mr-1" />
-                  Abbrechen
-                </Button>
-              </>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => setShowConfirmReset(true)}>
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Auf Standard zurücksetzen
-              </Button>
-            )}
-          </div>
-        </div>
-        <CardDescription>
-          Passe alle relevanten Kennzahlen an. Änderungen werden automatisch gespeichert und wirken global.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="grunddaten" className="flex items-center gap-1">
-              <Factory className="h-4 w-4" />
-              Grunddaten
-            </TabsTrigger>
-            <TabsTrigger value="saisonalitaet" className="flex items-center gap-1">
-              <BarChart className="h-4 w-4" />
-              Saisonalität
-            </TabsTrigger>
-            <TabsTrigger value="varianten" className="flex items-center gap-1">
-              <Package className="h-4 w-4" />
-              Varianten
-            </TabsTrigger>
-            <TabsTrigger value="feiertage" className="flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              Feiertage
-            </TabsTrigger>
-            <TabsTrigger value="lieferant" className="flex items-center gap-1">
-              <Truck className="h-4 w-4" />
-              Lieferant
-            </TabsTrigger>
-          </TabsList>
+    <div className="space-y-4">
+      {/* Reset Button Section */}
+      <div className="flex justify-end gap-2">
+        {showConfirmReset ? (
+          <>
+            <Button variant="destructive" size="sm" onClick={handleReset}>
+              <Check className="h-4 w-4 mr-1" />
+              Bestätigen
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowConfirmReset(false)}>
+              <X className="h-4 w-4 mr-1" />
+              Abbrechen
+            </Button>
+          </>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => setShowConfirmReset(true)}>
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Auf Standard zurücksetzen
+          </Button>
+        )}
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="grunddaten" className="flex items-center gap-1">
+            <Factory className="h-4 w-4" />
+            Grunddaten
+          </TabsTrigger>
+          <TabsTrigger value="saisonalitaet" className="flex items-center gap-1">
+            <BarChart className="h-4 w-4" />
+            Saisonalität
+          </TabsTrigger>
+          <TabsTrigger value="varianten" className="flex items-center gap-1">
+            <Package className="h-4 w-4" />
+            Varianten
+          </TabsTrigger>
+          <TabsTrigger value="feiertage" className="flex items-center gap-1">
+            <Calendar className="h-4 w-4" />
+            Feiertage
+          </TabsTrigger>
+          <TabsTrigger value="lieferant" className="flex items-center gap-1">
+            <Truck className="h-4 w-4" />
+            Lieferant
+          </TabsTrigger>
+        </TabsList>
 
           {/* GRUNDDATEN TAB */}
           <TabsContent value="grunddaten" className="space-y-4 mt-4">
@@ -444,10 +434,9 @@ export function EinstellungenPanel() {
             </div>
           </TabsContent>
         </Tabs>
-      </CardContent>
-    </Card>
-  )
-}
+      </div>
+    )
+  }
 
 /**
  * Sub-Komponente für Feiertage-Verwaltung

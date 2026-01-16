@@ -5,6 +5,7 @@ import { Package, LineChart, Download, Factory, BarChart3, Database } from 'luci
 import { SzenarienProvider } from '@/contexts/SzenarienContext'
 import { KonfigurationProvider } from '@/contexts/KonfigurationContext'
 import { SzenarienFloatingButton } from '@/components/SzenarienSidebar'
+import { EinstellungenFloatingButton } from '@/components/EinstellungenSidebar'
 
 export const metadata: Metadata = {
   title: 'MTB SCM Tool 2027 - Adventure Works AG (Code-Lösung)',
@@ -82,7 +83,9 @@ export default function RootLayout({
             </div>
           </footer>
 
-          {/* Floating Scenario Button - Available on all pages */}
+          {/* Floating Buttons - Available on all pages */}
+          {/* Settings button positioned above scenario button */}
+          <EinstellungenFloatingButton />
           <SzenarienFloatingButton />
         </div>
         </SzenarienProvider>
