@@ -127,6 +127,8 @@ export default function ReportingPage() {
   
   /**
    * Exportiert SCOR-Metriken als CSV
+   * HINWEIS: "Kapitalbindung" wurde entfernt, da sie redundant zu "Lagerreichweite" ist
+   * und auf Benutzerwunsch aus der Anzeige entfernt wurde.
    */
   const handleExportMetrics = () => {
     const metricsData = [

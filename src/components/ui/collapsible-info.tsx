@@ -15,11 +15,16 @@ import { ReactNode, useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from './button'
 
+/**
+ * Varianten für CollapsibleInfo Komponente
+ */
+export type CollapsibleInfoVariant = 'info' | 'warning' | 'success' | 'purple' | 'default' | 'destructive'
+
 export interface CollapsibleInfoProps {
   title: string | ReactNode
   children: ReactNode
   defaultOpen?: boolean
-  variant?: 'info' | 'warning' | 'success' | 'purple' | 'default' | 'destructive'
+  variant?: CollapsibleInfoVariant
   icon?: ReactNode
   className?: string
 }
