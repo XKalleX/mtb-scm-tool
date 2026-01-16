@@ -37,6 +37,7 @@ import {
 } from 'lucide-react'
 import { useKonfiguration, FeiertagConfig, STANDARD_KONFIGURATION } from '@/contexts/KonfigurationContext'
 import { formatNumber } from '@/lib/utils'
+import { DEFAULT_HEUTE_DATUM } from '@/lib/constants'
 
 /**
  * Hauptkomponente für Einstellungen
@@ -46,6 +47,7 @@ export function EinstellungenPanel() {
     konfiguration, 
     isInitialized,
     setJahresproduktion,
+    setHeuteDatum,
     updateSaisonalitaet,
     updateVariante,
     addFeiertag,
@@ -157,6 +159,21 @@ export function EinstellungenPanel() {
                   />
                   <p className="text-xs text-muted-foreground">
                     Standard: {formatNumber(STANDARD_KONFIGURATION.jahresproduktion, 0)} Bikes
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="heuteDatum">'Heute'-Datum (Frozen Zone)</Label>
+                  <Input
+                    id="heuteDatum"
+                    type="date"
+                    value={konfiguration.heuteDatum ?? DEFAULT_HEUTE_DATUM}
+                    onChange={(e) => setHeuteDatum(e.target.value)}
+                    min="2027-01-01"
+                    max="2027-12-31"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Standard: {DEFAULT_HEUTE_DATUM} - Trennt Vergangenheit (Frozen Zone) von Zukunft (Planning Zone)
                   </p>
                 </div>
 

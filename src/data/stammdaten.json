@@ -4,6 +4,7 @@
     "kunde": "Adventure Works AG",
     "standort": "Dortmund",
     "planungsjahr": 2027,
+    "heuteDatum": "2027-04-15",
     "beschreibung": "Comprehensive Supply Chain Management System für Mountain Bike Produktion"
   },
   "varianten": [
