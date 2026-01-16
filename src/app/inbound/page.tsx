@@ -297,67 +297,6 @@ export default function InboundPage() {
         </Card>
       </div>
 
-      {/* Lieferanten-Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{lieferant.land === 'China' ? '🇨🇳' : '🏭'} {lieferant.name}</CardTitle>
-          <CardDescription>
-            Einziger Lieferant für alle {konfiguration.bauteile.length} Komponenten
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <h4 className="font-semibold mb-2">Transport-Sequenz (Reihenfolge wichtig für Feiertage!):</h4>
-              <ul className="space-y-1 text-sm">
-                {lieferant.transportSequenz && lieferant.transportSequenz.map((step, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="font-bold text-blue-600">{step.schritt}.</span>
-                    <span>
-                      <strong>{step.typ}:</strong> {step.dauer} {step.einheit} 
-                      {step.von !== step.nach && ` (${step.von} → ${step.nach})`}
-                      <span className="text-muted-foreground text-xs ml-1">- {step.beschreibung}</span>
-                    </span>
-                  </li>
-                ))}
-                <li className="pt-2 border-t">
-                  <strong>Gesamt: {gesamtVorlaufzeit} Tage ({Math.ceil(gesamtVorlaufzeit / 7)} Wochen)</strong>
-                </li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold mb-2">Besonderheiten:</h4>
-              <ul className="space-y-1 text-sm">
-                {lieferant.besonderheiten.map((b, idx) => (
-                  <li key={idx}>✓ {b}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Komponenten */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Gelieferte Komponenten ({konfiguration.bauteile.length})</CardTitle>
-          <CardDescription>
-            Alle Komponenten kommen von diesem einen Lieferanten
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 md:grid-cols-3">
-            {konfiguration.bauteile.map(b => (
-              <div key={b.id} className="text-sm bg-slate-50 rounded px-3 py-2">
-                <span className="font-medium">{b.name}</span>
-                <span className="text-muted-foreground ml-2">({b.kategorie})</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* ✅ HAUPTSEKTION: Bestellansichten mit Tabs (Tägliche + Monatliche Ansicht) */}
       <Card className="border-orange-200 bg-orange-50">
         <CardHeader>
@@ -730,6 +669,67 @@ export default function InboundPage() {
               </div>
             </TabsContent>
           </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* Lieferanten-Details - Informationen */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{lieferant.land === 'China' ? '🇨🇳' : '🏭'} {lieferant.name}</CardTitle>
+          <CardDescription>
+            Einziger Lieferant für alle {konfiguration.bauteile.length} Komponenten
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <h4 className="font-semibold mb-2">Transport-Sequenz (Reihenfolge wichtig für Feiertage!):</h4>
+              <ul className="space-y-1 text-sm">
+                {lieferant.transportSequenz && lieferant.transportSequenz.map((step, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="font-bold text-blue-600">{step.schritt}.</span>
+                    <span>
+                      <strong>{step.typ}:</strong> {step.dauer} {step.einheit} 
+                      {step.von !== step.nach && ` (${step.von} → ${step.nach})`}
+                      <span className="text-muted-foreground text-xs ml-1">- {step.beschreibung}</span>
+                    </span>
+                  </li>
+                ))}
+                <li className="pt-2 border-t">
+                  <strong>Gesamt: {gesamtVorlaufzeit} Tage ({Math.ceil(gesamtVorlaufzeit / 7)} Wochen)</strong>
+                </li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-2">Besonderheiten:</h4>
+              <ul className="space-y-1 text-sm">
+                {lieferant.besonderheiten.map((b, idx) => (
+                  <li key={idx}>✓ {b}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Komponenten - Informationen */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Gelieferte Komponenten ({konfiguration.bauteile.length})</CardTitle>
+          <CardDescription>
+            Alle Komponenten kommen von diesem einen Lieferanten
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 md:grid-cols-3">
+            {konfiguration.bauteile.map(b => (
+              <div key={b.id} className="text-sm bg-slate-50 rounded px-3 py-2">
+                <span className="font-medium">{b.name}</span>
+                <span className="text-muted-foreground ml-2">({b.kategorie})</span>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
