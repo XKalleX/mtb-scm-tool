@@ -11,18 +11,20 @@
  * - Lagerbestandsmanagement
  * - Materialfluss-Visualisierung
  * 
- * NEU: Nutzt dynamische Konfiguration aus KonfigurationContext
+ * ✅ NEU: Szenarien-Integration global wirksam!
+ * ✅ Zeigt Deltas (+X / -X) gegenüber Baseline
  */
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Factory, AlertTriangle, TrendingUp, Package, Download } from 'lucide-react'
+import { Factory, AlertTriangle, TrendingUp, Package, Download, Zap } from 'lucide-react'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { formatNumber } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
+import { DeltaCell, DeltaBadge } from '@/components/DeltaCell'
 import { useMemo } from 'react'
 import { 
   generiereTagesproduktion, 
@@ -30,20 +32,31 @@ import {
   berechneProduktionsStatistiken,
   berechneTagesLagerbestaende
 } from '@/lib/calculations/zentrale-produktionsplanung'
+import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 
 /**
  * Produktion Hauptseite
  * Zeigt Produktionsstatus und Lagerbestände mit Excel-Tabellen
- * Nutzt dynamische Konfiguration aus KonfigurationContext
+ * ✅ Nutzt szenario-aware Berechnungen aus useSzenarioBerechnung Hook
  */
 export default function ProduktionPage() {
   // Hole Konfiguration aus Context
   const { konfiguration, isInitialized, getArbeitstageProJahr } = useKonfiguration()
   
-  // ✅ ERMÄSSIGUNG: Nur 4 Sattel-Varianten gemäß SSOT
-  // Quelle: kontext/Spezifikation_SSOT_MR.ts - BAUTEILE
-  // Dynamisch berechnet basierend auf aktueller Jahresproduktion und Varianten-Anteilen
-  const lagerbestaende = useMemo(() => 
+  // ✅ SZENARIO-AWARE: Nutze neuen Hook
+  const {
+    hasSzenarien,
+    aktiveSzenarienCount,
+    aktiveSzenarien,
+    tagesProduktion: tagesProduktionMitSzenarien,
+    lagerbestaende: lagerbestaendeMitSzenarien,
+    statistiken,
+    formatDelta,
+    getDeltaColorClass
+  } = useSzenarioBerechnung()
+  
+  // Baseline Lagerbestände (ohne Szenarien)
+  const baselineLagerbestaende = useMemo(() => 
     berechneLagerbestaende(konfiguration),
     [konfiguration]
   )
@@ -54,7 +67,14 @@ export default function ProduktionPage() {
   // 
   // Quelle: zentrale-produktionsplanung.ts
   // Mit Error Management für exakte Jahresproduktion
+  // ✅ SZENARIO-AWARE: Nutze tagesProduktionMitSzenarien wenn Szenarien aktiv
   const tagesProduktion = useMemo(() => {
+    // Wenn Szenarien aktiv sind, nutze Szenario-Daten
+    if (hasSzenarien && tagesProduktionMitSzenarien.length > 0) {
+      return tagesProduktionMitSzenarien
+    }
+    
+    // Ansonsten berechne Baseline
     const result = generiereTagesproduktion(konfiguration)
     
     // ✅ VALIDIERUNG: Log zur Kontrolle
@@ -72,7 +92,10 @@ export default function ProduktionPage() {
     }
     
     return result
-  }, [konfiguration])
+  }, [konfiguration, hasSzenarien, tagesProduktionMitSzenarien])
+  
+  // Lagerbestände (szenario-aware)
+  const lagerbestaende = hasSzenarien ? lagerbestaendeMitSzenarien : baselineLagerbestaende
   
   // ✅ NEU: Tägliche Lagerbestandsentwicklung (365 Tage × 4 Bauteile)
   const tagesLagerbestaende = useMemo(() => 
@@ -80,11 +103,22 @@ export default function ProduktionPage() {
     [konfiguration, tagesProduktion]
   )
   
-  // Berechne Produktionsstatistiken dynamisch
-  const produktionsStats = useMemo(() => 
-    berechneProduktionsStatistiken(tagesProduktion),
-    [tagesProduktion]
-  )
+  // Berechne Produktionsstatistiken dynamisch (szenario-aware)
+  const produktionsStats = useMemo(() => {
+    if (hasSzenarien) {
+      return {
+        geplant: statistiken.geplant,
+        produziert: statistiken.produziert,
+        abweichung: statistiken.abweichung,
+        planerfuellungsgrad: statistiken.planerfuellungsgrad,
+        arbeitstage: statistiken.arbeitstage,
+        schichtenGesamt: statistiken.schichtenGesamt,
+        mitMaterialmangel: statistiken.mitMaterialmangel,
+        auslastung: statistiken.auslastung
+      }
+    }
+    return berechneProduktionsStatistiken(tagesProduktion)
+  }, [tagesProduktion, hasSzenarien, statistiken])
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
@@ -138,45 +172,99 @@ export default function ProduktionPage() {
       {/* Aktive Szenarien Banner */}
       <ActiveScenarioBanner showDetails={false} />
 
-      {/* Übersicht Cards */}
+      {/* ✅ SZENARIEN AKTIV: Zeige Auswirkungen auf Produktion */}
+      {hasSzenarien && (
+        <CollapsibleInfo
+          title={`Szenarien aktiv (${aktiveSzenarienCount})`}
+          variant="success"
+          icon={<Zap className="h-5 w-5" />}
+          defaultOpen={true}
+        >
+          <div className="text-sm text-green-800">
+            <p className="mb-3">
+              <strong>✅ Szenarien wirken sich auf Produktion & Lager aus!</strong> Die Werte zeigen 
+              die Auswirkungen der aktiven Szenarien im Vergleich zum Baseline-Plan.
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t border-green-300">
+              <div>
+                <div className="text-xs text-green-600">Produktion Delta</div>
+                <DeltaBadge delta={statistiken.deltaProduziert} suffix=" Bikes" />
+              </div>
+              <div>
+                <div className="text-xs text-green-600">Planerfüllung</div>
+                <DeltaBadge delta={statistiken.deltaPlanerfuellungsgrad} suffix="%" />
+              </div>
+              <div>
+                <div className="text-xs text-green-600">Materialmangel</div>
+                <DeltaBadge delta={statistiken.deltaMitMaterialmangel} suffix=" Tage" inverseLogic={true} />
+              </div>
+              <div>
+                <div className="text-xs text-green-600">Auslastung</div>
+                <DeltaBadge delta={statistiken.deltaAuslastung} suffix="%" />
+              </div>
+            </div>
+          </div>
+        </CollapsibleInfo>
+      )}
+
+      {/* Übersicht Cards - MIT SZENARIO-DELTAS */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
+        <Card className={hasSzenarien ? 'border-green-200' : ''}>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Geplante Produktion</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Geplante Produktion
+                {hasSzenarien && <Zap className="h-3 w-3 inline ml-1 text-green-600" />}
+              </CardTitle>
               <Factory className="h-4 w-4 text-muted-foreground" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(produktionsStats.geplant, 0)}</div>
+            <DeltaCell 
+              value={produktionsStats.geplant} 
+              delta={hasSzenarien ? statistiken.deltaGeplant : 0}
+            />
             <p className="text-xs text-muted-foreground">MTBs Jahresplan</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={hasSzenarien ? 'border-green-200' : ''}>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Tatsächlich produziert</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Tatsächlich produziert
+                {hasSzenarien && <Zap className="h-3 w-3 inline ml-1 text-green-600" />}
+              </CardTitle>
               <TrendingUp className="h-4 w-4 text-green-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(produktionsStats.produziert, 0)}</div>
+            <DeltaCell 
+              value={produktionsStats.produziert}
+              delta={hasSzenarien ? statistiken.deltaProduziert : 0}
+            />
             <p className="text-xs text-muted-foreground">
               {formatNumber(produktionsStats.planerfuellungsgrad, 2)}% Planerfüllung
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={hasSzenarien && statistiken.deltaMitMaterialmangel > 0 ? 'border-red-200' : ''}>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Materialmangel</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Materialmangel
+                {hasSzenarien && statistiken.deltaMitMaterialmangel !== 0 && <Zap className="h-3 w-3 inline ml-1 text-orange-600" />}
+              </CardTitle>
               <AlertTriangle className="h-4 w-4 text-orange-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{produktionsStats.mitMaterialmangel}</div>
+            <DeltaCell 
+              value={produktionsStats.mitMaterialmangel}
+              delta={hasSzenarien ? statistiken.deltaMitMaterialmangel : 0}
+              inverseLogic={true}
+            />
             <p className="text-xs text-muted-foreground">Aufträge betroffen</p>
           </CardContent>
         </Card>

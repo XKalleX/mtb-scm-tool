@@ -23,20 +23,21 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
-import { Calendar, TrendingUp, AlertCircle, Download, AlertTriangle } from 'lucide-react'
+import { Calendar, TrendingUp, AlertCircle, Download, AlertTriangle, Zap } from 'lucide-react'
 import { formatNumber, formatDate } from '@/lib/utils'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import { showError, showSuccess } from '@/lib/notifications'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
-import { useSzenarien } from '@/contexts/SzenarienContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
+import { DeltaCell, DeltaBadge, SzenarioHinweis } from '@/components/DeltaCell'
 import React, { useState, useMemo } from 'react'
 import { 
   generiereAlleVariantenProduktionsplaene,
   berechneProduktionsStatistiken,
   type TagesProduktionEntry
 } from '@/lib/calculations/zentrale-produktionsplanung'
+import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { getDateRowBackgroundClasses, getDateTooltip } from '@/lib/date-classification'
 
 /**
@@ -51,15 +52,21 @@ export default function OEMProgrammPage() {
   const [selectedVariante, setSelectedVariante] = useState('MTBAllrounder')
   const [viewMode, setViewMode] = useState<'single' | 'all'>('single')
   
-  // Hole Konfiguration und Szenarien aus Contexts
+  // Hole Konfiguration aus Context
   const { konfiguration, isInitialized, getArbeitstageProJahr, getJahresproduktionProVariante } = useKonfiguration()
-  const { getAktiveSzenarien } = useSzenarien()
   
-  // Hole aktive Szenarien
-  const aktiveSzenarien = useMemo(() => getAktiveSzenarien(), [getAktiveSzenarien])
+  // ✅ NEUER HOOK: Nutze szenario-aware Berechnungen
+  const {
+    hasSzenarien,
+    aktiveSzenarienCount,
+    aktiveSzenarien,
+    variantenPlaene,
+    statistiken,
+    formatDelta,
+    getDeltaColorClass
+  } = useSzenarioBerechnung()
 
-  // Generiere Produktionspläne aus zentralem Modul
-  // TODO: In Zukunft Szenarien hier einbauen
+  // Baseline-Produktionspläne (für Vergleich)
   const produktionsplaene = useMemo(() => 
     generiereAlleVariantenProduktionsplaene(konfiguration),
     [konfiguration]
@@ -151,40 +158,67 @@ export default function OEMProgrammPage() {
       {/* Aktive Szenarien Banner */}
       <ActiveScenarioBanner showDetails={false} />
 
-      {/* Szenarien-Warnung - COLLAPSIBLE */}
-      {aktiveSzenarien.length > 0 && (
+      {/* ✅ SZENARIEN AKTIV: Zeige Auswirkungen */}
+      {hasSzenarien && (
         <CollapsibleInfo
-          title="Aktive Szenarien"
-          variant="warning"
-          icon={<AlertTriangle className="h-5 w-5" />}
-          defaultOpen={false}
+          title={`Szenarien aktiv (${aktiveSzenarienCount})`}
+          variant="success"
+          icon={<Zap className="h-5 w-5" />}
+          defaultOpen={true}
         >
-          <div className="text-sm text-orange-800">
+          <div className="text-sm text-green-800">
             <p className="mb-3">
-              {aktiveSzenarien.length} Szenario(en) aktiv. Die Produktionsplanung berücksichtigt momentan noch keine Szenarien.
-              Dies wird in einer zukünftigen Version implementiert.
+              <strong>✅ Szenarien wirken sich auf alle Berechnungen aus!</strong> Die Produktionsplanung 
+              zeigt jetzt Deltas (+ / -) gegenüber dem Baseline-Plan. Betroffene Zeilen sind markiert.
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mb-3">
               {aktiveSzenarien.map(s => (
-                <span key={s.id} className="text-xs bg-orange-200 text-orange-900 px-2 py-1 rounded">
+                <span key={s.id} className="text-xs bg-green-200 text-green-900 px-2 py-1 rounded flex items-center gap-1">
+                  {s.typ === 'marketingaktion' && '📈'}
+                  {s.typ === 'maschinenausfall' && '🔧'}
+                  {s.typ === 'wasserschaden' && '💧'}
+                  {s.typ === 'schiffsverspaetung' && '🚢'}
                   {s.typ}
                 </span>
               ))}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t border-green-300">
+              <div>
+                <div className="text-xs text-green-600">Plan-Delta</div>
+                <DeltaBadge delta={statistiken.deltaGeplant} suffix=" Bikes" />
+              </div>
+              <div>
+                <div className="text-xs text-green-600">Ist-Delta</div>
+                <DeltaBadge delta={statistiken.deltaProduziert} suffix=" Bikes" />
+              </div>
+              <div>
+                <div className="text-xs text-green-600">Planerfüllung</div>
+                <DeltaBadge delta={statistiken.deltaPlanerfuellungsgrad} suffix="%" />
+              </div>
+              <div>
+                <div className="text-xs text-green-600">Materialmangel</div>
+                <DeltaBadge delta={statistiken.deltaMitMaterialmangel} suffix=" Tage" inverseLogic={true} />
+              </div>
             </div>
           </div>
         </CollapsibleInfo>
       )}
 
-      {/* Übersicht Cards */}
+      {/* Übersicht Cards - MIT SZENARIO-DELTAS */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
+        <Card className={hasSzenarien ? 'border-green-200' : ''}>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Jahresproduktion</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Jahresproduktion
+              {hasSzenarien && <Zap className="h-3 w-3 inline ml-1 text-green-600" />}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatNumber(konfiguration.jahresproduktion, 0)}
-            </div>
+            <DeltaCell 
+              value={hasSzenarien ? statistiken.geplant : konfiguration.jahresproduktion}
+              delta={statistiken.deltaGeplant}
+              format={{ suffix: '' }}
+            />
             <p className="text-xs text-muted-foreground">MTBs gesamt</p>
           </CardContent>
         </Card>
@@ -199,14 +233,19 @@ export default function OEMProgrammPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={hasSzenarien ? 'border-green-200' : ''}>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Durchschnitt/Tag</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Durchschnitt/Tag
+              {hasSzenarien && <Zap className="h-3 w-3 inline ml-1 text-green-600" />}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatNumber(konfiguration.jahresproduktion / arbeitstage, 0)}
-            </div>
+            <DeltaCell 
+              value={hasSzenarien ? Math.round(statistiken.produziert / arbeitstage) : Math.round(konfiguration.jahresproduktion / arbeitstage)}
+              delta={hasSzenarien ? Math.round(statistiken.deltaProduziert / arbeitstage) : 0}
+              format={{ suffix: '' }}
+            />
             <p className="text-xs text-muted-foreground">Bikes pro Arbeitstag</p>
           </CardContent>
         </Card>
