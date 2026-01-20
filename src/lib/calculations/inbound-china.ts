@@ -474,19 +474,44 @@ export function generiereTaeglicheBestellungen(
 /**
  * Erstellt eine Zusatzbestellung für einen bestimmten Tag
  * Wird über das Zusatzbestellungs-Formular aufgerufen
+ * 
+ * @param bestelldatum - Datum der Bestellung
+ * @param komponenten - Komponenten mit Mengen (bereits exakt verteilt!)
+ * @param vorlaufzeitTage - Vorlaufzeit in Tagen (default: 49)
+ * @param skipLosgroessenRundung - Wenn true: KEINE Aufrundung, wenn false: Aufrundung pro Variante (default: false)
+ * @returns TaeglicheBestellung
  */
 export function erstelleZusatzbestellung(
   bestelldatum: Date,
   komponenten: Record<string, number>,
-  vorlaufzeitTage: number = 49
+  vorlaufzeitTage: number = 49,
+  skipLosgroessenRundung: boolean = false
 ): TaeglicheBestellung {
   const LOSGROESSE = lieferantData.lieferant.losgroesse
   
-  // Auf Losgröße aufrunden
-  const aufgerundeteKomponenten: Record<string, number> = {}
-  Object.entries(komponenten).forEach(([kompId, menge]) => {
-    aufgerundeteKomponenten[kompId] = rundeAufLosgroesse(menge)
-  })
+  /**
+   * 🎯 KORRIGIERT: Optionale Losgrößen-Rundung
+   * 
+   * Wenn skipLosgroessenRundung = true:
+   *   - Mengen werden EXAKT übernommen (bereits im Handler verteilt)
+   *   - Keine weitere Aufrundung pro Variante
+   *   - Verhindert das "5000 → 6000" Problem
+   * 
+   * Wenn skipLosgroessenRundung = false:
+   *   - Alte Logik: Jede Variante wird auf Losgröße aufgerundet
+   */
+  let finalKomponenten: Record<string, number>
+  
+  if (skipLosgroessenRundung) {
+    // KEINE Rundung - Mengen exakt übernehmen
+    finalKomponenten = { ...komponenten }
+  } else {
+    // Alte Logik: Auf Losgröße aufrunden pro Variante
+    finalKomponenten = {}
+    Object.entries(komponenten).forEach(([kompId, menge]) => {
+      finalKomponenten[kompId] = rundeAufLosgroesse(menge)
+    })
+  }
   
   const bedarfsdatum = addDays(bestelldatum, vorlaufzeitTage)
   
@@ -494,7 +519,7 @@ export function erstelleZusatzbestellung(
     id: generateId(),
     bestelldatum,
     bedarfsdatum,
-    komponenten: aufgerundeteKomponenten,
+    komponenten: finalKomponenten,
     erwarteteAnkunft: berechneAnkunftsdatum(bestelldatum),
     status: 'bestellt',
     istVorjahr: false,
