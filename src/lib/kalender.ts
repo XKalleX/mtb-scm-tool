@@ -136,7 +136,7 @@ export function istDeutschlandFeiertag(
     return gefunden.map(f => ({
       datum: new Date(f.datum),
       name: f.name,
-      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
+      typ: f.typ
     }))
   }
   
@@ -167,7 +167,7 @@ export function istChinaFeiertag(
     return gefunden.map(f => ({
       datum: new Date(f.datum),
       name: f.name,
-      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
+      typ: f.typ
     }))
   }
   
