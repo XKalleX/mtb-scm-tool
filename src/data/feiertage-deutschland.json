@@ -135,7 +135,16 @@
       "bundesland": "NRW"
     }
   ],
+  "feiertage2028": [
+    {
+      "datum": "2028-01-01",
+      "name": "Neujahr",
+      "typ": "gesetzlich",
+      "bundesland": "NRW"
+    }
+  ],
   "quelle": "https://www.feiertage-deutschland.de/nordrhein-westfalen/",
   "hinweis": "Gesetzliche Feiertage für Nordrhein-Westfalen (NRW)",
-  "wichtig": "NRW hat 11 gesetzliche Feiertage inkl. Fronleichnam und Allerheiligen"
+  "wichtig": "NRW hat 11 gesetzliche Feiertage inkl. Fronleichnam und Allerheiligen",
+  "zeitraum": "Oktober 2026 bis Februar 2028 (für Vorlaufzeiten-Berücksichtigung)"
 }

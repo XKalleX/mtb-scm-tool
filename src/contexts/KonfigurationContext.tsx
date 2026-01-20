@@ -207,6 +207,13 @@ const STANDARD_FEIERTAGE: FeiertagConfig[] = [
     typ: f.typ as 'gesetzlich',
     land: 'Deutschland' as const
   })),
+  // Deutschland (NRW) - 2028 (Januar-Februar für Vorlaufzeiten)
+  ...(feiertageDeutschlandData.feiertage2028 || []).map(f => ({
+    datum: f.datum,
+    name: f.name,
+    typ: f.typ as 'gesetzlich',
+    land: 'Deutschland' as const
+  })),
   // China - 2026
   ...feiertageChinaData.feiertage2026.map(f => ({
     datum: f.datum,
@@ -216,6 +223,13 @@ const STANDARD_FEIERTAGE: FeiertagConfig[] = [
   })),
   // China - 2027
   ...feiertageChinaData.feiertage2027.map(f => ({
+    datum: f.datum,
+    name: f.name,
+    typ: (f.typ === 'gesetzlich' ? 'gesetzlich' : 'Festival') as 'gesetzlich' | 'Festival',
+    land: 'China' as const
+  })),
+  // China - 2028 (Januar-Februar für Vorlaufzeiten)
+  ...(feiertageChinaData.feiertage2028 || []).map(f => ({
     datum: f.datum,
     name: f.name,
     typ: (f.typ === 'gesetzlich' ? 'gesetzlich' : 'Festival') as 'gesetzlich' | 'Festival',
