@@ -25,7 +25,7 @@
 
 import { Bestellung, TagesProduktionsplan, Stueckliste, Maschinenausfall } from '@/types'
 import { addDays, generateId, isWeekend } from '@/lib/utils'
-import { berechneBestelldatum, berechneAnkunftsdatum, istSpringFestival, istFeiertag } from '@/lib/kalender'
+import { berechneBestelldatum, berechneAnkunftsdatum, istSpringFestival, istChinaFeiertag } from '@/lib/kalender'
 import lieferantData from '@/data/lieferant-china.json'
 import stuecklistenData from '@/data/stueckliste.json'
 
@@ -388,27 +388,41 @@ export function generiereTaeglicheBestellungen(
   let aktuellerTag = new Date(bestellStart)
   
   while (aktuellerTag <= bestellEnde) {
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // ⚠️ FIX: Überspringe Wochenenden und Feiertage (DE + CN)
-    // An diesen Tagen kann nicht bestellt werden!
-    // ═══════════════════════════════════════════════════════════════════════════════
-    if (isWeekend(aktuellerTag) || istFeiertag(aktuellerTag)) {
-      // Überspringe diesen Tag - keine Bestellungen an Wochenenden/Feiertagen
-      aktuellerTag = addDays(aktuellerTag, 1)
-      continue
-    }
+    /**
+     * 🎯 FIX #2: BEDARFSERFASSUNG VOR WOCHENEND-PRÜFUNG
+     * 
+     * Problem: Wenn Wochenenden/Feiertage übersprungen werden, geht der Bedarf 
+     * für diese Tage verloren → 36.723 Sättel fehlen
+     * 
+     * Lösung:
+     * 1. ZUERST den Bedarf für diesen Tag erfassen (auch an Wochenenden!)
+     * 2. DANN prüfen ob BESTELLT werden kann (nur an Arbeitstagen)
+     * 
+     * Konzept: An Wochenenden/Feiertagen sammelt sich der Bedarf an,
+     * wird aber erst am nächsten Arbeitstag bestellt.
+     */
     
     // Berechne welcher Produktionstag in der Zukunft beliefert werden soll
     // (heute + 49 Tage Vorlaufzeit)
     const lieferTag = addDays(aktuellerTag, VORLAUFZEIT_TAGE)
     const lieferTagIndex = Math.floor((lieferTag.getTime() - produktionsStart.getTime()) / (1000 * 60 * 60 * 24))
     
+    // ✅ WICHTIG: Bedarf IMMER erfassen (auch an Wochenenden/Feiertagen!)
     // Nur Bedarf für das Planungsjahr sammeln
     if (lieferTagIndex >= 0 && lieferTagIndex < 365) {
       // Addiere Bedarf für den zukünftigen Liefertag zu offenen Mengen
       alleKomponenten.forEach(kompId => {
         offeneMengen[kompId] += taeglicheBedarf[kompId][lieferTagIndex] || 0
       })
+    }
+    
+    // ✅ Prüfe JETZT erst ob BESTELLUNG möglich ist (nur an Arbeitstagen in CHINA!)
+    // WICHTIG: Nur chinesische Feiertage relevant für Bestellungen bei China
+    if (isWeekend(aktuellerTag) || istChinaFeiertag(aktuellerTag).length > 0) {
+      // An Wochenenden/Feiertagen (China): Bedarf ist erfasst, aber keine Bestellung
+      // Bedarf bleibt in offeneMengen und wird am nächsten Arbeitstag verarbeitet
+      aktuellerTag = addDays(aktuellerTag, 1)
+      continue
     }
     
     // Prüfe ob Bestellung ausgelöst werden muss (Losgröße erreicht)
@@ -480,6 +494,37 @@ export function generiereTaeglicheBestellungen(
       istVorjahr: false,
       grund: 'losgroesse'  // Finale Restbestellung (nicht auf Losgröße gerundet)
     })
+  }
+  
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // VALIDIERUNG: Prüfe ob ALLE Sättel bestellt wurden (370.000 erwartet)
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const gesamtBestellteSaettel = bestellungen.reduce((sum, b) => {
+    return sum + Object.values(b.komponenten).reduce((s, m) => s + m, 0)
+  }, 0)
+  
+  const gesamtBenoetigteSaettel = Object.values(taeglicheBedarf).reduce((sum, bedarf) => {
+    return sum + bedarf.reduce((s, m) => s + m, 0)
+  }, 0)
+  
+  console.log(`
+    ═══════════════════════════════════════════════════════════════════════════════
+    BESTELLVALIDIERUNG (tägliche Bestelllogik)
+    ═══════════════════════════════════════════════════════════════════════════════
+    Gesamtbedarf (aus Produktionsplan): ${gesamtBenoetigteSaettel.toLocaleString('de-DE')} Sättel
+    Gesamt bestellt:                     ${gesamtBestellteSaettel.toLocaleString('de-DE')} Sättel
+    Differenz:                           ${(gesamtBestellteSaettel - gesamtBenoetigteSaettel).toLocaleString('de-DE')} Sättel
+    
+    Status: ${Math.abs(gesamtBestellteSaettel - gesamtBenoetigteSaettel) <= LOSGROESSE ? '✅ OK (innerhalb Losgröße)' : '❌ FEHLER!'}
+    
+    Anzahl Bestellungen: ${bestellungen.length}
+    Zeitraum:            ${bestellungen[0]?.bestelldatum instanceof Date ? bestellungen[0].bestelldatum.toLocaleDateString('de-DE') : 'N/A'} - ${bestellungen[bestellungen.length - 1]?.bestelldatum instanceof Date ? bestellungen[bestellungen.length - 1].bestelldatum.toLocaleDateString('de-DE') : 'N/A'}
+    ═══════════════════════════════════════════════════════════════════════════════
+  `)
+  
+  // Warnung wenn Differenz > 1 Losgröße (sollte nie passieren!)
+  if (Math.abs(gesamtBestellteSaettel - gesamtBenoetigteSaettel) > LOSGROESSE) {
+    console.warn(`⚠️ WARNUNG: Bestellmenge weicht um mehr als 1 Losgröße (${LOSGROESSE}) ab!`)
   }
   
   return bestellungen

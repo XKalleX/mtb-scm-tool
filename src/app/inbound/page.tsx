@@ -187,52 +187,101 @@ export default function InboundPage() {
   }, [taeglicheBestellungen])
   
   /**
-   * 🎯 FIX 5: ALLE 365 Tage anzeigen (nicht nur Bestelltage)
+   * 🎯 FIX: KORRIGIERTE Bestelllogik - Iteriere durch BEDARFSDATUM
    * 
-   * Generiert für jeden Tag des Jahres 2027 einen Eintrag:
-   * - Bestellungen: Wenn eine Bestellung existiert, zeige diese
-   * - Keine Bestellung: Zeige Grund (Wochenende, Feiertag, Losgröße nicht erreicht)
-   * - Visuelle Markierung für besondere Tage
+   * Konzept (gemäß Issue):
+   * - Bedarfsdatum = wann Sättel im Werk benötigt werden (01.01.2027 - 31.12.2027)
+   * - Bestelldatum = wann bestellt werden muss (49 Tage VOR Bedarfsdatum, z.B. 16.11.2026)
+   * - Tatsächliche Ankunft = berechnet aus Bestelldatum + Vorlaufzeit
+   * 
+   * Die Tabelle iteriert durch ALLE Bedarfsdaten des Jahres und zeigt:
+   * - An welchem Tag wurde/wird bestellt (Bestelldatum)
+   * - Wann wird die Lieferung erwartet (Ankunft)
+   * - Status der Bestellung für diesen Bedarf
    */
   const alleTageMitBestellungen = useMemo(() => {
     const jahr = konfiguration.planungsjahr
+    const vorlaufzeit = lieferant.gesamtVorlaufzeitTage
     const feiertage = ladeChinaFeiertage()
     const alleTage: any[] = []
     
-    // Erstelle Map für schnelle Bestellungs-Lookup
-    const bestellungenMap = new Map<string, TaeglicheBestellung>()
+    /**
+     * 🎯 FIX #1: MEHRERE BESTELLUNGEN PRO BEDARFSDATUM AGGREGIEREN
+     * 
+     * Problem: Map überschreibt Bestellungen mit gleichem Key (Bedarfsdatum)
+     * Lösung: Aggregiere Mengen wenn mehrere Bestellungen am selben Tag
+     * 
+     * Beispiel:
+     * - Bestellung 1: 500 Sättel für 15.04.2027
+     * - Bestellung 2: 500 Sättel für 15.04.2027
+     * → Gesamt: 1000 Sättel am 15.04.2027 (NICHT nur 500!)
+     */
+    const bestellungenNachBedarfsdatum = new Map<string, TaeglicheBestellung[]>()
     taeglicheBestellungen.forEach(b => {
-      const datum = b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum)
-      const key = datum.toISOString().split('T')[0]
-      bestellungenMap.set(key, b)
+      const bedarfsdatum = b.bedarfsdatum instanceof Date ? b.bedarfsdatum : new Date(b.bedarfsdatum)
+      const key = bedarfsdatum.toISOString().split('T')[0]
+      
+      // Sammle ALLE Bestellungen für dieses Datum (nicht überschreiben!)
+      const existing = bestellungenNachBedarfsdatum.get(key) || []
+      existing.push(b)
+      bestellungenNachBedarfsdatum.set(key, existing)
     })
     
-    // Iteriere über alle Tage des Jahres (365 oder 366 bei Schaltjahr)
+    // Iteriere über alle BEDARFSDATEN des Jahres (01.01.2027 - 31.12.2027)
     const jahresTage = new Date(jahr, 11, 31).getDate() === 31 && 
                       new Date(jahr, 1, 29).getMonth() === 1 ? 366 : 365
     
     for (let tag = 1; tag <= jahresTage; tag++) {
-      const datum = new Date(jahr, 0, tag)
-      const datumKey = datum.toISOString().split('T')[0]
-      const bestellung = bestellungenMap.get(datumKey)
+      const bedarfsdatum = new Date(jahr, 0, tag)
+      const bedarfsdatumKey = bedarfsdatum.toISOString().split('T')[0]
       
-      // Prüfe Tag-Typ
-      const istWochenende = isWeekend(datum)
-      const feiertag = istChinaFeiertag(datum)
+      // Berechne wann für diesen Bedarf bestellt werden müsste (49 Tage vorher)
+      const theoretischesBestelldatum = addDays(bedarfsdatum, -vorlaufzeit)
+      
+      // Prüfe Tag-Typ (für Bedarfsdatum - Produktion in Deutschland)
+      const istWochenende = isWeekend(bedarfsdatum)
+      const feiertag = istChinaFeiertag(bedarfsdatum)
       const istFeiertag = feiertag.length > 0
       
-      if (bestellung) {
-        // Tag MIT Bestellung
-        const bedarfsdatum = bestellung.bedarfsdatum instanceof Date ? bestellung.bedarfsdatum : new Date(bestellung.bedarfsdatum)
+      // Suche ob es Bestellungen gibt, die diesen Bedarf decken
+      const bestellungenFuerTag = bestellungenNachBedarfsdatum.get(bedarfsdatumKey)
+      
+      const bedarfsdatumStr = bedarfsdatum.toLocaleDateString('de-DE')
+      
+      if (bestellungenFuerTag && bestellungenFuerTag.length > 0) {
+        /**
+         * 🎯 FIX: AGGREGIERE MEHRERE BESTELLUNGEN FÜR DENSELBEN TAG
+         * 
+         * Wenn mehrere Bestellungen für dasselbe Bedarfsdatum existieren:
+         * - Summiere alle Mengen
+         * - Zeige frühestes Bestelldatum
+         * - Zeige kombinierte Gründe
+         */
+        const gesamtMenge = bestellungenFuerTag.reduce((sum, b) => {
+          return sum + Object.values(b.komponenten).reduce((s, m) => s + m, 0)
+        }, 0)
+        
+        // Frühestes Bestelldatum finden (falls mehrere Bestellungen)
+        const fruehestesBestelldatum = bestellungenFuerTag.reduce((fruehestes, b) => {
+          const bDatum = b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum)
+          return bDatum < fruehestes ? bDatum : fruehestes
+        }, bestellungenFuerTag[0].bestelldatum instanceof Date 
+            ? bestellungenFuerTag[0].bestelldatum 
+            : new Date(bestellungenFuerTag[0].bestelldatum))
+        
+        // Erwartete Ankunft (von erster Bestellung)
+        const bestellung = bestellungenFuerTag[0]
         const erwarteteAnkunft = bestellung.erwarteteAnkunft instanceof Date ? bestellung.erwarteteAnkunft : new Date(bestellung.erwarteteAnkunft)
-        const menge = Object.values(bestellung.komponenten).reduce((sum, m) => sum + m, 0)
         
-        // Erstelle formatierte Felder für visuelle Markierung
-        const dateStr = datum.toLocaleDateString('de-DE')
-        const datumFormatiert = istFeiertag ? `🔴 ${dateStr}` : istWochenende ? `🟡 ${dateStr}` : `🟢 ${dateStr}`
+        // Farbmarkierung basierend auf Bedarfsdatum-Typ
+        const bedarfsdatumFormatiert = istFeiertag ? `🔴 ${bedarfsdatumStr}` : istWochenende ? `🟡 ${bedarfsdatumStr}` : `🟢 ${bedarfsdatumStr}`
         
+        // Gründe kombinieren
+        const gruende = [...new Set(bestellungenFuerTag.map(b => b.grund))]
         let grundFormatiert = ''
-        if (bestellung.grund === 'losgroesse') {
+        if (bestellungenFuerTag.length > 1) {
+          grundFormatiert = `✓ ${bestellungenFuerTag.length} Bestellungen (${gruende.join(', ')})`
+        } else if (bestellung.grund === 'losgroesse') {
           grundFormatiert = '✓ Bestellung (Losgröße erreicht)'
         } else if (bestellung.grund === 'zusatzbestellung') {
           grundFormatiert = '✓ Zusatzbestellung (manuell)'
@@ -241,16 +290,15 @@ export default function InboundPage() {
         }
         
         alleTage.push({
-          datum,
-          bestelldatum: datum,
-          datumFormatiert,
-          istVorjahr: bestellung.istVorjahr,
           bedarfsdatum,
-          bedarfsdatumFormatiert: bedarfsdatum.toLocaleDateString('de-DE'),
-          vorlaufzeit: lieferant.gesamtVorlaufzeitTage,
-          vorlaufzeitFormatiert: `${lieferant.gesamtVorlaufzeitTage} Tage`,
-          menge,
-          mengeFormatiert: formatNumber(menge, 0) + ' Stk',
+          bedarfsdatumFormatiert,
+          bestelldatum: fruehestesBestelldatum,
+          bestelldatumFormatiert: fruehestesBestelldatum.toLocaleDateString('de-DE'),
+          istVorjahr: bestellung.istVorjahr,
+          vorlaufzeit: vorlaufzeit,
+          vorlaufzeitFormatiert: `${vorlaufzeit} Tage`,
+          menge: gesamtMenge,  // ✅ AGGREGIERTE MENGE!
+          mengeFormatiert: formatNumber(gesamtMenge, 0) + ' Stk',
           grund: bestellung.grund,
           grundFormatiert,
           erwarteteAnkunft,
@@ -262,28 +310,26 @@ export default function InboundPage() {
           feiertagName: istFeiertag ? feiertag[0].name : undefined
         })
       } else {
-        // Tag OHNE Bestellung - ermittle Grund
-        let grund = 'Losgröße nicht erreicht'
+        // Kein Bedarf/Keine Bestellung für dieses Datum - ermittle Grund
+        let grund = 'Kein Bedarf (Losgröße noch nicht erreicht)'
         let grundFormatiert = '⚠️ Losgröße nicht erreicht'
         
         if (istWochenende) {
-          grund = 'Wochenende'
+          grund = 'Wochenende (keine Produktion)'
           grundFormatiert = '❌ Wochenende (keine Produktion)'
         } else if (istFeiertag) {
           grund = `Feiertag: ${feiertag[0].name}`
           grundFormatiert = `❌ Feiertag: ${feiertag[0].name}`
         }
         
-        const dateStr = datum.toLocaleDateString('de-DE')
-        const datumFormatiert = istFeiertag ? `🔴 ${dateStr}` : istWochenende ? `🟡 ${dateStr}` : `⚪ ${dateStr}`
+        const bedarfsdatumFormatiert = istFeiertag ? `🔴 ${bedarfsdatumStr}` : istWochenende ? `🟡 ${bedarfsdatumStr}` : `⚪ ${bedarfsdatumStr}`
         
         alleTage.push({
-          datum,
-          bestelldatum: datum,
-          datumFormatiert,
-          istVorjahr: false,
-          bedarfsdatum: null,
-          bedarfsdatumFormatiert: '-',
+          bedarfsdatum,
+          bedarfsdatumFormatiert,
+          bestelldatum: theoretischesBestelldatum,
+          bestelldatumFormatiert: theoretischesBestelldatum.toLocaleDateString('de-DE'),
+          istVorjahr: theoretischesBestelldatum.getFullYear() < jahr,
           vorlaufzeit: null,
           vorlaufzeitFormatiert: '-',
           menge: 0,
@@ -581,37 +627,38 @@ export default function InboundPage() {
                   )}
                 </div>
 
-                {/* Excel-Tabelle mit ALLEN Tagen des Jahres */}
+                {/* Excel-Tabelle mit ALLEN BEDARFSDATEN des Jahres */}
                 <div className="mb-2 text-xs text-muted-foreground">
-                  ✅ Zeigt ALLE Tage des Jahres {konfiguration.planungsjahr} (inkl. Wochenenden/Feiertage) | 🟢 = Bestellung | 🟡 = Wochenende | 🔴 = Feiertag
+                  ✅ Zeigt alle BEDARFSDATEN {konfiguration.planungsjahr} (wann Sättel benötigt werden) | 🟢 = Bestellung | 🟡 = Wochenende | 🔴 = Feiertag | Bestelldatum = 49 Tage vor Bedarfsdatum
                 </div>
                 <ExcelTable
                   columns={[
                     {
-                      key: 'datumFormatiert',
-                      label: 'Datum',
-                      width: '110px',
-                      align: 'center',
-                      sumable: false
-                    },
-                    {
                       key: 'bedarfsdatumFormatiert',
                       label: 'Bedarfsdatum',
+                      width: '130px',
+                      align: 'center',
+                      sumable: false
+                    },
+                    {
+                      key: 'bestelldatumFormatiert',
+                      label: 'Bestelldatum',
                       width: '110px',
                       align: 'center',
                       sumable: false
                     },
                     {
-                      key: 'mengeFormatiert',
+                      key: 'menge',
                       label: 'Bestellmenge',
                       width: '120px',
                       align: 'right',
-                      sumable: false
+                      sumable: true,
+                      format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-'
                     },
                     {
                       key: 'grundFormatiert',
                       label: 'Status / Grund',
-                      width: '200px',
+                      width: '220px',
                       align: 'left',
                       sumable: false
                     },
@@ -624,8 +671,8 @@ export default function InboundPage() {
                     },
                     {
                       key: 'erwarteteAnkunftFormatiert',
-                      label: 'Ankunft',
-                      width: '110px',
+                      label: 'Tatsächliche Ankunft',
+                      width: '130px',
                       align: 'center',
                       sumable: false
                     }
@@ -633,9 +680,9 @@ export default function InboundPage() {
                   data={alleTageMitBestellungen}
                   maxHeight="400px"
                   showFormulas={false}
-                  showSums={false}
-                  sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen von ${alleTageMitBestellungen.length} Tagen (${bestellStatistik.vorjahr} aus 2026)`}
-                  dateColumnKey="bestelldatum"
+                  showSums={true}
+                  sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel`}
+                  dateColumnKey="bedarfsdatum"
                 />
 
               {/* Info-Box unter der Tabelle */}

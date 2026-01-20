@@ -128,12 +128,39 @@ export function istFeiertag(datum: Date): boolean {
 }
 
 /**
- * Prüft ob ein Datum ein Arbeitstag ist (Mo-Fr, kein Feiertag)
- * Relevant für China-Produktion
+ * Prüft ob ein Datum ein Arbeitstag in DEUTSCHLAND ist (Mo-Fr, kein deutscher Feiertag)
+ * 
+ * WICHTIG: Für OEM-Produktion in Deutschland (Dortmund)
+ * Prüft DEUTSCHE Feiertage (NRW), nicht chinesische!
+ * 
  * @param datum - Zu prüfendes Datum
- * @returns True wenn Arbeitstag
+ * @returns True wenn Arbeitstag in Deutschland
  */
-export function istArbeitstag(datum: Date): boolean {
+export function istArbeitstag_Deutschland(datum: Date): boolean {
+  // Wochenende?
+  if (isWeekend(datum)) {
+    return false
+  }
+  
+  // Deutscher Feiertag?
+  const feiertage = istDeutschlandFeiertag(datum)
+  if (feiertage.length > 0) {
+    return false
+  }
+  
+  return true
+}
+
+/**
+ * Prüft ob ein Datum ein Arbeitstag in CHINA ist (Mo-Fr, kein chinesischer Feiertag)
+ * 
+ * WICHTIG: Für China-Zulieferer (Produktion, Bestellungen)
+ * Prüft CHINESISCHE Feiertage, nicht deutsche!
+ * 
+ * @param datum - Zu prüfendes Datum
+ * @returns True wenn Arbeitstag in China
+ */
+export function istArbeitstag_China(datum: Date): boolean {
   // Wochenende?
   if (isWeekend(datum)) {
     return false
@@ -146,6 +173,23 @@ export function istArbeitstag(datum: Date): boolean {
   }
   
   return true
+}
+
+/**
+ * Prüft ob ein Datum ein Arbeitstag ist (Mo-Fr, kein Feiertag)
+ * 
+ * @deprecated Nutze stattdessen istArbeitstag_Deutschland() oder istArbeitstag_China()
+ *             je nachdem für welches Land die Prüfung erfolgen soll!
+ * 
+ * Legacy-Funktion: Prüft CHINESISCHE Feiertage (für Rückwärtskompatibilität)
+ * Relevant für China-Produktion
+ * 
+ * @param datum - Zu prüfendes Datum
+ * @returns True wenn Arbeitstag (China)
+ */
+export function istArbeitstag(datum: Date): boolean {
+  // Legacy: Nutzt China-Logik für Rückwärtskompatibilität
+  return istArbeitstag_China(datum)
 }
 
 /**
@@ -191,14 +235,14 @@ export function generiereJahreskalender(jahr: number = 2027): Kalendertag[] {
  * Berechnet Arbeitstage zwischen zwei Daten (für China)
  * @param von - Start-Datum
  * @param bis - End-Datum
- * @returns Anzahl Arbeitstage
+ * @returns Anzahl Arbeitstage (China)
  */
 export function berechneArbeitstage(von: Date, bis: Date): number {
   let arbeitstage = 0
   let aktuell = new Date(von)
   
   while (aktuell <= bis) {
-    if (istArbeitstag(aktuell)) {
+    if (istArbeitstag_China(aktuell)) {
       arbeitstage++
     }
     aktuell = addDays(aktuell, 1)
@@ -208,16 +252,36 @@ export function berechneArbeitstage(von: Date, bis: Date): number {
 }
 
 /**
- * Findet den nächsten Arbeitstag ab einem Datum
+ * Berechnet Arbeitstage zwischen zwei Daten (für Deutschland)
+ * @param von - Start-Datum
+ * @param bis - End-Datum
+ * @returns Anzahl Arbeitstage (Deutschland)
+ */
+export function berechneArbeitstage_Deutschland(von: Date, bis: Date): number {
+  let arbeitstage = 0
+  let aktuell = new Date(von)
+  
+  while (aktuell <= bis) {
+    if (istArbeitstag_Deutschland(aktuell)) {
+      arbeitstage++
+    }
+    aktuell = addDays(aktuell, 1)
+  }
+  
+  return arbeitstage
+}
+
+/**
+ * Findet den nächsten Arbeitstag ab einem Datum (China)
  * @param datum - Start-Datum
- * @returns Nächster Arbeitstag
+ * @returns Nächster Arbeitstag (China)
  */
 export function naechsterArbeitstag(datum: Date): Date {
   let aktuell = new Date(datum)
   
   // Maximal 14 Tage vorwärts suchen (Sicherheit)
   for (let i = 0; i < 14; i++) {
-    if (istArbeitstag(aktuell)) {
+    if (istArbeitstag_China(aktuell)) {
       return aktuell
     }
     aktuell = addDays(aktuell, 1)
@@ -228,7 +292,27 @@ export function naechsterArbeitstag(datum: Date): Date {
 }
 
 /**
- * Berechnet das Datum X Arbeitstage in der Zukunft
+ * Findet den nächsten Arbeitstag ab einem Datum (Deutschland)
+ * @param datum - Start-Datum
+ * @returns Nächster Arbeitstag (Deutschland)
+ */
+export function naechsterArbeitstag_Deutschland(datum: Date): Date {
+  let aktuell = new Date(datum)
+  
+  // Maximal 14 Tage vorwärts suchen (Sicherheit)
+  for (let i = 0; i < 14; i++) {
+    if (istArbeitstag_Deutschland(aktuell)) {
+      return aktuell
+    }
+    aktuell = addDays(aktuell, 1)
+  }
+  
+  // Fallback: Original-Datum
+  return datum
+}
+
+/**
+ * Berechnet das Datum X Arbeitstage in der Zukunft (China)
  * @param startDatum - Start-Datum
  * @param arbeitstage - Anzahl Arbeitstage
  * @returns Ziel-Datum
@@ -241,7 +325,7 @@ export function addArbeitstage(startDatum: Date, arbeitstage: number): Date {
   for (let i = 0; i < 365 && verbleibendeArbeitstage > 0; i++) {
     aktuell = addDays(aktuell, 1)
     
-    if (istArbeitstag(aktuell)) {
+    if (istArbeitstag_China(aktuell)) {
       verbleibendeArbeitstage--
     }
   }
@@ -250,7 +334,29 @@ export function addArbeitstage(startDatum: Date, arbeitstage: number): Date {
 }
 
 /**
- * Berechnet das Datum X Arbeitstage in der Vergangenheit
+ * Berechnet das Datum X Arbeitstage in der Zukunft (Deutschland)
+ * @param startDatum - Start-Datum
+ * @param arbeitstage - Anzahl Arbeitstage
+ * @returns Ziel-Datum
+ */
+export function addArbeitstage_Deutschland(startDatum: Date, arbeitstage: number): Date {
+  let aktuell = new Date(startDatum)
+  let verbleibendeArbeitstage = arbeitstage
+  
+  // Maximal 365 Tage durchsuchen (Sicherheit)
+  for (let i = 0; i < 365 && verbleibendeArbeitstage > 0; i++) {
+    aktuell = addDays(aktuell, 1)
+    
+    if (istArbeitstag_Deutschland(aktuell)) {
+      verbleibendeArbeitstage--
+    }
+  }
+  
+  return aktuell
+}
+
+/**
+ * Berechnet das Datum X Arbeitstage in der Vergangenheit (China)
  * @param zielDatum - Ziel-Datum
  * @param arbeitstage - Anzahl Arbeitstage
  * @returns Start-Datum
@@ -263,7 +369,29 @@ export function subtractArbeitstage(zielDatum: Date, arbeitstage: number): Date 
   for (let i = 0; i < 365 && verbleibendeArbeitstage > 0; i++) {
     aktuell = addDays(aktuell, -1)
     
-    if (istArbeitstag(aktuell)) {
+    if (istArbeitstag_China(aktuell)) {
+      verbleibendeArbeitstage--
+    }
+  }
+  
+  return aktuell
+}
+
+/**
+ * Berechnet das Datum X Arbeitstage in der Vergangenheit (Deutschland)
+ * @param zielDatum - Ziel-Datum
+ * @param arbeitstage - Anzahl Arbeitstage
+ * @returns Start-Datum
+ */
+export function subtractArbeitstage_Deutschland(zielDatum: Date, arbeitstage: number): Date {
+  let aktuell = new Date(zielDatum)
+  let verbleibendeArbeitstage = arbeitstage
+  
+  // Maximal 365 Tage zurück durchsuchen (Sicherheit)
+  for (let i = 0; i < 365 && verbleibendeArbeitstage > 0; i++) {
+    aktuell = addDays(aktuell, -1)
+    
+    if (istArbeitstag_Deutschland(aktuell)) {
       verbleibendeArbeitstage--
     }
   }
@@ -311,9 +439,9 @@ export function berechneBestelldatum(bedarfsdatum: Date): Date {
   // Schritt 5: Einen zusätzlichen Tag Puffer (Best Practice)
   bestelldatum = addDays(bestelldatum, -1)
   
-  // Schritt 6: Sicherstellen dass Bestelldatum ein Arbeitstag ist
+  // Schritt 6: Sicherstellen dass Bestelldatum ein Arbeitstag ist (China!)
   // Falls Wochenende/Feiertag -> vorheriger Arbeitstag
-  while (!istArbeitstag(bestelldatum)) {
+  while (!istArbeitstag_China(bestelldatum)) {
     bestelldatum = addDays(bestelldatum, -1)
   }
   
@@ -349,15 +477,32 @@ export function berechneAnkunftsdatum(bestelldatum: Date): Date {
 }
 
 /**
- * Zählt Arbeitstage pro Monat im Jahr 2027
- * @returns Array mit 12 Zahlen (Arbeitstage pro Monat)
+ * Zählt Arbeitstage pro Monat im Jahr 2027 (China)
+ * @returns Array mit 12 Zahlen (Arbeitstage pro Monat, China)
  */
 export function zaehleArbeitstageProMonat(): number[] {
   const kalender = generiereJahreskalender(2027)
   const arbeitstageProMonat: number[] = Array(12).fill(0)
   
   kalender.forEach(tag => {
-    if (istArbeitstag(tag.datum)) {
+    if (istArbeitstag_China(tag.datum)) {
+      arbeitstageProMonat[tag.monat - 1]++
+    }
+  })
+  
+  return arbeitstageProMonat
+}
+
+/**
+ * Zählt Arbeitstage pro Monat im Jahr 2027 (Deutschland)
+ * @returns Array mit 12 Zahlen (Arbeitstage pro Monat, Deutschland)
+ */
+export function zaehleArbeitstageProMonat_Deutschland(): number[] {
+  const kalender = generiereJahreskalender(2027)
+  const arbeitstageProMonat: number[] = Array(12).fill(0)
+  
+  kalender.forEach(tag => {
+    if (istArbeitstag_Deutschland(tag.datum)) {
       arbeitstageProMonat[tag.monat - 1]++
     }
   })
@@ -372,19 +517,23 @@ export function zaehleArbeitstageProMonat(): number[] {
  */
 export function kalenderStatistik(jahr: number = 2027) {
   const kalender = generiereJahreskalender(jahr)
-  const feiertage = ladeChinaFeiertage()
+  const feiertageDeutschland = ladeDeutschlandFeiertage()
+  const feiertageChina = ladeChinaFeiertage()
   
-  const arbeitstage = kalender.filter(k => istArbeitstag(k.datum)).length
+  const arbeitstageChina = kalender.filter(k => istArbeitstag_China(k.datum)).length
+  const arbeitstageDeutschland = kalender.filter(k => istArbeitstag_Deutschland(k.datum)).length
   const wochenenden = kalender.filter(k => isWeekend(k.datum)).length
   const springFestivalTage = kalender.filter(k => istSpringFestival(k.datum)).length
   
   return {
     gesamt: kalender.length,
-    arbeitstage,
+    arbeitstageChina,
+    arbeitstageDeutschland,
     wochenenden,
-    feiertageChina: feiertage.length,
+    feiertageDeutschland: feiertageDeutschland.length,
+    feiertageChina: feiertageChina.length,
     springFestivalTage,
-    produktionstage: arbeitstage // = Arbeitstage in China
+    produktionstage: arbeitstageChina // = Arbeitstage in China (Legacy)
   }
 }
 

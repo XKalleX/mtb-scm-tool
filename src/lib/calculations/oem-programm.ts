@@ -6,6 +6,10 @@
  * Zentrale Berechnungen für die tagesgenaue Produktionsplanung
  * mit Berücksichtigung von Saisonalität und Error-Management
  * 
+ * WICHTIG: Produktion in DEUTSCHLAND (Dortmund)
+ * → Nutzt DEUTSCHE Feiertage (NRW), nicht chinesische!
+ * → Anforderung A3: Deutsche Feiertage müssen respektiert werden
+ * 
  * KERNFUNKTIONEN:
  * 1. Jahresproduktion auf Monate verteilen (saisonal)
  * 2. Monatsproduktion auf Tage verteilen (gleichmäßig mit Error-Management)
@@ -15,7 +19,7 @@
 import { TagesProduktionsplan, SaisonalitaetMonat, MarketingAuftrag } from '@/types'
 import { addDays } from '@/lib/utils'
 import { berechneProduktionMitErrorManagement } from './error-management'
-import { generiereJahreskalender, istArbeitstag, zaehleArbeitstageProMonat } from '@/lib/kalender'
+import { generiereJahreskalender, istArbeitstag_Deutschland, zaehleArbeitstageProMonat_Deutschland } from '@/lib/kalender'
 import saisonalitaetData from '@/data/saisonalitaet.json'
 import stammdatenData from '@/data/stammdaten.json'
 
@@ -45,9 +49,12 @@ export function berechneMonatsproduktionen(jahresproduktion: number): number[] {
  * 
  * ABLAUF:
  * 1. Jahresproduktion auf 12 Monate verteilen (saisonal)
- * 2. Arbeitstage pro Monat zählen
+ * 2. Arbeitstage pro Monat zählen (DEUTSCHE Feiertage!)
  * 3. Für jeden Monat: Monatsproduktion / Arbeitstage = Tagesproduktion
  * 4. Error-Management anwenden für jeden Tag
+ * 
+ * WICHTIG: Nutzt deutsche Feiertage (NRW) für Produktion in Deutschland!
+ * Anforderung A3: Deutsche Feiertage müssen respektiert werden
  * 
  * @param varianteId - ID der Variante (z.B. "MTBAllrounder")
  * @param jahresproduktion - Gesamt-Jahresproduktion dieser Variante
@@ -59,7 +66,7 @@ export function generiereProduktionsplan(
 ): TagesProduktionsplan[] {
   const kalender = generiereJahreskalender(2027)
   const monatsproduktionen = berechneMonatsproduktionen(jahresproduktion)
-  const arbeitstageProMonat = zaehleArbeitstageProMonat()
+  const arbeitstageProMonat = zaehleArbeitstageProMonat_Deutschland() // ✅ DEUTSCHE Feiertage!
   
   const tagesplaene: TagesProduktionsplan[] = []
   
@@ -76,7 +83,7 @@ export function generiereProduktionsplan(
     const monatsTage = kalender.filter(k => k.monat === monat + 1)
     
     monatsTage.forEach(tag => {
-      if (istArbeitstag(tag.datum)) {
+      if (istArbeitstag_Deutschland(tag.datum)) { // ✅ DEUTSCHE Feiertage prüfen!
         // Produktionstag - Error-Management anwenden
         const errorState = berechneProduktionMitErrorManagement(
           sollProTag,
@@ -94,7 +101,7 @@ export function generiereProduktionsplan(
         
         kumulierterError = errorState.kumulierterError
       } else {
-        // Kein Produktionstag (Wochenende/Feiertag)
+        // Kein Produktionstag (Wochenende/deutscher Feiertag)
         tagesplaene.push({
           datum: tag.datum,
           varianteId,
