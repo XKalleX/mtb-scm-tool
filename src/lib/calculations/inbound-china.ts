@@ -24,8 +24,8 @@
  */
 
 import { Bestellung, TagesProduktionsplan, Stueckliste, Maschinenausfall } from '@/types'
-import { addDays, generateId } from '@/lib/utils'
-import { berechneBestelldatum, berechneAnkunftsdatum, istSpringFestival } from '@/lib/kalender'
+import { addDays, generateId, isWeekend } from '@/lib/utils'
+import { berechneBestelldatum, berechneAnkunftsdatum, istSpringFestival, istFeiertag } from '@/lib/kalender'
 import lieferantData from '@/data/lieferant-china.json'
 import stuecklistenData from '@/data/stueckliste.json'
 
@@ -388,6 +388,16 @@ export function generiereTaeglicheBestellungen(
   let aktuellerTag = new Date(bestellStart)
   
   while (aktuellerTag <= bestellEnde) {
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // ⚠️ FIX: Überspringe Wochenenden und Feiertage (DE + CN)
+    // An diesen Tagen kann nicht bestellt werden!
+    // ═══════════════════════════════════════════════════════════════════════════════
+    if (isWeekend(aktuellerTag) || istFeiertag(aktuellerTag)) {
+      // Überspringe diesen Tag - keine Bestellungen an Wochenenden/Feiertagen
+      aktuellerTag = addDays(aktuellerTag, 1)
+      continue
+    }
+    
     // Berechne welcher Produktionstag in der Zukunft beliefert werden soll
     // (heute + 49 Tage Vorlaufzeit)
     const lieferTag = addDays(aktuellerTag, VORLAUFZEIT_TAGE)
@@ -439,6 +449,8 @@ export function generiereTaeglicheBestellungen(
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // FINALE BESTELLUNG: Restliche Mengen bestellen (auch wenn < Losgröße)
+  // ⚠️ FIX: KEIN Aufrunden auf Losgröße für finale Bestellung!
+  // Dies führt zu Überbestellung (370.500 statt 370.000)
   // ═══════════════════════════════════════════════════════════════════════════════
   const restKomponenten: Record<string, number> = {}
   let hatRest = false
@@ -446,8 +458,10 @@ export function generiereTaeglicheBestellungen(
   alleKomponenten.forEach(kompId => {
     if (offeneMengen[kompId] > 0) {
       hatRest = true
-      // Auf Losgröße aufrunden für finale Bestellung
-      restKomponenten[kompId] = rundeAufLosgroesse(offeneMengen[kompId])
+      // ⚠️ FIX: KEINE Aufrundung mehr! Nur exakte Restmenge bestellen
+      // Alte Logik: restKomponenten[kompId] = rundeAufLosgroesse(offeneMengen[kompId])
+      // Neue Logik: Exakte Menge (verhindert Überbestellung)
+      restKomponenten[kompId] = offeneMengen[kompId]
       offeneMengen[kompId] = 0
     }
   })
@@ -464,7 +478,7 @@ export function generiereTaeglicheBestellungen(
       erwarteteAnkunft: berechneAnkunftsdatum(finalesBestelldatum),
       status: 'bestellt',
       istVorjahr: false,
-      grund: 'losgroesse'
+      grund: 'losgroesse'  // Finale Restbestellung (nicht auf Losgröße gerundet)
     })
   }
   

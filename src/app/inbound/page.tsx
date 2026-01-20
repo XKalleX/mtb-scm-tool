@@ -246,6 +246,7 @@ export default function InboundPage() {
           datumFormatiert,
           istVorjahr: bestellung.istVorjahr,
           bedarfsdatum,
+          bedarfsdatumFormatiert: bedarfsdatum.toLocaleDateString('de-DE'),
           vorlaufzeit: lieferant.gesamtVorlaufzeitTage,
           vorlaufzeitFormatiert: `${lieferant.gesamtVorlaufzeitTage} Tage`,
           menge,
@@ -282,6 +283,7 @@ export default function InboundPage() {
           datumFormatiert,
           istVorjahr: false,
           bedarfsdatum: null,
+          bedarfsdatumFormatiert: '-',
           vorlaufzeit: null,
           vorlaufzeitFormatiert: '-',
           menge: 0,
@@ -588,6 +590,13 @@ export default function InboundPage() {
                     {
                       key: 'datumFormatiert',
                       label: 'Datum',
+                      width: '110px',
+                      align: 'center',
+                      sumable: false
+                    },
+                    {
+                      key: 'bedarfsdatumFormatiert',
+                      label: 'Bedarfsdatum',
                       width: '110px',
                       align: 'center',
                       sumable: false
