@@ -68,11 +68,15 @@ export default function InboundPage() {
     if (isNaN(menge) || menge < 1) return
     
     // Erstelle Zusatzbestellung für alle Sattel-Varianten (gleichverteilt)
+    // Verwende Floor für die ersten 3, und berechne den Rest für die letzte Variante
+    // um exakt die angeforderte Menge zu verteilen
+    const basisMenge = Math.floor(menge / 4)
+    const restMenge = menge - (basisMenge * 3)  // Rest geht an die letzte Variante
     const komponenten: Record<string, number> = {
-      'SAT_FT': Math.ceil(menge / 4),
-      'SAT_RL': Math.ceil(menge / 4),
-      'SAT_SP': Math.ceil(menge / 4),
-      'SAT_SL': Math.ceil(menge / 4)
+      'SAT_FT': basisMenge,
+      'SAT_RL': basisMenge,
+      'SAT_SP': basisMenge,
+      'SAT_SL': restMenge  // Rest für letzte Variante
     }
     
     const neueBestellung = erstelleZusatzbestellung(

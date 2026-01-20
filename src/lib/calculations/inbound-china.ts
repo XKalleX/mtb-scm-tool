@@ -312,8 +312,11 @@ export interface TaeglicheBestellung {
   erwarteteAnkunft: Date
   status: 'bestellt' | 'unterwegs' | 'geliefert'
   istVorjahr: boolean // Bestellung aus 2026?
-  grund: 'losgroesse' | 'sicherheitsbestand' | 'zusatzbestellung'
+  grund: 'losgroesse' | 'zusatzbestellung'
 }
+
+// ✅ Konstante für Puffer-Tage (für Losgröße-Sammlung vor Produktionsstart)
+const LOSGROESSE_SAMMEL_PUFFER_TAGE = 14
 
 /**
  * Generiert tägliche Bestellungen über das ganze Jahr (+ Vorlauf aus 2026)
@@ -371,7 +374,7 @@ export function generiereTaeglicheBestellungen(
   
   // Berechne Startdatum: 01.01.2027 - Vorlaufzeit - Puffer für Losgröße-Sammlung
   const produktionsStart = new Date(planungsjahr, 0, 1) // 01.01.2027
-  const bestellStart = addDays(produktionsStart, -VORLAUFZEIT_TAGE - 14) // ~Mitte Oktober 2026
+  const bestellStart = addDays(produktionsStart, -VORLAUFZEIT_TAGE - LOSGROESSE_SAMMEL_PUFFER_TAGE) // ~Mitte Oktober 2026
   
   // Berechne Enddatum: Letzte Bestellung muss 49 Tage vor 31.12.2027 erfolgen
   const produktionsEnde = new Date(planungsjahr, 11, 31) // 31.12.2027
