@@ -300,7 +300,18 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
       const gespeicherteKonfiguration = localStorage.getItem(KONFIGURATION_STORAGE_KEY)
       if (gespeicherteKonfiguration) {
         const parsed = JSON.parse(gespeicherteKonfiguration) as KonfigurationData
-        setKonfiguration(parsed)
+        
+        // ✅ WICHTIG: Feiertage IMMER aus aktuellen JSON-Dateien laden!
+        // Dies verhindert, dass alte/fehlende Feiertage aus dem localStorage 
+        // die Produktionsplanung verfälschen.
+        // Feiertage werden NICHT aus localStorage übernommen, sondern immer
+        // aus STANDARD_FEIERTAGE (JSON-Dateien = Single Source of Truth)
+        const konfigurationMitAktuellenFeiertagen: KonfigurationData = {
+          ...parsed,
+          feiertage: STANDARD_FEIERTAGE // IMMER aktuelle Feiertage aus JSON!
+        }
+        
+        setKonfiguration(konfigurationMitAktuellenFeiertagen)
       }
     } catch (error) {
       console.error('Fehler beim Laden der Konfiguration:', error)
