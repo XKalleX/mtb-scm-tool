@@ -6,11 +6,6 @@
       "typ": "gesetzlich"
     },
     {
-      "datum": "2026-01-02",
-      "name": "New Year's Day",
-      "typ": "gesetzlich"
-    },
-    {
       "datum": "2026-02-16",
       "name": "Spring Festival (Tag 1)",
       "typ": "gesetzlich"
@@ -51,16 +46,6 @@
       "typ": "gesetzlich"
     },
     {
-      "datum": "2026-04-06",
-      "name": "Qingming Festival",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2026-04-07",
-      "name": "Qingming Festival",
-      "typ": "gesetzlich"
-    },
-    {
       "datum": "2026-05-01",
       "name": "Labour Day",
       "typ": "gesetzlich"
@@ -91,27 +76,7 @@
       "typ": "gesetzlich"
     },
     {
-      "datum": "2026-06-20",
-      "name": "Dragon Boat Festival",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2026-06-21",
-      "name": "Dragon Boat Festival",
-      "typ": "gesetzlich"
-    },
-    {
       "datum": "2026-09-25",
-      "name": "Mid-Autumn Festival",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2026-09-26",
-      "name": "Mid-Autumn Festival",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2026-09-27",
       "name": "Mid-Autumn Festival",
       "typ": "gesetzlich"
     },
@@ -158,68 +123,43 @@
       "typ": "gesetzlich"
     },
     {
-      "datum": "2027-01-02",
-      "name": "New Year's Day",
+      "datum": "2027-02-05",
+      "name": "Spring Festival (Vorabend)",
       "typ": "gesetzlich"
     },
     {
-      "datum": "2027-01-03",
-      "name": "New Year's Day",
+      "datum": "2027-02-06",
+      "name": "Spring Festival - Chinesischer Neujahrstag",
       "typ": "gesetzlich"
     },
     {
-      "datum": "2027-01-28",
-      "name": "Spring Festival (Tag 1)",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2027-01-29",
+      "datum": "2027-02-07",
       "name": "Spring Festival (Tag 2)",
       "typ": "gesetzlich"
     },
     {
-      "datum": "2027-01-30",
+      "datum": "2027-02-08",
       "name": "Spring Festival (Tag 3)",
       "typ": "gesetzlich"
     },
     {
-      "datum": "2027-01-31",
+      "datum": "2027-02-09",
       "name": "Spring Festival (Tag 4)",
       "typ": "gesetzlich"
     },
     {
-      "datum": "2027-02-01",
+      "datum": "2027-02-10",
       "name": "Spring Festival (Tag 5)",
       "typ": "gesetzlich"
     },
     {
-      "datum": "2027-02-02",
+      "datum": "2027-02-11",
       "name": "Spring Festival (Tag 6)",
       "typ": "gesetzlich"
     },
     {
-      "datum": "2027-02-03",
-      "name": "Spring Festival (Tag 7)",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2027-02-04",
-      "name": "Spring Festival (Tag 8)",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2027-04-03",
-      "name": "Qingming Festival (Tomb-Sweeping Day)",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2027-04-04",
-      "name": "Qingming Festival",
-      "typ": "gesetzlich"
-    },
-    {
       "datum": "2027-04-05",
-      "name": "Qingming Festival",
+      "name": "Qingming Festival (Tomb-Sweeping Day)",
       "typ": "gesetzlich"
     },
     {
@@ -253,27 +193,7 @@
       "typ": "gesetzlich"
     },
     {
-      "datum": "2027-06-10",
-      "name": "Dragon Boat Festival",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2027-06-11",
-      "name": "Dragon Boat Festival",
-      "typ": "gesetzlich"
-    },
-    {
       "datum": "2027-09-15",
-      "name": "Mid-Autumn Festival",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2027-09-16",
-      "name": "Mid-Autumn Festival",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2027-09-17",
       "name": "Mid-Autumn Festival",
       "typ": "gesetzlich"
     },
@@ -320,61 +240,51 @@
       "typ": "gesetzlich"
     },
     {
-      "datum": "2028-01-02",
-      "name": "New Year's Day",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2028-01-03",
-      "name": "New Year's Day",
-      "typ": "gesetzlich"
-    },
-    {
       "datum": "2028-01-26",
-      "name": "Spring Festival (Tag 1)",
+      "name": "Spring Festival (Vorabend)",
       "typ": "gesetzlich"
     },
     {
       "datum": "2028-01-27",
-      "name": "Spring Festival (Tag 2)",
+      "name": "Spring Festival - Chinesischer Neujahrstag",
       "typ": "gesetzlich"
     },
     {
       "datum": "2028-01-28",
-      "name": "Spring Festival (Tag 3)",
+      "name": "Spring Festival (Tag 2)",
       "typ": "gesetzlich"
     },
     {
       "datum": "2028-01-29",
-      "name": "Spring Festival (Tag 4)",
+      "name": "Spring Festival (Tag 3)",
       "typ": "gesetzlich"
     },
     {
       "datum": "2028-01-30",
-      "name": "Spring Festival (Tag 5)",
+      "name": "Spring Festival (Tag 4)",
       "typ": "gesetzlich"
     },
     {
       "datum": "2028-01-31",
-      "name": "Spring Festival (Tag 6)",
+      "name": "Spring Festival (Tag 5)",
       "typ": "gesetzlich"
     },
     {
       "datum": "2028-02-01",
-      "name": "Spring Festival (Tag 7)",
-      "typ": "gesetzlich"
-    },
-    {
-      "datum": "2028-02-02",
-      "name": "Spring Festival (Tag 8)",
+      "name": "Spring Festival (Tag 6)",
       "typ": "gesetzlich"
     }
   ],
-  "quelle": "Offizielle Shanghai Public Holidays - https://www.china-briefing.com/news/china-public-holidays/",
+  "quelle": "Offizielle Shanghai Public Holidays - Reale Kalenderdaten für Produktionsplanung",
   "region": "Shanghai",
   "hinweis": "Shanghai Region Feiertage - identisch mit nationalen gesetzlichen Feiertagen Chinas. Zeitraum Oktober 2026 bis Februar 2028 für Vorlaufzeiten-Berücksichtigung.",
   "wichtig2026": "Spring Festival (16.-22.02.2026) = 7 Tage Produktionsstopp",
-  "wichtig2027": "Spring Festival (28.01.-04.02.2027) = 8 Tage Produktionsstopp - SSOT korrekt!",
-  "wichtig2028": "Spring Festival (26.01.-02.02.2028) = 8 Tage Produktionsstopp",
-  "anmerkung": "In China werden Feiertage oft mit angrenzenden Wochenenden kombiniert und durch Kompensationsarbeitstage (make-up workdays) ausgeglichen. Die hier aufgeführten Tage sind die tatsächlichen arbeitsfreien Tage."
+  "wichtig2027": "Spring Festival (05.-11.02.2027) = 7 Tage Produktionsstopp - Realdaten!",
+  "wichtig2028": "Spring Festival (26.01.-01.02.2028) = 7 Tage Produktionsstopp",
+  "anmerkung": "In China werden Feiertage oft mit angrenzenden Wochenenden kombiniert und durch Kompensationsarbeitstage (make-up workdays) ausgeglichen. Die hier aufgeführten Tage sind die tatsächlichen arbeitsfreien Tage.",
+  "anzahl": {
+    "2026": "21 Feiertage",
+    "2027": "23 Feiertage", 
+    "2028": "8 Feiertage (Jan-Feb)"
+  }
 }
