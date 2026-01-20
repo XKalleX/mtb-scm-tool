@@ -25,7 +25,13 @@
 
 import { Bestellung, TagesProduktionsplan, Stueckliste, Maschinenausfall } from '@/types'
 import { addDays, generateId, isWeekend } from '@/lib/utils'
-import { berechneBestelldatum, berechneAnkunftsdatum, istSpringFestival, istChinaFeiertag } from '@/lib/kalender'
+import { 
+  berechneBestelldatum, 
+  berechneAnkunftsdatum, 
+  istSpringFestival, 
+  istChinaFeiertag,
+  FeiertagsKonfiguration 
+} from '@/lib/kalender'
 import lieferantData from '@/data/lieferant-china.json'
 import stuecklistenData from '@/data/stueckliste.json'
 
@@ -117,14 +123,16 @@ export function rundeAufLosgroesse(menge: number): number {
  * 
  * @param komponentenbedarf - Bedarf pro Komponente
  * @param bedarfsdatum - Wann wird Material gebraucht
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns Bestellung
  */
 export function erstelleBestellung(
   komponentenbedarf: Record<string, number>,
-  bedarfsdatum: Date
+  bedarfsdatum: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
 ): Bestellung {
-  const bestelldatum = berechneBestelldatum(bedarfsdatum)
-  const ankunftsdatum = berechneAnkunftsdatum(bestelldatum)
+  const bestelldatum = berechneBestelldatum(bedarfsdatum, customFeiertage)
+  const ankunftsdatum = berechneAnkunftsdatum(bestelldatum, customFeiertage)
   
   // Mengen auf Losgröße aufrunden
   const komponenten: Record<string, number> = {}
@@ -326,11 +334,18 @@ const LOSGROESSE_SAMMEL_PUFFER_TAGE = 14
  * - Exakt nur benötigte Mengen bestellen
  * - Zeitraum: Beginn ~Mitte Oktober 2026, Ende ~Mitte November 2027
  * - Bestellmenge = Produktionsmenge (370.000 Sättel)
+ * 
+ * @param alleProduktionsplaene - Pläne aller MTB-Varianten
+ * @param planungsjahr - Jahr (default: 2027)
+ * @param vorlaufzeitTage - Fixe Vorlaufzeit (default: 49 Tage, konfigurierbar)
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
+ * @returns Array von Bestellungen (inkl. Vorjahr!)
  */
 export function generiereTaeglicheBestellungen(
   alleProduktionsplaene: Record<string, TagesProduktionsplan[]>,
   planungsjahr: number = 2027,
-  vorlaufzeitTage: number = 49
+  vorlaufzeitTage: number = 49,
+  customFeiertage?: FeiertagsKonfiguration[]
 ): TaeglicheBestellung[] {
   const bestellungen: TaeglicheBestellung[] = []
   const stuecklisten = stuecklistenData.stuecklisten
@@ -418,7 +433,7 @@ export function generiereTaeglicheBestellungen(
     
     // ✅ Prüfe JETZT erst ob BESTELLUNG möglich ist (nur an Arbeitstagen in CHINA!)
     // WICHTIG: Nur chinesische Feiertage relevant für Bestellungen bei China
-    if (isWeekend(aktuellerTag) || istChinaFeiertag(aktuellerTag).length > 0) {
+    if (isWeekend(aktuellerTag) || istChinaFeiertag(aktuellerTag, customFeiertage).length > 0) {
       // An Wochenenden/Feiertagen (China): Bedarf ist erfasst, aber keine Bestellung
       // Bedarf bleibt in offeneMengen und wird am nächsten Arbeitstag verarbeitet
       aktuellerTag = addDays(aktuellerTag, 1)
@@ -450,7 +465,7 @@ export function generiereTaeglicheBestellungen(
         bestelldatum,
         bedarfsdatum,
         komponenten: bestellKomponenten,
-        erwarteteAnkunft: berechneAnkunftsdatum(bestelldatum),
+        erwarteteAnkunft: berechneAnkunftsdatum(bestelldatum, customFeiertage),
         status: bestelldatum.getFullYear() < planungsjahr ? 'geliefert' : 
                 bestelldatum.getMonth() < 3 ? 'unterwegs' : 'bestellt',
         istVorjahr: bestelldatum.getFullYear() < planungsjahr,
@@ -489,7 +504,7 @@ export function generiereTaeglicheBestellungen(
       bestelldatum: finalesBestelldatum,
       bedarfsdatum: finalesBedarfsdatum,
       komponenten: restKomponenten,
-      erwarteteAnkunft: berechneAnkunftsdatum(finalesBestelldatum),
+      erwarteteAnkunft: berechneAnkunftsdatum(finalesBestelldatum, customFeiertage),
       status: 'bestellt',
       istVorjahr: false,
       grund: 'losgroesse'  // Finale Restbestellung (nicht auf Losgröße gerundet)
@@ -538,13 +553,15 @@ export function generiereTaeglicheBestellungen(
  * @param komponenten - Komponenten mit Mengen (bereits exakt verteilt!)
  * @param vorlaufzeitTage - Vorlaufzeit in Tagen (default: 49)
  * @param skipLosgroessenRundung - Wenn true: KEINE Aufrundung, wenn false: Aufrundung pro Variante (default: false)
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns TaeglicheBestellung
  */
 export function erstelleZusatzbestellung(
   bestelldatum: Date,
   komponenten: Record<string, number>,
   vorlaufzeitTage: number = 49,
-  skipLosgroessenRundung: boolean = false
+  skipLosgroessenRundung: boolean = false,
+  customFeiertage?: FeiertagsKonfiguration[]
 ): TaeglicheBestellung {
   const LOSGROESSE = lieferantData.lieferant.losgroesse
   
@@ -579,7 +596,7 @@ export function erstelleZusatzbestellung(
     bestelldatum,
     bedarfsdatum,
     komponenten: finalKomponenten,
-    erwarteteAnkunft: berechneAnkunftsdatum(bestelldatum),
+    erwarteteAnkunft: berechneAnkunftsdatum(bestelldatum, customFeiertage),
     status: 'bestellt',
     istVorjahr: false,
     grund: 'zusatzbestellung'

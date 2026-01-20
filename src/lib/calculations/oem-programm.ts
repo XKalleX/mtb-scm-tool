@@ -19,7 +19,12 @@
 import { TagesProduktionsplan, SaisonalitaetMonat, MarketingAuftrag } from '@/types'
 import { addDays } from '@/lib/utils'
 import { berechneProduktionMitErrorManagement } from './error-management'
-import { generiereJahreskalender, istArbeitstag_Deutschland, zaehleArbeitstageProMonat_Deutschland } from '@/lib/kalender'
+import { 
+  generiereJahreskalender, 
+  istArbeitstag_Deutschland, 
+  zaehleArbeitstageProMonat_Deutschland,
+  FeiertagsKonfiguration 
+} from '@/lib/kalender'
 import saisonalitaetData from '@/data/saisonalitaet.json'
 import stammdatenData from '@/data/stammdaten.json'
 
@@ -58,15 +63,17 @@ export function berechneMonatsproduktionen(jahresproduktion: number): number[] {
  * 
  * @param varianteId - ID der Variante (z.B. "MTBAllrounder")
  * @param jahresproduktion - Gesamt-Jahresproduktion dieser Variante
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns Array von Tages-Produktionsplänen (365 Tage)
  */
 export function generiereProduktionsplan(
   varianteId: string,
-  jahresproduktion: number
+  jahresproduktion: number,
+  customFeiertage?: FeiertagsKonfiguration[]
 ): TagesProduktionsplan[] {
-  const kalender = generiereJahreskalender(2027)
+  const kalender = generiereJahreskalender(2027, customFeiertage)
   const monatsproduktionen = berechneMonatsproduktionen(jahresproduktion)
-  const arbeitstageProMonat = zaehleArbeitstageProMonat_Deutschland() // ✅ DEUTSCHE Feiertage!
+  const arbeitstageProMonat = zaehleArbeitstageProMonat_Deutschland(customFeiertage) // ✅ DEUTSCHE Feiertage!
   
   const tagesplaene: TagesProduktionsplan[] = []
   
@@ -83,7 +90,7 @@ export function generiereProduktionsplan(
     const monatsTage = kalender.filter(k => k.monat === monat + 1)
     
     monatsTage.forEach(tag => {
-      if (istArbeitstag_Deutschland(tag.datum)) { // ✅ DEUTSCHE Feiertage prüfen!
+      if (istArbeitstag_Deutschland(tag.datum, customFeiertage)) { // ✅ DEUTSCHE Feiertage prüfen!
         // Produktionstag - Error-Management anwenden
         const errorState = berechneProduktionMitErrorManagement(
           sollProTag,
@@ -119,14 +126,17 @@ export function generiereProduktionsplan(
 
 /**
  * Generiert Produktionspläne für ALLE 8 Varianten
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns Object mit Plänen pro Variante
  */
-export function generiereAlleProduktionsplaene(): Record<string, TagesProduktionsplan[]> {
+export function generiereAlleProduktionsplaene(
+  customFeiertage?: FeiertagsKonfiguration[]
+): Record<string, TagesProduktionsplan[]> {
   const jahresproduktion = stammdatenData.jahresproduktion.proVariante
   const plaene: Record<string, TagesProduktionsplan[]> = {}
   
   Object.entries(jahresproduktion).forEach(([varianteId, jahresprod]) => {
-    plaene[varianteId] = generiereProduktionsplan(varianteId, jahresprod as number)
+    plaene[varianteId] = generiereProduktionsplan(varianteId, jahresprod as number, customFeiertage)
   })
   
   return plaene
