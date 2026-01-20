@@ -18,7 +18,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Ship, AlertTriangle, Package, Download, Calendar, Zap } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Ship, AlertTriangle, Package, Download, Calendar, Zap, Plus } from 'lucide-react'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatNumber, addDays } from '@/lib/utils'
@@ -27,9 +29,9 @@ import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { DeltaCell, DeltaBadge } from '@/components/DeltaCell'
-import { useMemo } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { generiereAlleVariantenProduktionsplaene } from '@/lib/calculations/zentrale-produktionsplanung'
-import { generiereTaeglicheBestellungen, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
+import { generiereTaeglicheBestellungen, erstelleZusatzbestellung, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 
 /**
@@ -49,6 +51,44 @@ export default function InboundPage() {
     variantenPlaene,
     formatDelta
   } = useSzenarioBerechnung()
+  
+  // ✅ NEU: State für Zusatzbestellungen
+  const [zusatzBestellungen, setZusatzBestellungen] = useState<TaeglicheBestellung[]>([])
+  const [neueBestellungDatum, setNeueBestellungDatum] = useState<string>('')
+  const [neueBestellungMenge, setNeueBestellungMenge] = useState<string>('500')
+  
+  // ✅ NEU: Handler für Zusatzbestellung
+  const handleZusatzbestellung = useCallback(() => {
+    if (!neueBestellungDatum || !neueBestellungMenge) return
+    
+    const datum = new Date(neueBestellungDatum)
+    if (isNaN(datum.getTime())) return
+    
+    const menge = parseInt(neueBestellungMenge, 10)
+    if (isNaN(menge) || menge < 1) return
+    
+    // Erstelle Zusatzbestellung für alle Sattel-Varianten (gleichverteilt)
+    // Verwende Floor für die ersten 3, und berechne den Rest für die letzte Variante
+    // um exakt die angeforderte Menge zu verteilen
+    const basisMenge = Math.floor(menge / 4)
+    const restMenge = menge - (basisMenge * 3)  // Rest geht an die letzte Variante
+    const komponenten: Record<string, number> = {
+      'SAT_FT': basisMenge,
+      'SAT_RL': basisMenge,
+      'SAT_SP': basisMenge,
+      'SAT_SL': restMenge  // Rest für letzte Variante
+    }
+    
+    const neueBestellung = erstelleZusatzbestellung(
+      datum,
+      komponenten,
+      konfiguration.lieferant.gesamtVorlaufzeitTage
+    )
+    
+    setZusatzBestellungen(prev => [...prev, neueBestellung])
+    setNeueBestellungDatum('')
+    setNeueBestellungMenge('500')
+  }, [neueBestellungDatum, neueBestellungMenge, konfiguration.lieferant.gesamtVorlaufzeitTage])
   
   // Lieferant aus Konfiguration
   const lieferant = konfiguration.lieferant
@@ -88,16 +128,33 @@ export default function InboundPage() {
     return result
   }, [produktionsplaene])
   
-  // Berechne tägliche Bestellungen (inkl. Vorjahr!)
-  const taeglicheBestellungen = useMemo(() => {
-    return generiereTaeglicheBestellungen(produktionsplaeneFormatiert, konfiguration.planungsjahr)
-  }, [produktionsplaeneFormatiert, konfiguration.planungsjahr])
+  // ✅ KORRIGIERT: Berechne tägliche Bestellungen mit fixer Vorlaufzeit aus Konfiguration
+  // Vorlaufzeit ist IMMER 49 Tage (konfigurierbar in Einstellungen, aber fix - nicht dynamisch kalkuliert)
+  const generierteBestellungen = useMemo(() => {
+    return generiereTaeglicheBestellungen(
+      produktionsplaeneFormatiert, 
+      konfiguration.planungsjahr,
+      lieferant.gesamtVorlaufzeitTage // Fixe Vorlaufzeit aus Konfiguration (49 Tage)
+    )
+  }, [produktionsplaeneFormatiert, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage])
   
-  // Statistiken über Bestellungen
+  // ✅ Kombiniere generierte + Zusatzbestellungen
+  const taeglicheBestellungen = useMemo(() => {
+    const alle = [...generierteBestellungen, ...zusatzBestellungen]
+    // Sortiere nach Bestelldatum
+    return alle.sort((a, b) => {
+      const dateA = a.bestelldatum instanceof Date ? a.bestelldatum : new Date(a.bestelldatum)
+      const dateB = b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum)
+      return dateA.getTime() - dateB.getTime()
+    })
+  }, [generierteBestellungen, zusatzBestellungen])
+  
+  // Statistiken über Bestellungen (inkl. Zusatzbestellungen)
   const bestellStatistik = useMemo(() => {
     const gesamt = taeglicheBestellungen.length
     const vorjahr = taeglicheBestellungen.filter(b => b.istVorjahr).length
     const planungsjahr = gesamt - vorjahr
+    const zusatzBestellungenCount = taeglicheBestellungen.filter(b => b.grund === 'zusatzbestellung').length
     
     const gesamtMenge = taeglicheBestellungen.reduce((sum, b) => {
       return sum + Object.values(b.komponenten).reduce((s, m) => s + m, 0)
@@ -107,66 +164,92 @@ export default function InboundPage() {
       gesamt,
       vorjahr,
       planungsjahr,
+      zusatzBestellungenCount,
       gesamtMenge,
       durchschnittProBestellung: gesamt > 0 ? gesamtMenge / gesamt : 0
     }
   }, [taeglicheBestellungen])
   
-  // Lieferplan-Daten für Excel-Tabelle (deterministisch, basierend auf Konfiguration)
-  // ✅ ERWEITERT: Deckt 2026-2028 ab (analog zur täglichen Bestelllogik)
+  // ✅ KORRIGIERT: Monatliche Übersicht aus täglichen Bestellungen aggregieren
+  // Keine unabhängige Berechnung mehr - gleiche Datenquelle = gleiche Summen!
   const lieferplanDaten = useMemo(() => {
     const planungsjahr = konfiguration.planungsjahr
     const result: any[] = []
     
-    // Generiere Daten für 3 Jahre: Vorjahr, Planungsjahr, Folgejahr
-    for (let jahr = planungsjahr - 1; jahr <= planungsjahr + 1; jahr++) {
-      for (let monat = 1; monat <= 12; monat++) {
-        // Bestelldatum: 5. Tag des Monats
-        const bestelldatumObj = new Date(jahr, monat - 1, 5)
+    // Gruppiere tägliche Bestellungen nach Jahr und Monat
+    const monatlicheAggregation: Record<string, {
+      jahr: number;
+      monat: number;
+      bestellungen: TaeglicheBestellung[];
+      gesamtMenge: number;
+    }> = {}
+    
+    taeglicheBestellungen.forEach(bestellung => {
+      const datum = bestellung.bestelldatum instanceof Date 
+        ? bestellung.bestelldatum 
+        : new Date(bestellung.bestelldatum)
+      
+      const jahr = datum.getFullYear()
+      const monat = datum.getMonth() + 1
+      const key = `${jahr}-${monat}`
+      
+      // Berechne Gesamtmenge dieser Bestellung
+      const menge = Object.values(bestellung.komponenten).reduce((sum, m) => sum + m, 0)
+      
+      if (!monatlicheAggregation[key]) {
+        monatlicheAggregation[key] = {
+          jahr,
+          monat,
+          bestellungen: [],
+          gesamtMenge: 0
+        }
+      }
+      
+      monatlicheAggregation[key].bestellungen.push(bestellung)
+      monatlicheAggregation[key].gesamtMenge += menge
+    })
+    
+    // Konvertiere zu Array und sortiere nach Datum
+    // NUR relevante Monate: Oktober 2026 bis November 2027
+    const monatNamen = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+    
+    Object.values(monatlicheAggregation)
+      .sort((a, b) => {
+        if (a.jahr !== b.jahr) return a.jahr - b.jahr
+        return a.monat - b.monat
+      })
+      .forEach(agg => {
+        // Berechne erstes und letztes Bestelldatum im Monat
+        const ersteBestellung = agg.bestellungen[0]?.bestelldatum
+        const letzteBestellung = agg.bestellungen[agg.bestellungen.length - 1]?.bestelldatum
         
-        // Validierung: Prüfe ob Datum gültig ist
-        const bestelldatum = isNaN(bestelldatumObj.getTime()) 
-          ? `${jahr}-${String(monat).padStart(2, '0')}-05`
-          : bestelldatumObj.toISOString().split('T')[0]
+        // Berechne durchschnittliche Ankunft
+        const ersteAnkunft = agg.bestellungen[0]?.erwarteteAnkunft
         
-        // Lieferdatum: Bestelldatum + Vorlaufzeit (korrekte Addition mit addDays)
-        const lieferdatumObj = addDays(bestelldatumObj, gesamtVorlaufzeit)
-        
-        // Validierung: Prüfe ob Datum gültig ist
-        const lieferdatum = isNaN(lieferdatumObj.getTime())
-          ? '-'
-          : lieferdatumObj.toISOString().split('T')[0]
-        
-        // ✅ SZENARIO-AWARE: Menge basierend auf Saisonalität + Szenario-Produktionsfaktor
-        // Berücksichtigt Marketing-Kampagnen (+25%) oder Ausfälle (reduzierte Produktion)
-        const saisonAnteil = konfiguration.saisonalitaet[monat - 1]?.anteil || 8.33
-        const szenarioAdjustedProduktion = konfiguration.jahresproduktion * modifikation.produktionsFaktor
-        const menge = Math.round(szenarioAdjustedProduktion * (saisonAnteil / 100) * 1.1) // 10% Buffer
-        
-        // Status abhängig von Jahr und Monat
+        // Status basierend auf durchschnittlichem Bestelldatum
         let status = 'Geplant'
-        if (jahr < planungsjahr || (jahr === planungsjahr && monat <= 3)) {
+        const ersteDatum = ersteBestellung instanceof Date ? ersteBestellung : new Date(ersteBestellung)
+        if (ersteDatum.getFullYear() < planungsjahr) {
           status = 'Geliefert'
-        } else if (jahr === planungsjahr && monat <= 6) {
+        } else if (ersteDatum.getMonth() < 3) {
           status = 'Unterwegs'
         }
         
         result.push({
-          jahr,
-          monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][monat - 1],
-          bestelldatum,
-          lieferdatum,
-          vorlaufzeit: gesamtVorlaufzeit,
-          menge,
+          jahr: agg.jahr,
+          monat: monatNamen[agg.monat - 1],
+          monatNummer: agg.monat,
+          anzahlBestellungen: agg.bestellungen.length,
+          menge: agg.gesamtMenge,
           losgroesse: lieferant.losgroesse,
-          anzahlLose: Math.ceil(menge / lieferant.losgroesse),
+          anzahlLose: Math.ceil(agg.gesamtMenge / lieferant.losgroesse),
+          vorlaufzeit: gesamtVorlaufzeit,
           status
         })
-      }
-    }
+      })
     
     return result
-  }, [konfiguration, lieferant, gesamtVorlaufzeit, modifikation.produktionsFaktor])
+  }, [taeglicheBestellungen, konfiguration.planungsjahr, lieferant.losgroesse, gesamtVorlaufzeit])
   
   /**
    * Exportiert Lieferanten-Daten als JSON
@@ -398,8 +481,66 @@ export default function InboundPage() {
               <div className="bg-white rounded-lg p-4">
                 <h3 className="text-lg font-semibold mb-2">Tägliche Bestelllogik (Daily Ordering)</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Gemäß PDF-Anforderung: Tägliche Bedarfsermittlung + Bestellung bei Losgröße 500 oder Sicherheitsbestand
+                  Gemäß PDF-Anforderung: Tägliche Bedarfsermittlung + Bestellung bei Losgröße {lieferant.losgroesse}
                 </p>
+
+                {/* ✅ NEU: Zusatzbestellungs-Formular */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    Zusatzbestellung eingeben
+                  </h4>
+                  <div className="flex flex-wrap gap-4 items-end">
+                    <div className="flex-1 min-w-[200px]">
+                      <Label htmlFor="bestelldatum" className="text-xs text-blue-800">
+                        Bestelldatum
+                      </Label>
+                      <Input
+                        id="bestelldatum"
+                        type="date"
+                        value={neueBestellungDatum}
+                        onChange={(e) => setNeueBestellungDatum(e.target.value)}
+                        min={`${konfiguration.planungsjahr}-01-02`}
+                        max={`${konfiguration.planungsjahr}-11-12`}
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-[150px]">
+                      <Label htmlFor="bestellmenge" className="text-xs text-blue-800">
+                        Menge (Sättel)
+                      </Label>
+                      <Input
+                        id="bestellmenge"
+                        type="number"
+                        value={neueBestellungMenge}
+                        onChange={(e) => setNeueBestellungMenge(e.target.value)}
+                        min={lieferant.losgroesse}
+                        step={lieferant.losgroesse}
+                        placeholder={`Min. ${lieferant.losgroesse}`}
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="text-xs text-blue-700 flex-1 min-w-[150px]">
+                      Ankunft: {neueBestellungDatum 
+                        ? addDays(new Date(neueBestellungDatum), gesamtVorlaufzeit).toLocaleDateString('de-DE')
+                        : '-'
+                      }
+                    </div>
+                    <Button 
+                      onClick={handleZusatzbestellung}
+                      disabled={!neueBestellungDatum || !neueBestellungMenge}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Nachbestellen
+                    </Button>
+                  </div>
+                  {zusatzBestellungen.length > 0 && (
+                    <p className="text-xs text-blue-600 mt-2">
+                      ✓ {zusatzBestellungen.length} Zusatzbestellung(en) hinzugefügt
+                    </p>
+                  )}
+                </div>
 
                 {/* Excel-Tabelle mit täglichen Bestellungen */}
                 <ExcelTable
@@ -460,9 +601,9 @@ export default function InboundPage() {
                       width: '130px',
                       align: 'center',
                       format: (val) => {
-                        if (val === 'initial') return '🎯 Initial'
                         if (val === 'losgroesse') return '📦 Losgröße'
-                        return '⚠️ Sicherheit'
+                        if (val === 'zusatzbestellung') return '➕ Zusatz'
+                        return '📦 Losgröße'
                       },
                       sumable: false
                     },
@@ -535,25 +676,25 @@ export default function InboundPage() {
                   <div>
                     <h4 className="font-semibold text-blue-900 mb-2">1. Tägliche Bedarfsermittlung</h4>
                     <p className="text-sm text-blue-800">
-                      Jeden Tag wird der Bedarf aus dem Produktionsplan ermittelt und akkumuliert.
+                      Jeden Tag wird der Bedarf aus dem Produktionsplan für den Liefertag (+{gesamtVorlaufzeit} Tage) ermittelt.
                       Losgröße {lieferant.losgroesse} muss erreicht werden.
                     </p>
                   </div>
 
                   <div>
-                    <h4 className="font-semibold text-blue-900 mb-2">2. Bestellung bei Losgröße ODER Sicherheitsbestand</h4>
+                    <h4 className="font-semibold text-blue-900 mb-2">2. Bestellung bei Losgröße</h4>
                     <p className="text-sm text-blue-800">
-                      Bestellung erfolgt wenn:<br/>
-                      • Akkumulierter Bedarf ≥ {lieferant.losgroesse} Stück ODER<br/>
-                      • Alle 14 Tage (Sicherheitsbestand-Prüfung)
+                      Bestellung erfolgt nur wenn:<br/>
+                      • Akkumulierter Bedarf ≥ {lieferant.losgroesse} Stück<br/>
+                      • Keine Über-Bestellung: Nur benötigte Menge (370.000 = 370.000 Sättel)
                     </p>
                   </div>
 
                   <div>
-                    <h4 className="font-semibold text-blue-900 mb-2">3. ✅ Bestellungen müssen VOR 2027 beginnen!</h4>
+                    <h4 className="font-semibold text-blue-900 mb-2">3. ✅ Bestellzeitraum: Okt 2026 - Nov 2027</h4>
                     <p className="text-sm text-blue-800 font-bold">
-                      49 Tage Vorlaufzeit → Erste Bestellung: ~12. November 2026<br/>
-                      Damit am 01.01.2027 Material für Produktionsstart verfügbar ist.
+                      {gesamtVorlaufzeit} Tage Vorlaufzeit → Erste Bestellung: ~Mitte Oktober 2026<br/>
+                      Letzte Bestellung: ~12. November 2027 (31.12.2027 - {gesamtVorlaufzeit} Tage)
                     </p>
                   </div>
 
@@ -570,29 +711,24 @@ export default function InboundPage() {
             {/* TAB 2: MONATLICHE ÜBERSICHT */}
             <TabsContent value="monthly" className="space-y-4">
               <div className="bg-white rounded-lg p-4">
-                <h3 className="text-lg font-semibold mb-2">Monatliche Lieferplanung (2026-2028)</h3>
+                <h3 className="text-lg font-semibold mb-2">Monatliche Übersicht (Okt {konfiguration.planungsjahr - 1} - Nov {konfiguration.planungsjahr})</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Vereinfachte monatliche Darstellung über 3 Jahre
+                  ✅ Aggregiert aus täglichen Bestellungen - identische Summen garantiert!
                 </p>
 
                 {/* Formel-Karten */}
                 <div className="grid gap-4 md:grid-cols-2 mb-6">
                   <FormulaCard
-                    title="Vorlaufzeit Berechnung"
-                    formula={`Vorlaufzeit = ${lieferant.vorlaufzeitArbeitstage} AT (Produktion) + ${lieferant.lkwTransportChinaArbeitstage} AT (LKW China) + ${lieferant.vorlaufzeitKalendertage} KT (Seefracht) + ${lieferant.lkwTransportDeutschlandArbeitstage} AT (LKW DE) = ${gesamtVorlaufzeit} Tage (${Math.ceil(gesamtVorlaufzeit / 7)} Wochen)`}
-                    description={`Sequenz: 1. Produktion (${lieferant.vorlaufzeitArbeitstage} AT) → 2. LKW China→Hafen (${lieferant.lkwTransportChinaArbeitstage} AT) → 3. Seefracht (${lieferant.vorlaufzeitKalendertage} KT) → 4. LKW Hamburg→Werk (${lieferant.lkwTransportDeutschlandArbeitstage} AT). Reihenfolge wichtig für Feiertagsberechnung!`}
-                    example={(() => {
-                      const beispielDatum = new Date(konfiguration.planungsjahr, 0, 5)
-                      const lieferdatum = addDays(beispielDatum, gesamtVorlaufzeit)
-                      const lieferdatumStr = !isNaN(lieferdatum.getTime()) ? lieferdatum.toLocaleDateString('de-DE') : '-'
-                      return `Bestellung 05.01. → Lieferung ~${lieferdatumStr} (${gesamtVorlaufzeit} Tage später)`
-                    })()}
+                    title="Vorlaufzeit (fix)"
+                    formula={`Vorlaufzeit = ${gesamtVorlaufzeit} Tage (7 Wochen) - FEST konfiguriert`}
+                    description={`Produktion: ${lieferant.vorlaufzeitArbeitstage} AT + LKW: ${lieferant.lkwTransportArbeitstage} AT + Seefracht: ${lieferant.vorlaufzeitKalendertage} KT`}
+                    example={`Bestellung 15.10. → Lieferung ~03.12. (${gesamtVorlaufzeit} Tage später)`}
                   />
                   <FormulaCard
-                    title="Losgrößen-Aufrundung"
-                    formula="Anzahl Lose = AUFRUNDEN(Bestellmenge / Losgröße)"
-                    description="Jede Bestellung wird auf Vielfache der Losgröße aufgerundet"
-                    example={`Bedarf 35.000 → ${Math.ceil(35000 / lieferant.losgroesse)} Lose × ${formatNumber(lieferant.losgroesse, 0)} = ${formatNumber(Math.ceil(35000 / lieferant.losgroesse) * lieferant.losgroesse, 0)} Stück`}
+                    title="Monatliche Aggregation"
+                    formula="Monatsmenge = Σ(Tägliche Bestellungen im Monat)"
+                    description="Summen aus täglicher Bestelllogik - 100% konsistent"
+                    example={`${bestellStatistik.gesamt} Bestellungen → ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel gesamt`}
                   />
                 </div>
 
@@ -614,36 +750,11 @@ export default function InboundPage() {
                       sumable: false
                     },
                     {
-                      key: 'bestelldatum',
-                      label: 'Bestelldatum',
-                      width: '120px',
-                      align: 'center',
-                      format: (val) => {
-                        const date = new Date(val)
-                        return !isNaN(date.getTime()) ? date.toLocaleDateString('de-DE') : val
-                      },
-                      sumable: false
-                    },
-                    {
-                      key: 'vorlaufzeit',
-                      label: 'Vorlaufzeit',
+                      key: 'anzahlBestellungen',
+                      label: 'Bestellungen',
                       width: '100px',
                       align: 'center',
-                      formula: `${lieferant.vorlaufzeitArbeitstage} AT + ${lieferant.vorlaufzeitKalendertage} KT`,
-                      format: (val) => `${val} Tage`,
-                      sumable: false
-                    },
-                    {
-                      key: 'lieferdatum',
-                      label: 'Lieferdatum',
-                      width: '120px',
-                      align: 'center',
-                      formula: 'Bestelldatum + Vorlaufzeit',
-                      format: (val) => {
-                        const date = new Date(val)
-                        return !isNaN(date.getTime()) ? date.toLocaleDateString('de-DE') : val
-                      },
-                      sumable: false
+                      sumable: true
                     },
                     {
                       key: 'menge',
@@ -666,9 +777,16 @@ export default function InboundPage() {
                       label: 'Anzahl Lose',
                       width: '110px',
                       align: 'center',
-                      formula: 'AUFRUNDEN(Menge / Losgröße)',
                       format: (val) => `${val} Lose`,
                       sumable: true
+                    },
+                    {
+                      key: 'vorlaufzeit',
+                      label: 'Vorlaufzeit',
+                      width: '100px',
+                      align: 'center',
+                      format: (val) => `${val} Tage`,
+                      sumable: false
                     },
                     {
                       key: 'status',
@@ -690,7 +808,7 @@ export default function InboundPage() {
                   maxHeight="500px"
                   showFormulas={true}
                   showSums={true}
-                  sumRowLabel={`GESAMT (2026-2028)`}
+                  sumRowLabel={`GESAMT (${bestellStatistik.gesamt} Bestellungen = ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel)`}
                 />
               </div>
             </TabsContent>

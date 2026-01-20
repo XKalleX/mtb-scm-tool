@@ -289,16 +289,19 @@ export function berechneBestellstatistik(bestellungen: Bestellung[]) {
  * Implementiert die korrekte Bestelllogik gemäß Anforderungen:
  * 
  * 1. TÄGLICH wird der Bedarf ermittelt (nicht monatlich!)
- * 2. Bestellung erfolgt wenn:
- *    - Losgröße 500 erreicht ist ODER
- *    - Sicherheitsbestand unterschritten wird
- * 3. Bestellungen müssen VOR 2027 beginnen (49 Tage Vorlaufzeit!)
+ * 2. Bestellung erfolgt wenn Losgröße 500 erreicht ist
+ * 3. Bestellungen beginnen VOR 2027 (49 Tage Vorlaufzeit!)
  *    - Erste Produktion: 01.01.2027
  *    - Erste Bestellung: ~12.11.2026 (49 Tage vorher)
  * 4. Aggregation über alle 4 Sattel-Varianten
+ * 5. KEINE Initial-Bestellung! Nur täglicher Bedarf bestellen
+ * 6. Gesamtmenge = exakt 370.000 Sättel (1:1 mit Produktion)
+ * 
+ * WICHTIG: Bestellzeitraum endet bei 31.12.2027 - 49 Tage = ~12.11.2027
  * 
  * @param alleProduktionsplaene - Pläne aller MTB-Varianten
  * @param planungsjahr - Jahr (default: 2027)
+ * @param vorlaufzeitTage - Fixe Vorlaufzeit (default: 49 Tage, konfigurierbar)
  * @returns Array von Bestellungen (inkl. Vorjahr!)
  */
 export interface TaeglicheBestellung {
@@ -309,20 +312,30 @@ export interface TaeglicheBestellung {
   erwarteteAnkunft: Date
   status: 'bestellt' | 'unterwegs' | 'geliefert'
   istVorjahr: boolean // Bestellung aus 2026?
-  grund: 'losgroesse' | 'sicherheitsbestand' | 'initial'
+  grund: 'losgroesse' | 'zusatzbestellung'
 }
+
+// ✅ Konstante für Puffer-Tage (für Losgröße-Sammlung vor Produktionsstart)
+const LOSGROESSE_SAMMEL_PUFFER_TAGE = 14
 
 /**
  * Generiert tägliche Bestellungen über das ganze Jahr (+ Vorlauf aus 2026)
+ * 
+ * KORRIGIERT:
+ * - Keine Initial-Bestellung
+ * - Exakt nur benötigte Mengen bestellen
+ * - Zeitraum: Beginn ~Mitte Oktober 2026, Ende ~Mitte November 2027
+ * - Bestellmenge = Produktionsmenge (370.000 Sättel)
  */
 export function generiereTaeglicheBestellungen(
   alleProduktionsplaene: Record<string, TagesProduktionsplan[]>,
-  planungsjahr: number = 2027
+  planungsjahr: number = 2027,
+  vorlaufzeitTage: number = 49
 ): TaeglicheBestellung[] {
   const bestellungen: TaeglicheBestellung[] = []
   const stuecklisten = stuecklistenData.stuecklisten
   const LOSGROESSE = lieferantData.lieferant.losgroesse // 500
-  const VORLAUFZEIT_TAGE = 49
+  const VORLAUFZEIT_TAGE = vorlaufzeitTage // Fixe Vorlaufzeit (konfigurierbar)
   
   // Berechne täglichen Bedarf pro Komponente für das ganze Jahr
   const taeglicheBedarf: Record<string, number[]> = {} // komponente -> array[365]
@@ -354,86 +367,59 @@ export function generiereTaeglicheBestellungen(
     })
   })
   
-  // Simuliere tägliche Bedarfsprüfung und Bestellungen
-  // Starte im Vorjahr um Vorlaufzeit abzudecken!
-  const startDatum = new Date(planungsjahr - 1, 10, 1) // 1. November 2026
-  const endDatum = new Date(planungsjahr, 11, 31) // 31. Dezember 2027
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // BESTELLZEITRAUM: Beginne früh genug für Produktionsstart am 01.01.2027
+  // und ende bei 31.12.2027 - 49 Tage (~ 12.11.2027)
+  // ═══════════════════════════════════════════════════════════════════════════════
+  
+  // Berechne Startdatum: 01.01.2027 - Vorlaufzeit - Puffer für Losgröße-Sammlung
+  const produktionsStart = new Date(planungsjahr, 0, 1) // 01.01.2027
+  const bestellStart = addDays(produktionsStart, -VORLAUFZEIT_TAGE - LOSGROESSE_SAMMEL_PUFFER_TAGE) // ~Mitte Oktober 2026
+  
+  // Berechne Enddatum: Letzte Bestellung muss 49 Tage vor 31.12.2027 erfolgen
+  const produktionsEnde = new Date(planungsjahr, 11, 31) // 31.12.2027
+  const bestellEnde = addDays(produktionsEnde, -VORLAUFZEIT_TAGE) // ~12.11.2027
   
   // Offene Bestellmengen pro Komponente (akkumuliert bis Losgröße erreicht)
   const offeneMengen: Record<string, number> = {}
   alleKomponenten.forEach(k => { offeneMengen[k] = 0 })
   
-  // Berechne Jahresbedarf für Sicherheitsbestand
-  const jahresbedarf: Record<string, number> = {}
-  alleKomponenten.forEach(kompId => {
-    jahresbedarf[kompId] = taeglicheBedarf[kompId].reduce((sum, bedarf) => sum + bedarf, 0)
-  })
+  // Tägliche Bedarfsprüfung vom Bestellstart bis Bestellende
+  let aktuellerTag = new Date(bestellStart)
   
-  // ✅ INITIAL-BESTELLUNG für Produktionsstart am 01.01.2027
-  // Sicherheitsbestand = 14 Tage Bedarf
-  const initialBestelldatum = new Date(planungsjahr - 1, 10, 12) // 12. November 2026
-  const initialBedarfsdatum = new Date(planungsjahr, 0, 1) // 01. Januar 2027
-  const initialKomponenten: Record<string, number> = {}
-  
-  alleKomponenten.forEach(kompId => {
-    // 14 Tage Sicherheitsbestand zum Start
-    const tagesbedarf = jahresbedarf[kompId] / 365
-    const sicherheitsbestand = Math.ceil(tagesbedarf * 14)
-    // Auf Losgröße aufrunden
-    initialKomponenten[kompId] = rundeAufLosgroesse(sicherheitsbestand)
-  })
-  
-  bestellungen.push({
-    id: generateId(),
-    bestelldatum: initialBestelldatum,
-    bedarfsdatum: initialBedarfsdatum,
-    komponenten: initialKomponenten,
-    erwarteteAnkunft: berechneAnkunftsdatum(initialBestelldatum),
-    status: 'geliefert',
-    istVorjahr: true,
-    grund: 'initial'
-  })
-  
-  // Tägliche Bedarfsprüfung durch das Jahr
-  let aktuellerTag = new Date(startDatum)
-  let tagIndexImJahr = 0
-  
-  while (aktuellerTag <= endDatum) {
-    const jahr = aktuellerTag.getFullYear()
-    const istPlanungsjahr = jahr === planungsjahr
+  while (aktuellerTag <= bestellEnde) {
+    // Berechne welcher Produktionstag in der Zukunft beliefert werden soll
+    // (heute + 49 Tage Vorlaufzeit)
+    const lieferTag = addDays(aktuellerTag, VORLAUFZEIT_TAGE)
+    const lieferTagIndex = Math.floor((lieferTag.getTime() - produktionsStart.getTime()) / (1000 * 60 * 60 * 24))
     
-    if (istPlanungsjahr && tagIndexImJahr < 365) {
-      // Addiere heutigen Bedarf zu offenen Mengen
+    // Nur Bedarf für das Planungsjahr sammeln
+    if (lieferTagIndex >= 0 && lieferTagIndex < 365) {
+      // Addiere Bedarf für den zukünftigen Liefertag zu offenen Mengen
       alleKomponenten.forEach(kompId => {
-        offeneMengen[kompId] += taeglicheBedarf[kompId][tagIndexImJahr] || 0
+        offeneMengen[kompId] += taeglicheBedarf[kompId][lieferTagIndex] || 0
       })
     }
     
-    // Prüfe ob Bestellung ausgelöst werden muss
+    // Prüfe ob Bestellung ausgelöst werden muss (Losgröße erreicht)
     let sollBestellen = false
-    let bestellGrund: 'losgroesse' | 'sicherheitsbestand' | 'initial' = 'sicherheitsbestand'
     const bestellKomponenten: Record<string, number> = {}
     
     alleKomponenten.forEach(kompId => {
-      // Grund 1: Losgröße erreicht
+      // Bestelle wenn Losgröße erreicht (exakt, kein Aufrunden über Bedarf!)
       if (offeneMengen[kompId] >= LOSGROESSE) {
         sollBestellen = true
-        bestellGrund = 'losgroesse'
-        bestellKomponenten[kompId] = rundeAufLosgroesse(offeneMengen[kompId])
-        offeneMengen[kompId] = 0 // Reset nach Bestellung
-      }
-      // Grund 2: Sicherheitsbestand kritisch (alle 2 Wochen prüfen)
-      else if (tagIndexImJahr % 14 === 0 && offeneMengen[kompId] > 0) {
-        sollBestellen = true
-        // bestellGrund bleibt 'sicherheitsbestand' wenn nicht schon 'losgroesse'
-        bestellKomponenten[kompId] = rundeAufLosgroesse(offeneMengen[kompId])
-        offeneMengen[kompId] = 0
+        // Bestelle nur ganze Lose, behalte Rest für nächste Bestellung
+        const anzahlLose = Math.floor(offeneMengen[kompId] / LOSGROESSE)
+        const bestellMenge = anzahlLose * LOSGROESSE
+        bestellKomponenten[kompId] = bestellMenge
+        offeneMengen[kompId] -= bestellMenge // Rest bleibt für nächste Bestellung
       }
     })
     
     if (sollBestellen) {
-      const bedarfsdatum = addDays(aktuellerTag, VORLAUFZEIT_TAGE)
-      const bestelldatum = aktuellerTag
+      const bestelldatum = new Date(aktuellerTag)
+      const bedarfsdatum = addDays(bestelldatum, VORLAUFZEIT_TAGE)
       
       bestellungen.push({
         id: generateId(),
@@ -444,15 +430,74 @@ export function generiereTaeglicheBestellungen(
         status: bestelldatum.getFullYear() < planungsjahr ? 'geliefert' : 
                 bestelldatum.getMonth() < 3 ? 'unterwegs' : 'bestellt',
         istVorjahr: bestelldatum.getFullYear() < planungsjahr,
-        grund: bestellGrund
+        grund: 'losgroesse'
       })
     }
     
     aktuellerTag = addDays(aktuellerTag, 1)
-    if (istPlanungsjahr) {
-      tagIndexImJahr++
+  }
+  
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // FINALE BESTELLUNG: Restliche Mengen bestellen (auch wenn < Losgröße)
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const restKomponenten: Record<string, number> = {}
+  let hatRest = false
+  
+  alleKomponenten.forEach(kompId => {
+    if (offeneMengen[kompId] > 0) {
+      hatRest = true
+      // Auf Losgröße aufrunden für finale Bestellung
+      restKomponenten[kompId] = rundeAufLosgroesse(offeneMengen[kompId])
+      offeneMengen[kompId] = 0
     }
+  })
+  
+  if (hatRest) {
+    const finalesBestelldatum = new Date(bestellEnde)
+    const finalesBedarfsdatum = addDays(finalesBestelldatum, VORLAUFZEIT_TAGE)
+    
+    bestellungen.push({
+      id: generateId(),
+      bestelldatum: finalesBestelldatum,
+      bedarfsdatum: finalesBedarfsdatum,
+      komponenten: restKomponenten,
+      erwarteteAnkunft: berechneAnkunftsdatum(finalesBestelldatum),
+      status: 'bestellt',
+      istVorjahr: false,
+      grund: 'losgroesse'
+    })
   }
   
   return bestellungen
+}
+
+/**
+ * Erstellt eine Zusatzbestellung für einen bestimmten Tag
+ * Wird über das Zusatzbestellungs-Formular aufgerufen
+ */
+export function erstelleZusatzbestellung(
+  bestelldatum: Date,
+  komponenten: Record<string, number>,
+  vorlaufzeitTage: number = 49
+): TaeglicheBestellung {
+  const LOSGROESSE = lieferantData.lieferant.losgroesse
+  
+  // Auf Losgröße aufrunden
+  const aufgerundeteKomponenten: Record<string, number> = {}
+  Object.entries(komponenten).forEach(([kompId, menge]) => {
+    aufgerundeteKomponenten[kompId] = rundeAufLosgroesse(menge)
+  })
+  
+  const bedarfsdatum = addDays(bestelldatum, vorlaufzeitTage)
+  
+  return {
+    id: generateId(),
+    bestelldatum,
+    bedarfsdatum,
+    komponenten: aufgerundeteKomponenten,
+    erwarteteAnkunft: berechneAnkunftsdatum(bestelldatum),
+    status: 'bestellt',
+    istVorjahr: false,
+    grund: 'zusatzbestellung'
+  }
 }
