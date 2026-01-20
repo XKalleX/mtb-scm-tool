@@ -59,12 +59,12 @@ export interface Kalendertag {
 }
 
 /**
- * Feiertag (nur China relevant)
+ * Feiertag (für Deutschland und China)
  */
 export interface Feiertag {
   datum: Date;
   name: string;
-  typ: 'gesetzlich' | 'regional' | 'betrieblich';
+  typ: 'gesetzlich' | 'regional' | 'betrieblich' | 'Festival';
 }
 
 // ==========================================

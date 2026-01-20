@@ -13,7 +13,8 @@
  * WICHTIG: 
  * - Transport nutzt Kalendertage (24/7, Schiff fährt immer)
  * - Produktion nutzt Arbeitstage (Mo-Fr ohne Feiertage)
- * - Nur chinesische Feiertage relevant!
+ * - Feiertage werden aus JSON-Dateien geladen, können aber durch 
+ *   benutzerdefinierte Feiertage aus KonfigurationContext überschrieben werden
  * - 'Heute'-Datum wird aus globaler Konfiguration gelesen
  */
 
@@ -22,6 +23,17 @@ import { addDays, isWeekend, getDayOfYear, getWeekNumber } from './utils'
 import feiertagsData from '@/data/feiertage-china.json'
 import feiertagsDeutschlandData from '@/data/feiertage-deutschland.json'
 import { DEFAULT_HEUTE_DATUM, KONFIGURATION_STORAGE_KEY, parseDateSafe } from './constants'
+
+/**
+ * Interface für Feiertags-Konfiguration (aus KonfigurationContext)
+ * Ermöglicht es, benutzerdefinierte Feiertage zu übergeben
+ */
+export interface FeiertagsKonfiguration {
+  datum: string  // Format YYYY-MM-DD
+  name: string
+  typ: 'gesetzlich' | 'regional' | 'betrieblich' | 'Festival'
+  land: 'Deutschland' | 'China'
+}
 
 /**
  * Liest das 'Heute'-Datum aus der globalen Konfiguration
@@ -108,9 +120,27 @@ export function ladeChinaFeiertage(): Feiertag[] {
 /**
  * Prüft ob ein Datum ein deutscher Feiertag ist
  * @param datum - Zu prüfendes Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext.
+ *                          Wenn angegeben, werden diese statt der JSON-Feiertage verwendet.
  * @returns Array von Feiertagen an diesem Tag (leer wenn kein Feiertag)
  */
-export function istDeutschlandFeiertag(datum: Date): Feiertag[] {
+export function istDeutschlandFeiertag(
+  datum: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Feiertag[] {
+  // Wenn benutzerdefinierte Feiertage übergeben wurden, nutze diese
+  if (customFeiertage) {
+    const datumStr = datum.toISOString().split('T')[0]
+    const deutscheFeiertage = customFeiertage.filter(f => f.land === 'Deutschland')
+    const gefunden = deutscheFeiertage.filter(f => f.datum === datumStr)
+    return gefunden.map(f => ({
+      datum: new Date(f.datum),
+      name: f.name,
+      typ: f.typ
+    }))
+  }
+  
+  // Fallback: Lade aus JSON-Dateien
   const alleFeiertage = ladeDeutschlandFeiertage()
   
   return alleFeiertage.filter(f => 
@@ -121,9 +151,27 @@ export function istDeutschlandFeiertag(datum: Date): Feiertag[] {
 /**
  * Prüft ob ein Datum ein chinesischer Feiertag ist
  * @param datum - Zu prüfendes Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext.
+ *                          Wenn angegeben, werden diese statt der JSON-Feiertage verwendet.
  * @returns Array von Feiertagen an diesem Tag (leer wenn kein Feiertag)
  */
-export function istChinaFeiertag(datum: Date): Feiertag[] {
+export function istChinaFeiertag(
+  datum: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Feiertag[] {
+  // Wenn benutzerdefinierte Feiertage übergeben wurden, nutze diese
+  if (customFeiertage) {
+    const datumStr = datum.toISOString().split('T')[0]
+    const chinaFeiertage = customFeiertage.filter(f => f.land === 'China')
+    const gefunden = chinaFeiertage.filter(f => f.datum === datumStr)
+    return gefunden.map(f => ({
+      datum: new Date(f.datum),
+      name: f.name,
+      typ: f.typ
+    }))
+  }
+  
+  // Fallback: Lade aus JSON-Dateien
   const alleFeiertage = ladeChinaFeiertage()
   
   return alleFeiertage.filter(f => 
@@ -135,10 +183,15 @@ export function istChinaFeiertag(datum: Date): Feiertag[] {
  * Prüft ob ein Datum ein Feiertag ist (Deutschland ODER China)
  * Bestellungen können nicht an Feiertagen (DE oder CN) platziert werden
  * @param datum - Zu prüfendes Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns True wenn Feiertag (entweder DE oder CN)
  */
-export function istFeiertag(datum: Date): boolean {
-  return istDeutschlandFeiertag(datum).length > 0 || istChinaFeiertag(datum).length > 0
+export function istFeiertag(
+  datum: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): boolean {
+  return istDeutschlandFeiertag(datum, customFeiertage).length > 0 || 
+         istChinaFeiertag(datum, customFeiertage).length > 0
 }
 
 /**
@@ -148,16 +201,20 @@ export function istFeiertag(datum: Date): boolean {
  * Prüft DEUTSCHE Feiertage (NRW), nicht chinesische!
  * 
  * @param datum - Zu prüfendes Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns True wenn Arbeitstag in Deutschland
  */
-export function istArbeitstag_Deutschland(datum: Date): boolean {
+export function istArbeitstag_Deutschland(
+  datum: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): boolean {
   // Wochenende?
   if (isWeekend(datum)) {
     return false
   }
   
   // Deutscher Feiertag?
-  const feiertage = istDeutschlandFeiertag(datum)
+  const feiertage = istDeutschlandFeiertag(datum, customFeiertage)
   if (feiertage.length > 0) {
     return false
   }
@@ -172,16 +229,20 @@ export function istArbeitstag_Deutschland(datum: Date): boolean {
  * Prüft CHINESISCHE Feiertage, nicht deutsche!
  * 
  * @param datum - Zu prüfendes Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns True wenn Arbeitstag in China
  */
-export function istArbeitstag_China(datum: Date): boolean {
+export function istArbeitstag_China(
+  datum: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): boolean {
   // Wochenende?
   if (isWeekend(datum)) {
     return false
   }
   
   // Chinesischer Feiertag?
-  const feiertage = istChinaFeiertag(datum)
+  const feiertage = istChinaFeiertag(datum, customFeiertage)
   if (feiertage.length > 0) {
     return false
   }
@@ -199,11 +260,15 @@ export function istArbeitstag_China(datum: Date): boolean {
  * Relevant für China-Produktion
  * 
  * @param datum - Zu prüfendes Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns True wenn Arbeitstag (China)
  */
-export function istArbeitstag(datum: Date): boolean {
+export function istArbeitstag(
+  datum: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): boolean {
   // Legacy: Nutzt China-Logik für Rückwärtskompatibilität
-  return istArbeitstag_China(datum)
+  return istArbeitstag_China(datum, customFeiertage)
 }
 
 /**
@@ -221,9 +286,14 @@ export function istSpringFestival(datum: Date): boolean {
 
 /**
  * Generiert einen vollständigen Jahreskalender für 2027
+ * @param jahr - Das Jahr für den Kalender (default: 2027)
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns Array von Kalendertagen (365 Tage)
  */
-export function generiereJahreskalender(jahr: number = 2027): Kalendertag[] {
+export function generiereJahreskalender(
+  jahr: number = 2027,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Kalendertag[] {
   const kalender: Kalendertag[] = []
   const startDatum = new Date(jahr, 0, 1) // 1. Januar
   
@@ -237,8 +307,8 @@ export function generiereJahreskalender(jahr: number = 2027): Kalendertag[] {
       wochentag: datum.getDay(),
       kalenderwoche: getWeekNumber(datum),
       monat: datum.getMonth() + 1,
-      istArbeitstag: istArbeitstag(datum),
-      feiertage: istChinaFeiertag(datum)
+      istArbeitstag: istArbeitstag(datum, customFeiertage),
+      feiertage: istChinaFeiertag(datum, customFeiertage)
     })
   }
   
@@ -249,14 +319,19 @@ export function generiereJahreskalender(jahr: number = 2027): Kalendertag[] {
  * Berechnet Arbeitstage zwischen zwei Daten (für China)
  * @param von - Start-Datum
  * @param bis - End-Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Anzahl Arbeitstage (China)
  */
-export function berechneArbeitstage(von: Date, bis: Date): number {
+export function berechneArbeitstage(
+  von: Date, 
+  bis: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): number {
   let arbeitstage = 0
   let aktuell = new Date(von)
   
   while (aktuell <= bis) {
-    if (istArbeitstag_China(aktuell)) {
+    if (istArbeitstag_China(aktuell, customFeiertage)) {
       arbeitstage++
     }
     aktuell = addDays(aktuell, 1)
@@ -269,14 +344,19 @@ export function berechneArbeitstage(von: Date, bis: Date): number {
  * Berechnet Arbeitstage zwischen zwei Daten (für Deutschland)
  * @param von - Start-Datum
  * @param bis - End-Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Anzahl Arbeitstage (Deutschland)
  */
-export function berechneArbeitstage_Deutschland(von: Date, bis: Date): number {
+export function berechneArbeitstage_Deutschland(
+  von: Date, 
+  bis: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): number {
   let arbeitstage = 0
   let aktuell = new Date(von)
   
   while (aktuell <= bis) {
-    if (istArbeitstag_Deutschland(aktuell)) {
+    if (istArbeitstag_Deutschland(aktuell, customFeiertage)) {
       arbeitstage++
     }
     aktuell = addDays(aktuell, 1)
@@ -288,14 +368,18 @@ export function berechneArbeitstage_Deutschland(von: Date, bis: Date): number {
 /**
  * Findet den nächsten Arbeitstag ab einem Datum (China)
  * @param datum - Start-Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Nächster Arbeitstag (China)
  */
-export function naechsterArbeitstag(datum: Date): Date {
+export function naechsterArbeitstag(
+  datum: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Date {
   let aktuell = new Date(datum)
   
   // Maximal 14 Tage vorwärts suchen (Sicherheit)
   for (let i = 0; i < 14; i++) {
-    if (istArbeitstag_China(aktuell)) {
+    if (istArbeitstag_China(aktuell, customFeiertage)) {
       return aktuell
     }
     aktuell = addDays(aktuell, 1)
@@ -308,14 +392,18 @@ export function naechsterArbeitstag(datum: Date): Date {
 /**
  * Findet den nächsten Arbeitstag ab einem Datum (Deutschland)
  * @param datum - Start-Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Nächster Arbeitstag (Deutschland)
  */
-export function naechsterArbeitstag_Deutschland(datum: Date): Date {
+export function naechsterArbeitstag_Deutschland(
+  datum: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Date {
   let aktuell = new Date(datum)
   
   // Maximal 14 Tage vorwärts suchen (Sicherheit)
   for (let i = 0; i < 14; i++) {
-    if (istArbeitstag_Deutschland(aktuell)) {
+    if (istArbeitstag_Deutschland(aktuell, customFeiertage)) {
       return aktuell
     }
     aktuell = addDays(aktuell, 1)
@@ -329,9 +417,14 @@ export function naechsterArbeitstag_Deutschland(datum: Date): Date {
  * Berechnet das Datum X Arbeitstage in der Zukunft (China)
  * @param startDatum - Start-Datum
  * @param arbeitstage - Anzahl Arbeitstage
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Ziel-Datum
  */
-export function addArbeitstage(startDatum: Date, arbeitstage: number): Date {
+export function addArbeitstage(
+  startDatum: Date, 
+  arbeitstage: number,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Date {
   let aktuell = new Date(startDatum)
   let verbleibendeArbeitstage = arbeitstage
   
@@ -339,7 +432,7 @@ export function addArbeitstage(startDatum: Date, arbeitstage: number): Date {
   for (let i = 0; i < 365 && verbleibendeArbeitstage > 0; i++) {
     aktuell = addDays(aktuell, 1)
     
-    if (istArbeitstag_China(aktuell)) {
+    if (istArbeitstag_China(aktuell, customFeiertage)) {
       verbleibendeArbeitstage--
     }
   }
@@ -351,9 +444,14 @@ export function addArbeitstage(startDatum: Date, arbeitstage: number): Date {
  * Berechnet das Datum X Arbeitstage in der Zukunft (Deutschland)
  * @param startDatum - Start-Datum
  * @param arbeitstage - Anzahl Arbeitstage
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Ziel-Datum
  */
-export function addArbeitstage_Deutschland(startDatum: Date, arbeitstage: number): Date {
+export function addArbeitstage_Deutschland(
+  startDatum: Date, 
+  arbeitstage: number,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Date {
   let aktuell = new Date(startDatum)
   let verbleibendeArbeitstage = arbeitstage
   
@@ -361,7 +459,7 @@ export function addArbeitstage_Deutschland(startDatum: Date, arbeitstage: number
   for (let i = 0; i < 365 && verbleibendeArbeitstage > 0; i++) {
     aktuell = addDays(aktuell, 1)
     
-    if (istArbeitstag_Deutschland(aktuell)) {
+    if (istArbeitstag_Deutschland(aktuell, customFeiertage)) {
       verbleibendeArbeitstage--
     }
   }
@@ -373,9 +471,14 @@ export function addArbeitstage_Deutschland(startDatum: Date, arbeitstage: number
  * Berechnet das Datum X Arbeitstage in der Vergangenheit (China)
  * @param zielDatum - Ziel-Datum
  * @param arbeitstage - Anzahl Arbeitstage
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Start-Datum
  */
-export function subtractArbeitstage(zielDatum: Date, arbeitstage: number): Date {
+export function subtractArbeitstage(
+  zielDatum: Date, 
+  arbeitstage: number,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Date {
   let aktuell = new Date(zielDatum)
   let verbleibendeArbeitstage = arbeitstage
   
@@ -383,7 +486,7 @@ export function subtractArbeitstage(zielDatum: Date, arbeitstage: number): Date 
   for (let i = 0; i < 365 && verbleibendeArbeitstage > 0; i++) {
     aktuell = addDays(aktuell, -1)
     
-    if (istArbeitstag_China(aktuell)) {
+    if (istArbeitstag_China(aktuell, customFeiertage)) {
       verbleibendeArbeitstage--
     }
   }
@@ -395,9 +498,14 @@ export function subtractArbeitstage(zielDatum: Date, arbeitstage: number): Date 
  * Berechnet das Datum X Arbeitstage in der Vergangenheit (Deutschland)
  * @param zielDatum - Ziel-Datum
  * @param arbeitstage - Anzahl Arbeitstage
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Start-Datum
  */
-export function subtractArbeitstage_Deutschland(zielDatum: Date, arbeitstage: number): Date {
+export function subtractArbeitstage_Deutschland(
+  zielDatum: Date, 
+  arbeitstage: number,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Date {
   let aktuell = new Date(zielDatum)
   let verbleibendeArbeitstage = arbeitstage
   
@@ -405,7 +513,7 @@ export function subtractArbeitstage_Deutschland(zielDatum: Date, arbeitstage: nu
   for (let i = 0; i < 365 && verbleibendeArbeitstage > 0; i++) {
     aktuell = addDays(aktuell, -1)
     
-    if (istArbeitstag_Deutschland(aktuell)) {
+    if (istArbeitstag_Deutschland(aktuell, customFeiertage)) {
       verbleibendeArbeitstage--
     }
   }
@@ -421,9 +529,13 @@ export function subtractArbeitstage_Deutschland(zielDatum: Date, arbeitstage: nu
  * - Bearbeitung: 21 Arbeitstage (Mo-Fr ohne Feiertage)
  * 
  * @param bedarfsdatum - Wann Material in Deutschland benötigt wird
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Bestelldatum bei China
  */
-export function berechneBestelldatum(bedarfsdatum: Date): Date {
+export function berechneBestelldatum(
+  bedarfsdatum: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Date {
   // China-spezifische Vorlaufzeiten gemäß SSOT-Spezifikation und Anforderungen
   // TOTAL: 49 Tage = 7 Wochen Vorlaufzeit
   // Aufschlüsselung gemäß Anforderungen (Bild):
@@ -441,21 +553,21 @@ export function berechneBestelldatum(bedarfsdatum: Date): Date {
   let datumNachSeefracht = addDays(bedarfsdatum, -SEEFRACHT_KALENDERTAGE)
   
   // Schritt 2: LKW-Transport Deutschland (2 AT) abziehen
-  datumNachSeefracht = subtractArbeitstage(datumNachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE)
+  datumNachSeefracht = subtractArbeitstage(datumNachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE, customFeiertage)
   
   // Schritt 3: Von diesem Datum die Bearbeitungszeit (5 AT) abziehen
   // Dies berücksichtigt Wochenenden und chinesische Feiertage
-  let nachProduktion = subtractArbeitstage(datumNachSeefracht, BEARBEITUNG_ARBEITSTAGE)
+  let nachProduktion = subtractArbeitstage(datumNachSeefracht, BEARBEITUNG_ARBEITSTAGE, customFeiertage)
   
   // Schritt 4: LKW-Transport China (2 AT) abziehen
-  let bestelldatum = subtractArbeitstage(nachProduktion, LKW_CHINA_ARBEITSTAGE)
+  let bestelldatum = subtractArbeitstage(nachProduktion, LKW_CHINA_ARBEITSTAGE, customFeiertage)
   
   // Schritt 5: Einen zusätzlichen Tag Puffer (Best Practice)
   bestelldatum = addDays(bestelldatum, -1)
   
   // Schritt 6: Sicherstellen dass Bestelldatum ein Arbeitstag ist (China!)
   // Falls Wochenende/Feiertag -> vorheriger Arbeitstag
-  while (!istArbeitstag_China(bestelldatum)) {
+  while (!istArbeitstag_China(bestelldatum, customFeiertage)) {
     bestelldatum = addDays(bestelldatum, -1)
   }
   
@@ -465,9 +577,13 @@ export function berechneBestelldatum(bedarfsdatum: Date): Date {
 /**
  * Berechnet Ankunftsdatum vorwärts vom Bestelldatum
  * @param bestelldatum - Wann wurde bestellt
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Ankunftsdatum in Deutschland
  */
-export function berechneAnkunftsdatum(bestelldatum: Date): Date {
+export function berechneAnkunftsdatum(
+  bestelldatum: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Date {
   // Vorlaufzeit gemäß SSOT: 49 Tage
   // Aufschlüsselung: 5 AT Produktion + 2 AT + 30 KT + 2 AT Transport
   const SEEFRACHT_KALENDERTAGE = 30
@@ -476,30 +592,33 @@ export function berechneAnkunftsdatum(bestelldatum: Date): Date {
   const LKW_DEUTSCHLAND_ARBEITSTAGE = 2
   
   // Schritt 1: Bearbeitung in China (5 AT)
-  let nachBearbeitung = addArbeitstage(bestelldatum, BEARBEITUNG_ARBEITSTAGE)
+  let nachBearbeitung = addArbeitstage(bestelldatum, BEARBEITUNG_ARBEITSTAGE, customFeiertage)
   
   // Schritt 2: LKW-Transport China zum Hafen (2 AT)
-  let nachLKWChina = addArbeitstage(nachBearbeitung, LKW_CHINA_ARBEITSTAGE)
+  let nachLKWChina = addArbeitstage(nachBearbeitung, LKW_CHINA_ARBEITSTAGE, customFeiertage)
   
   // Schritt 3: Seefracht (30 KT)
   let nachSeefracht = addDays(nachLKWChina, SEEFRACHT_KALENDERTAGE)
   
   // Schritt 4: LKW-Transport Hamburg nach Dortmund (2 AT)
-  let ankunftsdatum = addArbeitstage(nachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE)
+  let ankunftsdatum = addArbeitstage(nachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE, customFeiertage)
   
   return ankunftsdatum
 }
 
 /**
  * Zählt Arbeitstage pro Monat im Jahr 2027 (China)
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Array mit 12 Zahlen (Arbeitstage pro Monat, China)
  */
-export function zaehleArbeitstageProMonat(): number[] {
-  const kalender = generiereJahreskalender(2027)
+export function zaehleArbeitstageProMonat(
+  customFeiertage?: FeiertagsKonfiguration[]
+): number[] {
+  const kalender = generiereJahreskalender(2027, customFeiertage)
   const arbeitstageProMonat: number[] = Array(12).fill(0)
   
   kalender.forEach(tag => {
-    if (istArbeitstag_China(tag.datum)) {
+    if (istArbeitstag_China(tag.datum, customFeiertage)) {
       arbeitstageProMonat[tag.monat - 1]++
     }
   })
@@ -509,14 +628,17 @@ export function zaehleArbeitstageProMonat(): number[] {
 
 /**
  * Zählt Arbeitstage pro Monat im Jahr 2027 (Deutschland)
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Array mit 12 Zahlen (Arbeitstage pro Monat, Deutschland)
  */
-export function zaehleArbeitstageProMonat_Deutschland(): number[] {
-  const kalender = generiereJahreskalender(2027)
+export function zaehleArbeitstageProMonat_Deutschland(
+  customFeiertage?: FeiertagsKonfiguration[]
+): number[] {
+  const kalender = generiereJahreskalender(2027, customFeiertage)
   const arbeitstageProMonat: number[] = Array(12).fill(0)
   
   kalender.forEach(tag => {
-    if (istArbeitstag_Deutschland(tag.datum)) {
+    if (istArbeitstag_Deutschland(tag.datum, customFeiertage)) {
       arbeitstageProMonat[tag.monat - 1]++
     }
   })
@@ -527,15 +649,19 @@ export function zaehleArbeitstageProMonat_Deutschland(): number[] {
 /**
  * Gibt Statistiken zum Kalender zurück
  * @param jahr - Jahr (default: 2027)
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Kalender-Statistiken
  */
-export function kalenderStatistik(jahr: number = 2027) {
-  const kalender = generiereJahreskalender(jahr)
+export function kalenderStatistik(
+  jahr: number = 2027,
+  customFeiertage?: FeiertagsKonfiguration[]
+) {
+  const kalender = generiereJahreskalender(jahr, customFeiertage)
   const feiertageDeutschland = ladeDeutschlandFeiertage()
   const feiertageChina = ladeChinaFeiertage()
   
-  const arbeitstageChina = kalender.filter(k => istArbeitstag_China(k.datum)).length
-  const arbeitstageDeutschland = kalender.filter(k => istArbeitstag_Deutschland(k.datum)).length
+  const arbeitstageChina = kalender.filter(k => istArbeitstag_China(k.datum, customFeiertage)).length
+  const arbeitstageDeutschland = kalender.filter(k => istArbeitstag_Deutschland(k.datum, customFeiertage)).length
   const wochenenden = kalender.filter(k => isWeekend(k.datum)).length
   const springFestivalTage = kalender.filter(k => istSpringFestival(k.datum)).length
   
@@ -555,10 +681,15 @@ export function kalenderStatistik(jahr: number = 2027) {
  * Prüft ob genug Vorlaufzeit für Bestellung vorhanden ist
  * @param bedarfsdatum - Wann wird Material gebraucht
  * @param heute - Heutiges Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns True wenn Bestellung noch rechtzeitig möglich
  */
-export function istBestellungRechtzeitig(bedarfsdatum: Date, heute: Date): boolean {
-  const bestelldatum = berechneBestelldatum(bedarfsdatum)
+export function istBestellungRechtzeitig(
+  bedarfsdatum: Date, 
+  heute: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): boolean {
+  const bestelldatum = berechneBestelldatum(bedarfsdatum, customFeiertage)
   return bestelldatum >= heute
 }
 
@@ -566,9 +697,13 @@ export function istBestellungRechtzeitig(bedarfsdatum: Date, heute: Date): boole
  * Prüft ob genug Vorlaufzeit für Bestellung vorhanden ist (mit globalem 'Heute')
  * Verwendet das 'Heute'-Datum aus der globalen Konfiguration
  * @param bedarfsdatum - Wann wird Material gebraucht
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns True wenn Bestellung noch rechtzeitig möglich
  */
-export function istBestellungRechtzeitigGlobal(bedarfsdatum: Date): boolean {
+export function istBestellungRechtzeitigGlobal(
+  bedarfsdatum: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): boolean {
   const heute = getHeuteDatum()
-  return istBestellungRechtzeitig(bedarfsdatum, heute)
+  return istBestellungRechtzeitig(bedarfsdatum, heute, customFeiertage)
 }
