@@ -664,12 +664,19 @@ export default function OEMProgrammPage() {
                         sumable: false
                       },
                       {
+                        key: 'status',
+                        label: 'Status',
+                        width: '160px',
+                        align: 'left',
+                        sumable: false
+                      },
+                      {
                         key: 'sollDezimal',
                         label: 'Soll (Dezimal)',
                         width: '120px',
                         align: 'right',
                         formula: 'Monatsmenge / Arbeitstage',
-                        format: (val) => formatNumber(val, 2),
+                        format: (val) => val === 0 ? '-' : formatNumber(val, 2),
                         sumable: true
                       },
                       {
@@ -678,7 +685,7 @@ export default function OEMProgrammPage() {
                         width: '130px',
                         align: 'right',
                         formula: 'RUNDEN(Soll + MonatsFehler)',
-                        format: (val) => formatNumber(val, 0),
+                        format: (val) => val === 0 ? '-' : formatNumber(val, 0),
                         sumable: true
                       },
                       {
@@ -688,6 +695,7 @@ export default function OEMProgrammPage() {
                         align: 'right',
                         formula: 'Soll(Dez) - Plan(Int)',
                         format: (val) => {
+                          if (val === 0 || val === undefined) return '-'
                           const formatted = formatNumber(val, 3)
                           return val > 0 ? `+${formatted}` : formatted
                         },
@@ -700,6 +708,7 @@ export default function OEMProgrammPage() {
                         align: 'right',
                         formula: 'Kumuliert im Monat',
                         format: (val) => {
+                          if (val === undefined) return '-'
                           const formatted = formatNumber(val, 3)
                           return val > 0 ? `+${formatted}` : formatted
                         },
@@ -720,7 +729,7 @@ export default function OEMProgrammPage() {
                         width: '100px',
                         align: 'right',
                         formula: 'Plan × 1',
-                        format: (val) => formatNumber(val, 0),
+                        format: (val) => val === 0 ? '-' : formatNumber(val, 0),
                         sumable: true
                       },
                       {
@@ -734,9 +743,9 @@ export default function OEMProgrammPage() {
                     ]}
                     data={(() => {
                       let kumulativPlan = 0
+                      // ✅ FIX: Zeige ALLE Tage (inkl. Wochenenden/Feiertage)
                       return produktionsplaene[selectedVariante]?.tage
-                        ?.filter(t => t.istMenge > 0)
-                        .map(tag => {
+                        ?.map(tag => {
                           const date = tag.datum
                           // ISO week calculation
                           const thursday = new Date(date.getTime())
@@ -746,11 +755,23 @@ export default function OEMProgrammPage() {
                           
                           kumulativPlan += tag.planMenge
                           
+                          // ✅ FIX: Status für Wochenenden/Feiertage/Arbeitstage
+                          let status = '🟢 Produktionstag'
+                          const wochentag = date.getDay()
+                          const istWochenende = wochentag === 0 || wochentag === 6
+                          
+                          if (tag.istFeiertag && tag.feiertagsName) {
+                            status = `🔴 ${tag.feiertagsName}`
+                          } else if (istWochenende) {
+                            status = wochentag === 0 ? '🟡 Sonntag' : '🟡 Samstag'
+                          }
+                          
                           return {
                             datum: date,
                             wochentag: date,
                             kw: weekNumber,
                             monat: tag.monatName,
+                            status: status,
                             sollDezimal: tag.sollProduktionDezimal,
                             planMenge: tag.planMenge,
                             tagesError: tag.tagesError,
@@ -782,7 +803,7 @@ export default function OEMProgrammPage() {
               <CardTitle>Tagesplanung - Alle Varianten im Überblick</CardTitle>
               <CardDescription>
                 Produktionsplanung für alle 8 MTB-Varianten mit kumulativem Error Management.
-                Zeigt nur Arbeitstage (ohne Wochenenden/Feiertage).
+                Zeigt alle 365 Tage inkl. Wochenenden/Feiertage (markiert).
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -829,7 +850,7 @@ export default function OEMProgrammPage() {
                     <li>Produktionsmenge jeder Variante (Ist-Menge mit Error Management)</li>
                     <li>Kumulativen Error pro Variante (sollte nahe 0 bleiben)</li>
                     <li>Gesamtproduktion über alle Varianten</li>
-                    <li>Nur Arbeitstage (Wochenenden/Feiertage ausgeblendet)</li>
+                    <li>🔴 = Feiertag | 🟡 = Wochenende | 🟢 = Produktionstag</li>
                   </ul>
                   <p className="pt-2 border-t border-blue-300">
                     <strong>Vorteil:</strong> Schneller Überblick über die gesamte Produktion und Engpass-Identifikation.
@@ -840,18 +861,18 @@ export default function OEMProgrammPage() {
 
               {/* Alle-Varianten Tabelle */}
               {produktionsplaene && (() => {
-                // Hole nur Arbeitstage (erste Variante als Referenz)
+                // ✅ FIX: Zeige ALLE Tage (inkl. Wochenenden/Feiertage)
                 const referenzVariante = Object.values(produktionsplaene)[0]
-                const arbeitstage = referenzVariante.tage.filter(t => t.istArbeitstag)
+                const alleTage = referenzVariante.tage
                 
-                // Erstelle Spalten: Datum + eine Spalte pro Variante + Gesamt
+                // Erstelle Spalten: Datum + Status + eine Spalte pro Variante + Gesamt
                 const variantenSpalten = konfiguration.varianten.flatMap(v => [
                   {
                     key: `${v.id}_menge`,
                     label: `${v.name.replace('MTB ', '')}`,
                     width: '90px',
                     align: 'right' as const,
-                    format: (val: number) => formatNumber(val, 0),
+                    format: (val: number) => val === 0 ? '-' : formatNumber(val, 0),
                     sumable: true
                   },
                   {
@@ -880,23 +901,42 @@ export default function OEMProgrammPage() {
                     align: 'center' as const,
                     sumable: false
                   },
+                  {
+                    key: 'status',
+                    label: 'Status',
+                    width: '140px',
+                    align: 'left' as const,
+                    sumable: false
+                  },
                   ...variantenSpalten,
                   {
                     key: 'gesamt',
                     label: 'Gesamt',
                     width: '100px',
                     align: 'right' as const,
-                    format: (val: number) => formatNumber(val, 0),
+                    format: (val: number) => val === 0 ? '-' : formatNumber(val, 0),
                     sumable: true,
                     className: 'font-bold bg-slate-100'
                   }
                 ]
                 
-                // Erstelle Daten
-                const data = arbeitstage.map(refTag => {
+                // ✅ FIX: Erstelle Daten für ALLE Tage
+                const data = alleTage.map(refTag => {
+                  const wochentag = refTag.datum.getDay()
+                  const istWochenende = wochentag === 0 || wochentag === 6
+                  
+                  // Status-Ermittlung
+                  let status = '🟢 Produktionstag'
+                  if (refTag.istFeiertag && refTag.feiertagsName) {
+                    status = `🔴 ${refTag.feiertagsName}`
+                  } else if (istWochenende) {
+                    status = wochentag === 0 ? '🟡 Sonntag' : '🟡 Samstag'
+                  }
+                  
                   const row: Record<string, any> = {
                     datum: refTag.datum,
-                    wochentag: refTag.wochentag
+                    wochentag: refTag.wochentag,
+                    status: status
                   }
                   
                   let gesamt = 0
@@ -928,7 +968,7 @@ export default function OEMProgrammPage() {
                   <div className="border rounded-lg overflow-hidden">
                     <div className="bg-slate-50 p-3 border-b">
                       <h4 className="font-semibold text-sm">
-                        Legende: <span className="text-muted-foreground font-normal">Bikes = Plan-Produktion | Error = Monatlicher Error-Tracker (±0.5 = optimal)</span>
+                        Legende: <span className="text-muted-foreground font-normal">🔴 = Feiertag | 🟡 = Wochenende | 🟢 = Produktionstag | Error = Monatlicher Error-Tracker (±0.5 = optimal)</span>
                       </h4>
                     </div>
                     <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
@@ -937,6 +977,7 @@ export default function OEMProgrammPage() {
                           <tr>
                             <th className="p-2 text-left font-medium">Datum</th>
                             <th className="p-2 text-center font-medium">Tag</th>
+                            <th className="p-2 text-left font-medium">Status</th>
                             {konfiguration.varianten.map(v => (
                               <th key={v.id} colSpan={2} className="p-2 text-center font-medium border-l">
                                 {v.name.replace('MTB ', '')}
@@ -945,6 +986,7 @@ export default function OEMProgrammPage() {
                             <th className="p-2 text-right font-medium border-l bg-slate-200">Gesamt</th>
                           </tr>
                           <tr className="bg-slate-50 text-xs text-muted-foreground">
+                            <th className="p-1"></th>
                             <th className="p-1"></th>
                             <th className="p-1"></th>
                             {konfiguration.varianten.map(v => (
@@ -967,18 +1009,20 @@ export default function OEMProgrammPage() {
                               <tr key={idx} className={`border-b ${dateClasses}`} title={tooltip}>
                                 <td className="p-2 text-left">{formatDate(row.datum)}</td>
                                 <td className="p-2 text-center">{row.wochentag}</td>
+                                <td className="p-2 text-left text-xs">{row.status}</td>
                                 {konfiguration.varianten.map(v => {
+                                  const menge = row[`${v.id}_menge`]
                                   const error = row[`${v.id}_error`]
                                   const errorClass = Math.abs(error) > 0.5 ? 'text-orange-600 font-semibold' : ''
                                   
                                   return (
                                     <React.Fragment key={`${v.id}-data`}>
-                                      <td className="p-2 text-right border-l">{formatNumber(row[`${v.id}_menge`], 0)}</td>
+                                      <td className="p-2 text-right border-l">{menge === 0 ? '-' : formatNumber(menge, 0)}</td>
                                       <td className={`p-2 text-right ${errorClass}`}>{formatNumber(error, 2)}</td>
                                     </React.Fragment>
                                   )
                                 })}
-                                <td className="p-2 text-right font-bold border-l bg-slate-50">{formatNumber(row.gesamt, 0)}</td>
+                                <td className="p-2 text-right font-bold border-l bg-slate-50">{row.gesamt === 0 ? '-' : formatNumber(row.gesamt, 0)}</td>
                               </tr>
                             )
                           })}
@@ -994,7 +1038,7 @@ export default function OEMProgrammPage() {
                             
                             return (
                               <tr className="bg-slate-100 font-bold border-t-2">
-                                <td className="p-2" colSpan={2}>JAHRESSUMME</td>
+                                <td className="p-2" colSpan={3}>JAHRESSUMME</td>
                                 {konfiguration.varianten.map(v => {
                                   const plan = produktionsplaene[v.id]
                                   const summe = plan?.tage.reduce((sum, t) => sum + t.planMenge, 0) || 0
