@@ -20,6 +20,7 @@
 import { Kalendertag, Feiertag } from '@/types'
 import { addDays, isWeekend, getDayOfYear, getWeekNumber } from './utils'
 import feiertagsData from '@/data/feiertage-china.json'
+import feiertagsDeutschlandData from '@/data/feiertage-deutschland.json'
 import { DEFAULT_HEUTE_DATUM, KONFIGURATION_STORAGE_KEY, parseDateSafe } from './constants'
 
 /**
@@ -51,6 +52,26 @@ export function getHeuteDatum(): Date {
 }
 
 /**
+ * Lädt alle deutschen Feiertage für beide Jahre (2026 + 2027)
+ * Wichtig für Vorlaufzeit-Berechnungen (49 Tage können bis 2026 zurückreichen)
+ * @returns Array von Feiertagen
+ */
+export function ladeDeutschlandFeiertage(): Feiertag[] {
+  return [
+    ...feiertagsDeutschlandData.feiertage2026.map(f => ({
+      ...f,
+      datum: new Date(f.datum),
+      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
+    })),
+    ...feiertagsDeutschlandData.feiertage2027.map(f => ({
+      ...f,
+      datum: new Date(f.datum),
+      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
+    }))
+  ]
+}
+
+/**
  * Lädt alle chinesischen Feiertage für beide Jahre (2026 + 2027)
  * Wichtig für Vorlaufzeit-Berechnungen (49 Tage können bis 2026 zurückreichen)
  * @returns Array von Feiertagen
@@ -71,6 +92,19 @@ export function ladeChinaFeiertage(): Feiertag[] {
 }
 
 /**
+ * Prüft ob ein Datum ein deutscher Feiertag ist
+ * @param datum - Zu prüfendes Datum
+ * @returns Array von Feiertagen an diesem Tag (leer wenn kein Feiertag)
+ */
+export function istDeutschlandFeiertag(datum: Date): Feiertag[] {
+  const alleFeiertage = ladeDeutschlandFeiertage()
+  
+  return alleFeiertage.filter(f => 
+    f.datum.toDateString() === datum.toDateString()
+  )
+}
+
+/**
  * Prüft ob ein Datum ein chinesischer Feiertag ist
  * @param datum - Zu prüfendes Datum
  * @returns Array von Feiertagen an diesem Tag (leer wenn kein Feiertag)
@@ -81,6 +115,16 @@ export function istChinaFeiertag(datum: Date): Feiertag[] {
   return alleFeiertage.filter(f => 
     f.datum.toDateString() === datum.toDateString()
   )
+}
+
+/**
+ * Prüft ob ein Datum ein Feiertag ist (Deutschland ODER China)
+ * Bestellungen können nicht an Feiertagen (DE oder CN) platziert werden
+ * @param datum - Zu prüfendes Datum
+ * @returns True wenn Feiertag (entweder DE oder CN)
+ */
+export function istFeiertag(datum: Date): boolean {
+  return istDeutschlandFeiertag(datum).length > 0 || istChinaFeiertag(datum).length > 0
 }
 
 /**

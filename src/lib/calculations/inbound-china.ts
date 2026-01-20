@@ -24,8 +24,8 @@
  */
 
 import { Bestellung, TagesProduktionsplan, Stueckliste, Maschinenausfall } from '@/types'
-import { addDays, generateId } from '@/lib/utils'
-import { berechneBestelldatum, berechneAnkunftsdatum, istSpringFestival } from '@/lib/kalender'
+import { addDays, generateId, isWeekend } from '@/lib/utils'
+import { berechneBestelldatum, berechneAnkunftsdatum, istSpringFestival, istFeiertag } from '@/lib/kalender'
 import lieferantData from '@/data/lieferant-china.json'
 import stuecklistenData from '@/data/stueckliste.json'
 
@@ -388,6 +388,16 @@ export function generiereTaeglicheBestellungen(
   let aktuellerTag = new Date(bestellStart)
   
   while (aktuellerTag <= bestellEnde) {
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // ⚠️ FIX: Überspringe Wochenenden und Feiertage (DE + CN)
+    // An diesen Tagen kann nicht bestellt werden!
+    // ═══════════════════════════════════════════════════════════════════════════════
+    if (isWeekend(aktuellerTag) || istFeiertag(aktuellerTag)) {
+      // Überspringe diesen Tag - keine Bestellungen an Wochenenden/Feiertagen
+      aktuellerTag = addDays(aktuellerTag, 1)
+      continue
+    }
+    
     // Berechne welcher Produktionstag in der Zukunft beliefert werden soll
     // (heute + 49 Tage Vorlaufzeit)
     const lieferTag = addDays(aktuellerTag, VORLAUFZEIT_TAGE)
@@ -439,6 +449,8 @@ export function generiereTaeglicheBestellungen(
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // FINALE BESTELLUNG: Restliche Mengen bestellen (auch wenn < Losgröße)
+  // ⚠️ FIX: KEIN Aufrunden auf Losgröße für finale Bestellung!
+  // Dies führt zu Überbestellung (370.500 statt 370.000)
   // ═══════════════════════════════════════════════════════════════════════════════
   const restKomponenten: Record<string, number> = {}
   let hatRest = false
@@ -446,8 +458,10 @@ export function generiereTaeglicheBestellungen(
   alleKomponenten.forEach(kompId => {
     if (offeneMengen[kompId] > 0) {
       hatRest = true
-      // Auf Losgröße aufrunden für finale Bestellung
-      restKomponenten[kompId] = rundeAufLosgroesse(offeneMengen[kompId])
+      // ⚠️ FIX: KEINE Aufrundung mehr! Nur exakte Restmenge bestellen
+      // Alte Logik: restKomponenten[kompId] = rundeAufLosgroesse(offeneMengen[kompId])
+      // Neue Logik: Exakte Menge (verhindert Überbestellung)
+      restKomponenten[kompId] = offeneMengen[kompId]
       offeneMengen[kompId] = 0
     }
   })
@@ -464,7 +478,7 @@ export function generiereTaeglicheBestellungen(
       erwarteteAnkunft: berechneAnkunftsdatum(finalesBestelldatum),
       status: 'bestellt',
       istVorjahr: false,
-      grund: 'losgroesse'
+      grund: 'losgroesse'  // Finale Restbestellung (nicht auf Losgröße gerundet)
     })
   }
   
@@ -474,19 +488,44 @@ export function generiereTaeglicheBestellungen(
 /**
  * Erstellt eine Zusatzbestellung für einen bestimmten Tag
  * Wird über das Zusatzbestellungs-Formular aufgerufen
+ * 
+ * @param bestelldatum - Datum der Bestellung
+ * @param komponenten - Komponenten mit Mengen (bereits exakt verteilt!)
+ * @param vorlaufzeitTage - Vorlaufzeit in Tagen (default: 49)
+ * @param skipLosgroessenRundung - Wenn true: KEINE Aufrundung, wenn false: Aufrundung pro Variante (default: false)
+ * @returns TaeglicheBestellung
  */
 export function erstelleZusatzbestellung(
   bestelldatum: Date,
   komponenten: Record<string, number>,
-  vorlaufzeitTage: number = 49
+  vorlaufzeitTage: number = 49,
+  skipLosgroessenRundung: boolean = false
 ): TaeglicheBestellung {
   const LOSGROESSE = lieferantData.lieferant.losgroesse
   
-  // Auf Losgröße aufrunden
-  const aufgerundeteKomponenten: Record<string, number> = {}
-  Object.entries(komponenten).forEach(([kompId, menge]) => {
-    aufgerundeteKomponenten[kompId] = rundeAufLosgroesse(menge)
-  })
+  /**
+   * 🎯 KORRIGIERT: Optionale Losgrößen-Rundung
+   * 
+   * Wenn skipLosgroessenRundung = true:
+   *   - Mengen werden EXAKT übernommen (bereits im Handler verteilt)
+   *   - Keine weitere Aufrundung pro Variante
+   *   - Verhindert das "5000 → 6000" Problem
+   * 
+   * Wenn skipLosgroessenRundung = false:
+   *   - Alte Logik: Jede Variante wird auf Losgröße aufgerundet
+   */
+  let finalKomponenten: Record<string, number>
+  
+  if (skipLosgroessenRundung) {
+    // KEINE Rundung - Mengen exakt übernehmen
+    finalKomponenten = { ...komponenten }
+  } else {
+    // Alte Logik: Auf Losgröße aufrunden pro Variante
+    finalKomponenten = {}
+    Object.entries(komponenten).forEach(([kompId, menge]) => {
+      finalKomponenten[kompId] = rundeAufLosgroesse(menge)
+    })
+  }
   
   const bedarfsdatum = addDays(bestelldatum, vorlaufzeitTage)
   
@@ -494,7 +533,7 @@ export function erstelleZusatzbestellung(
     id: generateId(),
     bestelldatum,
     bedarfsdatum,
-    komponenten: aufgerundeteKomponenten,
+    komponenten: finalKomponenten,
     erwarteteAnkunft: berechneAnkunftsdatum(bestelldatum),
     status: 'bestellt',
     istVorjahr: false,

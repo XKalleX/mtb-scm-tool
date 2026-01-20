@@ -22,7 +22,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Ship, AlertTriangle, Package, Download, Calendar, Zap, Plus } from 'lucide-react'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatNumber, addDays } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
@@ -33,6 +32,8 @@ import { useMemo, useState, useCallback } from 'react'
 import { generiereAlleVariantenProduktionsplaene } from '@/lib/calculations/zentrale-produktionsplanung'
 import { generiereTaeglicheBestellungen, erstelleZusatzbestellung, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
+import { istChinaFeiertag, ladeChinaFeiertage } from '@/lib/kalender'
+import { isWeekend } from '@/lib/utils'
 
 /**
  * Inbound Logistik Hauptseite
@@ -67,9 +68,20 @@ export default function InboundPage() {
     const menge = parseInt(neueBestellungMenge, 10)
     if (isNaN(menge) || menge < 1) return
     
-    // Erstelle Zusatzbestellung für alle Sattel-Varianten (gleichverteilt)
-    // Verwende Floor für die ersten 3, und berechne den Rest für die letzte Variante
-    // um exakt die angeforderte Menge zu verteilen
+    /**
+     * 🎯 FIX: EXAKTE Mengenverteilung (kein Aufrunden!)
+     * 
+     * Problem: Bei 5000 Sätteln würde rundeAufLosgroesse() pro Variante aufrunden:
+     *   - 1250 → 1500 (pro Variante)
+     *   - 1500 * 4 = 6000 (1000 zu viel!)
+     * 
+     * Lösung: Menge wird hier bereits EXAKT verteilt
+     *   - 1250 + 1250 + 1250 + 1250 = 5000 (korrekt!)
+     * 
+     * WICHTIG: Die Eingabe-Menge wird vom Benutzer bereits auf Losgröße 
+     * gerundet (via step={losgroesse} im Input), daher keine weitere 
+     * Aufrundung nötig!
+     */
     const basisMenge = Math.floor(menge / 4)
     const restMenge = menge - (basisMenge * 3)  // Rest geht an die letzte Variante
     const komponenten: Record<string, number> = {
@@ -79,10 +91,14 @@ export default function InboundPage() {
       'SAT_SL': restMenge  // Rest für letzte Variante
     }
     
+    // Erstelle Zusatzbestellung OHNE weitere Aufrundung
+    // Parameter: bestelldatum, komponenten, vorlaufzeit, skipLosgroessenRundung=false
+    // (false = keine Aufrundung, da Mengen bereits exakt verteilt sind)
     const neueBestellung = erstelleZusatzbestellung(
       datum,
       komponenten,
-      konfiguration.lieferant.gesamtVorlaufzeitTage
+      konfiguration.lieferant.gesamtVorlaufzeitTage,
+      false
     )
     
     setZusatzBestellungen(prev => [...prev, neueBestellung])
@@ -170,86 +186,123 @@ export default function InboundPage() {
     }
   }, [taeglicheBestellungen])
   
-  // ✅ KORRIGIERT: Monatliche Übersicht aus täglichen Bestellungen aggregieren
-  // Keine unabhängige Berechnung mehr - gleiche Datenquelle = gleiche Summen!
-  const lieferplanDaten = useMemo(() => {
-    const planungsjahr = konfiguration.planungsjahr
-    const result: any[] = []
+  /**
+   * 🎯 FIX 5: ALLE 365 Tage anzeigen (nicht nur Bestelltage)
+   * 
+   * Generiert für jeden Tag des Jahres 2027 einen Eintrag:
+   * - Bestellungen: Wenn eine Bestellung existiert, zeige diese
+   * - Keine Bestellung: Zeige Grund (Wochenende, Feiertag, Losgröße nicht erreicht)
+   * - Visuelle Markierung für besondere Tage
+   */
+  const alleTageMitBestellungen = useMemo(() => {
+    const jahr = konfiguration.planungsjahr
+    const feiertage = ladeChinaFeiertage()
+    const alleTage: any[] = []
     
-    // Gruppiere tägliche Bestellungen nach Jahr und Monat
-    const monatlicheAggregation: Record<string, {
-      jahr: number;
-      monat: number;
-      bestellungen: TaeglicheBestellung[];
-      gesamtMenge: number;
-    }> = {}
-    
-    taeglicheBestellungen.forEach(bestellung => {
-      const datum = bestellung.bestelldatum instanceof Date 
-        ? bestellung.bestelldatum 
-        : new Date(bestellung.bestelldatum)
-      
-      const jahr = datum.getFullYear()
-      const monat = datum.getMonth() + 1
-      const key = `${jahr}-${monat}`
-      
-      // Berechne Gesamtmenge dieser Bestellung
-      const menge = Object.values(bestellung.komponenten).reduce((sum, m) => sum + m, 0)
-      
-      if (!monatlicheAggregation[key]) {
-        monatlicheAggregation[key] = {
-          jahr,
-          monat,
-          bestellungen: [],
-          gesamtMenge: 0
-        }
-      }
-      
-      monatlicheAggregation[key].bestellungen.push(bestellung)
-      monatlicheAggregation[key].gesamtMenge += menge
+    // Erstelle Map für schnelle Bestellungs-Lookup
+    const bestellungenMap = new Map<string, TaeglicheBestellung>()
+    taeglicheBestellungen.forEach(b => {
+      const datum = b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum)
+      const key = datum.toISOString().split('T')[0]
+      bestellungenMap.set(key, b)
     })
     
-    // Konvertiere zu Array und sortiere nach Datum
-    // NUR relevante Monate: Oktober 2026 bis November 2027
-    const monatNamen = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+    // Iteriere über alle Tage des Jahres (365 oder 366 bei Schaltjahr)
+    const jahresTage = new Date(jahr, 11, 31).getDate() === 31 && 
+                      new Date(jahr, 1, 29).getMonth() === 1 ? 366 : 365
     
-    Object.values(monatlicheAggregation)
-      .sort((a, b) => {
-        if (a.jahr !== b.jahr) return a.jahr - b.jahr
-        return a.monat - b.monat
-      })
-      .forEach(agg => {
-        // Berechne erstes und letztes Bestelldatum im Monat
-        const ersteBestellung = agg.bestellungen[0]?.bestelldatum
-        const letzteBestellung = agg.bestellungen[agg.bestellungen.length - 1]?.bestelldatum
+    for (let tag = 1; tag <= jahresTage; tag++) {
+      const datum = new Date(jahr, 0, tag)
+      const datumKey = datum.toISOString().split('T')[0]
+      const bestellung = bestellungenMap.get(datumKey)
+      
+      // Prüfe Tag-Typ
+      const istWochenende = isWeekend(datum)
+      const feiertag = istChinaFeiertag(datum)
+      const istFeiertag = feiertag.length > 0
+      
+      if (bestellung) {
+        // Tag MIT Bestellung
+        const bedarfsdatum = bestellung.bedarfsdatum instanceof Date ? bestellung.bedarfsdatum : new Date(bestellung.bedarfsdatum)
+        const erwarteteAnkunft = bestellung.erwarteteAnkunft instanceof Date ? bestellung.erwarteteAnkunft : new Date(bestellung.erwarteteAnkunft)
+        const menge = Object.values(bestellung.komponenten).reduce((sum, m) => sum + m, 0)
         
-        // Berechne durchschnittliche Ankunft
-        const ersteAnkunft = agg.bestellungen[0]?.erwarteteAnkunft
+        // Erstelle formatierte Felder für visuelle Markierung
+        const dateStr = datum.toLocaleDateString('de-DE')
+        const datumFormatiert = istFeiertag ? `🔴 ${dateStr}` : istWochenende ? `🟡 ${dateStr}` : `🟢 ${dateStr}`
         
-        // Status basierend auf durchschnittlichem Bestelldatum
-        let status = 'Geplant'
-        const ersteDatum = ersteBestellung instanceof Date ? ersteBestellung : new Date(ersteBestellung)
-        if (ersteDatum.getFullYear() < planungsjahr) {
-          status = 'Geliefert'
-        } else if (ersteDatum.getMonth() < 3) {
-          status = 'Unterwegs'
+        let grundFormatiert = ''
+        if (bestellung.grund === 'losgroesse') {
+          grundFormatiert = '✓ Bestellung (Losgröße erreicht)'
+        } else if (bestellung.grund === 'zusatzbestellung') {
+          grundFormatiert = '✓ Zusatzbestellung (manuell)'
+        } else {
+          grundFormatiert = '✓ Bestellung'
         }
         
-        result.push({
-          jahr: agg.jahr,
-          monat: monatNamen[agg.monat - 1],
-          monatNummer: agg.monat,
-          anzahlBestellungen: agg.bestellungen.length,
-          menge: agg.gesamtMenge,
-          losgroesse: lieferant.losgroesse,
-          anzahlLose: Math.ceil(agg.gesamtMenge / lieferant.losgroesse),
-          vorlaufzeit: gesamtVorlaufzeit,
-          status
+        alleTage.push({
+          datum,
+          bestelldatum: datum,
+          datumFormatiert,
+          istVorjahr: bestellung.istVorjahr,
+          bedarfsdatum,
+          bedarfsdatumFormatiert: bedarfsdatum.toLocaleDateString('de-DE'),
+          vorlaufzeit: lieferant.gesamtVorlaufzeitTage,
+          vorlaufzeitFormatiert: `${lieferant.gesamtVorlaufzeitTage} Tage`,
+          menge,
+          mengeFormatiert: formatNumber(menge, 0) + ' Stk',
+          grund: bestellung.grund,
+          grundFormatiert,
+          erwarteteAnkunft,
+          erwarteteAnkunftFormatiert: erwarteteAnkunft.toLocaleDateString('de-DE'),
+          status: bestellung.status,
+          hatBestellung: true,
+          istWochenende,
+          istFeiertag,
+          feiertagName: istFeiertag ? feiertag[0].name : undefined
         })
-      })
+      } else {
+        // Tag OHNE Bestellung - ermittle Grund
+        let grund = 'Losgröße nicht erreicht'
+        let grundFormatiert = '⚠️ Losgröße nicht erreicht'
+        
+        if (istWochenende) {
+          grund = 'Wochenende'
+          grundFormatiert = '❌ Wochenende (keine Produktion)'
+        } else if (istFeiertag) {
+          grund = `Feiertag: ${feiertag[0].name}`
+          grundFormatiert = `❌ Feiertag: ${feiertag[0].name}`
+        }
+        
+        const dateStr = datum.toLocaleDateString('de-DE')
+        const datumFormatiert = istFeiertag ? `🔴 ${dateStr}` : istWochenende ? `🟡 ${dateStr}` : `⚪ ${dateStr}`
+        
+        alleTage.push({
+          datum,
+          bestelldatum: datum,
+          datumFormatiert,
+          istVorjahr: false,
+          bedarfsdatum: null,
+          bedarfsdatumFormatiert: '-',
+          vorlaufzeit: null,
+          vorlaufzeitFormatiert: '-',
+          menge: 0,
+          mengeFormatiert: '-',
+          grund,
+          grundFormatiert,
+          erwarteteAnkunft: null,
+          erwarteteAnkunftFormatiert: '-',
+          status: '-',
+          hatBestellung: false,
+          istWochenende,
+          istFeiertag,
+          feiertagName: istFeiertag ? feiertag[0].name : undefined
+        })
+      }
+    }
     
-    return result
-  }, [taeglicheBestellungen, konfiguration.planungsjahr, lieferant.losgroesse, gesamtVorlaufzeit])
+    return alleTage
+  }, [taeglicheBestellungen, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage])
   
   /**
    * Exportiert Lieferanten-Daten als JSON
@@ -463,29 +516,15 @@ export default function InboundPage() {
             </Card>
           </div>
 
-          {/* ✅ TABS: Tägliche vs. Monatliche Ansicht */}
-          <Tabs defaultValue="daily" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="daily">
-                <Calendar className="h-4 w-4 mr-2" />
-                Tägliche Bestelllogik
-              </TabsTrigger>
-              <TabsTrigger value="monthly">
-                <Package className="h-4 w-4 mr-2" />
-                Monatliche Übersicht
-              </TabsTrigger>
-            </TabsList>
+          {/* ✅ TÄGLICHE BESTELLLOGIK (SSOT) */}
+          <div className="bg-white rounded-lg p-4">
+            <h3 className="text-lg font-semibold mb-2">Tägliche Bestelllogik (Daily Ordering)</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Gemäß PDF-Anforderung: Tägliche Bedarfsermittlung + Bestellung bei Losgröße {lieferant.losgroesse}
+            </p>
 
-            {/* TAB 1: TÄGLICHE BESTELLLOGIK */}
-            <TabsContent value="daily" className="space-y-4">
-              <div className="bg-white rounded-lg p-4">
-                <h3 className="text-lg font-semibold mb-2">Tägliche Bestelllogik (Daily Ordering)</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Gemäß PDF-Anforderung: Tägliche Bedarfsermittlung + Bestellung bei Losgröße {lieferant.losgroesse}
-                </p>
-
-                {/* ✅ NEU: Zusatzbestellungs-Formular */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            {/* ✅ NEU: Zusatzbestellungs-Formular */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                   <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
                     <Plus className="h-4 w-4" />
                     Zusatzbestellung eingeben
@@ -500,7 +539,7 @@ export default function InboundPage() {
                         type="date"
                         value={neueBestellungDatum}
                         onChange={(e) => setNeueBestellungDatum(e.target.value)}
-                        min={`${konfiguration.planungsjahr}-01-02`}
+                        min={`${konfiguration.planungsjahr - 1}-10-01`}
                         max={`${konfiguration.planungsjahr}-11-12`}
                         className="bg-white"
                       />
@@ -542,128 +581,62 @@ export default function InboundPage() {
                   )}
                 </div>
 
-                {/* Excel-Tabelle mit täglichen Bestellungen */}
+                {/* Excel-Tabelle mit ALLEN Tagen des Jahres */}
+                <div className="mb-2 text-xs text-muted-foreground">
+                  ✅ Zeigt ALLE Tage des Jahres {konfiguration.planungsjahr} (inkl. Wochenenden/Feiertage) | 🟢 = Bestellung | 🟡 = Wochenende | 🔴 = Feiertag
+                </div>
                 <ExcelTable
                   columns={[
                     {
-                      key: 'bestelldatum',
-                      label: 'Bestelldatum',
+                      key: 'datumFormatiert',
+                      label: 'Datum',
                       width: '110px',
                       align: 'center',
-                      format: (val) => {
-                        if (val instanceof Date && !isNaN(val.getTime())) {
-                          return val.toLocaleDateString('de-DE')
-                        }
-                        return val || '-'
-                      },
                       sumable: false
                     },
                     {
-                      key: 'istVorjahr',
-                      label: 'Jahr',
-                      width: '60px',
-                      align: 'center',
-                      format: (val) => val ? '2026' : '2027',
-                      sumable: false
-                    },
-                    {
-                      key: 'bedarfsdatum',
+                      key: 'bedarfsdatumFormatiert',
                       label: 'Bedarfsdatum',
                       width: '110px',
                       align: 'center',
-                      format: (val) => {
-                        if (val instanceof Date && !isNaN(val.getTime())) {
-                          return val.toLocaleDateString('de-DE')
-                        }
-                        return val || '-'
-                      },
                       sumable: false
                     },
                     {
-                      key: 'vorlaufzeit',
-                      label: 'Vorlaufzeit',
-                      width: '90px',
-                      align: 'center',
-                      format: (val) => `${val} Tage`,
-                      sumable: false
-                    },
-                    {
-                      key: 'menge',
+                      key: 'mengeFormatiert',
                       label: 'Bestellmenge',
                       width: '120px',
                       align: 'right',
-                      format: (val) => formatNumber(val, 0) + ' Stk',
-                      sumable: true
-                    },
-                    {
-                      key: 'grund',
-                      label: 'Grund',
-                      width: '130px',
-                      align: 'center',
-                      format: (val) => {
-                        if (val === 'losgroesse') return '📦 Losgröße'
-                        if (val === 'zusatzbestellung') return '➕ Zusatz'
-                        return '📦 Losgröße'
-                      },
                       sumable: false
                     },
                     {
-                      key: 'erwarteteAnkunft',
+                      key: 'grundFormatiert',
+                      label: 'Status / Grund',
+                      width: '200px',
+                      align: 'left',
+                      sumable: false
+                    },
+                    {
+                      key: 'vorlaufzeitFormatiert',
+                      label: 'Vorlaufzeit',
+                      width: '90px',
+                      align: 'center',
+                      sumable: false
+                    },
+                    {
+                      key: 'erwarteteAnkunftFormatiert',
                       label: 'Ankunft',
                       width: '110px',
                       align: 'center',
-                      format: (val) => {
-                        if (val instanceof Date && !isNaN(val.getTime())) {
-                          return val.toLocaleDateString('de-DE')
-                        }
-                        return val || '-'
-                      },
-                      sumable: false
-                    },
-                    {
-                      key: 'status',
-                      label: 'Status',
-                      width: '100px',
-                      align: 'center',
-                      format: (val) => {
-                        if (val === 'geliefert') return '✅ Geliefert'
-                        if (val === 'unterwegs') return '🚢 Unterwegs'
-                        return '📋 Bestellt'
-                      },
                       sumable: false
                     }
                   ]}
-                  data={taeglicheBestellungen.map((b, idx) => {
-                    // Sichere Date-Konvertierung mit Validierung
-                    const bestelldatum = b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum)
-                    const bedarfsdatum = b.bedarfsdatum instanceof Date ? b.bedarfsdatum : new Date(b.bedarfsdatum)
-                    const erwarteteAnkunft = b.erwarteteAnkunft instanceof Date ? b.erwarteteAnkunft : new Date(b.erwarteteAnkunft)
-                    
-                    // Berechne Vorlaufzeit in Tagen (mit Validierung für ungültige Daten)
-                    const vorlaufzeitMs = erwarteteAnkunft.getTime() - bestelldatum.getTime()
-                    const vorlaufzeitTage = isNaN(vorlaufzeitMs) ? 0 : Math.round(vorlaufzeitMs / (1000 * 60 * 60 * 24))
-                    
-                    // Berechne Gesamtmenge
-                    const menge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
-                    
-                    return {
-                      bestelldatum,
-                      istVorjahr: b.istVorjahr,
-                      bedarfsdatum,
-                      vorlaufzeit: vorlaufzeitTage,
-                      menge,
-                      grund: b.grund,
-                      erwarteteAnkunft,
-                      status: b.status
-                    }
-                  })}
+                  data={alleTageMitBestellungen}
                   maxHeight="400px"
                   showFormulas={false}
-                  showSums={true}
-                  sumRowLabel={`GESAMT (${bestellStatistik.gesamt} Bestellungen, davon ${bestellStatistik.vorjahr} aus 2026)`}
+                  showSums={false}
+                  sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen von ${alleTageMitBestellungen.length} Tagen (${bestellStatistik.vorjahr} aus 2026)`}
                   dateColumnKey="bestelldatum"
                 />
-              </div>
 
               {/* Info-Box unter der Tabelle */}
               <CollapsibleInfo
@@ -706,125 +679,22 @@ export default function InboundPage() {
                   </div>
                 </div>
               </CollapsibleInfo>
-            </TabsContent>
-
-            {/* TAB 2: MONATLICHE ÜBERSICHT */}
-            <TabsContent value="monthly" className="space-y-4">
-              <div className="bg-white rounded-lg p-4">
-                <h3 className="text-lg font-semibold mb-2">Monatliche Übersicht (Okt {konfiguration.planungsjahr - 1} - Nov {konfiguration.planungsjahr})</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  ✅ Aggregiert aus täglichen Bestellungen - identische Summen garantiert!
-                </p>
-
-                {/* Formel-Karten */}
-                <div className="grid gap-4 md:grid-cols-2 mb-6">
-                  <FormulaCard
-                    title="Vorlaufzeit (fix)"
-                    formula={`Vorlaufzeit = ${gesamtVorlaufzeit} Tage (7 Wochen) - FEST konfiguriert`}
-                    description={`Produktion: ${lieferant.vorlaufzeitArbeitstage} AT + LKW: ${lieferant.lkwTransportArbeitstage} AT + Seefracht: ${lieferant.vorlaufzeitKalendertage} KT`}
-                    example={`Bestellung 15.10. → Lieferung ~03.12. (${gesamtVorlaufzeit} Tage später)`}
-                  />
-                  <FormulaCard
-                    title="Monatliche Aggregation"
-                    formula="Monatsmenge = Σ(Tägliche Bestellungen im Monat)"
-                    description="Summen aus täglicher Bestelllogik - 100% konsistent"
-                    example={`${bestellStatistik.gesamt} Bestellungen → ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel gesamt`}
-                  />
-                </div>
-
-                {/* Excel-ähnliche Tabelle */}
-                <ExcelTable
-                  columns={[
-                    {
-                      key: 'jahr',
-                      label: 'Jahr',
-                      width: '70px',
-                      align: 'center',
-                      sumable: false
-                    },
-                    {
-                      key: 'monat',
-                      label: 'Monat',
-                      width: '80px',
-                      align: 'center',
-                      sumable: false
-                    },
-                    {
-                      key: 'anzahlBestellungen',
-                      label: 'Bestellungen',
-                      width: '100px',
-                      align: 'center',
-                      sumable: true
-                    },
-                    {
-                      key: 'menge',
-                      label: 'Bestellmenge',
-                      width: '120px',
-                      align: 'right',
-                      format: (val) => formatNumber(val, 0) + ' Stk',
-                      sumable: true
-                    },
-                    {
-                      key: 'losgroesse',
-                      label: 'Losgröße',
-                      width: '100px',
-                      align: 'right',
-                      format: (val) => formatNumber(val, 0),
-                      sumable: false
-                    },
-                    {
-                      key: 'anzahlLose',
-                      label: 'Anzahl Lose',
-                      width: '110px',
-                      align: 'center',
-                      format: (val) => `${val} Lose`,
-                      sumable: true
-                    },
-                    {
-                      key: 'vorlaufzeit',
-                      label: 'Vorlaufzeit',
-                      width: '100px',
-                      align: 'center',
-                      format: (val) => `${val} Tage`,
-                      sumable: false
-                    },
-                    {
-                      key: 'status',
-                      label: 'Status',
-                      width: '100px',
-                      align: 'center',
-                      format: (val) => {
-                        const colors: Record<string, string> = {
-                          'Geliefert': '✓ Geliefert',
-                          'Unterwegs': '🚢 Unterwegs',
-                          'Geplant': '📅 Geplant'
-                        }
-                        return colors[val] || val
-                      },
-                      sumable: false
-                    }
-                  ]}
-                  data={lieferplanDaten}
-                  maxHeight="500px"
-                  showFormulas={true}
-                  showSums={true}
-                  sumRowLabel={`GESAMT (${bestellStatistik.gesamt} Bestellungen = ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel)`}
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
+            </div>
         </CardContent>
       </Card>
 
-      {/* Lieferanten-Details - Informationen */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{lieferant.land === 'China' ? '🇨🇳' : '🏭'} {lieferant.name}</CardTitle>
-          <CardDescription>
+      {/* Lieferanten-Details - Informationen (ausklappbar) */}
+      <CollapsibleInfo
+        title={`${lieferant.land === 'China' ? '🇨🇳' : '🏭'} ${lieferant.name} - Lieferanten-Details`}
+        variant="info"
+        icon={<Ship className="h-5 w-5" />}
+        defaultOpen={false}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
             Einziger Lieferant für alle {konfiguration.bauteile.length} Komponenten
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+          
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <h4 className="font-semibold mb-2">Transport-Sequenz (Reihenfolge wichtig für Feiertage!):</h4>
@@ -854,28 +724,8 @@ export default function InboundPage() {
               </ul>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Komponenten - Informationen */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Gelieferte Komponenten ({konfiguration.bauteile.length})</CardTitle>
-          <CardDescription>
-            Alle Komponenten kommen von diesem einen Lieferanten
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 md:grid-cols-3">
-            {konfiguration.bauteile.map(b => (
-              <div key={b.id} className="text-sm bg-slate-50 rounded px-3 py-2">
-                <span className="font-medium">{b.name}</span>
-                <span className="text-muted-foreground ml-2">({b.kategorie})</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </CollapsibleInfo>
 
       {/* Bestelllogik Info-Boxen - unter den Tabs */}
       <Card>
