@@ -23,6 +23,10 @@ import {
   BAUTEILE,
   STUECKLISTE
 } from '../../../kontext/Spezifikation_SSOT_MR'
+import { FeiertagsKonfiguration } from '@/lib/kalender'
+
+// Re-export for backwards compatibility
+export type { FeiertagsKonfiguration } from '@/lib/kalender'
 
 /**
  * Tagesproduktionseintrag mit Error Management
@@ -68,10 +72,20 @@ export interface VariantenProduktionsplan {
 
 /**
  * Prüft ob ein Datum ein deutscher Feiertag ist
+ * 
+ * @param datum - Zu prüfendes Datum
+ * @param feiertage - Optionale benutzerdefinierte Feiertage. Falls nicht angegeben, 
+ *                    werden die Standard-Feiertage aus SSOT verwendet.
+ * @returns Objekt mit 'ist' (boolean) und optionalem 'name' des Feiertags
  */
-function istFeiertag(datum: Date): { ist: boolean; name?: string } {
+function istFeiertag(
+  datum: Date, 
+  feiertage?: FeiertagsKonfiguration[]
+): { ist: boolean; name?: string } {
   const dateStr = datum.toISOString().split('T')[0]
-  const feiertag = FEIERTAGE_DEUTSCHLAND.find(f => f.datum === dateStr)
+  // Nutze übergebene Feiertage oder Fallback auf SSOT-Feiertage
+  const feiertagsListe = feiertage || FEIERTAGE_DEUTSCHLAND
+  const feiertag = feiertagsListe.find(f => f.datum === dateStr)
   return {
     ist: !!feiertag,
     name: feiertag?.name
@@ -80,11 +94,19 @@ function istFeiertag(datum: Date): { ist: boolean; name?: string } {
 
 /**
  * Prüft ob ein Datum ein Arbeitstag ist (Mo-Fr, kein Feiertag)
+ * 
+ * @param datum - Zu prüfendes Datum
+ * @param feiertage - Optionale benutzerdefinierte Feiertage. Falls nicht angegeben,
+ *                    werden die Standard-Feiertage aus SSOT verwendet.
+ * @returns True wenn Arbeitstag (kein Wochenende und kein Feiertag)
  */
-function istArbeitstag(datum: Date): boolean {
+function istArbeitstag(
+  datum: Date,
+  feiertage?: FeiertagsKonfiguration[]
+): boolean {
   const wochentag = datum.getDay()
   const istWochenende = wochentag === 0 || wochentag === 6
-  const feiertag = istFeiertag(datum)
+  const feiertag = istFeiertag(datum, feiertage)
   
   return !istWochenende && !feiertag.ist
 }
@@ -97,10 +119,12 @@ function istArbeitstag(datum: Date): boolean {
  * - Garantiert exakte Jahressumme (z.B. 111.000 Bikes für Allrounder)
  * 
  * @param variante - MTB-Variante aus SSOT
+ * @param feiertage - Optionale benutzerdefinierte deutsche Feiertage
  * @returns Produktionsplan mit 365 Tageseinträgen
  */
 export function generiereVariantenProduktionsplan(
-  variante: typeof MTB_VARIANTEN[0]
+  variante: typeof MTB_VARIANTEN[0],
+  feiertage?: FeiertagsKonfiguration[]
 ): VariantenProduktionsplan {
   const tage: TagesProduktionDetail[] = []
   
@@ -120,8 +144,8 @@ export function generiereVariantenProduktionsplan(
     const monat = datum.getMonth() + 1 // 1-12
     const wochentag = datum.toLocaleDateString('de-DE', { weekday: 'short' })
     
-    const arbeitstag = istArbeitstag(datum)
-    const feiertagInfo = istFeiertag(datum)
+    const arbeitstag = istArbeitstag(datum, feiertage)
+    const feiertagInfo = istFeiertag(datum, feiertage)
     
     // Saisonalitätsfaktor für diesen Monat
     const saisonMonat = SAISONALITAET.find(s => s.monat === monat)!
@@ -139,7 +163,7 @@ export function generiereVariantenProduktionsplan(
       // KRITISCH: saisonMonat.produktionsMenge ist für ALLE Bikes, nicht nur diese Variante!
       // Korrekte Formel: Varianten-Jahresproduktion * Saisonaler Anteil / Arbeitstage
       
-      const arbeitstageImMonat = countArbeitstageInMonat(datum)
+      const arbeitstageImMonat = countArbeitstageInMonat(datum, feiertage)
       
       // Schritt A: Berechne Monatsproduktion dieser Variante
       const variantenMonatsProduktion = variante.jahresProduktion * (saisonFaktor / 100)
@@ -231,8 +255,15 @@ export function generiereVariantenProduktionsplan(
 
 /**
  * Zählt Arbeitstage in einem Monat
+ * 
+ * @param datum - Ein Datum in dem zu prüfenden Monat
+ * @param feiertage - Optionale benutzerdefinierte Feiertage
+ * @returns Anzahl Arbeitstage im Monat
  */
-function countArbeitstageInMonat(datum: Date): number {
+function countArbeitstageInMonat(
+  datum: Date, 
+  feiertage?: FeiertagsKonfiguration[]
+): number {
   const jahr = datum.getFullYear()
   const monat = datum.getMonth() // 0-11
   
@@ -242,7 +273,7 @@ function countArbeitstageInMonat(datum: Date): number {
   
   for (let tag = 1; tag <= letzterTag.getDate(); tag++) {
     const d = new Date(jahr, monat, tag)
-    if (istArbeitstag(d)) {
+    if (istArbeitstag(d, feiertage)) {
       arbeitstage++
     }
   }
@@ -253,11 +284,14 @@ function countArbeitstageInMonat(datum: Date): number {
 /**
  * 🎯 Generiert Produktionspläne für ALLE 8 MTB-Varianten
  * 
+ * @param feiertage - Optionale benutzerdefinierte deutsche Feiertage
  * @returns Array mit 8 Produktionsplänen (je 365 Tage)
  */
-export function generiereAlleVariantenProduktionsplaene(): VariantenProduktionsplan[] {
+export function generiereAlleVariantenProduktionsplaene(
+  feiertage?: FeiertagsKonfiguration[]
+): VariantenProduktionsplan[] {
   return MTB_VARIANTEN.map(variante => 
-    generiereVariantenProduktionsplan(variante)
+    generiereVariantenProduktionsplan(variante, feiertage)
   )
 }
 
