@@ -52,11 +52,13 @@ export function getHeuteDatum(): Date {
 }
 
 /**
- * Lädt alle deutschen Feiertage für beide Jahre (2026 + 2027)
- * Wichtig für Vorlaufzeit-Berechnungen (49 Tage können bis 2026 zurückreichen)
+ * Lädt alle deutschen Feiertage für drei Jahre (2026, 2027, 2028)
+ * Wichtig für Vorlaufzeit-Berechnungen (49 Tage können bis 2026 zurückreichen,
+ * und bis Februar 2028 hineinreichen)
  * @returns Array von Feiertagen
  */
 export function ladeDeutschlandFeiertage(): Feiertag[] {
+  const feiertage2028 = (feiertagsDeutschlandData as any).feiertage2028 || []
   return [
     ...feiertagsDeutschlandData.feiertage2026.map(f => ({
       ...f,
@@ -67,16 +69,23 @@ export function ladeDeutschlandFeiertage(): Feiertag[] {
       ...f,
       datum: new Date(f.datum),
       typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
+    })),
+    ...feiertage2028.map((f: any) => ({
+      ...f,
+      datum: new Date(f.datum),
+      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
     }))
   ]
 }
 
 /**
- * Lädt alle chinesischen Feiertage für beide Jahre (2026 + 2027)
- * Wichtig für Vorlaufzeit-Berechnungen (49 Tage können bis 2026 zurückreichen)
+ * Lädt alle chinesischen Feiertage für drei Jahre (2026, 2027, 2028)
+ * Wichtig für Vorlaufzeit-Berechnungen (49 Tage können bis 2026 zurückreichen,
+ * und bis Februar 2028 hineinreichen)
  * @returns Array von Feiertagen
  */
 export function ladeChinaFeiertage(): Feiertag[] {
+  const feiertage2028 = (feiertagsData as any).feiertage2028 || []
   return [
     ...feiertagsData.feiertage2026.map(f => ({
       ...f,
@@ -84,6 +93,11 @@ export function ladeChinaFeiertage(): Feiertag[] {
       typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
     })),
     ...feiertagsData.feiertage2027.map(f => ({
+      ...f,
+      datum: new Date(f.datum),
+      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
+    })),
+    ...feiertage2028.map((f: any) => ({
       ...f,
       datum: new Date(f.datum),
       typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'

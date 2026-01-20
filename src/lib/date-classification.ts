@@ -31,9 +31,10 @@ export type DateClassification = {
 }
 
 /**
- * Lädt deutsche Feiertage aus JSON (beide Jahre 2026 + 2027)
+ * Lädt deutsche Feiertage aus JSON (2026, 2027, 2028)
  */
 function ladeDeutscheFeiertage(): Feiertag[] {
+  const feiertage2028 = (feiertageDeutschlandData as any).feiertage2028 || []
   return [
     ...feiertageDeutschlandData.feiertage2026.map(f => ({
       ...f,
@@ -44,14 +45,20 @@ function ladeDeutscheFeiertage(): Feiertag[] {
       ...f,
       datum: new Date(f.datum),
       typ: f.typ as 'gesetzlich'
+    })),
+    ...feiertage2028.map((f: any) => ({
+      ...f,
+      datum: new Date(f.datum),
+      typ: f.typ as 'gesetzlich'
     }))
   ]
 }
 
 /**
- * Lädt chinesische Feiertage aus JSON (beide Jahre 2026 + 2027)
+ * Lädt chinesische Feiertage aus JSON (2026, 2027, 2028)
  */
 function ladeChinaFeiertage(): Feiertag[] {
+  const feiertage2028 = (feiertageChinaData as any).feiertage2028 || []
   return [
     ...feiertageChinaData.feiertage2026.map(f => ({
       ...f,
@@ -59,6 +66,11 @@ function ladeChinaFeiertage(): Feiertag[] {
       typ: f.typ as 'gesetzlich'
     })),
     ...feiertageChinaData.feiertage2027.map(f => ({
+      ...f,
+      datum: new Date(f.datum),
+      typ: f.typ as 'gesetzlich'
+    })),
+    ...feiertage2028.map((f: any) => ({
       ...f,
       datum: new Date(f.datum),
       typ: f.typ as 'gesetzlich'
