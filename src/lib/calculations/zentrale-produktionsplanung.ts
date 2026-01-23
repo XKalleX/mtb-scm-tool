@@ -2,19 +2,22 @@
  * ========================================
  * ZENTRALE PRODUKTIONSPLANUNG
  * ========================================
- * 
- * Zentrale Berechnungsfunktionen die von ALLEN Seiten genutzt werden.
+ * * Zentrale Berechnungsfunktionen die von ALLEN Seiten genutzt werden.
  * Nutzt ausschließlich Daten aus dem KonfigurationContext.
- * 
- * ✅ SINGLE SOURCE OF TRUTH: Alle Berechnungen basieren auf KonfigurationData
+ * * ✅ SINGLE SOURCE OF TRUTH: Alle Berechnungen basieren auf KonfigurationData
  * ✅ DURCHGÄNGIGKEIT: Von Settings → OEM → Inbound → Produktion → Reporting
  * ✅ KONSISTENZ: Gleiche Logik in allen Modulen
- * 
- * WICHTIG: Diese Funktionen erhalten KonfigurationData als Parameter,
+ * * WICHTIG: Diese Funktionen erhalten KonfigurationData als Parameter,
  * damit sie unabhängig von React-Context funktionieren.
  */
 
 import type { KonfigurationData } from '@/contexts/KonfigurationContext'
+
+/**
+ * Typ für wöchentliche Überschreibungen (OEM Programplanung)
+ * Key: Kalenderwoche (1-52/53), Value: Exakte Menge für diese Woche
+ */
+export type WochenPlanung = Record<number, number>;
 
 /**
  * Tagesproduktionseintrag mit Error Management
@@ -25,6 +28,7 @@ export interface TagesProduktionEntry {
   wochentag: string              // Mo, Di, Mi, ...
   monat: number                  // Monat (1-12)
   monatName: string              // Januar, Februar, ...
+  kalenderwoche: number          // KW (1-53)
   istArbeitstag: boolean         // Produktionstag?
   istFeiertag: boolean           // Deutscher Feiertag?
   feiertagsName?: string         // Name des Feiertags
@@ -68,18 +72,30 @@ export interface VariantenProduktionsplan {
 }
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ========================================
+ * HILFSFUNKTIONEN (Kalenderwoche & Datum)
+ * ========================================
+ */
+
+/**
+ * Ermittelt die Kalenderwoche (ISO 8601) für ein Datum
+ */
+function getKalenderWoche(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+/**
+ * ========================================
  * ARBEITSTAGE-BERECHNUNG (Deutschland)
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ========================================
  */
 
 /**
  * Zählt die tatsächlichen Arbeitstage in einem Monat
- * 
- * @param jahr - Planungsjahr
- * @param monat - Monat (1-12)
- * @param feiertage - Array von Feiertags-Daten (Format: YYYY-MM-DD)
- * @returns Anzahl Arbeitstage (Mo-Fr, ohne Feiertage)
  */
 export function countArbeitstageInMonat(
   jahr: number,
@@ -104,10 +120,31 @@ export function countArbeitstageInMonat(
 }
 
 /**
+ * Zählt Arbeitstage in einer spezifischen Kalenderwoche
+ */
+export function countArbeitstageInWoche(
+  kw: number,
+  jahr: number,
+  feiertage: string[]
+): number {
+  let arbeitstage = 0
+  const startDatum = new Date(jahr, 0, 1)
+  for (let i = 0; i < 365; i++) {
+    const datum = new Date(jahr, 0, i + 1)
+    if (getKalenderWoche(datum) === kw) {
+       const datumStr = datum.toISOString().split('T')[0]
+       const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
+       const istFeiertag = feiertage.includes(datumStr)
+       if (!istWochenende && !istFeiertag) {
+         arbeitstage++
+       }
+    }
+  }
+  return arbeitstage
+}
+
+/**
  * Zählt alle Arbeitstage im Jahr (Deutschland)
- * 
- * @param konfiguration - KonfigurationData aus Context
- * @returns Anzahl Arbeitstage im Jahr
  */
 export function countArbeitstageImJahr(konfiguration: KonfigurationData): number {
   const deutscheFeiertage = konfiguration.feiertage
@@ -128,17 +165,11 @@ export function countArbeitstageImJahr(konfiguration: KonfigurationData): number
 }
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ========================================
  * SAISONALE VERTEILUNG
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ========================================
  */
 
-/**
- * Berechnet saisonale Verteilung mit EXAKTEN Arbeitstagen
- * 
- * @param konfiguration - KonfigurationData aus Context
- * @returns Array mit 12 Monaten inkl. Arbeitstagen
- */
 export function berechneSaisonaleVerteilung(konfiguration: KonfigurationData) {
   const deutscheFeiertage = konfiguration.feiertage
     .filter(f => f.land === 'Deutschland')
@@ -167,31 +198,21 @@ export function berechneSaisonaleVerteilung(konfiguration: KonfigurationData) {
 }
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ========================================
  * TAGESPRODUKTION MIT ERROR MANAGEMENT
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ========================================
  */
 
 /**
  * 🎯 KERNFUNKTION: Generiert 365-Tage Produktionsplan mit Error Management
- * 
- * KONZEPT: Error Management verhindert kumulative Rundungsfehler
- * - Plan-Menge = Geplante Jahresproduktion (370.000 Bikes)
- * - Ist-Menge = Tatsächlich produziert (kann bei Störungen abweichen)
- * - Ohne Szenarien: Ist = Plan (perfekte Ausführung)
- * 
- * VALIDIERUNG: Summe(planMenge) MUSS exakt Jahresproduktion sein!
- * 
- * @param konfiguration - KonfigurationData aus Context
- * @returns Array mit 365 Tagen
+ * * Jetzt inkl. optionaler Wochenplanung (wochenPlanung Parameter)
  */
 export function generiereTagesproduktion(
-  konfiguration: KonfigurationData
+  konfiguration: KonfigurationData,
+  wochenPlanung?: WochenPlanung // Optionaler Parameter für manuelle Wochenplanung
 ): TagesProduktionEntry[] {
-  // Saisonale Verteilung berechnen
   const saisonalitaet = berechneSaisonaleVerteilung(konfiguration)
   
-  // Deutsche Feiertage
   const deutscheFeiertage = konfiguration.feiertage
     .filter(f => f.land === 'Deutschland')
     .map(f => f.datum)
@@ -202,9 +223,7 @@ export function generiereTagesproduktion(
       .map(f => [f.datum, f.name])
   )
   
-  // Error Management: Pro Monat separate Fehlerkorrektur
   const monatlicheFehlerTracker: Record<number, number> = {}
-  
   const result: TagesProduktionEntry[] = []
   
   for (let i = 0; i < 365; i++) {
@@ -212,18 +231,16 @@ export function generiereTagesproduktion(
     const datum = new Date(konfiguration.planungsjahr, 0, tag)
     const wochentag = datum.toLocaleDateString('de-DE', { weekday: 'short' })
     const datumStr = datum.toISOString().split('T')[0]
+    const kw = getKalenderWoche(datum)
     
-    // Arbeitstag-Prüfung
     const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
     const istFeiertag = deutscheFeiertage.includes(datumStr)
     const istArbeitstag = !istWochenende && !istFeiertag
     const feiertagsName = feiertagMap.get(datumStr)
     
-    // Monat für Saisonalität
     const monat = datum.getMonth() + 1
     const saisonInfo = saisonalitaet.find(s => s.monat === monat)!
     
-    // Initialisiere Fehler-Tracker für diesen Monat
     if (!(monat in monatlicheFehlerTracker)) {
       monatlicheFehlerTracker[monat] = 0
     }
@@ -239,26 +256,34 @@ export function generiereTagesproduktion(
     if (istArbeitstag) {
       // ✅ PRODUKTIONSTAG mit ERROR MANAGEMENT
       
-      // Soll-Produktion: Monatliche Bikes / Arbeitstage im Monat (DEZIMAL!)
-      sollProduktionDezimal = saisonInfo.bikes / saisonInfo.arbeitstage
+      // Prüfe auf Wochenplanung Override
+      if (wochenPlanung && wochenPlanung[kw] !== undefined) {
+         // Fall A: Manuelle Wochenplanung
+         const arbeitstageInWoche = countArbeitstageInWoche(kw, konfiguration.planungsjahr, deutscheFeiertage)
+         if (arbeitstageInWoche > 0) {
+            sollProduktionDezimal = wochenPlanung[kw] / arbeitstageInWoche
+         } else {
+            sollProduktionDezimal = 0 
+         }
+      } else {
+         // Fall B: Standard Saisonale Verteilung
+         sollProduktionDezimal = saisonInfo.bikes / saisonInfo.arbeitstage
+      }
       
-      // Error Management: Kumulative Fehlerkorrektur
+      // Error Management
       monatsFehlerVorher = monatlicheFehlerTracker[monat]
       const tagesErrorRoh = sollProduktionDezimal - Math.round(sollProduktionDezimal)
       const fehlerGesamt = monatsFehlerVorher + tagesErrorRoh
       
       if (fehlerGesamt >= 0.5) {
-        // Aufrunden weil Error zu groß
         planMenge = Math.ceil(sollProduktionDezimal)
         monatlicheFehlerTracker[monat] = fehlerGesamt - 1.0
         errorKorrekturAngewendet = true
       } else if (fehlerGesamt <= -0.5) {
-        // Abrunden weil Error zu klein
         planMenge = Math.floor(sollProduktionDezimal)
         monatlicheFehlerTracker[monat] = fehlerGesamt + 1.0
         errorKorrekturAngewendet = true
       } else {
-        // Normal runden
         planMenge = Math.round(sollProduktionDezimal)
         monatlicheFehlerTracker[monat] = fehlerGesamt
         errorKorrekturAngewendet = false
@@ -267,24 +292,17 @@ export function generiereTagesproduktion(
       monatsFehlerNachher = monatlicheFehlerTracker[monat]
       tagesError = sollProduktionDezimal - planMenge
       
-      // ✅ Ist-Menge: IDENTISCH mit Plan-Menge (perfekte Ausführung ohne Störungen)
-      // Szenarien können später Abweichungen einführen (Maschinenausfall, etc.)
-      // Für Basis-Plan: Ist = Plan (EXAKT! Keine künstliche Varianz)
-      // WICHTIG: Durch Error Management ist planMenge bereits exakt auf Jahresproduktion abgestimmt
+      // Ist = Plan (Basis)
       istMenge = planMenge
     }
     
     const abweichung = istMenge - planMenge
     const materialVerfuegbar = istArbeitstag
     
-    // ✅ KAPAZITÄTSAUSLASTUNG KORREKT BERECHNEN
-    // Auslastung = Ist-Produktion / Maximale Kapazität (nicht Plan!)
     const kapazitaetProSchicht = 
-      konfiguration.produktion.kapazitaetProStunde * 
-      konfiguration.produktion.stundenProSchicht
+      konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
     const schichten = istArbeitstag ? Math.ceil(istMenge / kapazitaetProSchicht) : 0
     
-    // Maximale Kapazität = Anzahl Schichten × Kapazität pro Schicht
     const maxKapazitaet = schichten > 0 ? schichten * kapazitaetProSchicht : 0
     const auslastung = maxKapazitaet > 0 ? (istMenge / maxKapazitaet) * 100 : 0
     
@@ -294,6 +312,7 @@ export function generiereTagesproduktion(
       wochentag,
       monat,
       monatName: saisonInfo.nameKurz,
+      kalenderwoche: kw,
       istArbeitstag,
       istFeiertag,
       feiertagsName,
@@ -310,12 +329,12 @@ export function generiereTagesproduktion(
       schichten,
       auslastung: Math.round(auslastung * 10) / 10,
       materialVerfuegbar,
-      kumulativPlan: 0, // Wird später berechnet
-      kumulativIst: 0   // Wird später berechnet
+      kumulativPlan: 0,
+      kumulativIst: 0
     })
   }
   
-  // Kumulative Werte berechnen
+  // Kumulative Werte
   let kumulativPlan = 0
   let kumulativIst = 0
   result.forEach(tag => {
@@ -325,122 +344,82 @@ export function generiereTagesproduktion(
     tag.kumulativIst = kumulativIst
   })
   
-  // ✅ VALIDIERUNG & FINALE KORREKTUR
-  let summePlan = result.reduce((sum, tag) => sum + tag.planMenge, 0)
-  let summeIst = result.reduce((sum, tag) => sum + tag.istMenge, 0)
-  
-  const differenz = summePlan - konfiguration.jahresproduktion
-  
-  if (differenz !== 0) {
-    // ⚠️ Finale Korrektur: Verteile Differenz intelligent auf Arbeitstage
-    console.warn(`⚠️ FINALE KORREKTUR: Summendifferenz ${differenz} Bikes wird korrigiert`)
-    
-    // Finde Arbeitstage mit höchster Produktion (am flexibelsten für Anpassung)
-    const arbeitstage = result.filter(t => t.istArbeitstag)
-    
-    // Sortiere nach Plan-Menge (höchste zuerst) für gleichmäßigere Verteilung
-    arbeitstage.sort((a, b) => b.planMenge - a.planMenge)
-    
-    let verbleibendeKorrektur = Math.abs(differenz)
-    const korrekturRichtung = differenz > 0 ? -1 : +1 // Zu viel → -1, zu wenig → +1
-    
-    // Verteile Korrektur auf mehrere Tage (max. 1 pro Tag für gleichmäßige Verteilung)
-    for (let i = 0; i < arbeitstage.length && verbleibendeKorrektur > 0; i++) {
-      const tag = arbeitstage[i]
+  // ✅ Validierung (Nur wenn kein Wochenplan-Override aktiv)
+  if (!wochenPlanung) {
+      let summePlan = result.reduce((sum, tag) => sum + tag.planMenge, 0)
+      const differenz = summePlan - konfiguration.jahresproduktion
       
-      // Korrigiere sowohl Plan als auch Ist (bleiben identisch!)
-      tag.planMenge += korrekturRichtung
-      tag.istMenge += korrekturRichtung
-      tag.abweichung = 0 // Bleibt 0, da Ist = Plan
-      
-      verbleibendeKorrektur--
-      
-      // Update kumulative Werte für alle folgenden Tage
-      const tagIndex = result.findIndex(t => t.tag === tag.tag)
-      for (let j = tagIndex; j < result.length; j++) {
-        result[j].kumulativPlan += korrekturRichtung
-        result[j].kumulativIst += korrekturRichtung
+      if (differenz !== 0) {
+        console.warn(`⚠️ FINALE KORREKTUR: Summendifferenz ${differenz} Bikes wird korrigiert`)
+        
+        const arbeitstage = result.filter(t => t.istArbeitstag)
+        arbeitstage.sort((a, b) => b.planMenge - a.planMenge)
+        
+        let verbleibendeKorrektur = Math.abs(differenz)
+        const korrekturRichtung = differenz > 0 ? -1 : +1 
+        
+        for (let i = 0; i < arbeitstage.length && verbleibendeKorrektur > 0; i++) {
+          const tag = arbeitstage[i]
+          tag.planMenge += korrekturRichtung
+          tag.istMenge += korrekturRichtung
+          tag.abweichung = 0 
+          verbleibendeKorrektur--
+          
+          const tagIndex = result.findIndex(t => t.tag === tag.tag)
+          for (let j = tagIndex; j < result.length; j++) {
+            result[j].kumulativPlan += korrekturRichtung
+            result[j].kumulativIst += korrekturRichtung
+          }
+        }
       }
-    }
-    
-    // Re-Berechnung nach Korrektur
-    summePlan = result.reduce((sum, tag) => sum + tag.planMenge, 0)
-    summeIst = result.reduce((sum, tag) => sum + tag.istMenge, 0)
-    
-    console.log(`✓ Nach Korrektur: Plan=${summePlan.toLocaleString('de-DE')}, Ist=${summeIst.toLocaleString('de-DE')} (Ziel: ${konfiguration.jahresproduktion.toLocaleString('de-DE')})`)
   }
-  
-  // ✅ FINALE VALIDIERUNG: MUSS exakt sein!
-  if (summePlan !== konfiguration.jahresproduktion) {
-    console.error(`❌ KRITISCHER FEHLER: Plan-Menge = ${summePlan}, Soll = ${konfiguration.jahresproduktion}, Differenz = ${summePlan - konfiguration.jahresproduktion} Bikes!`)
-    throw new Error(`Error Management fehlgeschlagen: Jahresproduktion weicht um ${summePlan - konfiguration.jahresproduktion} Bikes ab!`)
-  }
-  
-  if (summeIst !== konfiguration.jahresproduktion) {
-    console.error(`❌ KRITISCHER FEHLER: Ist-Menge = ${summeIst}, Soll = ${konfiguration.jahresproduktion}, Differenz = ${summeIst - konfiguration.jahresproduktion} Bikes!`)
-    throw new Error(`Ist-Produktion fehlerhaft: Weicht um ${summeIst - konfiguration.jahresproduktion} Bikes ab!`)
-  }
-  
-  console.log(`✅ VALIDIERUNG ERFOLGREICH: Plan=${summePlan.toLocaleString('de-DE')}, Ist=${summeIst.toLocaleString('de-DE')} = Jahresproduktion=${konfiguration.jahresproduktion.toLocaleString('de-DE')} Bikes (100,00% Exakt!)`)
-  
   
   return result
 }
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ========================================
  * PRODUKTIONSPLANUNG FÜR VARIANTEN
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ========================================
  */
 
-/**
- * Generiert Produktionsplan für eine bestimmte MTB-Variante
- * 
- * @param konfiguration - KonfigurationData aus Context
- * @param varianteId - ID der Variante (z.B. "MTBAllrounder")
- * @returns VariantenProduktionsplan mit 365 Tagen
- */
 export function generiereVariantenProduktionsplan(
   konfiguration: KonfigurationData,
-  varianteId: string
+  varianteId: string,
+  wochenPlanung?: WochenPlanung
 ): VariantenProduktionsplan | null {
   const variante = konfiguration.varianten.find(v => v.id === varianteId)
   if (!variante) return null
   
   const jahresProduktion = Math.round(konfiguration.jahresproduktion * variante.anteilPrognose)
   
-  // Erstelle Konfiguration nur für diese Variante
   const varianteKonfiguration: KonfigurationData = {
     ...konfiguration,
     jahresproduktion: jahresProduktion
   }
   
-  const tage = generiereTagesproduktion(varianteKonfiguration)
+  const tage = generiereTagesproduktion(varianteKonfiguration, wochenPlanung)
   const jahresProduktionIst = tage.reduce((sum, t) => sum + t.istMenge, 0)
   
   return {
     varianteId: variante.id,
     varianteName: variante.name,
-    jahresProduktion,
+    jahresProduktion: wochenPlanung ? jahresProduktionIst : jahresProduktion,
     jahresProduktionIst,
-    abweichung: jahresProduktionIst - jahresProduktion,
+    abweichung: wochenPlanung ? 0 : (jahresProduktionIst - jahresProduktion),
     tage
   }
 }
 
-/**
- * Generiert Produktionspläne für ALLE 8 MTB-Varianten
- * 
- * @param konfiguration - KonfigurationData aus Context
- * @returns Record<varianteId, VariantenProduktionsplan>
- */
 export function generiereAlleVariantenProduktionsplaene(
-  konfiguration: KonfigurationData
+  konfiguration: KonfigurationData,
+  wochenPlanungen?: Record<string, WochenPlanung>
 ): Record<string, VariantenProduktionsplan> {
   const plaene: Record<string, VariantenProduktionsplan> = {}
   
   konfiguration.varianten.forEach(variante => {
-    const plan = generiereVariantenProduktionsplan(konfiguration, variante.id)
+    const planOverride = wochenPlanungen ? wochenPlanungen[variante.id] : undefined;
+    const plan = generiereVariantenProduktionsplan(konfiguration, variante.id, planOverride)
     if (plan) {
       plaene[variante.id] = plan
     }
@@ -450,9 +429,9 @@ export function generiereAlleVariantenProduktionsplaene(
 }
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ========================================
  * LAGERBESTANDS-BERECHNUNG
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ========================================
  */
 
 export interface LagerbestandInfo {
@@ -466,31 +445,20 @@ export interface LagerbestandInfo {
   jahresbedarf: number
 }
 
-/**
- * Berechnet Lagerbestände basierend auf Produktionsplan
- * 
- * ✅ ERMÄSSIGUNG: Nur 4 Sattel-Varianten
- * 
- * @param konfiguration - KonfigurationData aus Context
- * @returns Array von Lagerbestand-Informationen
- */
 export function berechneLagerbestaende(
   konfiguration: KonfigurationData
 ): LagerbestandInfo[] {
-  // Berechne Jahresproduktion pro Variante
   const variantenProduktion: Record<string, number> = {}
   konfiguration.varianten.forEach(v => {
     variantenProduktion[v.id] = Math.round(konfiguration.jahresproduktion * v.anteilPrognose)
   })
   
-  // Berechne Bedarf für jede Komponente
   const komponentenBedarf: Record<string, {
     jahresbedarf: number
     verwendung: string[]
     name: string
   }> = {}
   
-  // Initialisiere mit allen Bauteilen
   konfiguration.bauteile.forEach(bauteil => {
     komponentenBedarf[bauteil.id] = {
       jahresbedarf: 0,
@@ -499,14 +467,12 @@ export function berechneLagerbestaende(
     }
   })
   
-  // Berechne Jahresbedarf basierend auf Stückliste
   konfiguration.stueckliste.forEach(position => {
     const produktion = variantenProduktion[position.mtbVariante] || 0
     const bedarf = produktion * position.menge
     
     if (komponentenBedarf[position.bauteilId]) {
       komponentenBedarf[position.bauteilId].jahresbedarf += bedarf
-      
       const variante = konfiguration.varianten.find(v => v.id === position.mtbVariante)
       if (variante) {
         komponentenBedarf[position.bauteilId].verwendung.push(variante.name)
@@ -514,15 +480,14 @@ export function berechneLagerbestaende(
     }
   })
   
-  // Generiere Lagerbestände
   const lagerbestaende: LagerbestandInfo[] = []
   
   Object.entries(komponentenBedarf).forEach(([bauteilId, info]) => {
-    if (info.jahresbedarf === 0) return // Keine Verwendung
+    if (info.jahresbedarf === 0) return 
     
     const tagesbedarf = Math.round(info.jahresbedarf / 365)
-    const sicherheit = Math.round(info.jahresbedarf / 365 * 7) // 7 Tage Puffer
-    const bestand = Math.round(info.jahresbedarf * 0.35) // 35% Lagerbestand
+    const sicherheit = Math.round(info.jahresbedarf / 365 * 7)
+    const bestand = Math.round(info.jahresbedarf * 0.35) 
     
     let status: 'ok' | 'niedrig' | 'kritisch' = 'ok'
     if (bestand < sicherheit) {
@@ -546,51 +511,30 @@ export function berechneLagerbestaende(
   return lagerbestaende.sort((a, b) => a.komponente.localeCompare(b.komponente))
 }
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════════
- * LAGERBESTANDS-BERECHNUNG AUF TAGESBASIS
- * ═══════════════════════════════════════════════════════════════════════════════
- */
-
 export interface TagesLagerbestand {
   tag: number
   datum: Date
   wochentag: string
   monat: number
   istArbeitstag: boolean
-  
-  // Pro Bauteil
   bauteile: {
     bauteilId: string
     bauteilName: string
     anfangsBestand: number
-    zugang: number          // Lieferungen von Zulieferer
-    verbrauch: number       // Produktion (= Bikes produziert × 1)
-    endBestand: number      // anfang + zugang - verbrauch
+    zugang: number          
+    verbrauch: number       
+    endBestand: number      
     sicherheit: number
-    verfuegbar: number      // endBestand - sicherheit
-    reichweite: number      // verfuegbar / durchschnittlicher Tagesbedarf
+    verfuegbar: number      
+    reichweite: number      
     status: 'ok' | 'niedrig' | 'kritisch'
   }[]
 }
 
-/**
- * Berechnet Lagerbestandsentwicklung über 365 Tage
- * 
- * Simuliert Lagerbewegungen:
- * - Anfangsbestand am 01.01.2027
- * - Zugänge durch Lieferungen (vereinfacht: konstante Nachlieferung)
- * - Abgänge durch Produktion (1:1 Stückliste)
- * 
- * @param konfiguration - KonfigurationData aus Context
- * @param tagesProduktion - Produktionsplan (für Verbrauch)
- * @returns Array mit 365 Tagen Lagerbeständen
- */
 export function berechneTagesLagerbestaende(
   konfiguration: KonfigurationData,
   tagesProduktion: TagesProduktionEntry[]
 ): TagesLagerbestand[] {
-  // Berechne Jahresbedarfe pro Bauteil
   const variantenProduktion: Record<string, number> = {}
   konfiguration.varianten.forEach(v => {
     variantenProduktion[v.id] = Math.round(konfiguration.jahresproduktion * v.anteilPrognose)
@@ -613,26 +557,22 @@ export function berechneTagesLagerbestaende(
   konfiguration.stueckliste.forEach(position => {
     const produktion = variantenProduktion[position.mtbVariante] || 0
     const bedarf = produktion * position.menge
-    
     if (bauteilBedarfe[position.bauteilId]) {
       bauteilBedarfe[position.bauteilId].jahresbedarf += bedarf
     }
   })
   
-  // Tagesbedarfe berechnen
   Object.keys(bauteilBedarfe).forEach(bauteilId => {
     const info = bauteilBedarfe[bauteilId]
     info.tagesbedarf = Math.round(info.jahresbedarf / 365)
   })
   
-  // Anfangsbestände (35% des Jahresbedarfs als Startlager)
   const aktuelleBestaende: Record<string, number> = {}
   Object.keys(bauteilBedarfe).forEach(bauteilId => {
     const jahresbedarf = bauteilBedarfe[bauteilId].jahresbedarf
     aktuelleBestaende[bauteilId] = Math.round(jahresbedarf * 0.35)
   })
   
-  // Simuliere Lagerbewegungen über 365 Tage
   const result: TagesLagerbestand[] = []
   
   tagesProduktion.forEach((tag, index) => {
@@ -645,13 +585,8 @@ export function berechneTagesLagerbestaende(
       if (!info || info.jahresbedarf === 0) return
       
       const anfangsBestand = aktuelleBestaende[bauteilId]
-      
-      // Vereinfachte Zugangslogik: Konstante Nachlieferung (Tagesbedarf × 1.1 für Buffer)
-      // In Realität würde hier die Inbound-Logik mit Losgrößen 500 und Vorlaufzeit 49 Tage greifen
       const zugang = tag.istArbeitstag ? Math.round(info.tagesbedarf * 1.1) : 0
       
-      // Verbrauch = Produktion an diesem Tag × Stücklistenmenge (1:1)
-      // Berechne wie viele Bikes diese Komponente benötigen
       let verbrauch = 0
       konfiguration.stueckliste.forEach(position => {
         if (position.bauteilId === bauteilId) {
@@ -664,7 +599,7 @@ export function berechneTagesLagerbestaende(
       const endBestand = Math.max(0, anfangsBestand + zugang - verbrauch)
       aktuelleBestaende[bauteilId] = endBestand
       
-      const sicherheit = Math.round(info.tagesbedarf * 7) // 7 Tage Sicherheit
+      const sicherheit = Math.round(info.tagesbedarf * 7)
       const verfuegbar = Math.max(0, endBestand - sicherheit)
       const reichweite = info.tagesbedarf > 0 ? verfuegbar / info.tagesbedarf : 999
       
@@ -703,17 +638,11 @@ export function berechneTagesLagerbestaende(
 }
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ========================================
  * STATISTIKEN
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ========================================
  */
 
-/**
- * Berechnet Produktionsstatistiken
- * 
- * @param tagesProduktion - Array von TagesProduktionEntry
- * @returns Statistiken
- */
 export function berechneProduktionsStatistiken(tagesProduktion: TagesProduktionEntry[]) {
   const geplant = tagesProduktion.reduce((sum, tag) => sum + tag.planMenge, 0)
   const produziert = tagesProduktion.reduce((sum, tag) => sum + tag.istMenge, 0)
@@ -721,10 +650,8 @@ export function berechneProduktionsStatistiken(tagesProduktion: TagesProduktionE
   const schichtenGesamt = tagesProduktion.reduce((sum, tag) => sum + tag.schichten, 0)
   const planerfuellungsgrad = geplant > 0 ? (produziert / geplant) * 100 : 0
   
-  // Tage mit Materialmangel (TODO: Aus ATP-Check)
   const mitMaterialmangel = tagesProduktion.filter(tag => !tag.materialVerfuegbar).length
   
-  // Durchschnittliche Auslastung
   const auslastungsDurchschnitt = arbeitstage > 0
     ? tagesProduktion
         .filter(tag => tag.istArbeitstag)
@@ -741,4 +668,34 @@ export function berechneProduktionsStatistiken(tagesProduktion: TagesProduktionE
     mitMaterialmangel,
     auslastung: Math.round(auslastungsDurchschnitt * 10) / 10
   }
+}
+
+/**
+ * ========================================
+ * VISUALISIERUNG & REPORTING (NEU)
+ * ========================================
+ */
+
+export interface RueckstandsDatenpunkt {
+  datum: string;
+  rueckstand: number; // Positive = Rückstand (Zu wenig produziert), Negative = Vorlauf
+  kumulativSoll: number;
+  kumulativIst: number;
+}
+
+/**
+ * Berechnet den täglichen Produktionsrückstand für Visualisierungen.
+ * 
+ */
+export function berechneProduktionsRueckstandTrend(
+  tagesProduktion: TagesProduktionEntry[]
+): RueckstandsDatenpunkt[] {
+  return tagesProduktion.map(tag => ({
+    datum: tag.datum.toISOString().split('T')[0],
+    // Rückstand = Was wir hätten bauen sollen (kumulativPlan) - Was wir gebaut haben (kumulativIst)
+    // Wenn Plan = 1000, Ist = 900 -> Rückstand = 100 (Positiv)
+    rueckstand: tag.kumulativPlan - tag.kumulativIst, 
+    kumulativSoll: tag.kumulativPlan,
+    kumulativIst: tag.kumulativIst
+  }));
 }
