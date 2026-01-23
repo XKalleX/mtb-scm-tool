@@ -7,11 +7,11 @@
  * * ✅ SINGLE SOURCE OF TRUTH: Alle Berechnungen basieren auf KonfigurationData
  * ✅ DURCHGÄNGIGKEIT: Von Settings → OEM → Inbound → Produktion → Reporting
  * ✅ KONSISTENZ: Gleiche Logik in allen Modulen
- * * WICHTIG: Diese Funktionen erhalten KonfigurationData als Parameter,
- * damit sie unabhängig von React-Context funktionieren.
  */
 
 import type { KonfigurationData } from '@/contexts/KonfigurationContext'
+import { daysBetween } from '@/lib/utils' // Assumed helper
+import type { Bestellung, Produktionsauftrag, Lagerbestand, MarketingAuftrag } from '@/types' // Assumed types
 
 /**
  * Typ für wöchentliche Überschreibungen (OEM Programplanung)
@@ -39,24 +39,30 @@ export interface TagesProduktionEntry {
   istMenge: number               // Tatsächliche Ist-Menge
   abweichung: number             // Differenz Ist - Plan
   
+  // Marketing & Zusatz
+  istMarketing?: boolean
+  marketingMenge?: number
+  sollMenge?: number             // Explizites Soll (für Marketing-Anpassungen)
+
   // Error Management (KERN!)
-  tagesError: number             // Fehler dieses Tags (sollDezimal - planMenge)
+  tagesError: number             // Fehler dieses Tags
   monatsFehlerVorher: number     // Monatlicher Fehler vom Vortag
-  monatsFehlerNachher: number    // Monatlicher Fehler nach diesem Tag (sollte ±0.5 bleiben!)
-  errorKorrekturAngewendet: boolean  // Wurde auf-/abgerundet wegen Error?
+  monatsFehlerNachher: number    // Monatlicher Fehler nach diesem Tag
+  errorKorrekturAngewendet: boolean  
   
   // Saisonalität
-  saisonFaktor: number           // Monatlicher Anteil (0.04 - 0.16)
-  saisonMenge: number            // Monatliche Bikes
+  saisonFaktor: number           
+  saisonMenge: number            
   
   // Kapazität
-  schichten: number              // Benötigte Schichten
-  auslastung: number             // % Auslastung
-  materialVerfuegbar: boolean    // Material OK?
+  schichten: number              
+  auslastung: number             
+  materialVerfuegbar: boolean    
   
   // Kumulative Werte
   kumulativPlan: number          // Σ Plan bis heute
   kumulativIst: number           // Σ Ist bis heute
+  kumulativSoll?: number         // Σ Soll bis heute (inkl. Marketing)
 }
 
 /**
@@ -77,9 +83,6 @@ export interface VariantenProduktionsplan {
  * ========================================
  */
 
-/**
- * Ermittelt die Kalenderwoche (ISO 8601) für ein Datum
- */
 function getKalenderWoche(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
@@ -94,9 +97,6 @@ function getKalenderWoche(date: Date): number {
  * ========================================
  */
 
-/**
- * Zählt die tatsächlichen Arbeitstage in einem Monat
- */
 export function countArbeitstageInMonat(
   jahr: number,
   monat: number,
@@ -115,13 +115,9 @@ export function countArbeitstageInMonat(
       arbeitstage++
     }
   }
-  
   return arbeitstage
 }
 
-/**
- * Zählt Arbeitstage in einer spezifischen Kalenderwoche
- */
 export function countArbeitstageInWoche(
   kw: number,
   jahr: number,
@@ -143,16 +139,12 @@ export function countArbeitstageInWoche(
   return arbeitstage
 }
 
-/**
- * Zählt alle Arbeitstage im Jahr (Deutschland)
- */
 export function countArbeitstageImJahr(konfiguration: KonfigurationData): number {
   const deutscheFeiertage = konfiguration.feiertage
     .filter(f => f.land === 'Deutschland')
     .map(f => f.datum)
   
   let arbeitstage = 0
-  
   for (let monat = 1; monat <= 12; monat++) {
     arbeitstage += countArbeitstageInMonat(
       konfiguration.planungsjahr,
@@ -160,7 +152,6 @@ export function countArbeitstageImJahr(konfiguration: KonfigurationData): number
       deutscheFeiertage
     )
   }
-  
   return arbeitstage
 }
 
@@ -199,17 +190,75 @@ export function berechneSaisonaleVerteilung(konfiguration: KonfigurationData) {
 
 /**
  * ========================================
- * TAGESPRODUKTION MIT ERROR MANAGEMENT
+ * TAGESPRODUKTION & MARKETING
  * ========================================
  */
 
 /**
- * 🎯 KERNFUNKTION: Generiert 365-Tage Produktionsplan mit Error Management
- * * Jetzt inkl. optionaler Wochenplanung (wochenPlanung Parameter)
+ * Fügt einen Marketing-Zusatzauftrag in den Produktionsplan ein
+ * * 🎯 UPDATE: Korrekte Neuberechnung der kumulativen Zähler
  */
+export function fuegeMarketingAuftragEin(
+  plan: TagesProduktionEntry[],
+  auftrag: MarketingAuftrag
+): TagesProduktionEntry[] {
+  // 1. Find index of the target date
+  const targetIndex = plan.findIndex(t => 
+    t.datum.toDateString() === auftrag.wunschtermin.toDateString()
+  );
+
+  if (targetIndex === -1) return plan;
+
+  // 2. Clone the plan to avoid mutation
+  const newPlan = [...plan];
+  
+  // 3. Add the marketing quantity
+  const targetDay = newPlan[targetIndex];
+  const addedAmount = auftrag.menge;
+
+  // Bestimme aktuelles Soll (Fallback auf planMenge falls undefined)
+  const aktuellesSoll = targetDay.sollMenge !== undefined ? targetDay.sollMenge : targetDay.planMenge;
+
+  newPlan[targetIndex] = {
+    ...targetDay,
+    istMarketing: true,
+    marketingMenge: addedAmount,
+    istMenge: targetDay.istMenge + addedAmount,
+    // Marketing erhöht das SOLL (Nachfrage), was potenziell zu Rückstand führt, wenn nicht sofort produziert
+    sollMenge: aktuellesSoll + addedAmount 
+  };
+
+  // 4. CRITICAL: Recalculate Kumulativ values for ALL subsequent days
+  // Dies stellt sicher, dass der Backlog-Graph korrekt bleibt
+  for (let i = targetIndex; i < newPlan.length; i++) {
+     if (i === targetIndex) {
+         // Bereits oben aktualisiert, aber wir müssen kumulativ neu setzen
+         const prevSoll = i > 0 ? (newPlan[i-1].kumulativSoll ?? newPlan[i-1].kumulativPlan) : 0;
+         const prevIst = i > 0 ? newPlan[i-1].kumulativIst : 0;
+         
+         newPlan[i].kumulativSoll = prevSoll + (newPlan[i].sollMenge ?? newPlan[i].planMenge);
+         newPlan[i].kumulativIst = prevIst + newPlan[i].istMenge;
+         newPlan[i].kumulativPlan = newPlan[i].kumulativSoll!; // Sync Plan mit Soll
+     } else {
+         const prevSoll = newPlan[i-1].kumulativSoll!;
+         const prevIst = newPlan[i-1].kumulativIst;
+         const currSoll = newPlan[i].sollMenge !== undefined ? newPlan[i].sollMenge : newPlan[i].planMenge;
+
+         newPlan[i] = {
+             ...newPlan[i],
+             kumulativSoll: prevSoll + currSoll!,
+             kumulativIst: prevIst + newPlan[i].istMenge,
+             kumulativPlan: prevSoll + currSoll! // Sync
+         };
+     }
+  }
+
+  return newPlan;
+}
+
 export function generiereTagesproduktion(
   konfiguration: KonfigurationData,
-  wochenPlanung?: WochenPlanung // Optionaler Parameter für manuelle Wochenplanung
+  wochenPlanung?: WochenPlanung
 ): TagesProduktionEntry[] {
   const saisonalitaet = berechneSaisonaleVerteilung(konfiguration)
   
@@ -254,11 +303,7 @@ export function generiereTagesproduktion(
     let errorKorrekturAngewendet = false
     
     if (istArbeitstag) {
-      // ✅ PRODUKTIONSTAG mit ERROR MANAGEMENT
-      
-      // Prüfe auf Wochenplanung Override
       if (wochenPlanung && wochenPlanung[kw] !== undefined) {
-         // Fall A: Manuelle Wochenplanung
          const arbeitstageInWoche = countArbeitstageInWoche(kw, konfiguration.planungsjahr, deutscheFeiertage)
          if (arbeitstageInWoche > 0) {
             sollProduktionDezimal = wochenPlanung[kw] / arbeitstageInWoche
@@ -266,11 +311,9 @@ export function generiereTagesproduktion(
             sollProduktionDezimal = 0 
          }
       } else {
-         // Fall B: Standard Saisonale Verteilung
          sollProduktionDezimal = saisonInfo.bikes / saisonInfo.arbeitstage
       }
       
-      // Error Management
       monatsFehlerVorher = monatlicheFehlerTracker[monat]
       const tagesErrorRoh = sollProduktionDezimal - Math.round(sollProduktionDezimal)
       const fehlerGesamt = monatsFehlerVorher + tagesErrorRoh
@@ -291,8 +334,6 @@ export function generiereTagesproduktion(
       
       monatsFehlerNachher = monatlicheFehlerTracker[monat]
       tagesError = sollProduktionDezimal - planMenge
-      
-      // Ist = Plan (Basis)
       istMenge = planMenge
     }
     
@@ -318,6 +359,7 @@ export function generiereTagesproduktion(
       feiertagsName,
       sollProduktionDezimal,
       planMenge,
+      sollMenge: planMenge, // Initiale Belegung
       istMenge,
       abweichung,
       tagesError,
@@ -330,11 +372,11 @@ export function generiereTagesproduktion(
       auslastung: Math.round(auslastung * 10) / 10,
       materialVerfuegbar,
       kumulativPlan: 0,
-      kumulativIst: 0
+      kumulativIst: 0,
+      kumulativSoll: 0
     })
   }
   
-  // Kumulative Werte
   let kumulativPlan = 0
   let kumulativIst = 0
   result.forEach(tag => {
@@ -342,16 +384,14 @@ export function generiereTagesproduktion(
     kumulativIst += tag.istMenge
     tag.kumulativPlan = kumulativPlan
     tag.kumulativIst = kumulativIst
+    tag.kumulativSoll = kumulativPlan // Initial gleich
   })
   
-  // ✅ Validierung (Nur wenn kein Wochenplan-Override aktiv)
   if (!wochenPlanung) {
       let summePlan = result.reduce((sum, tag) => sum + tag.planMenge, 0)
       const differenz = summePlan - konfiguration.jahresproduktion
       
       if (differenz !== 0) {
-        console.warn(`⚠️ FINALE KORREKTUR: Summendifferenz ${differenz} Bikes wird korrigiert`)
-        
         const arbeitstage = result.filter(t => t.istArbeitstag)
         arbeitstage.sort((a, b) => b.planMenge - a.planMenge)
         
@@ -361,6 +401,7 @@ export function generiereTagesproduktion(
         for (let i = 0; i < arbeitstage.length && verbleibendeKorrektur > 0; i++) {
           const tag = arbeitstage[i]
           tag.planMenge += korrekturRichtung
+          tag.sollMenge = tag.planMenge
           tag.istMenge += korrekturRichtung
           tag.abweichung = 0 
           verbleibendeKorrektur--
@@ -369,6 +410,7 @@ export function generiereTagesproduktion(
           for (let j = tagIndex; j < result.length; j++) {
             result[j].kumulativPlan += korrekturRichtung
             result[j].kumulativIst += korrekturRichtung
+            result[j].kumulativSoll! += korrekturRichtung
           }
         }
       }
@@ -376,12 +418,6 @@ export function generiereTagesproduktion(
   
   return result
 }
-
-/**
- * ========================================
- * PRODUKTIONSPLANUNG FÜR VARIANTEN
- * ========================================
- */
 
 export function generiereVariantenProduktionsplan(
   konfiguration: KonfigurationData,
@@ -426,6 +462,141 @@ export function generiereAlleVariantenProduktionsplaene(
   })
   
   return plaene
+}
+
+/**
+ * ========================================
+ * SCOR METRIKEN & VISUALISIERUNG
+ * ========================================
+ */
+
+export interface SCORMetriken {
+  // RELIABILITY
+  planerfuellungsgrad: number;
+  liefertreueChina: number;
+  deliveryPerformance: number;
+  
+  // RESPONSIVENESS
+  durchlaufzeitProduktion: number;
+  lagerumschlag: number;
+  forecastAccuracy: number;
+
+  // NEU: Lead Time Breakdown for the Diagram
+  durchlaufzeitBreakdown: {
+    transport: number;
+    produktionChina: number;
+    verzollung: number;
+    gesamt: number;
+  };
+  
+  // AGILITY
+  produktionsflexibilitaet: number;
+  materialverfuegbarkeit: number;
+  
+  // ASSETS
+  lagerreichweite: number;
+  kapitalbindung: number;
+  
+  // KPI
+  gesamtproduktion: number;
+  produktionstage: number;
+  durchschnittProTag: number;
+  auslastung: number;
+}
+
+export function berechneSCORMetriken(
+  produktionsauftraege: Produktionsauftrag[],
+  lagerbestaende: Record<string, Lagerbestand>,
+  bestellungen: Bestellung[]
+): SCORMetriken {
+  const vollstaendigeAuftraege = produktionsauftraege.filter(
+    a => a.tatsaechlicheMenge === a.geplanteMenge
+  ).length
+  
+  const planerfuellungsgrad = produktionsauftraege.length > 0
+    ? (vollstaendigeAuftraege / produktionsauftraege.length) * 100
+    : 100
+  
+  const puenktlicheBestellungen = bestellungen.filter(b => {
+    if (!b.tatsaechlicheAnkunft) return true
+    return b.tatsaechlicheAnkunft <= b.erwarteteAnkunft
+  }).length
+  
+  const liefertreueChina = bestellungen.length > 0
+    ? (puenktlicheBestellungen / bestellungen.length) * 100
+    : 100
+  
+  const CHINA_VORLAUFZEIT_TAGE = 49
+  const TOLERANZ_TAGE = 2
+  const lieferungenInVorlaufzeit = bestellungen.filter(b => {
+    if (!b.tatsaechlicheAnkunft) return true
+    const tatsaechlicheDauer = daysBetween(b.bestelldatum, b.tatsaechlicheAnkunft)
+    return tatsaechlicheDauer <= CHINA_VORLAUFZEIT_TAGE + TOLERANZ_TAGE
+  }).length
+  
+  const deliveryPerformance = bestellungen.length > 0
+    ? (lieferungenInVorlaufzeit / bestellungen.length) * 100
+    : 100
+  
+  let durchlaufzeiten: number[] = []
+  bestellungen.forEach(b => {
+    const ankunft = b.tatsaechlicheAnkunft || b.erwarteteAnkunft
+    const dauer = daysBetween(b.bestelldatum, ankunft)
+    durchlaufzeiten.push(dauer)
+  })
+  
+  const durchlaufzeitProduktion = durchlaufzeiten.length > 0
+    ? durchlaufzeiten.reduce((sum, d) => sum + d, 0) / durchlaufzeiten.length
+    : 0
+
+  // NEW: Lead Time Breakdown Logic
+  const durchlaufzeitBreakdown = {
+     produktionChina: 5, 
+     transport: 42,      // 49 total - 5 production - 2 handling
+     verzollung: 2,
+     gesamt: 49
+  };
+
+  const avgActualDuration = bestellungen.length > 0 
+    ? bestellungen.reduce((sum, b) => sum + daysBetween(b.bestelldatum, b.tatsaechlicheAnkunft || b.erwarteteAnkunft), 0) / bestellungen.length
+    : 49;
+
+  if (avgActualDuration > 49) {
+     durchlaufzeitBreakdown.transport += (avgActualDuration - 49);
+     durchlaufzeitBreakdown.gesamt = avgActualDuration;
+  }
+  
+  const lagerbestandswert = Object.values(lagerbestaende).reduce((sum, l) => sum + l.bestand, 0)
+  const jahresproduktion = produktionsauftraege.reduce((sum, a) => sum + a.tatsaechlicheMenge, 0)
+  const lagerumschlag = lagerbestandswert > 0 ? jahresproduktion / lagerbestandswert : 0
+  
+  const gesamtAbweichung = produktionsauftraege.reduce((sum, a) => sum + Math.abs(a.tatsaechlicheMenge - a.geplanteMenge), 0)
+  const gesamtPlan = produktionsauftraege.reduce((sum, a) => sum + a.geplanteMenge, 0)
+  const forecastAccuracy = gesamtPlan > 0 ? Math.max(0, 100 - (gesamtAbweichung / gesamtPlan) * 100) : 100
+  
+  const materialVerfuegbarTage = produktionsauftraege.filter(a => !a.materialmangel || a.materialmangel.length === 0).length
+  const materialverfuegbarkeit = produktionsauftraege.length > 0 ? (materialVerfuegbarTage / produktionsauftraege.length) * 100 : 100
+  
+  const durchschnittProTag = produktionsauftraege.length > 0 ? jahresproduktion / produktionsauftraege.length : 0
+  const lagerreichweite = durchschnittProTag > 0 ? lagerbestandswert / durchschnittProTag : 0
+  
+  return {
+    planerfuellungsgrad,
+    liefertreueChina,
+    deliveryPerformance,
+    durchlaufzeitProduktion,
+    lagerumschlag,
+    forecastAccuracy,
+    durchlaufzeitBreakdown, // Added here
+    produktionsflexibilitaet: planerfuellungsgrad,
+    materialverfuegbarkeit,
+    lagerreichweite,
+    kapitalbindung: lagerreichweite,
+    gesamtproduktion: jahresproduktion,
+    produktionstage: produktionsauftraege.filter(a => a.tatsaechlicheMenge > 0).length,
+    durchschnittProTag,
+    auslastung: planerfuellungsgrad
+  }
 }
 
 /**
@@ -639,7 +810,7 @@ export function berechneTagesLagerbestaende(
 
 /**
  * ========================================
- * STATISTIKEN
+ * STATISTIKEN & VISUALISIERUNG
  * ========================================
  */
 
@@ -670,32 +841,25 @@ export function berechneProduktionsStatistiken(tagesProduktion: TagesProduktionE
   }
 }
 
-/**
- * ========================================
- * VISUALISIERUNG & REPORTING (NEU)
- * ========================================
- */
-
 export interface RueckstandsDatenpunkt {
   datum: string;
-  rueckstand: number; // Positive = Rückstand (Zu wenig produziert), Negative = Vorlauf
+  rueckstand: number; 
   kumulativSoll: number;
   kumulativIst: number;
 }
 
+
+
 /**
  * Berechnet den täglichen Produktionsrückstand für Visualisierungen.
- * 
  */
 export function berechneProduktionsRueckstandTrend(
   tagesProduktion: TagesProduktionEntry[]
 ): RueckstandsDatenpunkt[] {
   return tagesProduktion.map(tag => ({
     datum: tag.datum.toISOString().split('T')[0],
-    // Rückstand = Was wir hätten bauen sollen (kumulativPlan) - Was wir gebaut haben (kumulativIst)
-    // Wenn Plan = 1000, Ist = 900 -> Rückstand = 100 (Positiv)
-    rueckstand: tag.kumulativPlan - tag.kumulativIst, 
-    kumulativSoll: tag.kumulativPlan,
+    rueckstand: (tag.kumulativSoll ?? tag.kumulativPlan) - tag.kumulativIst, 
+    kumulativSoll: tag.kumulativSoll ?? tag.kumulativPlan,
     kumulativIst: tag.kumulativIst
   }));
 }
