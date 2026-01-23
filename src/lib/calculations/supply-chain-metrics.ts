@@ -2,18 +2,14 @@
  * ========================================
  * ZENTRALER SUPPLY CHAIN METRICS RECHNER
  * ========================================
- * 
- * SINGLE SOURCE OF TRUTH für alle Berechnungen im Tool.
+ * * SINGLE SOURCE OF TRUTH für alle Berechnungen im Tool.
  * Diese Datei berechnet alle KPIs dynamisch basierend auf:
  * - Konfigurationswerte (Jahresproduktion, Saisonalität, etc.)
  * - Aktive Szenarien (Marketing, Maschinenausfall, etc.)
- * 
- * Alle Seiten (Dashboard, Reporting, etc.) MÜSSEN diese
+ * * Alle Seiten (Dashboard, Reporting, etc.) MÜSSEN diese
  * Berechnungen nutzen für konsistente Daten!
- * 
- * Quelle: kontext/Spezifikation_SSOT_MR.ts
- * 
- * NEU: Unterstützt dynamische Konfiguration aus KonfigurationContext
+ * * Quelle: kontext/Spezifikation_SSOT_MR.ts
+ * * NEU: Unterstützt dynamische Konfiguration aus KonfigurationContext
  */
 
 import { SzenarioConfig } from '@/contexts/SzenarienContext'
@@ -79,6 +75,14 @@ export const WASSERSCHADEN_VERLUST_DIVISOR = 10000
  * 1 Tag Verzögerung = 1% Penalty auf Lieferperformance
  */
 export const DURCHLAUFZEIT_PENALTY_FAKTOR = 100
+
+// <--- CHANGED: New Constant for "Lean" Inventory Goal
+/**
+ * Ziel-Sicherheitsbestand: 3 Tage
+ * Ersetzt die alte Annahme von 2 Wochen (Just-in-Time Ziel)
+ */
+export const ZIEL_SICHERHEITSBESTAND_TAGE = 3 
+
 
 // ========================================
 // KONFIGURATION INTERFACE (für dynamische Werte)
@@ -155,18 +159,10 @@ export interface MonatsProduktion {
 
 /**
  * Berechnet die monatliche Produktionsverteilung basierend auf SSOT
- * 
- * Verwendet saisonalitaetData.saisonalitaetMonatlich mit Struktur:
- * - monat: 1-12 (Monatsnummer)
- * - anteil: Prozentanteil der Jahresproduktion (Summe muss 100% ergeben)
- * - name: Monatsname (z.B. "Januar")
- * 
- * @param jahresproduktion - Gesamtproduktion pro Jahr
- * @returns Array mit 12 Monatsproduktionen
  */
 export function berechneMonatlicheProduktion(jahresproduktion: number): MonatsProduktion[] {
   const monatsnamen = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
-  
+   
   return saisonalitaetData.saisonalitaetMonatlich.map((monat, index) => {
     const plan = Math.round(jahresproduktion * monat.anteil / 100)
     // Ist-Wert mit leichter natürlicher Abweichung (ca. 1-2%)
@@ -197,8 +193,6 @@ export interface VariantenProduktion {
 
 /**
  * Berechnet die Produktion pro MTB-Variante basierend auf SSOT
- * @param jahresproduktion - Gesamtproduktion pro Jahr
- * @returns Array mit 8 Variantenproduktionen
  */
 export function berechneVariantenProduktion(jahresproduktion: number): VariantenProduktion[] {
   return stammdatenData.varianten.map(variante => ({
@@ -218,7 +212,7 @@ export interface SzenarioAuswirkungen {
   produktionsmenge: number
   produktionsDelta: number
   produktionsDeltaProzent: number
-  
+   
   // Lieferkettenbezogen
   materialverfuegbarkeit: number
   materialverfuegbarkeitDelta: number
@@ -226,12 +220,12 @@ export interface SzenarioAuswirkungen {
   liefertreueDelta: number
   durchlaufzeit: number
   durchlaufzeitDelta: number
-  
+   
   // Leistungsbezogen
   planerfuellungsgrad: number
   lagerumschlag: number
   auslastung: number
-  
+   
   // Produktionstage und Durchschnitt
   produktionstage: number
   durchschnittProTag: number
@@ -239,9 +233,6 @@ export interface SzenarioAuswirkungen {
 
 /**
  * Berechnet die Auswirkungen aller aktiven Szenarien auf die Supply Chain
- * 
- * @param aktiveSzenarien - Array von aktiven Szenario-Konfigurationen
- * @returns Berechnete Auswirkungen auf alle Metriken
  */
 export function berechneSzenarioAuswirkungen(aktiveSzenarien: SzenarioConfig[]): SzenarioAuswirkungen {
   // Start mit Baseline-Werten
@@ -322,20 +313,20 @@ export function berechneSzenarioAuswirkungen(aktiveSzenarien: SzenarioConfig[]):
     produktionsmenge: Math.round(produktionsmenge),
     produktionsDelta: Math.round(produktionsmenge - BASELINE.jahresproduktion),
     produktionsDeltaProzent: ((produktionsmenge - BASELINE.jahresproduktion) / BASELINE.jahresproduktion) * 100,
-    
+     
     materialverfuegbarkeit: Math.round(materialverfuegbarkeit * 10) / 10,
     materialverfuegbarkeitDelta: Math.round((materialverfuegbarkeit - BASELINE.materialverfuegbarkeit) * 10) / 10,
-    
+     
     liefertreue: Math.round(liefertreue * 10) / 10,
     liefertreueDelta: Math.round((liefertreue - BASELINE.liefertreue) * 10) / 10,
-    
+     
     durchlaufzeit: Math.round(durchlaufzeit),
     durchlaufzeitDelta: Math.round(durchlaufzeit - BASELINE.durchlaufzeit),
-    
+     
     planerfuellungsgrad: Math.round(planerfuellungsgrad * 100) / 100,
     lagerumschlag: Math.round(lagerumschlag * 10) / 10,
     auslastung: Math.round(auslastung * 100) / 100,
-    
+     
     produktionstage,
     durchschnittProTag
   }
@@ -350,20 +341,20 @@ export interface SCORMetrikenBerechnet {
   planerfuellungsgrad: number
   liefertreueChina: number
   deliveryPerformance: number        // NEU: % Lieferungen innerhalb Vorlaufzeit
-  
+   
   // RESPONSIVENESS (Reaktionsfähigkeit)
   durchlaufzeitProduktion: number
   lagerumschlag: number
   forecastAccuracy: number           // NEU: % Genauigkeit Plan vs. Ist
-  
+   
   // AGILITY (Flexibilität)
   produktionsflexibilitaet: number
   materialverfuegbarkeit: number
-  
+   
   // ASSETS (Anlagenverwaltung - KEINE KOSTEN!)
   lagerreichweite: number            // Lagerbestand in Tagen Reichweite
   kapitalbindung: number             // Durchschnittliche Lagerdauer in Tagen
-  
+   
   // PRODUKTIONS-KPIs
   gesamtproduktion: number
   produktionstage: number
@@ -371,27 +362,36 @@ export interface SCORMetrikenBerechnet {
   auslastung: number
 }
 
+// <--- CHANGED: Logic updated to use real inventory data instead of "2 weeks fixed"
 /**
  * Berechnet alle SCOR-Metriken basierend auf aktiven Szenarien
- * 
- * @param aktiveSzenarien - Array von aktiven Szenario-Konfigurationen
+ * * @param aktiveSzenarien - Array von aktiven Szenario-Konfigurationen
+ * @param realerLagerbestand - (NEU) Der aktuelle tatsächliche Lagerbestand aus der Simulation
  * @returns Vollständige SCOR-Metriken
  */
-export function berechneSCORMetriken(aktiveSzenarien: SzenarioConfig[]): SCORMetrikenBerechnet {
+export function berechneSCORMetriken(
+    aktiveSzenarien: SzenarioConfig[], 
+    realerLagerbestand: number // <--- CHANGED: Added parameter
+): SCORMetrikenBerechnet {
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
+   
+  // <--- CHANGED: Removed static "2 weeks" calculation.
+  // OLD CODE:
+  // const WOCHEN_PRO_JAHR = 52
+  // const LAGERBESTAND_WOCHEN = 2
+  // const durchschnittlicherLagerbestand = Math.round(auswirkungen.produktionsmenge / (WOCHEN_PRO_JAHR / LAGERBESTAND_WOCHEN))
   
-  // Lagerreichweite berechnen (in Tagen)
-  // Durchschnittlicher Lagerbestand: ca. 2 Wochen Produktion (52 Wochen / 2 = 26)
-  const WOCHEN_PRO_JAHR = 52
-  const LAGERBESTAND_WOCHEN = 2
-  const durchschnittlicherLagerbestand = Math.round(auswirkungen.produktionsmenge / (WOCHEN_PRO_JAHR / LAGERBESTAND_WOCHEN))
-  const lagerreichweite = Math.round((durchschnittlicherLagerbestand / auswirkungen.durchschnittProTag) * 10) / 10
-  
+  // NEW CODE:
+  // Lagerreichweite (Days of Supply) = Current Inventory / Daily Demand
+  const lagerreichweite = auswirkungen.durchschnittProTag > 0
+    ? Math.round((realerLagerbestand / auswirkungen.durchschnittProTag) * 10) / 10
+    : 0
+   
   // Kapitalbindung: Durchschnittliche Lagerdauer in Tagen
   // HINWEIS: Identisch mit Lagerreichweite, da beide die durchschnittliche Verweildauer
   // von Komponenten im Lager messen. Keine Kosten-Komponente mehr!
   const kapitalbindung = lagerreichweite
-  
+   
   // NEU: Delivery Performance - % Lieferungen innerhalb der Vorlaufzeit (49 Tage)
   // Basis: Liefertreue mit Toleranz für Durchlaufzeit-Verzögerungen
   const DURCHLAUFZEIT_PENALTY_FAKTOR = 100 // Divisor für Verzögerungsberechnung (1 Tag = 1% Penalty)
@@ -402,7 +402,7 @@ export function berechneSCORMetriken(aktiveSzenarien: SzenarioConfig[]): SCORMet
       auswirkungen.liefertreue * (1 - (auswirkungen.durchlaufzeit - BASELINE.durchlaufzeit) / DURCHLAUFZEIT_PENALTY_FAKTOR)
     )
   )
-  
+   
   // NEU: Forecast Accuracy - Genauigkeit der Planerfüllung
   // Berechnet aus der Abweichung zwischen Plan und Ist über alle Monate
   const monatlicheProduktion = berechneMonatlicheProduktion(auswirkungen.produktionsmenge)
@@ -411,26 +411,26 @@ export function berechneSCORMetriken(aktiveSzenarien: SzenarioConfig[]): SCORMet
   const forecastAccuracy = gesamtPlan > 0 
     ? Math.max(0, Math.min(100, 100 - (gesamtAbweichung / gesamtPlan) * 100))
     : 100
-  
+   
   return {
     // RELIABILITY
     planerfuellungsgrad: auswirkungen.planerfuellungsgrad,
     liefertreueChina: auswirkungen.liefertreue,
     deliveryPerformance: Math.round(deliveryPerformance * 10) / 10,
-    
+     
     // RESPONSIVENESS
     durchlaufzeitProduktion: auswirkungen.durchlaufzeit,
     lagerumschlag: auswirkungen.lagerumschlag,
     forecastAccuracy: Math.round(forecastAccuracy * 10) / 10,
-    
+     
     // AGILITY
     produktionsflexibilitaet: auswirkungen.planerfuellungsgrad, // Gleich wie Planerfüllung
     materialverfuegbarkeit: auswirkungen.materialverfuegbarkeit,
-    
+     
     // ASSETS (KEINE KOSTEN!)
-    lagerreichweite,
+    lagerreichweite, // <--- CHANGED: Now uses the calculated value from real inventory
     kapitalbindung,
-    
+     
     // PRODUKTIONS-KPIs
     gesamtproduktion: auswirkungen.produktionsmenge,
     produktionstage: auswirkungen.produktionstage,
@@ -462,17 +462,17 @@ export function berechneTaeglicherDaten(
 ): { tag: number; plan: number; ist: number; abweichung: number }[] {
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
   const basisProduktion = auswirkungen.durchschnittProTag
-  
+   
   return Array.from({ length: 365 }, (_, i) => {
     // Saisonale Schwankung basierend auf Monat
     const monat = Math.floor(i / 30.4)
     const saisonalitaet = saisonalitaetData.saisonalitaetMonatlich[Math.min(monat, 11)]
     const saisonFaktor = (saisonalitaet.anteil / 8.33) // 8.33% = gleichmäßig
-    
+     
     const saisonaleProduktion = basisProduktion * saisonFaktor
     const plan = Math.round(saisonaleProduktion * 1.02)
     const ist = Math.round(saisonaleProduktion)
-    
+     
     return {
       tag: i + 1,
       plan,
@@ -492,13 +492,13 @@ export function berechneWoechentlicheAuslastung(
   const WOCHEN_PRO_JAHR = 52
   const wochenProduktion = Math.round(auswirkungen.produktionsmenge / WOCHEN_PRO_JAHR)
   const WOCHEN_PRO_MONAT = WOCHEN_PRO_JAHR / 12 // ≈ 4.33
-  
+   
   return Array.from({ length: WOCHEN_PRO_JAHR }, (_, i) => {
     // Saisonale Schwankung
     const monat = Math.floor(i / WOCHEN_PRO_MONAT)
     const saisonalitaet = saisonalitaetData.saisonalitaetMonatlich[Math.min(monat, 11)]
     const saisonFaktor = saisonalitaet.anteil / GLEICHMAESSIGER_MONATSANTEIL
-    
+     
     return {
       woche: i + 1,
       auslastung: Math.min(100, auswirkungen.auslastung * saisonFaktor * 0.95 + 10),
@@ -516,21 +516,19 @@ export function berechneLagerDaten(
 ): { monat: string; saettel: number }[] {
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
   const monatsnamen = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
-  
-  // Basisbestand: ca. 2 Wochen Produktion (52 Wochen / 2 = 26)
-  const WOCHEN_PRO_JAHR = 52
-  const LAGERBESTAND_WOCHEN = 2
-  const basisBestand = Math.round(auswirkungen.produktionsmenge / (WOCHEN_PRO_JAHR / LAGERBESTAND_WOCHEN))
-  
+   
+  // <--- CHANGED: Updated to use 3-days safety stock logic instead of 2 weeks
+  const basisBestand = Math.round(auswirkungen.durchschnittProTag * ZIEL_SICHERHEITSBESTAND_TAGE)
+   
   // Materialverfügbarkeit beeinflusst Lagerbestand
   const verfuegbarkeitsFaktor = auswirkungen.materialverfuegbarkeit / 100
-  
+   
   return monatsnamen.map((monat, i) => {
     // Saisonale Schwankung im Lager (invers zur Produktion)
     const saisonalitaet = saisonalitaetData.saisonalitaetMonatlich[i]
     // Hohe Produktion = niedriger Lagerbestand
     const saisonFaktor = 1 - ((saisonalitaet.anteil - GLEICHMAESSIGER_MONATSANTEIL) / 100)
-    
+     
     return {
       monat,
       saettel: Math.round(basisBestand * verfuegbarkeitsFaktor * saisonFaktor)
@@ -554,16 +552,27 @@ export interface GesamtMetriken {
 /**
  * Berechnet ALLE Metriken auf einmal
  * Hauptfunktion für konsistente Daten über alle Seiten hinweg
- * 
- * @param aktiveSzenarien - Array von aktiven Szenario-Konfigurationen
+ * * @param aktiveSzenarien - Array von aktiven Szenario-Konfigurationen
+ * @param aktuellerLagerbestand - (Optional) Wenn vorhanden, wird er für SCOR genutzt. Sonst Ziel-Bestand.
  * @returns Vollständiges Metriken-Objekt
  */
-export function berechneGesamtMetriken(aktiveSzenarien: SzenarioConfig[]): GesamtMetriken {
+export function berechneGesamtMetriken(
+    aktiveSzenarien: SzenarioConfig[],
+    aktuellerLagerbestand?: number // <--- CHANGED: Added optional parameter
+): GesamtMetriken {
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
-  const scor = berechneSCORMetriken(aktiveSzenarien)
+  
+  // <--- CHANGED: Logic to handle missing inventory (fallback to lean 3-day stock)
+  // If no real stock is provided, we simulate the "perfect" lean stock (3 days)
+  const kalkulatorischerBestand = aktuellerLagerbestand !== undefined 
+    ? aktuellerLagerbestand 
+    : (auswirkungen.durchschnittProTag * ZIEL_SICHERHEITSBESTAND_TAGE);
+
+  const scor = berechneSCORMetriken(aktiveSzenarien, kalkulatorischerBestand) // <--- CHANGED: Passing the value
+  
   const monatlicheProduktion = berechneMonatlicheProduktion(auswirkungen.produktionsmenge)
   const variantenProduktion = berechneVariantenProduktion(auswirkungen.produktionsmenge)
-  
+   
   return {
     scor,
     auswirkungen,
@@ -588,7 +597,7 @@ export function berechneSzenarioAuswirkungenMitKonfig(
   dynamicConfig: DynamicConfig
 ): SzenarioAuswirkungen {
   const baseline = createDynamicBaseline(dynamicConfig)
-  
+   
   // Start mit dynamischen Baseline-Werten
   let produktionsmenge = baseline.jahresproduktion
   let materialverfuegbarkeit = baseline.materialverfuegbarkeit
@@ -655,20 +664,20 @@ export function berechneSzenarioAuswirkungenMitKonfig(
     produktionsmenge: Math.round(produktionsmenge),
     produktionsDelta: Math.round(produktionsmenge - baseline.jahresproduktion),
     produktionsDeltaProzent: ((produktionsmenge - baseline.jahresproduktion) / baseline.jahresproduktion) * 100,
-    
+     
     materialverfuegbarkeit: Math.round(materialverfuegbarkeit * 10) / 10,
     materialverfuegbarkeitDelta: Math.round((materialverfuegbarkeit - baseline.materialverfuegbarkeit) * 10) / 10,
-    
+     
     liefertreue: Math.round(liefertreue * 10) / 10,
     liefertreueDelta: Math.round((liefertreue - baseline.liefertreue) * 10) / 10,
-    
+     
     durchlaufzeit: Math.round(durchlaufzeit),
     durchlaufzeitDelta: Math.round(durchlaufzeit - baseline.durchlaufzeit),
-    
+     
     planerfuellungsgrad: Math.round(planerfuellungsgrad * 100) / 100,
     lagerumschlag: Math.round(lagerumschlag * 10) / 10,
     auslastung: Math.round(auslastung * 100) / 100,
-    
+     
     produktionstage,
     durchschnittProTag
   }
@@ -684,7 +693,7 @@ export function berechneMonatlicheProduktionMitKonfig(
   saisonalitaet: Array<{ monat: number; anteil: number }>
 ): MonatsProduktion[] {
   const monatsnamen = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
-  
+   
   return saisonalitaet.map((monat, index) => {
     const plan = Math.round(jahresproduktion * monat.anteil / 100)
     const abweichungsFaktor = 1 - (Math.sin(index * 0.8) * 0.02 + 0.01)
@@ -722,23 +731,28 @@ export function berechneVariantenProduktionMitKonfig(
  * Berechnet alle Metriken mit dynamischer Konfiguration
  * @param aktiveSzenarien - Aktive Szenarien
  * @param dynamicConfig - Dynamische Konfigurationswerte
+ * @param aktuellerLagerbestand - (Optional)
  */
 export function berechneGesamtMetrikenMitKonfig(
   aktiveSzenarien: SzenarioConfig[],
-  dynamicConfig: DynamicConfig
+  dynamicConfig: DynamicConfig,
+  aktuellerLagerbestand?: number // <--- CHANGED: Added optional parameter
 ): GesamtMetriken {
   const auswirkungen = berechneSzenarioAuswirkungenMitKonfig(aktiveSzenarien, dynamicConfig)
   const baseline = createDynamicBaseline(dynamicConfig)
   
-  // Berechne SCOR-Metriken basierend auf den Auswirkungen (KEINE KOSTEN!)
-  const WOCHEN_PRO_JAHR = 52
-  const LAGERBESTAND_WOCHEN = 2
-  const durchschnittlicherLagerbestand = Math.round(auswirkungen.produktionsmenge / (WOCHEN_PRO_JAHR / LAGERBESTAND_WOCHEN))
-  const lagerreichweite = Math.round((durchschnittlicherLagerbestand / auswirkungen.durchschnittProTag) * 10) / 10
+  // <--- CHANGED: Logic Updated to match the "Just-In-Time" goal (3 days default if no stock provided)
+  const berechneterBestand = aktuellerLagerbestand !== undefined
+    ? aktuellerLagerbestand
+    : (auswirkungen.durchschnittProTag * ZIEL_SICHERHEITSBESTAND_TAGE)
+
+  const lagerreichweite = auswirkungen.durchschnittProTag > 0
+    ? Math.round((berechneterBestand / auswirkungen.durchschnittProTag) * 10) / 10
+    : 0
   
   // HINWEIS: Kapitalbindung = Lagerreichweite (beide messen Verweildauer im Lager)
   const kapitalbindung = lagerreichweite
-  
+   
   // NEU: Delivery Performance - % Lieferungen innerhalb der Vorlaufzeit
   const deliveryPerformance = Math.max(
     0,
@@ -747,7 +761,7 @@ export function berechneGesamtMetrikenMitKonfig(
       auswirkungen.liefertreue * (1 - (auswirkungen.durchlaufzeit - baseline.durchlaufzeit) / DURCHLAUFZEIT_PENALTY_FAKTOR)
     )
   )
-  
+   
   // NEU: Forecast Accuracy - Genauigkeit der Planerfüllung
   const monatlicheProduktion = berechneMonatlicheProduktionMitKonfig(
     auswirkungen.produktionsmenge, 
@@ -772,7 +786,7 @@ export function berechneGesamtMetrikenMitKonfig(
     produktionsflexibilitaet: auswirkungen.planerfuellungsgrad,
     materialverfuegbarkeit: auswirkungen.materialverfuegbarkeit,
     // ASSETS (KEINE KOSTEN!)
-    lagerreichweite,
+    lagerreichweite, // <--- CHANGED: Dynamic value
     kapitalbindung,
     // PRODUKTIONS-KPIs
     gesamtproduktion: auswirkungen.produktionsmenge,
@@ -780,12 +794,12 @@ export function berechneGesamtMetrikenMitKonfig(
     durchschnittProTag: auswirkungen.durchschnittProTag,
     auslastung: auswirkungen.auslastung
   }
-  
+   
   const variantenProduktion = berechneVariantenProduktionMitKonfig(
     auswirkungen.produktionsmenge,
     dynamicConfig.varianten
   )
-  
+   
   return {
     scor,
     auswirkungen,
