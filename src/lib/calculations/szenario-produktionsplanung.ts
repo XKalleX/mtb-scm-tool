@@ -194,25 +194,44 @@ export function berechneSzenarioModifikation(
         const faktor = 1 + erhoehung
         
         // Parse Datumsangaben (Format: "2027-07-01")
-        const startDatum = szenario.parameter.startDatum 
-          ? new Date(szenario.parameter.startDatum) 
-          : new Date(planungsjahr, 6, 1) // Fallback: 1. Juli
+        // Validierung: Prüfe ob Datum gültig ist
+        const parseDate = (dateStr: string | undefined, fallback: Date): Date => {
+          if (!dateStr) return fallback
+          const parsed = new Date(dateStr)
+          return isNaN(parsed.getTime()) ? fallback : parsed
+        }
         
-        const endDatum = szenario.parameter.endDatum
-          ? new Date(szenario.parameter.endDatum)
-          : new Date(startDatum.getTime() + 14 * 24 * 60 * 60 * 1000) // Fallback: +14 Tage
+        const startDatum = parseDate(
+          szenario.parameter.startDatum,
+          new Date(planungsjahr, 6, 1) // Fallback: 1. Juli
+        )
         
-        // Berechne betroffene Tage (1-365)
-        const jahresStart = new Date(planungsjahr, 0, 1)
-        const startTag = Math.ceil((startDatum.getTime() - jahresStart.getTime()) / (24 * 60 * 60 * 1000)) + 1
-        const endTag = Math.ceil((endDatum.getTime() - jahresStart.getTime()) / (24 * 60 * 60 * 1000)) + 1
+        const endDatum = parseDate(
+          szenario.parameter.endDatum,
+          new Date(startDatum.getTime() + 14 * 24 * 60 * 60 * 1000) // Fallback: +14 Tage
+        )
+        
+        // Berechne betroffene Tage (1-365/366)
+        // Nutzt UTC um DST-Probleme zu vermeiden
+        const jahresStart = new Date(Date.UTC(planungsjahr, 0, 1))
+        const startUTC = Date.UTC(startDatum.getFullYear(), startDatum.getMonth(), startDatum.getDate())
+        const endUTC = Date.UTC(endDatum.getFullYear(), endDatum.getMonth(), endDatum.getDate())
+        const jahresStartUTC = jahresStart.getTime()
+        
+        const startTag = Math.ceil((startUTC - jahresStartUTC) / (24 * 60 * 60 * 1000)) + 1
+        const endTag = Math.ceil((endUTC - jahresStartUTC) / (24 * 60 * 60 * 1000)) + 1
+        
+        // Bestimme Anzahl Tage im Jahr (365 oder 366 für Schaltjahr)
+        const tageImJahr = new Date(planungsjahr, 11, 31).getDate() === 31 
+          ? (new Date(planungsjahr, 1, 29).getMonth() === 1 ? 366 : 365)
+          : 365
         
         // Betroffene Varianten
         const varianteIds: string[] = szenario.parameter.varianteIds || []
         const betroffeneVarianten = varianteIds.length > 0 ? varianteIds : ['*'] // '*' = alle Varianten
         
         // Tagesgenaue Faktoren setzen
-        for (let tag = Math.max(1, startTag); tag <= Math.min(365, endTag); tag++) {
+        for (let tag = Math.max(1, startTag); tag <= Math.min(tageImJahr, endTag); tag++) {
           betroffeneVarianten.forEach(varianteId => {
             const key = `${varianteId}-${tag}`
             // Wenn bereits ein Faktor existiert, multiplizieren (mehrere Marketingaktionen)
@@ -474,7 +493,10 @@ export function generiereAlleVariantenMitSzenarien(
     let jahresProduktionSzenarioGeplant = 0
     let jahresProduktionSzenarioIst = 0
     
-    for (let tagIndex = 0; tagIndex < 365; tagIndex++) {
+    // Bestimme Anzahl Tage im Jahr (365 oder 366 für Schaltjahr)
+    const tageImJahr = baselineTage.length // Nutze die Länge vom Baseline-Plan
+    
+    for (let tagIndex = 0; tagIndex < tageImJahr; tagIndex++) {
       const baselineTag = baselineTage[tagIndex]
       const tagNummer = tagIndex + 1
       
