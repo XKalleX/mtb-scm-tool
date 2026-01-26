@@ -13,7 +13,7 @@
  * - Lieferant-Parameter
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,15 +32,22 @@ import {
   Truck,
   Factory,
   BarChart,
-  Package
+  Package,
+  AlertCircle
 } from 'lucide-react'
-import { useKonfiguration, FeiertagConfig, STANDARD_KONFIGURATION } from '@/contexts/KonfigurationContext'
+import { useKonfiguration, FeiertagConfig, STANDARD_KONFIGURATION, KonfigurationData, ProduktionConfig, LieferantConfig } from '@/contexts/KonfigurationContext'
 import { formatNumber } from '@/lib/utils'
 import { DEFAULT_HEUTE_DATUM } from '@/lib/constants'
 
 /**
  * Hauptkomponente für Einstellungen
  * Kann sowohl standalone als auch in einem Sidebar verwendet werden
+ * 
+ * ÄNDERUNG: Draft-State Konzept
+ * - Alle Eingaben werden ERST lokal gespeichert (draftKonfiguration)
+ * - Änderungen werden NICHT sofort an Context weitergegeben
+ * - Nur durch "Einstellungen speichern" Button werden Änderungen übernommen
+ * - Dies verhindert Performance-Probleme durch sofortige Neuberechnungen
  */
 export function EinstellungenPanel() {
   const { 
@@ -62,52 +69,200 @@ export function EinstellungenPanel() {
 
   const [activeTab, setActiveTab] = useState('grunddaten')
   const [showConfirmReset, setShowConfirmReset] = useState(false)
+  
+  // ========================================
+  // DRAFT STATE - Lokale Kopie für Bearbeitung
+  // ========================================
+  const [draftKonfiguration, setDraftKonfiguration] = useState<KonfigurationData | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
-  if (!isInitialized) {
+  // Initialisiere Draft-State wenn Konfiguration geladen ist
+  useEffect(() => {
+    if (isInitialized && !draftKonfiguration) {
+      setDraftKonfiguration(JSON.parse(JSON.stringify(konfiguration)))
+    }
+  }, [isInitialized, konfiguration, draftKonfiguration])
+
+  // Setze hasUnsavedChanges wenn Draft sich vom Original unterscheidet
+  useEffect(() => {
+    if (draftKonfiguration && isInitialized) {
+      const isDifferent = JSON.stringify(draftKonfiguration) !== JSON.stringify(konfiguration)
+      setHasUnsavedChanges(isDifferent)
+    }
+  }, [draftKonfiguration, konfiguration, isInitialized])
+
+  if (!isInitialized || !draftKonfiguration) {
     return <div className="text-center py-8">Lade Konfiguration...</div>
   }
 
+  // ========================================
+  // EVENT HANDLER - Arbeiten mit Draft-State
+  // ========================================
+
+  // Helper function für Draft-Updates
+  const updateDraft = <K extends keyof KonfigurationData>(
+    key: K, 
+    value: KonfigurationData[K]
+  ) => {
+    setDraftKonfiguration(prev => prev ? {...prev, [key]: value} : prev)
+  }
+
+  const updateDraftProduktion = (updates: Partial<ProduktionConfig>) => {
+    setDraftKonfiguration(prev => prev ? {
+      ...prev, 
+      produktion: {...prev.produktion, ...updates}
+    } : prev)
+  }
+
+  const updateDraftLieferant = (updates: Partial<LieferantConfig>) => {
+    setDraftKonfiguration(prev => prev ? {
+      ...prev,
+      lieferant: {...prev.lieferant, ...updates}
+    } : prev)
+  }
+
+  const handleSaveChanges = () => {
+    // Validierung vor Speicherung
+    const saisonalitaetSumme = draftKonfiguration.saisonalitaet.reduce((sum, s) => sum + s.anteil, 0)
+    const saisonalitaetValid = Math.abs(saisonalitaetSumme - 100) < 0.1
+
+    const variantenSumme = draftKonfiguration.varianten.reduce((sum, v) => sum + v.anteilPrognose * 100, 0)
+    const variantenValid = Math.abs(variantenSumme - 100) < 0.1
+
+    // Validierung wird durch canSave bereits im UI verhindert
+    // Diese Prüfung ist eine zusätzliche Sicherheit
+    if (!saisonalitaetValid || !variantenValid) {
+      console.error('Validierungsfehler beim Speichern - sollte durch UI verhindert werden')
+      return
+    }
+
+    // Übernehme alle Änderungen in Context
+    setJahresproduktion(draftKonfiguration.jahresproduktion)
+    setHeuteDatum(draftKonfiguration.heuteDatum)
+    
+    // Saisonalität
+    draftKonfiguration.saisonalitaet.forEach(s => {
+      updateSaisonalitaet(s.monat, s.anteil)
+    })
+    
+    // Varianten
+    draftKonfiguration.varianten.forEach(v => {
+      updateVariante(v.id, { anteilPrognose: v.anteilPrognose })
+    })
+    
+    // Lieferant
+    updateLieferant(draftKonfiguration.lieferant)
+    
+    // Produktion
+    updateProduktion(draftKonfiguration.produktion)
+    
+    // Feiertage werden separat verwaltet, nicht im Draft
+    
+    setHasUnsavedChanges(false)
+  }
+
+  const handleDiscardChanges = () => {
+    setDraftKonfiguration(JSON.parse(JSON.stringify(konfiguration)))
+    setHasUnsavedChanges(false)
+  }
+
   const handleReset = () => {
-    // Reset UI state BEFORE calling context update to avoid race condition
-    // When zuruecksetzenAufStandard() updates the context, it causes this component
-    // to re-render, which could interfere with the state update if done afterwards
     setShowConfirmReset(false)
     zuruecksetzenAufStandard()
+    setDraftKonfiguration(JSON.parse(JSON.stringify(STANDARD_KONFIGURATION)))
+    setHasUnsavedChanges(false)
   }
 
   const arbeitstage = getArbeitstageProJahr()
   const produktionProVariante = getJahresproduktionProVariante()
   
-  // Prüfe ob Saisonalität Summe = 100%
-  const saisonalitaetSumme = konfiguration.saisonalitaet.reduce((sum, s) => sum + s.anteil, 0)
+  // Prüfe ob Saisonalität Summe = 100% (im Draft)
+  const saisonalitaetSumme = draftKonfiguration.saisonalitaet.reduce((sum, s) => sum + s.anteil, 0)
   const saisonalitaetValid = Math.abs(saisonalitaetSumme - 100) < 0.1
 
-  // Prüfe ob Varianten-Anteile Summe = 100%
-  const variantenSumme = konfiguration.varianten.reduce((sum, v) => sum + v.anteilPrognose * 100, 0)
+  // Prüfe ob Varianten-Anteile Summe = 100% (im Draft)
+  const variantenSumme = draftKonfiguration.varianten.reduce((sum, v) => sum + v.anteilPrognose * 100, 0)
   const variantenValid = Math.abs(variantenSumme - 100) < 0.1
+
+  const canSave = saisonalitaetValid && variantenValid
 
   return (
     <div className="space-y-4">
-      {/* Reset Button Section */}
-      <div className="flex justify-end gap-2">
-        {showConfirmReset ? (
-          <>
-            <Button variant="destructive" size="sm" onClick={handleReset}>
-              <Check className="h-4 w-4 mr-1" />
-              Bestätigen
+      {/* Unsaved Changes Warning + Action Buttons */}
+      {hasUnsavedChanges && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="font-semibold text-yellow-900">Nicht gespeicherte Änderungen</p>
+            <p className="text-sm text-yellow-700">Sie haben Änderungen vorgenommen, die noch nicht gespeichert wurden.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleSaveChanges} disabled={!canSave} className="bg-green-600 hover:bg-green-700">
+              <Save className="h-4 w-4 mr-2" />
+              Speichern
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowConfirmReset(false)}>
-              <X className="h-4 w-4 mr-1" />
-              Abbrechen
+            <Button onClick={handleDiscardChanges} variant="outline">
+              <X className="h-4 w-4 mr-2" />
+              Verwerfen
             </Button>
-          </>
-        ) : (
-          <Button variant="outline" size="sm" onClick={() => setShowConfirmReset(true)}>
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Auf Standard zurücksetzen
+          </div>
+        </div>
+      )}
+
+      {/* Save/Discard Buttons - Always visible */}
+      <div className="flex justify-between items-center gap-2">
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleSaveChanges} 
+            disabled={!hasUnsavedChanges || !canSave}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Einstellungen speichern
           </Button>
-        )}
+          <Button 
+            onClick={handleDiscardChanges} 
+            variant="outline"
+            disabled={!hasUnsavedChanges}
+          >
+            <X className="h-4 w-4 mr-2" />
+            Änderungen verwerfen
+          </Button>
+        </div>
+
+        {/* Reset Button */}
+        <div className="flex gap-2">
+          {showConfirmReset ? (
+            <>
+              <Button variant="destructive" size="sm" onClick={handleReset}>
+                <Check className="h-4 w-4 mr-1" />
+                Bestätigen
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowConfirmReset(false)}>
+                <X className="h-4 w-4 mr-1" />
+                Abbrechen
+              </Button>
+            </>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => setShowConfirmReset(true)}>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Auf Standard zurücksetzen
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Validation Errors */}
+      {!canSave && hasUnsavedChanges && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <div className="text-sm text-red-800">
+            <strong>Validierungsfehler:</strong> Die Summen müssen jeweils 100% ergeben.
+            {!saisonalitaetValid && <span className="ml-2">Saisonalität: {saisonalitaetSumme.toFixed(1)}%</span>}
+            {!variantenValid && <span className="ml-2">Varianten: {variantenSumme.toFixed(1)}%</span>}
+          </div>
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-5">
@@ -142,8 +297,8 @@ export function EinstellungenPanel() {
                   <Input
                     id="jahresproduktion"
                     type="number"
-                    value={konfiguration.jahresproduktion ?? 0}
-                    onChange={(e) => setJahresproduktion(parseInt(e.target.value) || 0)}
+                    value={draftKonfiguration.jahresproduktion ?? 0}
+                    onChange={(e) => updateDraft('jahresproduktion', parseInt(e.target.value) || 0)}
                     min={0}
                     step={1000}
                   />
@@ -157,8 +312,8 @@ export function EinstellungenPanel() {
                   <Input
                     id="heuteDatum"
                     type="date"
-                    value={konfiguration.heuteDatum ?? DEFAULT_HEUTE_DATUM}
-                    onChange={(e) => setHeuteDatum(e.target.value)}
+                    value={draftKonfiguration.heuteDatum ?? DEFAULT_HEUTE_DATUM}
+                    onChange={(e) => updateDraft('heuteDatum', e.target.value)}
                     min="2027-01-01"
                     max="2027-12-31"
                   />
@@ -171,8 +326,8 @@ export function EinstellungenPanel() {
                   <Label>Produktionskapazität (Bikes/Stunde)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.produktion.kapazitaetProStunde ?? 0}
-                    onChange={(e) => updateProduktion({ kapazitaetProStunde: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.produktion.kapazitaetProStunde ?? 0}
+                    onChange={(e) => updateDraftProduktion({ kapazitaetProStunde: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                 </div>
@@ -181,8 +336,8 @@ export function EinstellungenPanel() {
                   <Label>Stunden pro Schicht</Label>
                   <Input
                     type="number"
-                    value={konfiguration.produktion.stundenProSchicht ?? 0}
-                    onChange={(e) => updateProduktion({ stundenProSchicht: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.produktion.stundenProSchicht ?? 0}
+                    onChange={(e) => updateDraftProduktion({ stundenProSchicht: parseInt(e.target.value) || 0 })}
                     min={1}
                     max={24}
                   />
@@ -198,19 +353,19 @@ export function EinstellungenPanel() {
                   </div>
                   <div className="flex justify-between">
                     <span>Durchschnitt pro Arbeitstag:</span>
-                    <span className="font-medium">{formatNumber(konfiguration.jahresproduktion / arbeitstage, 1)} Bikes</span>
+                    <span className="font-medium">{formatNumber(draftKonfiguration.jahresproduktion / arbeitstage, 1)} Bikes</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Kapazität pro Schicht:</span>
                     <span className="font-medium">
-                      {formatNumber(konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht, 0)} Bikes
+                      {formatNumber(draftKonfiguration.produktion.kapazitaetProStunde * draftKonfiguration.produktion.stundenProSchicht, 0)} Bikes
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Benötigte Schichten (Durchschnitt):</span>
                     <span className="font-medium">
-                      {((konfiguration.jahresproduktion / arbeitstage) / 
-                        (konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht)).toFixed(2)}
+                      {((draftKonfiguration.jahresproduktion / arbeitstage) / 
+                        (draftKonfiguration.produktion.kapazitaetProStunde * draftKonfiguration.produktion.stundenProSchicht)).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -236,8 +391,8 @@ export function EinstellungenPanel() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {konfiguration.saisonalitaet.map((s) => {
-                  const menge = Math.round(konfiguration.jahresproduktion * (s.anteil / 100))
+                {draftKonfiguration.saisonalitaet.map((s) => {
+                  const menge = Math.round(draftKonfiguration.jahresproduktion * (s.anteil / 100))
                   return (
                     <TableRow key={s.monat}>
                       <TableCell className="font-medium">{s.name}</TableCell>
@@ -245,7 +400,15 @@ export function EinstellungenPanel() {
                         <Input
                           type="number"
                           value={s.anteil}
-                          onChange={(e) => updateSaisonalitaet(s.monat, parseFloat(e.target.value) || 0)}
+                          onChange={(e) => {
+                            const newAnteil = parseFloat(e.target.value) || 0
+                            setDraftKonfiguration(prev => prev ? {
+                              ...prev, 
+                              saisonalitaet: prev.saisonalitaet.map(sais => 
+                                sais.monat === s.monat ? {...sais, anteil: newAnteil} : sais
+                              )
+                            } : prev)
+                          }}
                           min={0}
                           max={100}
                           step={0.5}
@@ -286,24 +449,35 @@ export function EinstellungenPanel() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {konfiguration.varianten.map((v) => (
-                  <TableRow key={v.id}>
-                    <TableCell className="font-medium">{v.name}</TableCell>
-                    <TableCell>{v.kategorie}</TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={(v.anteilPrognose * 100).toFixed(1)}
-                        onChange={(e) => updateVariante(v.id, { anteilPrognose: (parseFloat(e.target.value) || 0) / 100 })}
-                        min={0}
-                        max={100}
-                        step={0.5}
-                        className="w-20"
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">{formatNumber(produktionProVariante[v.id], 0)}</TableCell>
-                  </TableRow>
-                ))}
+                {draftKonfiguration.varianten.map((v) => {
+                  const jahresMenge = Math.round(draftKonfiguration.jahresproduktion * v.anteilPrognose)
+                  return (
+                    <TableRow key={v.id}>
+                      <TableCell className="font-medium">{v.name}</TableCell>
+                      <TableCell>{v.kategorie}</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={(v.anteilPrognose * 100).toFixed(1)}
+                          onChange={(e) => {
+                            const newAnteil = (parseFloat(e.target.value) || 0) / 100
+                            setDraftKonfiguration(prev => prev ? {
+                              ...prev,
+                              varianten: prev.varianten.map(variant => 
+                                variant.id === v.id ? {...variant, anteilPrognose: newAnteil} : variant
+                              )
+                            } : prev)
+                          }}
+                          min={0}
+                          max={100}
+                          step={0.5}
+                          className="w-20"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">{formatNumber(jahresMenge, 0)}</TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </TabsContent>
@@ -320,8 +494,8 @@ export function EinstellungenPanel() {
                 <div className="space-y-2">
                   <Label>Lieferant Name</Label>
                   <Input
-                    value={konfiguration.lieferant.name ?? ''}
-                    onChange={(e) => updateLieferant({ name: e.target.value })}
+                    value={draftKonfiguration.lieferant.name ?? ''}
+                    onChange={(e) => updateDraftLieferant({ name: e.target.value })}
                   />
                 </div>
 
@@ -329,8 +503,8 @@ export function EinstellungenPanel() {
                   <Label>Vorlaufzeit Arbeitstage (Produktion)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.vorlaufzeitArbeitstage ?? 0}
-                    onChange={(e) => updateLieferant({ vorlaufzeitArbeitstage: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.vorlaufzeitArbeitstage ?? 0}
+                    onChange={(e) => updateDraftLieferant({ vorlaufzeitArbeitstage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.vorlaufzeitArbeitstage} Tage</p>
@@ -340,8 +514,8 @@ export function EinstellungenPanel() {
                   <Label>Vorlaufzeit Kalendertage (Seefracht Shanghai → Hamburg)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.vorlaufzeitKalendertage ?? 0}
-                    onChange={(e) => updateLieferant({ vorlaufzeitKalendertage: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.vorlaufzeitKalendertage ?? 0}
+                    onChange={(e) => updateDraftLieferant({ vorlaufzeitKalendertage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.vorlaufzeitKalendertage} KT (24/7 Seefracht)</p>
@@ -351,8 +525,8 @@ export function EinstellungenPanel() {
                   <Label>LKW-Transport China → Hafen (Arbeitstage)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.lkwTransportChinaArbeitstage ?? 0}
-                    onChange={(e) => updateLieferant({ lkwTransportChinaArbeitstage: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.lkwTransportChinaArbeitstage ?? 0}
+                    onChange={(e) => updateDraftLieferant({ lkwTransportChinaArbeitstage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.lkwTransportChinaArbeitstage} AT (Mo-Fr)</p>
@@ -362,8 +536,8 @@ export function EinstellungenPanel() {
                   <Label>LKW-Transport Hamburg → Werk (Arbeitstage)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.lkwTransportDeutschlandArbeitstage ?? 0}
-                    onChange={(e) => updateLieferant({ lkwTransportDeutschlandArbeitstage: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.lkwTransportDeutschlandArbeitstage ?? 0}
+                    onChange={(e) => updateDraftLieferant({ lkwTransportDeutschlandArbeitstage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.lkwTransportDeutschlandArbeitstage} AT (Mo-Fr)</p>
@@ -373,8 +547,8 @@ export function EinstellungenPanel() {
                   <Label>Gesamte Vorlaufzeit (Kalendertage)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.gesamtVorlaufzeitTage ?? 0}
-                    onChange={(e) => updateLieferant({ gesamtVorlaufzeitTage: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.gesamtVorlaufzeitTage ?? 0}
+                    onChange={(e) => updateDraftLieferant({ gesamtVorlaufzeitTage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.gesamtVorlaufzeitTage} Tage ({Math.ceil(STANDARD_KONFIGURATION.lieferant.gesamtVorlaufzeitTage / 7)} Wochen)</p>
@@ -386,8 +560,8 @@ export function EinstellungenPanel() {
                   <Label>Losgröße (Mindestbestellung)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.losgroesse ?? 0}
-                    onChange={(e) => updateLieferant({ losgroesse: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.losgroesse ?? 0}
+                    onChange={(e) => updateDraftLieferant({ losgroesse: parseInt(e.target.value) || 0 })}
                     min={1}
                     step={100}
                   />
@@ -398,8 +572,8 @@ export function EinstellungenPanel() {
                   <Label>Lieferintervall (Tage)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.lieferintervall ?? 0}
-                    onChange={(e) => updateLieferant({ lieferintervall: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.lieferintervall ?? 0}
+                    onChange={(e) => updateDraftLieferant({ lieferintervall: parseInt(e.target.value) || 0 })}
                     min={1}
                   />
                 </div>
@@ -408,8 +582,8 @@ export function EinstellungenPanel() {
                   <Label>Kapazität (Stück/Tag)</Label>
                   <Input
                     type="number"
-                    value={konfiguration.lieferant.kapazitaet ?? 0}
-                    onChange={(e) => updateLieferant({ kapazitaet: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.kapazitaet ?? 0}
+                    onChange={(e) => updateDraftLieferant({ kapazitaet: parseInt(e.target.value) || 0 })}
                     min={0}
                     step={1000}
                   />
@@ -420,13 +594,13 @@ export function EinstellungenPanel() {
             <div className="bg-blue-50 rounded-lg p-4 mt-4">
               <h4 className="font-semibold text-blue-900 mb-2">Transport-Sequenz (Reihenfolge wichtig!):</h4>
               <ol className="list-decimal list-inside text-blue-800 text-sm space-y-1">
-                <li>Produktion: {konfiguration.lieferant.vorlaufzeitArbeitstage} AT (Mo-Fr ohne Feiertage)</li>
-                <li>LKW China → Hafen: {konfiguration.lieferant.lkwTransportChinaArbeitstage} AT (Mo-Fr)</li>
-                <li>Seefracht: {konfiguration.lieferant.vorlaufzeitKalendertage} KT (24/7 unterwegs)</li>
-                <li>LKW Hamburg → Werk: {konfiguration.lieferant.lkwTransportDeutschlandArbeitstage} AT (Mo-Fr)</li>
+                <li>Produktion: {draftKonfiguration.lieferant.vorlaufzeitArbeitstage} AT (Mo-Fr ohne Feiertage)</li>
+                <li>LKW China → Hafen: {draftKonfiguration.lieferant.lkwTransportChinaArbeitstage} AT (Mo-Fr)</li>
+                <li>Seefracht: {draftKonfiguration.lieferant.vorlaufzeitKalendertage} KT (24/7 unterwegs)</li>
+                <li>LKW Hamburg → Werk: {draftKonfiguration.lieferant.lkwTransportDeutschlandArbeitstage} AT (Mo-Fr)</li>
               </ol>
               <p className="text-blue-900 font-bold mt-3">
-                Gesamt: {konfiguration.lieferant.gesamtVorlaufzeitTage} Tage ({Math.ceil(konfiguration.lieferant.gesamtVorlaufzeitTage / 7)} Wochen)
+                Gesamt: {draftKonfiguration.lieferant.gesamtVorlaufzeitTage} Tage ({Math.ceil(draftKonfiguration.lieferant.gesamtVorlaufzeitTage / 7)} Wochen)
               </p>
               <p className="text-xs text-blue-600 mt-2 italic">
                 Hinweis: Reihenfolge ist wichtig für Feiertagsberechnung. AT = Arbeitstage (Mo-Fr), KT = Kalendertage (24/7)
