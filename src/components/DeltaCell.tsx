@@ -84,7 +84,7 @@ export function DeltaCell({
   inverseLogic = false,
   threshold = 0,
   compact = false,
-  align = 'right',
+  align = 'left',
   className
 }: DeltaCellProps) {
   const { decimals = 0, suffix = '', prefix = '' } = format
@@ -146,14 +146,14 @@ export function DeltaCell({
   
   return (
     <div className={cn('flex flex-col', alignClasses[align], className)}>
-      {/* Hauptwert */}
-      <span className="font-medium">
+      {/* Hauptwert - Always displayed large and bold for Overview Cards */}
+      <div className="text-2xl font-bold">
         {prefix}{formattedValue}{suffix}
-      </span>
+      </div>
       
       {/* Delta (nur wenn signifikant) */}
       {isDeltaSignificant && (
-        <span className={cn('text-xs font-mono flex items-center gap-0.5', deltaColorClass, align === 'right' && 'justify-end')}>
+        <span className={cn('text-xs font-mono flex items-center gap-0.5 mt-1', deltaColorClass, align === 'right' && 'justify-end')}>
           {isPositiveDelta && <ArrowUp className="h-3 w-3" />}
           {isNegativeDelta && <ArrowDown className="h-3 w-3" />}
           {formatDelta(safeDelta)}
