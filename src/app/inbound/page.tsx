@@ -497,8 +497,12 @@ export default function InboundPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{lieferant.lkwTransportArbeitstage}</div>
-            <p className="text-xs text-muted-foreground">AT (2 China + 2 DE)</p>
+            <div className="text-2xl font-bold">
+              {lieferant.lkwTransportChinaArbeitstage + lieferant.lkwTransportDeutschlandArbeitstage}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              AT ({lieferant.lkwTransportChinaArbeitstage} China + {lieferant.lkwTransportDeutschlandArbeitstage} DE)
+            </p>
           </CardContent>
         </Card>
 
