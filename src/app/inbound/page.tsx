@@ -32,7 +32,7 @@ import { useMemo, useState, useCallback } from 'react'
 import { generiereAlleVariantenProduktionsplaene } from '@/lib/calculations/zentrale-produktionsplanung'
 import { generiereTaeglicheBestellungen, erstelleZusatzbestellung, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
-import { istChinaFeiertag, ladeChinaFeiertage } from '@/lib/kalender'
+import { istDeutschlandFeiertag, ladeDeutschlandFeiertage } from '@/lib/kalender'
 import { isWeekend } from '@/lib/utils'
 
 /**
@@ -202,7 +202,9 @@ export default function InboundPage() {
   const alleTageMitBestellungen = useMemo(() => {
     const jahr = konfiguration.planungsjahr
     const vorlaufzeit = lieferant.gesamtVorlaufzeitTage
-    const feiertage = ladeChinaFeiertage()
+    // ✅ KORRIGIERT: Deutsche Feiertage für Produktionsbedarf (nicht chinesische!)
+    // Produktion findet in DEUTSCHLAND statt → deutsche Feiertage relevant
+    const feiertage = ladeDeutschlandFeiertage()
     const alleTage: any[] = []
     
     /**
@@ -238,9 +240,11 @@ export default function InboundPage() {
       // Berechne wann für diesen Bedarf bestellt werden müsste (49 Tage vorher)
       const theoretischesBestelldatum = addDays(bedarfsdatum, -vorlaufzeit)
       
-      // Prüfe Tag-Typ (für Bedarfsdatum - Produktion in Deutschland)
+      // Prüfe Tag-Typ (für Bedarfsdatum - Produktion in DEUTSCHLAND!)
+      // ✅ KORRIGIERT: Deutsche Feiertage prüfen (nicht chinesische!)
+      // Die Produktion findet in Deutschland statt → Keine Produktion an deutschen Feiertagen
       const istWochenende = isWeekend(bedarfsdatum)
-      const feiertag = istChinaFeiertag(bedarfsdatum)
+      const feiertag = istDeutschlandFeiertag(bedarfsdatum)
       const istFeiertag = feiertag.length > 0
       
       // Suche ob es Bestellungen gibt, die diesen Bedarf decken
