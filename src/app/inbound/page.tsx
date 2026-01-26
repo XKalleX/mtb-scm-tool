@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Ship, AlertTriangle, Package, Download, Calendar, Zap, Plus } from 'lucide-react'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
-import { formatNumber, addDays } from '@/lib/utils'
+import { formatNumber, addDays, toLocalISODateString } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
@@ -221,7 +221,7 @@ export default function InboundPage() {
     const bestellungenNachBedarfsdatum = new Map<string, TaeglicheBestellung[]>()
     taeglicheBestellungen.forEach(b => {
       const bedarfsdatum = b.bedarfsdatum instanceof Date ? b.bedarfsdatum : new Date(b.bedarfsdatum)
-      const key = bedarfsdatum.toISOString().split('T')[0]
+      const key = toLocalISODateString(bedarfsdatum)
       
       // Sammle ALLE Bestellungen für dieses Datum (nicht überschreiben!)
       const existing = bestellungenNachBedarfsdatum.get(key) || []
@@ -235,7 +235,7 @@ export default function InboundPage() {
     
     for (let tag = 1; tag <= jahresTage; tag++) {
       const bedarfsdatum = new Date(jahr, 0, tag)
-      const bedarfsdatumKey = bedarfsdatum.toISOString().split('T')[0]
+      const bedarfsdatumKey = toLocalISODateString(bedarfsdatum)
       
       // Berechne wann für diesen Bedarf bestellt werden müsste (49 Tage vorher)
       const theoretischesBestelldatum = addDays(bedarfsdatum, -vorlaufzeit)

@@ -33,6 +33,7 @@ import feiertageDeutschlandData from '@/data/feiertage-deutschland.json'
 import lieferantChinaData from '@/data/lieferant-china.json'
 import stuecklisteData from '@/data/stueckliste.json'
 import { DEFAULT_HEUTE_DATUM, PLANUNGSJAHR, KONFIGURATION_STORAGE_KEY, isValidDate, parseDateSafe } from '@/lib/constants'
+import { toLocalISODateString } from '@/lib/utils'
 
 // ========================================
 // TYPEN FÜR KONFIGURATION
@@ -353,7 +354,8 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
     const datum = parseDateSafe(value, value) // Fallback = value selbst für Prüfung
     
     // Falls parseDateSafe einen Fallback verwendet hat, war das Original ungültig
-    if (datum.toISOString().split('T')[0] !== value) {
+    // Verwende toLocalISODateString um Timezone-Probleme zu vermeiden
+    if (toLocalISODateString(datum) !== value) {
       console.error('Fehler: Ungültiges Datumsformat:', value)
       return // Nicht speichern bei ungültigem Datum
     }
@@ -502,7 +504,7 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
     for (let i = 0; i < 365; i++) {
       const datum = new Date(jahr, 0, 1 + i)
       const wochentag = datum.getDay()
-      const datumStr = datum.toISOString().split('T')[0]
+      const datumStr = toLocalISODateString(datum)
       
       // Kein Wochenende und kein Feiertag
       if (wochentag !== 0 && wochentag !== 6 && !deutscheFeiertagSet.has(datumStr)) {

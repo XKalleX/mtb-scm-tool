@@ -19,7 +19,7 @@
  */
 
 import { Kalendertag, Feiertag } from '@/types'
-import { addDays, isWeekend, getDayOfYear, getWeekNumber } from './utils'
+import { addDays, isWeekend, getDayOfYear, getWeekNumber, toLocalISODateString } from './utils'
 import feiertagsData from '@/data/feiertage-china.json'
 import feiertagsDeutschlandData from '@/data/feiertage-deutschland.json'
 import { DEFAULT_HEUTE_DATUM, KONFIGURATION_STORAGE_KEY, parseDateSafe } from './constants'
@@ -130,7 +130,7 @@ export function istDeutschlandFeiertag(
 ): Feiertag[] {
   // Wenn benutzerdefinierte Feiertage übergeben wurden, nutze diese
   if (customFeiertage) {
-    const datumStr = datum.toISOString().split('T')[0]
+    const datumStr = toLocalISODateString(datum)
     const deutscheFeiertage = customFeiertage.filter(f => f.land === 'Deutschland')
     const gefunden = deutscheFeiertage.filter(f => f.datum === datumStr)
     return gefunden.map(f => ({
@@ -161,7 +161,7 @@ export function istChinaFeiertag(
 ): Feiertag[] {
   // Wenn benutzerdefinierte Feiertage übergeben wurden, nutze diese
   if (customFeiertage) {
-    const datumStr = datum.toISOString().split('T')[0]
+    const datumStr = toLocalISODateString(datum)
     const chinaFeiertage = customFeiertage.filter(f => f.land === 'China')
     const gefunden = chinaFeiertage.filter(f => f.datum === datumStr)
     return gefunden.map(f => ({

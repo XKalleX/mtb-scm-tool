@@ -78,6 +78,23 @@ export function formatDate(date: Date): string {
 }
 
 /**
+ * Konvertiert ein Date-Objekt in einen lokalen ISO-Format String (YYYY-MM-DD)
+ * 
+ * WICHTIG: Diese Funktion vermeidet Timezone-Probleme!
+ * - new Date(2027, 0, 1).toISOString().split('T')[0] würde in UTC+1 "2026-12-31" ergeben!
+ * - Diese Funktion gibt korrekt "2027-01-01" zurück
+ * 
+ * @param date - Date Objekt
+ * @returns Datum als String im Format YYYY-MM-DD (lokale Zeit, nicht UTC!)
+ */
+export function toLocalISODateString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/**
  * Formatiert Datum mit Wochentag (z.B. Montag, 15.04.2027)
  * @param date - Date Objekt
  * @returns Formatiertes Datum mit Wochentag als String

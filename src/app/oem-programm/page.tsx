@@ -24,7 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { Calendar, TrendingUp, AlertCircle, Download, AlertTriangle, Zap } from 'lucide-react'
-import { formatNumber, formatDate } from '@/lib/utils'
+import { formatNumber, formatDate, toLocalISODateString } from '@/lib/utils'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import { showError, showSuccess } from '@/lib/notifications'
@@ -945,7 +945,7 @@ export default function OEMProgrammPage() {
                   konfiguration.varianten.forEach(v => {
                     const plan = produktionsplaene[v.id]
                     const tag = plan?.tage.find(t => 
-                      t.datum.toISOString().split('T')[0] === refTag.datum.toISOString().split('T')[0]
+                      toLocalISODateString(t.datum) === toLocalISODateString(refTag.datum)
                     )
                     
                     if (tag) {
