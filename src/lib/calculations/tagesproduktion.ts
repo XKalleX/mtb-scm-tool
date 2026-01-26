@@ -24,6 +24,7 @@ import {
   STUECKLISTE
 } from '../../../kontext/Spezifikation_SSOT_MR'
 import { FeiertagsKonfiguration } from '@/lib/kalender'
+import { toLocalISODateString } from '@/lib/utils'
 
 // Re-export for backwards compatibility
 export type { FeiertagsKonfiguration } from '@/lib/kalender'
@@ -82,7 +83,7 @@ function istFeiertag(
   datum: Date, 
   feiertage?: FeiertagsKonfiguration[]
 ): { ist: boolean; name?: string } {
-  const dateStr = datum.toISOString().split('T')[0]
+  const dateStr = toLocalISODateString(datum)
   // Nutze übergebene Feiertage oder Fallback auf SSOT-Feiertage
   const feiertagsListe = feiertage || FEIERTAGE_DEUTSCHLAND
   const feiertag = feiertagsListe.find(f => f.datum === dateStr)

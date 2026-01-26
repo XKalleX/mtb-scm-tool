@@ -10,7 +10,7 @@
  */
 
 import type { KonfigurationData } from '@/contexts/KonfigurationContext'
-import { daysBetween } from '@/lib/utils' // Assumed helper
+import { daysBetween, toLocalISODateString } from '@/lib/utils'
 import type { Bestellung, Produktionsauftrag, Lagerbestand, MarketingAuftrag } from '@/types' // Assumed types
 
 /**
@@ -107,7 +107,7 @@ export function countArbeitstageInMonat(
   
   for (let tag = 1; tag <= daysInMonth; tag++) {
     const datum = new Date(jahr, monat - 1, tag)
-    const datumStr = datum.toISOString().split('T')[0]
+    const datumStr = toLocalISODateString(datum)
     const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
     const istFeiertag = feiertage.includes(datumStr)
     
@@ -128,7 +128,7 @@ export function countArbeitstageInWoche(
   for (let i = 0; i < 365; i++) {
     const datum = new Date(jahr, 0, i + 1)
     if (getKalenderWoche(datum) === kw) {
-       const datumStr = datum.toISOString().split('T')[0]
+       const datumStr = toLocalISODateString(datum)
        const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
        const istFeiertag = feiertage.includes(datumStr)
        if (!istWochenende && !istFeiertag) {
@@ -279,7 +279,7 @@ export function generiereTagesproduktion(
     const tag = i + 1
     const datum = new Date(konfiguration.planungsjahr, 0, tag)
     const wochentag = datum.toLocaleDateString('de-DE', { weekday: 'short' })
-    const datumStr = datum.toISOString().split('T')[0]
+    const datumStr = toLocalISODateString(datum)
     const kw = getKalenderWoche(datum)
     
     const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
@@ -857,7 +857,7 @@ export function berechneProduktionsRueckstandTrend(
   tagesProduktion: TagesProduktionEntry[]
 ): RueckstandsDatenpunkt[] {
   return tagesProduktion.map(tag => ({
-    datum: tag.datum.toISOString().split('T')[0],
+    datum: toLocalISODateString(tag.datum),
     rueckstand: (tag.kumulativSoll ?? tag.kumulativPlan) - tag.kumulativIst, 
     kumulativSoll: tag.kumulativSoll ?? tag.kumulativPlan,
     kumulativIst: tag.kumulativIst
