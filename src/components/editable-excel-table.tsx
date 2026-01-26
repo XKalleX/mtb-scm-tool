@@ -158,7 +158,7 @@ export default function EditableExcelTable({
     const row = data[editingCell.rowIndex]
     
     // Parse Wert (angenommen: meistens Zahlen)
-    let newValue: any = editValue.trim()
+    let newValue: string | number = editValue.trim()
     
     // Versuche als Zahl zu parsen
     if (!isNaN(Number(newValue))) {
