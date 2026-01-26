@@ -102,8 +102,9 @@ export default function InboundPage() {
     )
     
     setZusatzBestellungen(prev => [...prev, neueBestellung])
-    setNeueBestellungDatum('')
-    setNeueBestellungMenge('500')
+    // ✅ FIX: Datum NICHT zurücksetzen, damit Benutzer sieht welches Datum gewählt wurde
+    // und einfacher weitere Bestellungen mit ähnlichem Datum eingeben kann
+    setNeueBestellungMenge('500')  // Nur Menge zurücksetzen
   }, [neueBestellungDatum, neueBestellungMenge, konfiguration.lieferant.gesamtVorlaufzeitTage])
   
   // Lieferant aus Konfiguration
@@ -604,6 +605,14 @@ export default function InboundPage() {
                         max={`${konfiguration.planungsjahr}-11-12`}
                         className="bg-white"
                       />
+                      {neueBestellungDatum && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Gewählt: {(() => {
+                            const date = new Date(neueBestellungDatum);
+                            return isNaN(date.getTime()) ? 'Ungültiges Datum' : date.toLocaleDateString('de-DE');
+                          })()}
+                        </p>
+                      )}
                     </div>
                     <div className="flex-1 min-w-[150px]">
                       <Label htmlFor="bestellmenge" className="text-xs text-blue-800">

@@ -499,12 +499,24 @@ export function EinstellungenPanel() {
                   />
                 </div>
 
+                {/* 
+                  ✅ FIX: Number Input Leading Zeros Prevention
+                  
+                  Pattern: value={field ?? ''} statt value={field ?? 0}
+                  Grund: Verhindert führende Nullen beim Tippen (z.B. "01" statt "1")
+                  
+                  Type Safety: HTML Input value prop akzeptiert string | number | readonly string[]
+                  Der Browser konvertiert automatisch zwischen String und Number bei type="number"
+                  
+                  onChange: Explizite Behandlung von leeren Strings → 0
+                */}
+
                 <div className="space-y-2">
                   <Label>Vorlaufzeit Arbeitstage (Produktion)</Label>
                   <Input
                     type="number"
-                    value={draftKonfiguration.lieferant.vorlaufzeitArbeitstage ?? 0}
-                    onChange={(e) => updateDraftLieferant({ vorlaufzeitArbeitstage: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.vorlaufzeitArbeitstage ?? ''}
+                    onChange={(e) => updateDraftLieferant({ vorlaufzeitArbeitstage: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.vorlaufzeitArbeitstage} Tage</p>
@@ -514,8 +526,8 @@ export function EinstellungenPanel() {
                   <Label>Vorlaufzeit Kalendertage (Seefracht Shanghai → Hamburg)</Label>
                   <Input
                     type="number"
-                    value={draftKonfiguration.lieferant.vorlaufzeitKalendertage ?? 0}
-                    onChange={(e) => updateDraftLieferant({ vorlaufzeitKalendertage: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.vorlaufzeitKalendertage ?? ''}
+                    onChange={(e) => updateDraftLieferant({ vorlaufzeitKalendertage: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.vorlaufzeitKalendertage} KT (24/7 Seefracht)</p>
@@ -525,8 +537,8 @@ export function EinstellungenPanel() {
                   <Label>LKW-Transport China → Hafen (Arbeitstage)</Label>
                   <Input
                     type="number"
-                    value={draftKonfiguration.lieferant.lkwTransportChinaArbeitstage ?? 0}
-                    onChange={(e) => updateDraftLieferant({ lkwTransportChinaArbeitstage: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.lkwTransportChinaArbeitstage ?? ''}
+                    onChange={(e) => updateDraftLieferant({ lkwTransportChinaArbeitstage: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.lkwTransportChinaArbeitstage} AT (Mo-Fr)</p>
@@ -536,8 +548,8 @@ export function EinstellungenPanel() {
                   <Label>LKW-Transport Hamburg → Werk (Arbeitstage)</Label>
                   <Input
                     type="number"
-                    value={draftKonfiguration.lieferant.lkwTransportDeutschlandArbeitstage ?? 0}
-                    onChange={(e) => updateDraftLieferant({ lkwTransportDeutschlandArbeitstage: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.lkwTransportDeutschlandArbeitstage ?? ''}
+                    onChange={(e) => updateDraftLieferant({ lkwTransportDeutschlandArbeitstage: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.lkwTransportDeutschlandArbeitstage} AT (Mo-Fr)</p>
@@ -547,8 +559,8 @@ export function EinstellungenPanel() {
                   <Label>Gesamte Vorlaufzeit (Kalendertage)</Label>
                   <Input
                     type="number"
-                    value={draftKonfiguration.lieferant.gesamtVorlaufzeitTage ?? 0}
-                    onChange={(e) => updateDraftLieferant({ gesamtVorlaufzeitTage: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.gesamtVorlaufzeitTage ?? ''}
+                    onChange={(e) => updateDraftLieferant({ gesamtVorlaufzeitTage: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.gesamtVorlaufzeitTage} Tage ({Math.ceil(STANDARD_KONFIGURATION.lieferant.gesamtVorlaufzeitTage / 7)} Wochen)</p>
@@ -560,8 +572,8 @@ export function EinstellungenPanel() {
                   <Label>Losgröße (Mindestbestellung)</Label>
                   <Input
                     type="number"
-                    value={draftKonfiguration.lieferant.losgroesse ?? 0}
-                    onChange={(e) => updateDraftLieferant({ losgroesse: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.losgroesse ?? ''}
+                    onChange={(e) => updateDraftLieferant({ losgroesse: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
                     min={1}
                     step={100}
                   />
@@ -572,8 +584,8 @@ export function EinstellungenPanel() {
                   <Label>Lieferintervall (Tage)</Label>
                   <Input
                     type="number"
-                    value={draftKonfiguration.lieferant.lieferintervall ?? 0}
-                    onChange={(e) => updateDraftLieferant({ lieferintervall: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.lieferintervall ?? ''}
+                    onChange={(e) => updateDraftLieferant({ lieferintervall: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
                     min={1}
                   />
                 </div>
@@ -582,8 +594,8 @@ export function EinstellungenPanel() {
                   <Label>Kapazität (Stück/Tag)</Label>
                   <Input
                     type="number"
-                    value={draftKonfiguration.lieferant.kapazitaet ?? 0}
-                    onChange={(e) => updateDraftLieferant({ kapazitaet: parseInt(e.target.value) || 0 })}
+                    value={draftKonfiguration.lieferant.kapazitaet ?? ''}
+                    onChange={(e) => updateDraftLieferant({ kapazitaet: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
                     min={0}
                     step={1000}
                   />
