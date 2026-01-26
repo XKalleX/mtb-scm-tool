@@ -84,7 +84,7 @@ export function DeltaCell({
   inverseLogic = false,
   threshold = 0,
   compact = false,
-  align = 'right',
+  align = 'left',
   className
 }: DeltaCellProps) {
   const { decimals = 0, suffix = '', prefix = '' } = format
