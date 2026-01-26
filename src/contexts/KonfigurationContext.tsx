@@ -435,10 +435,21 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updateLieferant = useCallback((updates: Partial<LieferantConfig>) => {
-    setKonfiguration(prev => ({
-      ...prev,
-      lieferant: { ...prev.lieferant, ...updates }
-    }))
+    setKonfiguration(prev => {
+      const updatedLieferant = { ...prev.lieferant, ...updates }
+      
+      // Auto-sync lkwTransportArbeitstage when China or Deutschland values change
+      // This ensures the total is always correct and reactive
+      if ('lkwTransportChinaArbeitstage' in updates || 'lkwTransportDeutschlandArbeitstage' in updates) {
+        updatedLieferant.lkwTransportArbeitstage = 
+          updatedLieferant.lkwTransportChinaArbeitstage + updatedLieferant.lkwTransportDeutschlandArbeitstage
+      }
+      
+      return {
+        ...prev,
+        lieferant: updatedLieferant
+      }
+    })
   }, [])
 
   const updateProduktion = useCallback((updates: Partial<ProduktionConfig>) => {
