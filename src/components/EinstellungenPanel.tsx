@@ -35,7 +35,7 @@ import {
   Package,
   AlertCircle
 } from 'lucide-react'
-import { useKonfiguration, FeiertagConfig, STANDARD_KONFIGURATION, KonfigurationData } from '@/contexts/KonfigurationContext'
+import { useKonfiguration, FeiertagConfig, STANDARD_KONFIGURATION, KonfigurationData, ProduktionConfig, LieferantConfig } from '@/contexts/KonfigurationContext'
 import { formatNumber } from '@/lib/utils'
 import { DEFAULT_HEUTE_DATUM } from '@/lib/constants'
 
@@ -99,6 +99,28 @@ export function EinstellungenPanel() {
   // EVENT HANDLER - Arbeiten mit Draft-State
   // ========================================
 
+  // Helper function für Draft-Updates
+  const updateDraft = <K extends keyof KonfigurationData>(
+    key: K, 
+    value: KonfigurationData[K]
+  ) => {
+    setDraftKonfiguration(prev => prev ? {...prev, [key]: value} : prev)
+  }
+
+  const updateDraftProduktion = (updates: Partial<ProduktionConfig>) => {
+    setDraftKonfiguration(prev => prev ? {
+      ...prev, 
+      produktion: {...prev.produktion, ...updates}
+    } : prev)
+  }
+
+  const updateDraftLieferant = (updates: Partial<LieferantConfig>) => {
+    setDraftKonfiguration(prev => prev ? {
+      ...prev,
+      lieferant: {...prev.lieferant, ...updates}
+    } : prev)
+  }
+
   const handleSaveChanges = () => {
     // Validierung vor Speicherung
     const saisonalitaetSumme = draftKonfiguration.saisonalitaet.reduce((sum, s) => sum + s.anteil, 0)
@@ -107,8 +129,10 @@ export function EinstellungenPanel() {
     const variantenSumme = draftKonfiguration.varianten.reduce((sum, v) => sum + v.anteilPrognose * 100, 0)
     const variantenValid = Math.abs(variantenSumme - 100) < 0.1
 
+    // Validierung wird durch canSave bereits im UI verhindert
+    // Diese Prüfung ist eine zusätzliche Sicherheit
     if (!saisonalitaetValid || !variantenValid) {
-      alert('Fehler: Die Summen von Saisonalität und Varianten-Anteilen müssen jeweils 100% ergeben!')
+      console.error('Validierungsfehler beim Speichern - sollte durch UI verhindert werden')
       return
     }
 
@@ -274,7 +298,7 @@ export function EinstellungenPanel() {
                     id="jahresproduktion"
                     type="number"
                     value={draftKonfiguration.jahresproduktion ?? 0}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, jahresproduktion: parseInt(e.target.value) || 0} : prev)}
+                    onChange={(e) => updateDraft('jahresproduktion', parseInt(e.target.value) || 0)}
                     min={0}
                     step={1000}
                   />
@@ -289,7 +313,7 @@ export function EinstellungenPanel() {
                     id="heuteDatum"
                     type="date"
                     value={draftKonfiguration.heuteDatum ?? DEFAULT_HEUTE_DATUM}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, heuteDatum: e.target.value} : prev)}
+                    onChange={(e) => updateDraft('heuteDatum', e.target.value)}
                     min="2027-01-01"
                     max="2027-12-31"
                   />
@@ -303,7 +327,7 @@ export function EinstellungenPanel() {
                   <Input
                     type="number"
                     value={draftKonfiguration.produktion.kapazitaetProStunde ?? 0}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, produktion: {...prev.produktion, kapazitaetProStunde: parseInt(e.target.value) || 0}} : prev)}
+                    onChange={(e) => updateDraftProduktion({ kapazitaetProStunde: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                 </div>
@@ -313,7 +337,7 @@ export function EinstellungenPanel() {
                   <Input
                     type="number"
                     value={draftKonfiguration.produktion.stundenProSchicht ?? 0}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, produktion: {...prev.produktion, stundenProSchicht: parseInt(e.target.value) || 0}} : prev)}
+                    onChange={(e) => updateDraftProduktion({ stundenProSchicht: parseInt(e.target.value) || 0 })}
                     min={1}
                     max={24}
                   />
@@ -471,7 +495,7 @@ export function EinstellungenPanel() {
                   <Label>Lieferant Name</Label>
                   <Input
                     value={draftKonfiguration.lieferant.name ?? ''}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, lieferant: {...prev.lieferant, name: e.target.value}} : prev)}
+                    onChange={(e) => updateDraftLieferant({ name: e.target.value })}
                   />
                 </div>
 
@@ -480,7 +504,7 @@ export function EinstellungenPanel() {
                   <Input
                     type="number"
                     value={draftKonfiguration.lieferant.vorlaufzeitArbeitstage ?? 0}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, lieferant: {...prev.lieferant, vorlaufzeitArbeitstage: parseInt(e.target.value) || 0}} : prev)}
+                    onChange={(e) => updateDraftLieferant({ vorlaufzeitArbeitstage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.vorlaufzeitArbeitstage} Tage</p>
@@ -491,7 +515,7 @@ export function EinstellungenPanel() {
                   <Input
                     type="number"
                     value={draftKonfiguration.lieferant.vorlaufzeitKalendertage ?? 0}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, lieferant: {...prev.lieferant, vorlaufzeitKalendertage: parseInt(e.target.value) || 0}} : prev)}
+                    onChange={(e) => updateDraftLieferant({ vorlaufzeitKalendertage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.vorlaufzeitKalendertage} KT (24/7 Seefracht)</p>
@@ -502,7 +526,7 @@ export function EinstellungenPanel() {
                   <Input
                     type="number"
                     value={draftKonfiguration.lieferant.lkwTransportChinaArbeitstage ?? 0}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, lieferant: {...prev.lieferant, lkwTransportChinaArbeitstage: parseInt(e.target.value) || 0}} : prev)}
+                    onChange={(e) => updateDraftLieferant({ lkwTransportChinaArbeitstage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.lkwTransportChinaArbeitstage} AT (Mo-Fr)</p>
@@ -513,7 +537,7 @@ export function EinstellungenPanel() {
                   <Input
                     type="number"
                     value={draftKonfiguration.lieferant.lkwTransportDeutschlandArbeitstage ?? 0}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, lieferant: {...prev.lieferant, lkwTransportDeutschlandArbeitstage: parseInt(e.target.value) || 0}} : prev)}
+                    onChange={(e) => updateDraftLieferant({ lkwTransportDeutschlandArbeitstage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.lkwTransportDeutschlandArbeitstage} AT (Mo-Fr)</p>
@@ -524,7 +548,7 @@ export function EinstellungenPanel() {
                   <Input
                     type="number"
                     value={draftKonfiguration.lieferant.gesamtVorlaufzeitTage ?? 0}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, lieferant: {...prev.lieferant, gesamtVorlaufzeitTage: parseInt(e.target.value) || 0}} : prev)}
+                    onChange={(e) => updateDraftLieferant({ gesamtVorlaufzeitTage: parseInt(e.target.value) || 0 })}
                     min={0}
                   />
                   <p className="text-xs text-muted-foreground">Standard: {STANDARD_KONFIGURATION.lieferant.gesamtVorlaufzeitTage} Tage ({Math.ceil(STANDARD_KONFIGURATION.lieferant.gesamtVorlaufzeitTage / 7)} Wochen)</p>
@@ -537,7 +561,7 @@ export function EinstellungenPanel() {
                   <Input
                     type="number"
                     value={draftKonfiguration.lieferant.losgroesse ?? 0}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, lieferant: {...prev.lieferant, losgroesse: parseInt(e.target.value) || 0}} : prev)}
+                    onChange={(e) => updateDraftLieferant({ losgroesse: parseInt(e.target.value) || 0 })}
                     min={1}
                     step={100}
                   />
@@ -549,7 +573,7 @@ export function EinstellungenPanel() {
                   <Input
                     type="number"
                     value={draftKonfiguration.lieferant.lieferintervall ?? 0}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, lieferant: {...prev.lieferant, lieferintervall: parseInt(e.target.value) || 0}} : prev)}
+                    onChange={(e) => updateDraftLieferant({ lieferintervall: parseInt(e.target.value) || 0 })}
                     min={1}
                   />
                 </div>
@@ -559,7 +583,7 @@ export function EinstellungenPanel() {
                   <Input
                     type="number"
                     value={draftKonfiguration.lieferant.kapazitaet ?? 0}
-                    onChange={(e) => setDraftKonfiguration(prev => prev ? {...prev, lieferant: {...prev.lieferant, kapazitaet: parseInt(e.target.value) || 0}} : prev)}
+                    onChange={(e) => updateDraftLieferant({ kapazitaet: parseInt(e.target.value) || 0 })}
                     min={0}
                     step={1000}
                   />
