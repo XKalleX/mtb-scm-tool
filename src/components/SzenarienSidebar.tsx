@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { 
   Zap, 
   Plus, 
@@ -40,6 +41,7 @@ import {
 } from 'lucide-react'
 import { useSzenarien, SzenarioTyp, SzenarioConfig } from '@/contexts/SzenarienContext'
 import szenarioDefaults from '@/data/szenario-defaults.json'
+import stammdaten from '@/data/stammdaten.json'
 
 /**
  * Floating button that opens the scenario sidebar
@@ -205,8 +207,23 @@ function SzenarioListItem({
  */
 function getSzenarioSummary(szenario: SzenarioConfig): string {
   switch (szenario.typ) {
-    case 'marketingaktion':
-      return `+${szenario.parameter.erhoehungProzent}% für ${szenario.parameter.dauerWochen} Wochen`
+    case 'marketingaktion': {
+      const startDatum = szenario.parameter.startDatum ? new Date(szenario.parameter.startDatum) : null
+      const endDatum = szenario.parameter.endDatum ? new Date(szenario.parameter.endDatum) : null
+      const varianteIds = szenario.parameter.varianteIds || []
+      
+      const dauerTage = startDatum && endDatum 
+        ? Math.ceil((endDatum.getTime() - startDatum.getTime()) / (24 * 60 * 60 * 1000)) + 1
+        : 0
+      
+      const variantenText = varianteIds.length === 0 
+        ? 'alle' 
+        : varianteIds.length === 1
+          ? stammdaten.varianten.find(v => v.id === varianteIds[0])?.name || varianteIds[0]
+          : `${varianteIds.length} Varianten`
+      
+      return `+${szenario.parameter.erhoehungProzent}% für ${variantenText} (${dauerTage} Tage)`
+    }
     case 'maschinenausfall':
       return `-${szenario.parameter.reduktionProzent}% für ${szenario.parameter.dauerTage} Tage`
     case 'wasserschaden':
@@ -287,7 +304,7 @@ function SzenarioForm({
   type FieldDef = {
     key: string
     label: string
-    type: 'number' | 'date' | 'text'
+    type: 'number' | 'date' | 'text' | 'multiselect'
     min?: number | string
     max?: number | string
   }
@@ -304,7 +321,7 @@ function SzenarioForm({
     return Object.entries(paramDefs).map(([key, def]: [string, any]) => ({
       key,
       label: def.label,
-      type: def.typ as 'number' | 'date' | 'text',
+      type: def.typ as 'number' | 'date' | 'text' | 'multiselect',
       min: def.min,
       max: def.max
     }))
@@ -375,6 +392,45 @@ function SzenarioForm({
                 onChange={(e) => setParameter({...parameter, [field.key]: e.target.value})}
                 className="h-8 text-sm"
               />
+            )}
+            
+            {field.type === 'multiselect' && field.key === 'varianteIds' && (
+              <div className="space-y-2">
+                <div className="text-xs text-gray-500 mb-2">
+                  Leer lassen = Alle Fahrräder betroffen
+                </div>
+                <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto border rounded p-2">
+                  {stammdaten.varianten.map((variante) => {
+                    const isSelected = (parameter[field.key] as string[] || []).includes(variante.id)
+                    return (
+                      <div key={variante.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`variant-${variante.id}`}
+                          checked={isSelected}
+                          onCheckedChange={(checked) => {
+                            const current = (parameter[field.key] as string[]) || []
+                            const updated = checked
+                              ? [...current, variante.id]
+                              : current.filter((id: string) => id !== variante.id)
+                            setParameter({...parameter, [field.key]: updated})
+                          }}
+                        />
+                        <label
+                          htmlFor={`variant-${variante.id}`}
+                          className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          {variante.name} ({Math.round(variante.anteilPrognose * 100)}%)
+                        </label>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {(parameter[field.key] as string[] || []).length === 0 
+                    ? '✓ Alle Varianten ausgewählt' 
+                    : `${(parameter[field.key] as string[] || []).length} Variante(n) ausgewählt`}
+                </div>
+              </div>
             )}
           </div>
         ))}

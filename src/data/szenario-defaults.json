@@ -7,39 +7,46 @@
     "marketingaktion": {
       "id": "marketingaktion",
       "name": "Marketingaktion",
-      "beschreibung": "Nachfrageerhöhung durch erfolgreiche Marketing-Kampagne",
+      "beschreibung": "Nachfrageerhöhung durch erfolgreiche Marketing-Kampagne - granular je Fahrrad & Tagesbasis",
       "standardParameter": {
-        "startKW": 28,
-        "dauerWochen": 4,
-        "erhoehungProzent": 20
+        "startDatum": "2027-07-01",
+        "endDatum": "2027-07-14",
+        "erhoehungProzent": 20,
+        "varianteIds": []
       },
       "parameterDefinitionen": {
-        "startKW": {
-          "label": "Start Kalenderwoche",
-          "typ": "number",
-          "einheit": "KW",
-          "min": 1,
-          "max": 52,
-          "beschreibung": "Kalenderwoche in der die Marketingaktion startet"
+        "startDatum": {
+          "label": "Start Datum",
+          "typ": "date",
+          "einheit": "Datum",
+          "min": "2027-01-01",
+          "max": "2027-12-31",
+          "beschreibung": "Datum an dem die Marketingaktion startet"
         },
-        "dauerWochen": {
-          "label": "Dauer (Wochen)",
-          "typ": "number",
-          "einheit": "Wochen",
-          "min": 1,
-          "max": 12,
-          "beschreibung": "Anzahl der Wochen, die die Marketingaktion läuft"
+        "endDatum": {
+          "label": "End Datum",
+          "typ": "date",
+          "einheit": "Datum",
+          "min": "2027-01-01",
+          "max": "2027-12-31",
+          "beschreibung": "Datum an dem die Marketingaktion endet (inklusiv)"
         },
         "erhoehungProzent": {
           "label": "Nachfrage-Erhöhung (%)",
           "typ": "number",
           "einheit": "%",
           "min": 5,
-          "max": 50,
+          "max": 100,
           "beschreibung": "Prozentuale Erhöhung der Nachfrage während der Kampagne"
+        },
+        "varianteIds": {
+          "label": "Betroffene Fahrräder",
+          "typ": "multiselect",
+          "einheit": "",
+          "beschreibung": "Auswahl der betroffenen MTB-Varianten (leer = alle Varianten)"
         }
       },
-      "beispiel": "Zeitschrift 'Mountain Biker' Sonderausgabe erhöht Nachfrage für alle MTB-Varianten um 20% über 4 Wochen"
+      "beispiel": "Zeitschrift 'Mountain Biker' Sonderausgabe vom 01.07. bis 14.07.2027 erhöht Nachfrage für Allrounder +20% (tagesgenau)"
     },
     "maschinenausfall": {
       "id": "maschinenausfall",

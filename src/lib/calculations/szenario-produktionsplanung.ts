@@ -65,6 +65,11 @@ export interface SzenarioModifikation {
   produktionsFaktor: number        // Multiplikator für Produktion (1.0 = unverändert)
   produktionsAusfallTage: number[] // Liste von Tagen (1-365) ohne Produktion
   
+  // GRANULAR: Tagesgenaue Faktoren pro Variante für Marketingaktionen
+  // Key: `${varianteId}-${tagNummer}`, Value: Faktor (z.B. 1.2 für +20%)
+  // Wenn keine Variante spezifiziert (varianteId = "*"), gilt für alle Varianten
+  tagesgenaueMarketingFaktoren: Map<string, number>
+  
   // Material-Modifikatoren
   materialverfuegbarkeitFaktor: number  // Faktor für Materialverfügbarkeit
   materialVerlust: number               // Absolute Menge verlorener Teile
@@ -149,6 +154,11 @@ export interface ProduktionsStatistikMitDelta {
 /**
  * Berechnet die Modifikatoren basierend auf aktiven Szenarien
  * 
+ * WICHTIG: Marketingaktionen sind jetzt GRANULAR je Fahrrad und Tagesbasis!
+ * - startDatum/endDatum statt Kalenderwochen
+ * - varianteIds Array (leer = alle Varianten)
+ * - Tagesgenaue Faktoren werden in Map gespeichert
+ * 
  * @param szenarien - Array von aktiven Szenarien
  * @param planungsjahr - Jahr für Datumsberechnungen
  * @returns SzenarioModifikation mit allen Faktoren
@@ -162,6 +172,7 @@ export function berechneSzenarioModifikation(
   // Start mit neutralen Werten
   let produktionsFaktor = 1.0
   const produktionsAusfallTage: number[] = []
+  const tagesgenaueMarketingFaktoren = new Map<string, number>()
   let materialverfuegbarkeitFaktor = 1.0
   let materialVerlust = 0
   let vorlaufzeitAenderung = 0
@@ -173,21 +184,54 @@ export function berechneSzenarioModifikation(
     
     switch (szenario.typ) {
       case 'marketingaktion': {
-        // Marketingaktion erhöht die Nachfrage
+        /**
+         * GRANULARE MARKETINGAKTION (NEU):
+         * - Tagesgenaue Nachfrageerhöhung (startDatum → endDatum)
+         * - Pro Fahrrad konfigurierbar (varianteIds Array)
+         * - Wenn varianteIds leer: Gilt für ALLE Varianten
+         */
         const erhoehung = (szenario.parameter.erhoehungProzent || 20) / 100
-        const dauerWochen = szenario.parameter.dauerWochen || 4
-        const startKW = szenario.parameter.startKW || 28
+        const faktor = 1 + erhoehung
         
-        // Berechne betroffene Tage (KW → Tage)
-        const startTag = (startKW - 1) * 7 + 1
-        const endTag = startTag + dauerWochen * 7 - 1
+        // Parse Datumsangaben (Format: "2027-07-01")
+        const startDatum = szenario.parameter.startDatum 
+          ? new Date(szenario.parameter.startDatum) 
+          : new Date(planungsjahr, 6, 1) // Fallback: 1. Juli
         
-        // Produktionsfaktor nur für die Dauer der Kampagne
-        // Vereinfacht: Jahreseffekt berechnen
-        const jahresEffekt = (dauerWochen / 52) * erhoehung
-        produktionsFaktor *= (1 + jahresEffekt)
+        const endDatum = szenario.parameter.endDatum
+          ? new Date(szenario.parameter.endDatum)
+          : new Date(startDatum.getTime() + 14 * 24 * 60 * 60 * 1000) // Fallback: +14 Tage
         
-        beschreibungen.push(`Marketing: +${szenario.parameter.erhoehungProzent}% für ${dauerWochen} Wochen (KW ${startKW})`)
+        // Berechne betroffene Tage (1-365)
+        const jahresStart = new Date(planungsjahr, 0, 1)
+        const startTag = Math.ceil((startDatum.getTime() - jahresStart.getTime()) / (24 * 60 * 60 * 1000)) + 1
+        const endTag = Math.ceil((endDatum.getTime() - jahresStart.getTime()) / (24 * 60 * 60 * 1000)) + 1
+        
+        // Betroffene Varianten
+        const varianteIds: string[] = szenario.parameter.varianteIds || []
+        const betroffeneVarianten = varianteIds.length > 0 ? varianteIds : ['*'] // '*' = alle Varianten
+        
+        // Tagesgenaue Faktoren setzen
+        for (let tag = Math.max(1, startTag); tag <= Math.min(365, endTag); tag++) {
+          betroffeneVarianten.forEach(varianteId => {
+            const key = `${varianteId}-${tag}`
+            // Wenn bereits ein Faktor existiert, multiplizieren (mehrere Marketingaktionen)
+            const existingFaktor = tagesgenaueMarketingFaktoren.get(key) || 1.0
+            tagesgenaueMarketingFaktoren.set(key, existingFaktor * faktor)
+          })
+        }
+        
+        // Beschreibung erstellen
+        const dauerTage = Math.max(1, endTag - startTag + 1)
+        const variantenText = varianteIds.length === 0 
+          ? 'alle Varianten' 
+          : varianteIds.length === 1 
+            ? varianteIds[0]
+            : `${varianteIds.length} Varianten`
+        
+        beschreibungen.push(
+          `Marketing: +${szenario.parameter.erhoehungProzent}% für ${variantenText} (${dauerTage} Tage, ${startDatum.toLocaleDateString('de-DE')} - ${endDatum.toLocaleDateString('de-DE')})`
+        )
         break
       }
       
@@ -251,6 +295,7 @@ export function berechneSzenarioModifikation(
   return {
     produktionsFaktor,
     produktionsAusfallTage,
+    tagesgenaueMarketingFaktoren,
     materialverfuegbarkeitFaktor,
     materialVerlust,
     vorlaufzeitAenderung,
@@ -384,6 +429,11 @@ export function generiereTagesproduktionMitSzenarien(
 
 /**
  * Generiert alle Varianten-Produktionspläne MIT Szenario-Unterstützung
+ * 
+ * WICHTIG: Unterstützt GRANULARE Marketingaktionen je Fahrrad & Tagesbasis!
+ * - Tagesgenaue Marketing-Faktoren aus modifikation.tagesgenaueMarketingFaktoren
+ * - Varianten-spezifische Anwendung der Faktoren
+ * - Korrekte Error-Management Berechnung mit variablen Tagesfaktoren
  */
 export function generiereAlleVariantenMitSzenarien(
   konfiguration: KonfigurationData,
@@ -395,50 +445,140 @@ export function generiereAlleVariantenMitSzenarien(
   const result: Record<string, VariantenProduktionsplan & { tage: TagesProduktionMitDelta[] }> = {}
   
   konfiguration.varianten.forEach(variante => {
-    const jahresProduktion = Math.round(
-      konfiguration.jahresproduktion * variante.anteilPrognose * modifikation.produktionsFaktor
-    )
-    
-    // Baseline-Jahresproduktion
+    // Baseline-Jahresproduktion (ohne Szenarien)
     const baselineJahresProduktion = Math.round(
       konfiguration.jahresproduktion * variante.anteilPrognose
     )
     
-    // Erstelle Varianten-Konfiguration
-    const varianteKonfiguration: KonfigurationData = {
-      ...konfiguration,
-      jahresproduktion: jahresProduktion
-    }
-    
+    // Baseline-Konfiguration
     const baselineKonfiguration: KonfigurationData = {
       ...konfiguration,
       jahresproduktion: baselineJahresProduktion
     }
     
-    // Generiere Pläne
-    const szenarioTage = generiereTagesproduktionMitSzenarien(varianteKonfiguration, szenarien)
+    // Generiere Baseline-Plan (ohne Szenarien)
     const baselineTage = generiereTagesproduktion(baselineKonfiguration)
     
-    // Füge Baseline-Referenz hinzu
-    const tage: TagesProduktionMitDelta[] = szenarioTage.map((tag, i) => ({
-      ...tag,
-      baselinePlanMenge: baselineTage[i].planMenge,
-      baselineIstMenge: baselineTage[i].istMenge,
-      deltaPlanMenge: tag.planMenge - baselineTage[i].planMenge,
-      deltaIstMenge: tag.istMenge - baselineTage[i].istMenge,
-      istVonSzenarioBetroffen: tag.planMenge !== baselineTage[i].planMenge || 
-                               tag.istMenge !== baselineTage[i].istMenge
-    }))
+    /**
+     * GRANULARE MARKETINGAKTION: Tagesgenaue Anpassung der Produktion
+     * 
+     * Für jeden Tag prüfen wir ob ein Marketing-Faktor existiert:
+     * 1. Varianten-spezifisch: Key = `${variante.id}-${tagNummer}`
+     * 2. Alle Varianten: Key = `*-${tagNummer}`
+     * 
+     * Wenn ein Faktor existiert, wird die Tagesproduktion angepasst
+     * unter Berücksichtigung von Error-Management für korrekte Jahressummen.
+     */
+    const szenarioTage: TagesProduktionMitDelta[] = []
+    let kumulierterErrorSzenario = 0
+    let jahresProduktionSzenarioGeplant = 0
+    let jahresProduktionSzenarioIst = 0
     
-    const jahresProduktionIst = tage.reduce((sum, t) => sum + t.istMenge, 0)
+    for (let tagIndex = 0; tagIndex < 365; tagIndex++) {
+      const baselineTag = baselineTage[tagIndex]
+      const tagNummer = tagIndex + 1
+      
+      // Prüfe Marketing-Faktor für diesen Tag und diese Variante
+      const variantenKey = `${variante.id}-${tagNummer}`
+      const globalKey = `*-${tagNummer}`
+      
+      let marketingFaktor = 1.0
+      let istMarketingTag = false
+      let marketingNotiz: string | undefined
+      
+      // Varianten-spezifischer Faktor hat Vorrang
+      if (modifikation.tagesgenaueMarketingFaktoren.has(variantenKey)) {
+        marketingFaktor = modifikation.tagesgenaueMarketingFaktoren.get(variantenKey)!
+        istMarketingTag = true
+        marketingNotiz = `Marketing: +${Math.round((marketingFaktor - 1) * 100)}% für ${variante.name}`
+      } else if (modifikation.tagesgenaueMarketingFaktoren.has(globalKey)) {
+        marketingFaktor = modifikation.tagesgenaueMarketingFaktoren.get(globalKey)!
+        istMarketingTag = true
+        marketingNotiz = `Marketing: +${Math.round((marketingFaktor - 1) * 100)}% alle Varianten`
+      }
+      
+      // Berechne Plan- und Ist-Menge mit Marketing-Faktor
+      let planMenge = baselineTag.planMenge * marketingFaktor
+      let istMenge = baselineTag.istMenge * marketingFaktor
+      
+      // Error-Management anwenden (nur auf Arbeitstagen)
+      if (baselineTag.istArbeitstag) {
+        const sollMenge = planMenge
+        const fehlerVorher = kumulierterErrorSzenario
+        kumulierterErrorSzenario += (sollMenge - Math.round(sollMenge))
+        
+        if (kumulierterErrorSzenario >= 0.5) {
+          istMenge = Math.ceil(sollMenge)
+          kumulierterErrorSzenario -= 1.0
+        } else if (kumulierterErrorSzenario <= -0.5) {
+          istMenge = Math.floor(sollMenge)
+          kumulierterErrorSzenario += 1.0
+        } else {
+          istMenge = Math.round(sollMenge)
+        }
+      } else {
+        // Kein Arbeitstag
+        planMenge = 0
+        istMenge = 0
+      }
+      
+      // Prüfe Produktionsausfall
+      const istAusfallTag = modifikation.produktionsAusfallTage.includes(tagNummer)
+      if (istAusfallTag && baselineTag.istArbeitstag) {
+        istMenge = Math.round(istMenge * MACHINE_FAILURE_PRODUCTION_RATE)
+        marketingNotiz = 'Produktionsausfall China'
+      }
+      
+      // Prüfe Materialverfügbarkeit (deterministisch)
+      const materialSchwelle = 0.1 + (tagNummer % 10) / 10
+      const materialOk = baselineTag.materialVerfuegbar && 
+                         materialSchwelle < modifikation.materialverfuegbarkeitFaktor
+      
+      if (!materialOk && baselineTag.istArbeitstag && !istAusfallTag) {
+        istMenge = Math.round(istMenge * MATERIAL_SHORTAGE_PRODUCTION_RATE)
+        marketingNotiz = marketingNotiz || 'Reduzierte Materialverfügbarkeit'
+      }
+      
+      // Akkumuliere Jahresproduktion
+      jahresProduktionSzenarioGeplant += planMenge
+      jahresProduktionSzenarioIst += istMenge
+      
+      // Deltas berechnen
+      const deltaPlan = planMenge - baselineTag.planMenge
+      const deltaIst = istMenge - baselineTag.istMenge
+      
+      szenarioTage.push({
+        ...baselineTag,
+        planMenge,
+        istMenge,
+        abweichung: istMenge - planMenge,
+        kumulativPlan: jahresProduktionSzenarioGeplant,
+        kumulativIst: jahresProduktionSzenarioIst,
+        kumulierterError: kumulierterErrorSzenario,
+        materialVerfuegbar: materialOk,
+        
+        // Baseline-Referenz
+        baselinePlanMenge: baselineTag.planMenge,
+        baselineIstMenge: baselineTag.istMenge,
+        
+        // Deltas
+        deltaPlanMenge: deltaPlan,
+        deltaIstMenge: deltaIst,
+        
+        // Szenario-Info
+        istVonSzenarioBetroffen: istMarketingTag || istAusfallTag || !materialOk,
+        szenarioTyp: istMarketingTag ? 'marketingaktion' : istAusfallTag ? 'maschinenausfall' : undefined,
+        szenarioNotiz: marketingNotiz
+      })
+    }
     
     result[variante.id] = {
       varianteId: variante.id,
       varianteName: variante.name,
-      jahresProduktion,
-      jahresProduktionIst,
-      abweichung: jahresProduktionIst - jahresProduktion,
-      tage
+      jahresProduktion: Math.round(jahresProduktionSzenarioGeplant),
+      jahresProduktionIst: Math.round(jahresProduktionSzenarioIst),
+      abweichung: Math.round(jahresProduktionSzenarioIst - jahresProduktionSzenarioGeplant),
+      tage: szenarioTage
     }
   })
   
