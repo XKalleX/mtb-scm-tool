@@ -30,6 +30,8 @@ import {
   berechneAnkunftsdatum, 
   istSpringFestival, 
   istChinaFeiertag,
+  istArbeitstag_Deutschland,
+  naechsterArbeitstag_Deutschland,
   FeiertagsKonfiguration 
 } from '@/lib/kalender'
 import lieferantData from '@/data/lieferant-china.json'
@@ -458,7 +460,15 @@ export function generiereTaeglicheBestellungen(
     
     if (sollBestellen) {
       const bestelldatum = new Date(aktuellerTag)
-      const bedarfsdatum = addDays(bestelldatum, VORLAUFZEIT_TAGE)
+      let bedarfsdatum = addDays(bestelldatum, VORLAUFZEIT_TAGE)
+      
+      // ✅ KORRIGIERT: Bedarfsdatum muss ein deutscher Arbeitstag sein!
+      // Falls das berechnete Datum auf Wochenende/Feiertag fällt, 
+      // verschiebe auf den NÄCHSTEN deutschen Arbeitstag
+      // (Produktion findet in Deutschland statt)
+      if (!istArbeitstag_Deutschland(bedarfsdatum, customFeiertage)) {
+        bedarfsdatum = naechsterArbeitstag_Deutschland(bedarfsdatum, customFeiertage)
+      }
       
       bestellungen.push({
         id: generateId(),
@@ -497,7 +507,12 @@ export function generiereTaeglicheBestellungen(
   
   if (hatRest) {
     const finalesBestelldatum = new Date(bestellEnde)
-    const finalesBedarfsdatum = addDays(finalesBestelldatum, VORLAUFZEIT_TAGE)
+    let finalesBedarfsdatum = addDays(finalesBestelldatum, VORLAUFZEIT_TAGE)
+    
+    // ✅ KORRIGIERT: Bedarfsdatum muss ein deutscher Arbeitstag sein!
+    if (!istArbeitstag_Deutschland(finalesBedarfsdatum, customFeiertage)) {
+      finalesBedarfsdatum = naechsterArbeitstag_Deutschland(finalesBedarfsdatum, customFeiertage)
+    }
     
     bestellungen.push({
       id: generateId(),
@@ -589,7 +604,12 @@ export function erstelleZusatzbestellung(
     })
   }
   
-  const bedarfsdatum = addDays(bestelldatum, vorlaufzeitTage)
+  let bedarfsdatum = addDays(bestelldatum, vorlaufzeitTage)
+  
+  // ✅ KORRIGIERT: Bedarfsdatum muss ein deutscher Arbeitstag sein!
+  if (!istArbeitstag_Deutschland(bedarfsdatum, customFeiertage)) {
+    bedarfsdatum = naechsterArbeitstag_Deutschland(bedarfsdatum, customFeiertage)
+  }
   
   return {
     id: generateId(),
