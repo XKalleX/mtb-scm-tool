@@ -608,13 +608,8 @@ export function berechneAnkunftsdatum(
   // Schritt 4: LKW-Transport Hamburg nach Dortmund (2 AT)
   // ✅ KORRIGIERT: Nutzt DEUTSCHE Arbeitstage (nicht chinesische!)
   // LKW-Transport in Deutschland respektiert deutsche Feiertage
+  // addArbeitstage_Deutschland garantiert bereits dass das Ergebnis ein deutscher Arbeitstag ist
   let ankunftsdatum = addArbeitstage_Deutschland(nachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE, customFeiertage)
-  
-  // ✅ NEU: Sicherstellen dass Ankunft an einem deutschen Arbeitstag ist
-  // Falls das berechnete Datum auf ein Wochenende/Feiertag fällt, verschiebe auf nächsten Arbeitstag
-  while (!istArbeitstag_Deutschland(ankunftsdatum, customFeiertage)) {
-    ankunftsdatum = addDays(ankunftsdatum, 1)
-  }
   
   return ankunftsdatum
 }
