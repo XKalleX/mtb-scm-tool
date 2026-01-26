@@ -146,7 +146,7 @@ export function DeltaCell({
   
   return (
     <div className={cn('flex flex-col', alignClasses[align], className)}>
-      {/* Hauptwert - IMMER GROSS UND FETT für Overview Cards */}
+      {/* Hauptwert - Always displayed large and bold for Overview Cards */}
       <div className="text-2xl font-bold">
         {prefix}{formattedValue}{suffix}
       </div>
