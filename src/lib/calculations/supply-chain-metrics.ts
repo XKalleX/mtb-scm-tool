@@ -15,41 +15,35 @@
 import { SzenarioConfig } from '@/contexts/SzenarienContext'
 import saisonalitaetData from '@/data/saisonalitaet.json'
 import stammdatenData from '@/data/stammdaten.json'
+import lieferantChinaData from '@/data/lieferant-china.json'
 
 // ========================================
-// SSOT KONSTANTEN (Standard-Werte, können überschrieben werden)
+// SSOT KONSTANTEN (Standard-Werte aus JSON, können überschrieben werden)
 // ========================================
 
 /**
  * KRITISCH: 370.000 Bikes pro Jahr (NICHT 185.000!)
+ * Wird aus JSON geladen, fallback auf Standard-Wert
  */
-export const JAHRESPRODUKTION_SSOT = 370_000
+export const JAHRESPRODUKTION_SSOT = (stammdatenData as any).jahresproduktion?.gesamt || 370_000
 
 /**
- * China Vorlaufzeit: 49 Tage (7 Wochen, NICHT 56!)
- * Breakdown: 42 Tage Seefracht + 5 Tage Produktion + 2 Tage Handling/Verzollung
+ * China Vorlaufzeit: Feste Management-Referenz aus JSON (lieferant-china.json)
+ * Dies ist ein fix definierter Wert vom Management, NICHT die Summe der Transportphasen.
+ * Die tatsächliche Lieferzeit kann durch Feiertage, Szenarien etc. abweichen.
+ * 
+ * Transport-Phasen (aus JSON, zur Information):
+ * - 5 AT Produktion in China
+ * - 2 AT LKW zum Hafen
+ * - 30 KT Seefracht
+ * - 2 AT LKW zum Werk
  */
-export const CHINA_VORLAUFZEIT_TAGE = 49
+export const CHINA_VORLAUFZEIT_TAGE = lieferantChinaData.lieferant.gesamtVorlaufzeitTage || 49
 
 /**
- * Produktionstage China: 5 Arbeitstage
+ * Losgröße Sättel aus JSON
  */
-export const CHINA_PRODUKTIONSZEIT_TAGE = 5
-
-/**
- * Seefracht Transportzeit: 42 Tage
- */
-export const CHINA_TRANSPORT_SEEFRACHT_TAGE = 42
-
-/**
- * Handling & Verzollung: 2 Tage
- */
-export const CHINA_HANDLING_TAGE = 2
-
-/**
- * Losgröße Sättel: 500 Stück
- */
-export const LOSGROESSE_SAETTEL = 500
+export const LOSGROESSE_SAETTEL = lieferantChinaData.lieferant.losgroesse || 500
 
 /**
  * Arbeitstage pro Jahr (Mo-Fr ohne Feiertage)
@@ -987,41 +981,47 @@ export function berechneVorlaufzeitBreakdown(
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
   const gesamtDurchlaufzeit = auswirkungen.durchlaufzeit
   
-  // SSOT: 49 Tage = 5 (Produktion) + 42 (Transport) + 2 (Handling)
-  const produktionTage = CHINA_PRODUKTIONSZEIT_TAGE
-  const transportTage = CHINA_TRANSPORT_SEEFRACHT_TAGE
-  const handlingTage = CHINA_HANDLING_TAGE
+  // Transport-Sequenz aus JSON (lieferant-china.json) laden
+  const transportSequenz = lieferantChinaData.lieferant.transportSequenz
+  const referenzVorlaufzeit = lieferantChinaData.lieferant.gesamtVorlaufzeitTage
   
-  // Bei Verzögerungen (Szenarien) wird Transport verlängert
-  const zusatzTage = Math.max(0, gesamtDurchlaufzeit - CHINA_VORLAUFZEIT_TAGE)
-  const tatsaechlicherTransport = transportTage + zusatzTage
+  // Bei Verzögerungen (Szenarien) wird die Seefracht verlängert
+  const zusatzTage = Math.max(0, gesamtDurchlaufzeit - referenzVorlaufzeit)
   
-  return [
-    {
-      phase: 'Produktion China',
-      tage: produktionTage,
-      start: 0,
-      ende: produktionTage,
-      farbe: '#10b981', // green
-      beschreibung: `Herstellung der Sättel beim Zulieferer in China (${produktionTage} Werktage)`
-    },
-    {
-      phase: 'Seefracht',
-      tage: tatsaechlicherTransport,
-      start: produktionTage,
-      ende: produktionTage + tatsaechlicherTransport,
-      farbe: '#3b82f6', // blue
-      beschreibung: `Container-Transport von Shanghai nach Hamburg (${tatsaechlicherTransport} Tage)${zusatzTage > 0 ? ` + ${zusatzTage} Tage Verspätung` : ''}`
-    },
-    {
-      phase: 'Verzollung & Handling',
-      tage: handlingTage,
-      start: produktionTage + tatsaechlicherTransport,
-      ende: produktionTage + tatsaechlicherTransport + handlingTage,
-      farbe: '#f59e0b', // amber
-      beschreibung: `Zollabfertigung und Anlieferung nach Dortmund (${handlingTage} Tage)`
+  // Farben für die Phasen
+  const FARBEN = {
+    'Produktion': '#10b981', // green
+    'LKW': '#f59e0b',        // amber
+    'Seefracht': '#3b82f6'   // blue
+  }
+  
+  let kumulativeStart = 0
+  const ergebnis: VorlaufzeitBreakdown[] = []
+  
+  transportSequenz.forEach((phase, index) => {
+    // Bei Seefracht werden eventuelle Verzögerungen addiert
+    let tatsaechlicheDauer = phase.dauer
+    if (phase.typ === 'Seefracht') {
+      tatsaechlicheDauer += zusatzTage
     }
-  ]
+    
+    ergebnis.push({
+      phase: `${phase.typ}${phase.typ === 'LKW' ? ` (${phase.von} → ${phase.nach})` : ''}`,
+      tage: tatsaechlicheDauer,
+      start: kumulativeStart,
+      ende: kumulativeStart + tatsaechlicheDauer,
+      farbe: FARBEN[phase.typ as keyof typeof FARBEN] || '#6b7280',
+      beschreibung: `${phase.beschreibung} (${tatsaechlicheDauer} ${phase.einheit})${
+        phase.typ === 'Seefracht' && zusatzTage > 0 
+          ? ` inkl. ${zusatzTage} Tage Verspätung` 
+          : ''
+      }`
+    })
+    
+    kumulativeStart += tatsaechlicheDauer
+  })
+  
+  return ergebnis
 }
 
 /**

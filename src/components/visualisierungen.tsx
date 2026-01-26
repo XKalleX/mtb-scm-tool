@@ -1390,10 +1390,13 @@ function SCORDashboard({
             
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-900">
-                <strong>✓ SSOT Korrekt:</strong> Gesamte Vorlaufzeit = {vorlaufzeitDaten[vorlaufzeitDaten.length - 1].ende} Tage 
-                (7 Wochen, NICHT 56 Tage / 8 Wochen!)
-                {vorlaufzeitDaten[vorlaufzeitDaten.length - 1].ende > 49 && 
-                  ` +${vorlaufzeitDaten[vorlaufzeitDaten.length - 1].ende - 49} Tage Verspätung durch Szenarien`
+                <strong>📋 Management-Referenz:</strong> Vorlaufzeit = {konfiguration.lieferant.gesamtVorlaufzeitTage} Tage (7 Wochen)
+                <br />
+                <span className="text-xs">Dies ist ein fix definierter Wert. Die tatsächliche Lieferzeit (aktuell: {vorlaufzeitDaten[vorlaufzeitDaten.length - 1]?.ende} Tage) kann durch Feiertage/Szenarien abweichen.</span>
+                {vorlaufzeitDaten[vorlaufzeitDaten.length - 1]?.ende > konfiguration.lieferant.gesamtVorlaufzeitTage && 
+                  <span className="text-red-700 font-semibold block mt-1">
+                    ⚠️ +{vorlaufzeitDaten[vorlaufzeitDaten.length - 1].ende - konfiguration.lieferant.gesamtVorlaufzeitTage} Tage Verspätung durch aktive Szenarien
+                  </span>
                 }
               </p>
             </div>
