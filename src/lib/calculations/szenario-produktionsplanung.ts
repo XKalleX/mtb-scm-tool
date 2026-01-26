@@ -554,7 +554,6 @@ export function generiereAlleVariantenMitSzenarien(
         abweichung: istMenge - planMenge,
         kumulativPlan: jahresProduktionSzenarioGeplant,
         kumulativIst: jahresProduktionSzenarioIst,
-        kumulierterError: kumulierterErrorSzenario,
         materialVerfuegbar: materialOk,
         
         // Baseline-Referenz
