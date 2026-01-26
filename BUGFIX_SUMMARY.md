@@ -211,7 +211,7 @@ src/app/inbound/page.tsx               (10 Zeilen geändert)
 **Reviewer:** Pending  
 
 **Autor:** Development Team  
-**Datum:** 2024  
+**Datum:** 26.01.2026  
 
 ---
 

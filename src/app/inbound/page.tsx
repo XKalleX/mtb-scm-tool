@@ -104,7 +104,6 @@ export default function InboundPage() {
     setZusatzBestellungen(prev => [...prev, neueBestellung])
     // ✅ FIX: Datum NICHT zurücksetzen, damit Benutzer sieht welches Datum gewählt wurde
     // und einfacher weitere Bestellungen mit ähnlichem Datum eingeben kann
-    // setNeueBestellungDatum('')  // <- ENTFERNT
     setNeueBestellungMenge('500')  // Nur Menge zurücksetzen
   }, [neueBestellungDatum, neueBestellungMenge, konfiguration.lieferant.gesamtVorlaufzeitTage])
   
@@ -605,7 +604,6 @@ export default function InboundPage() {
                         min={`${konfiguration.planungsjahr - 1}-10-01`}
                         max={`${konfiguration.planungsjahr}-11-12`}
                         className="bg-white"
-                        placeholder="TT.MM.JJJJ"
                       />
                       {neueBestellungDatum && (
                         <p className="text-xs text-blue-600 mt-1">
