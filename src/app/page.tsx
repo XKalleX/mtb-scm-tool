@@ -85,9 +85,6 @@ export default function Dashboard() {
           Übersicht über alle wichtigen Kennzahlen und Funktionen
           {aktiveSzenarien.length > 0 && ' - Live-Berechnung mit aktiven Szenarien'}
         </p>
-        <p className="text-sm text-blue-600 mt-2">
-          💡 Tipp: Öffnen Sie die Einstellungen über das blaue ⚙️ Icon rechts unten
-        </p>
       </div>
 
       {/* Aktive Szenarien Banner */}
