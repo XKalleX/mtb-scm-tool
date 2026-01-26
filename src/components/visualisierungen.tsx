@@ -62,7 +62,12 @@ import {
   berechneWoechentlicheAuslastung,
   berechneVariantenProduktionMitKonfig,
   berechneLagerDaten,
-  berechneGesamtMetrikenMitKonfig
+  berechneGesamtMetrikenMitKonfig,
+  berechneSCORMetrikenEntwicklung,
+  berechneProduktionsRueckstand,
+  berechneVorlaufzeitBreakdown,
+  berechneLagerreichweiteTrend,
+  RUECKSTAND_SAMPLING_INTERVALL
 } from '@/lib/calculations/supply-chain-metrics'
 import { generiereTagesproduktion, berechneSaisonaleVerteilung } from '@/lib/calculations/zentrale-produktionsplanung'
 import { formatNumber } from '@/lib/utils'
@@ -1081,6 +1086,26 @@ function SCORDashboard({
     return berechneGlobaleAuswirkungen(aktiveSzenarien)
   }, [aktiveSzenarien])
   
+  // NEU: Berechne zeitliche Entwicklung der Metriken
+  const metrikenEntwicklung = useMemo(() => {
+    return berechneSCORMetrikenEntwicklung(aktiveSzenarien)
+  }, [aktiveSzenarien])
+  
+  // NEU: Produktionsrückstand
+  const rueckstandDaten = useMemo(() => {
+    return berechneProduktionsRueckstand(aktiveSzenarien)
+  }, [aktiveSzenarien])
+  
+  // NEU: Vorlaufzeit Breakdown
+  const vorlaufzeitDaten = useMemo(() => {
+    return berechneVorlaufzeitBreakdown(aktiveSzenarien)
+  }, [aktiveSzenarien])
+  
+  // NEU: Lagerreichweite Trend
+  const lagerreichweiteDaten = useMemo(() => {
+    return berechneLagerreichweiteTrend(aktiveSzenarien)
+  }, [aktiveSzenarien])
+  
   // SCOR Metriken mit dynamischen Werten
   const scorMetriken = useMemo(() => [
     {
@@ -1088,16 +1113,18 @@ function SCORDashboard({
       farbe: COLORS.primary,
       metriken: [
         { 
-          name: 'Perfect Order Fulfillment', 
-          wert: auswirkungen.liefertreue, 
+          name: 'Planerfüllungsgrad', 
+          wert: metriken.scor.planerfuellungsgrad, 
           ziel: 95, 
-          einheit: '%' 
+          einheit: '%',
+          beschreibung: 'Perfect Order Fulfillment - Anteil vollständig erfüllter Aufträge'
         },
         { 
-          name: 'Order Accuracy', 
-          wert: Math.min(100, auswirkungen.liefertreue + 3), 
-          ziel: 98, 
-          einheit: '%' 
+          name: 'Liefertreue China', 
+          wert: metriken.scor.liefertreueChina, 
+          ziel: 95, 
+          einheit: '%',
+          beschreibung: 'On-Time Delivery - Pünktliche Lieferungen vom Zulieferer'
         }
       ]
     },
@@ -1106,16 +1133,18 @@ function SCORDashboard({
       farbe: COLORS.secondary,
       metriken: [
         { 
-          name: 'Order Cycle Time', 
+          name: 'Durchlaufzeit', 
           wert: auswirkungen.durchlaufzeit, 
-          ziel: 45, 
-          einheit: 'Tage' 
+          ziel: 49, 
+          einheit: 'Tage',
+          beschreibung: 'Order Cycle Time - Gesamte Vorlaufzeit von Bestellung bis Ankunft (SSOT: 49 Tage)'
         },
         { 
-          name: 'Production Cycle Time', 
-          wert: konfiguration.produktion.durchlaufzeitMontageMinuten / 60, 
-          ziel: 6, 
-          einheit: 'Std' 
+          name: 'Forecast Accuracy', 
+          wert: metriken.scor.forecastAccuracy, 
+          ziel: 95, 
+          einheit: '%',
+          beschreibung: 'Planungsgenauigkeit - Abweichung Plan vs. Ist'
         }
       ]
     },
@@ -1124,41 +1153,46 @@ function SCORDashboard({
       farbe: COLORS.info,
       metriken: [
         { 
-          name: 'Supply Chain Flexibility', 
-          wert: auswirkungen.materialverfuegbarkeit * 0.9, 
-          ziel: 85, 
-          einheit: '%' 
+          name: 'Materialverfügbarkeit', 
+          wert: auswirkungen.materialverfuegbarkeit, 
+          ziel: 98, 
+          einheit: '%',
+          beschreibung: 'Supply Chain Flexibility - Verfügbarkeit benötigter Bauteile'
         },
         { 
-          name: 'Upside Adaptability', 
-          wert: Math.round(konfiguration.lieferant.gesamtVorlaufzeitTage * 0.5), 
-          ziel: 20, 
-          einheit: 'Tage' 
+          name: 'Produktionsflexibilität', 
+          wert: metriken.scor.produktionsflexibilitaet, 
+          ziel: 95, 
+          einheit: '%',
+          beschreibung: 'Upside Adaptability - Fähigkeit auf Nachfrageänderungen zu reagieren'
         }
       ]
     },
     {
       kategorie: 'Assets (Vermögenswerte)',
-      farbe: COLORS.danger,
+      farbe: COLORS.warning,
       metriken: [
         { 
-          name: 'Cash-to-Cash Cycle', 
-          wert: auswirkungen.durchlaufzeit + 15, 
-          ziel: 60, 
-          einheit: 'Tage' 
+          name: 'Lagerreichweite', 
+          wert: metriken.scor.lagerreichweite, 
+          ziel: 3, 
+          einheit: 'Tage',
+          beschreibung: 'Inventory Days of Supply - Lagerbestand in Tagen (Ziel: 3 Tage JIT)'
         },
         { 
-          name: 'Inventory Days of Supply', 
-          wert: Math.round(konfiguration.lieferant.gesamtVorlaufzeitTage * 0.85), 
-          ziel: 45, 
-          einheit: 'Tage' 
+          name: 'Lagerumschlag', 
+          wert: metriken.scor.lagerumschlag, 
+          ziel: 4, 
+          einheit: 'x/Jahr',
+          beschreibung: 'Inventory Turnover - Wie oft das Lager pro Jahr umgeschlagen wird'
         }
       ]
     }
-  ], [auswirkungen, konfiguration])
+  ], [auswirkungen, konfiguration, metriken])
 
   return (
     <div className="space-y-6">
+      {/* KPI-Karten mit Metriken */}
       {scorMetriken.map((kategorie, idx) => (
         <Card key={idx}>
           <CardHeader className="pb-3">
@@ -1189,7 +1223,9 @@ function SCORDashboard({
                     </div>
                     
                     <div className="flex items-baseline gap-3">
-                      <span className="text-3xl font-bold">{metrik.wert}</span>
+                      <span className="text-3xl font-bold">
+                        {typeof metrik.wert === 'number' ? metrik.wert.toFixed(1) : metrik.wert}
+                      </span>
                       <span className="text-gray-500">
                         / {metrik.ziel} {metrik.einheit}
                       </span>
@@ -1211,6 +1247,8 @@ function SCORDashboard({
                         />
                       </div>
                     </div>
+                    
+                    <p className="text-xs text-gray-600 mt-2">{metrik.beschreibung}</p>
                   </div>
                 )
               })}
@@ -1218,6 +1256,268 @@ function SCORDashboard({
           </CardContent>
         </Card>
       ))}
+      
+      {/* NEU: Produktionsrückstand-Visualisierung */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Factory className="h-5 w-5 text-blue-600" />
+            Produktionsrückstand (Kumulativ Soll vs. Ist)
+          </CardTitle>
+          <CardDescription>
+            Kumulative Entwicklung über 365 Tage - Soll (Plan) vs. Ist (Realisiert)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <ComposedChart data={rueckstandDaten.filter((_, i) => i % RUECKSTAND_SAMPLING_INTERVALL === 0)}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="woche" 
+                label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5 }}
+              />
+              <YAxis 
+                label={{ value: 'Kumulierte Bikes', angle: -90, position: 'insideLeft' }}
+              />
+              <Tooltip 
+                formatter={(value: any) => [formatNumber(value), '']}
+                labelFormatter={(label) => `Woche ${label}`}
+              />
+              <Legend />
+              <Area 
+                type="monotone" 
+                dataKey="kumulativSoll" 
+                stackId="1"
+                stroke={COLORS.warning} 
+                fill={COLORS.warning}
+                fillOpacity={0.3}
+                name="Kumulativ Soll"
+              />
+              <Area 
+                type="monotone" 
+                dataKey="kumulativIst" 
+                stackId="2"
+                stroke={COLORS.primary} 
+                fill={COLORS.primary}
+                fillOpacity={0.6}
+                name="Kumulativ Ist"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="rueckstand" 
+                stroke={COLORS.danger}
+                strokeWidth={2}
+                name="Rückstand"
+                dot={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <div className="p-3 bg-gray-50 rounded">
+              <div className="text-sm text-gray-600">Jahres-Soll</div>
+              <div className="text-2xl font-bold">{formatNumber(rueckstandDaten[rueckstandDaten.length - 1]?.kumulativSoll || 0)}</div>
+            </div>
+            <div className="p-3 bg-gray-50 rounded">
+              <div className="text-sm text-gray-600">Jahres-Ist</div>
+              <div className="text-2xl font-bold">{formatNumber(rueckstandDaten[rueckstandDaten.length - 1]?.kumulativIst || 0)}</div>
+            </div>
+            <div className="p-3 bg-gray-50 rounded">
+              <div className="text-sm text-gray-600">Rückstand</div>
+              <div className="text-2xl font-bold text-red-600">
+                {formatNumber(rueckstandDaten[rueckstandDaten.length - 1]?.rueckstand || 0)}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* NEU: 49-Tage-Vorlaufzeit Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Truck className="h-5 w-5 text-blue-600" />
+            China Vorlaufzeit Breakdown (49 Tage)
+          </CardTitle>
+          <CardDescription>
+            Aufteilung der Gesamtdurchlaufzeit: Produktion → Transport → Verzollung
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Gantt-ähnliche Visualisierung */}
+            <div className="relative h-24 bg-gray-100 rounded-lg overflow-hidden">
+              {vorlaufzeitDaten.map((phase, idx) => {
+                const totalTage = vorlaufzeitDaten[vorlaufzeitDaten.length - 1].ende
+                const startProzent = (phase.start / totalTage) * 100
+                const breiteProzent = (phase.tage / totalTage) * 100
+                
+                return (
+                  <div
+                    key={idx}
+                    className="absolute top-4 h-16 flex items-center justify-center text-white font-semibold rounded"
+                    style={{
+                      left: `${startProzent}%`,
+                      width: `${breiteProzent}%`,
+                      backgroundColor: phase.farbe
+                    }}
+                    title={phase.beschreibung}
+                  >
+                    <div className="text-center">
+                      <div className="text-sm">{phase.phase}</div>
+                      <div className="text-lg font-bold">{phase.tage} Tage</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            
+            {/* Legende und Details */}
+            <div className="grid grid-cols-3 gap-4 mt-6">
+              {vorlaufzeitDaten.map((phase, idx) => (
+                <div key={idx} className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div 
+                      className="w-4 h-4 rounded" 
+                      style={{ backgroundColor: phase.farbe }}
+                    />
+                    <span className="font-semibold">{phase.phase}</span>
+                  </div>
+                  <div className="text-2xl font-bold mb-1">{phase.tage} Tage</div>
+                  <div className="text-xs text-gray-600">{phase.beschreibung}</div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-900">
+                <strong>✓ SSOT Korrekt:</strong> Gesamte Vorlaufzeit = {vorlaufzeitDaten[vorlaufzeitDaten.length - 1].ende} Tage 
+                (7 Wochen, NICHT 56 Tage / 8 Wochen!)
+                {vorlaufzeitDaten[vorlaufzeitDaten.length - 1].ende > 49 && 
+                  ` +${vorlaufzeitDaten[vorlaufzeitDaten.length - 1].ende - 49} Tage Verspätung durch Szenarien`
+                }
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* NEU: SCOR-Metriken Entwicklung über Zeit */}
+      <div className="grid grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Lagerreichweite-Trend</CardTitle>
+            <CardDescription>Monatliche Entwicklung (Ziel: 3 Tage JIT)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={lagerreichweiteDaten}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="monat" />
+                <YAxis label={{ value: 'Tage', angle: -90, position: 'insideLeft' }} />
+                <Tooltip />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="zielWert" 
+                  stroke="#999"
+                  strokeDasharray="5 5"
+                  name="Ziel (3 Tage)"
+                  dot={false}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="lagerreichweite" 
+                  stroke={COLORS.primary}
+                  strokeWidth={2}
+                  name="Lagerreichweite"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Liefertreue-Entwicklung</CardTitle>
+            <CardDescription>Monatlicher Trend (Ziel: 95%)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={metrikenEntwicklung}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="monat" />
+                <YAxis domain={[80, 100]} />
+                <Tooltip formatter={(value: any) => `${value}%`} />
+                <Legend />
+                <Area 
+                  type="monotone" 
+                  dataKey="liefertreue" 
+                  stroke={COLORS.secondary}
+                  fill={COLORS.secondary}
+                  fillOpacity={0.6}
+                  name="Liefertreue China"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Materialverfügbarkeit-Trend</CardTitle>
+            <CardDescription>Monatliche Entwicklung (Ziel: 98%)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={metrikenEntwicklung}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="monat" />
+                <YAxis domain={[80, 100]} />
+                <Tooltip formatter={(value: any) => `${value}%`} />
+                <Legend />
+                <Bar 
+                  dataKey="materialverfuegbarkeit" 
+                  fill={COLORS.primary}
+                  name="Materialverfügbarkeit"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Planerfüllungsgrad-Trend</CardTitle>
+            <CardDescription>Monatlicher Trend (Ziel: 95%)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={metrikenEntwicklung}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="monat" />
+                <YAxis domain={[90, 100]} />
+                <Tooltip formatter={(value: any) => `${value}%`} />
+                <Legend />
+                <Area 
+                  type="monotone" 
+                  dataKey="planerfuellungsgrad" 
+                  fill={COLORS.info}
+                  fillOpacity={0.3}
+                  stroke={COLORS.info}
+                  name="Planerfüllungsgrad"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="auslastung" 
+                  stroke={COLORS.warning}
+                  strokeWidth={2}
+                  name="Auslastung"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

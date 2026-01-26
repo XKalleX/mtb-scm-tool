@@ -27,13 +27,24 @@ export const JAHRESPRODUKTION_SSOT = 370_000
 
 /**
  * China Vorlaufzeit: 49 Tage (7 Wochen, NICHT 56!)
+ * Breakdown: 42 Tage Seefracht + 5 Tage Produktion + 2 Tage Handling/Verzollung
  */
 export const CHINA_VORLAUFZEIT_TAGE = 49
 
 /**
- * Produktionstage: 5 Arbeitstage
+ * Produktionstage China: 5 Arbeitstage
  */
 export const CHINA_PRODUKTIONSZEIT_TAGE = 5
+
+/**
+ * Seefracht Transportzeit: 42 Tage
+ */
+export const CHINA_TRANSPORT_SEEFRACHT_TAGE = 42
+
+/**
+ * Handling & Verzollung: 2 Tage
+ */
+export const CHINA_HANDLING_TAGE = 2
 
 /**
  * Losgröße Sättel: 500 Stück
@@ -59,6 +70,28 @@ export const DURCHSCHNITT_TAGE_PRO_MONAT = 30.4
  * Gleichmäßiger monatlicher Anteil in Prozent (100% / 12 Monate)
  */
 export const GLEICHMAESSIGER_MONATSANTEIL = 100 / 12 // ≈ 8.33%
+
+/**
+ * Monatsnamen (kurz) für Visualisierungen
+ */
+export const MONATSNAMEN_KURZ = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+
+/**
+ * Saisonale Auswirkungsfaktoren für SCOR-Metriken
+ * In Peak-Monaten (hohe Produktion) werden Metriken leicht beeinträchtigt
+ */
+export const SAISONALE_AUSWIRKUNG = {
+  PLANERFUELLUNG_FAKTOR: 5,      // Reduzierung in % pro Saisonalitätspunkt über Normal
+  LIEFERTREUE_FAKTOR: 3,         // Reduzierung in % pro Saisonalitätspunkt
+  MATERIALVERFUEGBARKEIT_FAKTOR: 4,  // Reduzierung in % pro Saisonalitätspunkt
+  DURCHLAUFZEIT_BONUS: 2         // Zusätzliche Tage bei hoher Auslastung
+}
+
+/**
+ * Sampling-Intervall für Produktionsrückstand-Visualisierung
+ * 7 = Wöchentliche Datenpunkte (365 Tage / 7 = ~52 Punkte)
+ */
+export const RUECKSTAND_SAMPLING_INTERVALL = 7
 
 /**
  * Wasserschaden: Maximaler relativer Verlusteffekt
@@ -121,7 +154,7 @@ export const BASELINE: BaselineWerte = {
   durchschnittProTag: Math.round(JAHRESPRODUKTION_SSOT / ARBEITSTAGE_PRO_JAHR), // ≈ 1.468
   materialverfuegbarkeit: 98.5,
   liefertreue: 95.2,
-  durchlaufzeit: CHINA_VORLAUFZEIT_TAGE + 7, // 49 + 7 = 56 Tage (Vorlauf + OEM Produktion)
+  durchlaufzeit: CHINA_VORLAUFZEIT_TAGE, // 49 Tage (China-Vorlauf)
   planerfuellungsgrad: 99.86,
   lagerumschlag: 4.2,
   auslastung: 99.86
@@ -137,7 +170,7 @@ export function createDynamicBaseline(config: DynamicConfig): BaselineWerte {
     durchschnittProTag: Math.round(config.jahresproduktion / config.arbeitstage),
     materialverfuegbarkeit: 98.5,
     liefertreue: 95.2,
-    durchlaufzeit: CHINA_VORLAUFZEIT_TAGE + 7,
+    durchlaufzeit: CHINA_VORLAUFZEIT_TAGE, // 49 Tage (korrekt!)
     planerfuellungsgrad: 99.86,
     lagerumschlag: 4.2,
     auslastung: 99.86
@@ -161,7 +194,6 @@ export interface MonatsProduktion {
  * Berechnet die monatliche Produktionsverteilung basierend auf SSOT
  */
 export function berechneMonatlicheProduktion(jahresproduktion: number): MonatsProduktion[] {
-  const monatsnamen = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
    
   return saisonalitaetData.saisonalitaetMonatlich.map((monat, index) => {
     const plan = Math.round(jahresproduktion * monat.anteil / 100)
@@ -170,7 +202,7 @@ export function berechneMonatlicheProduktion(jahresproduktion: number): MonatsPr
     const ist = Math.round(plan * abweichungsFaktor)
     
     return {
-      monat: monatsnamen[index],
+      monat: MONATSNAMEN_KURZ[index],
       monatIndex: index + 1,
       anteil: monat.anteil,
       plan,
@@ -515,7 +547,6 @@ export function berechneLagerDaten(
   aktiveSzenarien: SzenarioConfig[]
 ): { monat: string; saettel: number }[] {
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
-  const monatsnamen = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
    
   // <--- CHANGED: Updated to use 3-days safety stock logic instead of 2 weeks
   const basisBestand = Math.round(auswirkungen.durchschnittProTag * ZIEL_SICHERHEITSBESTAND_TAGE)
@@ -523,7 +554,7 @@ export function berechneLagerDaten(
   // Materialverfügbarkeit beeinflusst Lagerbestand
   const verfuegbarkeitsFaktor = auswirkungen.materialverfuegbarkeit / 100
    
-  return monatsnamen.map((monat, i) => {
+  return MONATSNAMEN_KURZ.map((monat, i) => {
     // Saisonale Schwankung im Lager (invers zur Produktion)
     const saisonalitaet = saisonalitaetData.saisonalitaetMonatlich[i]
     // Hohe Produktion = niedriger Lagerbestand
@@ -692,7 +723,6 @@ export function berechneMonatlicheProduktionMitKonfig(
   jahresproduktion: number,
   saisonalitaet: Array<{ monat: number; anteil: number }>
 ): MonatsProduktion[] {
-  const monatsnamen = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
    
   return saisonalitaet.map((monat, index) => {
     const plan = Math.round(jahresproduktion * monat.anteil / 100)
@@ -700,7 +730,7 @@ export function berechneMonatlicheProduktionMitKonfig(
     const ist = Math.round(plan * abweichungsFaktor)
     
     return {
-      monat: monatsnamen[index],
+      monat: MONATSNAMEN_KURZ[index],
       monatIndex: index + 1,
       anteil: monat.anteil,
       plan,
@@ -808,4 +838,231 @@ export function berechneGesamtMetrikenMitKonfig(
     aktiveSzenarienAnzahl: aktiveSzenarien.length,
     istBaseline: aktiveSzenarien.length === 0
   }
+}
+// ========================================
+// NEUE VISUALISIERUNGS-DATEN (für Dashboards)
+// ========================================
+
+/**
+ * Berechnet die zeitliche Entwicklung der SCOR-Metriken über das Jahr
+ * Monatliche Daten für Trend-Visualisierungen
+ */
+export function berechneSCORMetrikenEntwicklung(
+  aktiveSzenarien: SzenarioConfig[],
+  aktuellerLagerbestand?: number
+): {
+  monat: string;
+  monatNr: number;
+  planerfuellungsgrad: number;
+  liefertreue: number;
+  materialverfuegbarkeit: number;
+  lagerreichweite: number;
+  durchlaufzeit: number;
+  auslastung: number;
+}[] {
+  const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
+  
+  // Realistische monatliche Schwankungen basierend auf Saisonalität
+  return saisonalitaetData.saisonalitaetMonatlich.map((saison, index) => {
+    // Saisonalitätsfaktor (Abweichung vom Durchschnitt)
+    const saisonFaktor = saison.anteil / GLEICHMAESSIGER_MONATSANTEIL // Normal = 1.0
+    
+    // Planerfüllungsgrad: Niedriger in Peak-Monaten (schwieriger zu erfüllen)
+    // Verwendet SAISONALE_AUSWIRKUNG.PLANERFUELLUNG_FAKTOR für dokumentierte Berechnung
+    const planerfuellungsgrad = Math.max(
+      95,
+      Math.min(100, auswirkungen.planerfuellungsgrad - (saisonFaktor - 1) * SAISONALE_AUSWIRKUNG.PLANERFUELLUNG_FAKTOR)
+    )
+    
+    // Liefertreue: Korreliert mit Auslastung
+    // Verwendet SAISONALE_AUSWIRKUNG.LIEFERTREUE_FAKTOR
+    const liefertreue = Math.max(
+      90,
+      Math.min(100, auswirkungen.liefertreue - (saisonFaktor - 1) * SAISONALE_AUSWIRKUNG.LIEFERTREUE_FAKTOR)
+    )
+    
+    // Materialverfügbarkeit: Invers zur Produktion (mehr Produktion = weniger Lager)
+    // Verwendet SAISONALE_AUSWIRKUNG.MATERIALVERFUEGBARKEIT_FAKTOR
+    const materialverfuegbarkeit = Math.max(
+      85,
+      Math.min(100, auswirkungen.materialverfuegbarkeit - (saisonFaktor - 1) * SAISONALE_AUSWIRKUNG.MATERIALVERFUEGBARKEIT_FAKTOR)
+    )
+    
+    // Lagerreichweite: Niedriger in Peak-Monaten
+    const basisBestand = aktuellerLagerbestand || (auswirkungen.durchschnittProTag * ZIEL_SICHERHEITSBESTAND_TAGE)
+    const lagerreichweite = Math.max(
+      1,
+      (basisBestand / (auswirkungen.durchschnittProTag * saisonFaktor))
+    )
+    
+    // Durchlaufzeit: Konstant (von China) mit leichten Schwankungen durch Auslastung
+    // Verwendet SAISONALE_AUSWIRKUNG.DURCHLAUFZEIT_BONUS
+    const durchlaufzeit = Math.round(
+      auswirkungen.durchlaufzeit + (saisonFaktor > 1.2 ? (saisonFaktor - 1) * SAISONALE_AUSWIRKUNG.DURCHLAUFZEIT_BONUS : 0)
+    )
+    
+    // Auslastung: Direkt proportional zur Saisonalität
+    const auslastung = Math.min(100, auswirkungen.auslastung * saisonFaktor)
+    
+    return {
+      monat: MONATSNAMEN_KURZ[index],
+      monatNr: index + 1,
+      planerfuellungsgrad: Math.round(planerfuellungsgrad * 10) / 10,
+      liefertreue: Math.round(liefertreue * 10) / 10,
+      materialverfuegbarkeit: Math.round(materialverfuegbarkeit * 10) / 10,
+      lagerreichweite: Math.round(lagerreichweite * 10) / 10,
+      durchlaufzeit,
+      auslastung: Math.round(auslastung * 10) / 10
+    }
+  })
+}
+
+/**
+ * Berechnet kumulativen Produktionsrückstand (Soll vs. Ist)
+ * Für Backlog-Visualisierung
+ */
+export interface ProduktionsRueckstandDatapoint {
+  tag: number
+  datum: string
+  woche: number
+  monat: string
+  kumulativSoll: number
+  kumulativIst: number
+  rueckstand: number
+  rueckstandProzent: number
+}
+
+export function berechneProduktionsRueckstand(
+  aktiveSzenarien: SzenarioConfig[],
+  tagesDaten?: { tag: number; plan: number; ist: number }[]
+): ProduktionsRueckstandDatapoint[] {
+  const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
+  
+  // Verwende übergebene Daten oder generiere Standard-Daten
+  const daten = tagesDaten || berechneTaeglicherDaten(aktiveSzenarien)
+  
+  let kumulativSoll = 0
+  let kumulativIst = 0
+  
+  
+  return daten.map((tag, index) => {
+    kumulativSoll += tag.plan
+    kumulativIst += tag.ist
+    const rueckstand = kumulativSoll - kumulativIst
+    const rueckstandProzent = kumulativSoll > 0 ? (rueckstand / kumulativSoll) * 100 : 0
+    
+    // Berechne Woche und Monat
+    const woche = Math.floor(index / 7) + 1
+    const monat = Math.floor(index / 30.4)
+    
+    return {
+      tag: tag.tag,
+      datum: `Tag ${tag.tag}`,
+      woche,
+      monat: MONATSNAMEN_KURZ[Math.min(monat, 11)],
+      kumulativSoll,
+      kumulativIst,
+      rueckstand,
+      rueckstandProzent: Math.round(rueckstandProzent * 100) / 100
+    }
+  })
+}
+
+/**
+ * Berechnet die 49-Tage-Vorlaufzeit Breakdown für Visualisierung
+ * Zeigt Aufteilung: Produktion → Transport → Verzollung
+ */
+export interface VorlaufzeitBreakdown {
+  phase: string
+  tage: number
+  start: number
+  ende: number
+  farbe: string
+  beschreibung: string
+}
+
+export function berechneVorlaufzeitBreakdown(
+  aktiveSzenarien: SzenarioConfig[]
+): VorlaufzeitBreakdown[] {
+  const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
+  const gesamtDurchlaufzeit = auswirkungen.durchlaufzeit
+  
+  // SSOT: 49 Tage = 5 (Produktion) + 42 (Transport) + 2 (Handling)
+  const produktionTage = CHINA_PRODUKTIONSZEIT_TAGE
+  const transportTage = CHINA_TRANSPORT_SEEFRACHT_TAGE
+  const handlingTage = CHINA_HANDLING_TAGE
+  
+  // Bei Verzögerungen (Szenarien) wird Transport verlängert
+  const zusatzTage = Math.max(0, gesamtDurchlaufzeit - CHINA_VORLAUFZEIT_TAGE)
+  const tatsaechlicherTransport = transportTage + zusatzTage
+  
+  return [
+    {
+      phase: 'Produktion China',
+      tage: produktionTage,
+      start: 0,
+      ende: produktionTage,
+      farbe: '#10b981', // green
+      beschreibung: `Herstellung der Sättel beim Zulieferer in China (${produktionTage} Werktage)`
+    },
+    {
+      phase: 'Seefracht',
+      tage: tatsaechlicherTransport,
+      start: produktionTage,
+      ende: produktionTage + tatsaechlicherTransport,
+      farbe: '#3b82f6', // blue
+      beschreibung: `Container-Transport von Shanghai nach Hamburg (${tatsaechlicherTransport} Tage)${zusatzTage > 0 ? ` + ${zusatzTage} Tage Verspätung` : ''}`
+    },
+    {
+      phase: 'Verzollung & Handling',
+      tage: handlingTage,
+      start: produktionTage + tatsaechlicherTransport,
+      ende: produktionTage + tatsaechlicherTransport + handlingTage,
+      farbe: '#f59e0b', // amber
+      beschreibung: `Zollabfertigung und Anlieferung nach Dortmund (${handlingTage} Tage)`
+    }
+  ]
+}
+
+/**
+ * Berechnet die monatliche Lagerreichweite für Trend-Visualisierung
+ */
+export function berechneLagerreichweiteTrend(
+  aktiveSzenarien: SzenarioConfig[],
+  aktuellerLagerbestand?: number
+): {
+  monat: string
+  monatNr: number
+  lagerreichweite: number
+  zielWert: number
+  status: 'kritisch' | 'niedrig' | 'ok' | 'optimal'
+}[] {
+  const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
+  const basisBestand = aktuellerLagerbestand || (auswirkungen.durchschnittProTag * ZIEL_SICHERHEITSBESTAND_TAGE)
+  
+  return saisonalitaetData.saisonalitaetMonatlich.map((saison, index) => {
+    const saisonFaktor = saison.anteil / GLEICHMAESSIGER_MONATSANTEIL
+    const tagesbedarf = auswirkungen.durchschnittProTag * saisonFaktor
+    const lagerreichweite = tagesbedarf > 0 ? basisBestand / tagesbedarf : 0
+    
+    // Status basierend auf Ziel-Sicherheitsbestand (3 Tage)
+    let status: 'kritisch' | 'niedrig' | 'ok' | 'optimal'
+    if (lagerreichweite < 2) {
+      status = 'kritisch'
+    } else if (lagerreichweite < ZIEL_SICHERHEITSBESTAND_TAGE) {
+      status = 'niedrig'
+    } else if (lagerreichweite <= 5) {
+      status = 'optimal'
+    } else {
+      status = 'ok'
+    }
+    
+    return {
+      monat: MONATSNAMEN_KURZ[index],
+      monatNr: index + 1,
+      lagerreichweite: Math.round(lagerreichweite * 10) / 10,
+      zielWert: ZIEL_SICHERHEITSBESTAND_TAGE,
+      status
+    }
+  })
 }
