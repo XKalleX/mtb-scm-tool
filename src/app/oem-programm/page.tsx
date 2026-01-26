@@ -482,7 +482,7 @@ export default function OEMProgrammPage() {
                           {formatNumber(jahresprod, 0)} Stück
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {konfiguration.lieferant.land} ({konfiguration.lieferant.vorlaufzeitArbeitstage + konfiguration.lieferant.vorlaufzeitKalendertage} Tage Vorlauf)
+                          {konfiguration.lieferant.land} ({konfiguration.lieferant.gesamtVorlaufzeitTage} Tage Vorlauf)
                         </TableCell>
                       </TableRow>
                     )
