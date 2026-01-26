@@ -689,11 +689,41 @@ export default function InboundPage() {
                     }
                   ]}
                   data={alleTageMitBestellungen}
-                  maxHeight="400px"
+                  maxHeight="600px"
                   showFormulas={false}
                   showSums={true}
                   sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel`}
                   dateColumnKey="bedarfsdatum"
+                  highlightRow={(row) => {
+                    // Verspätung = erwarteteAnkunft > bedarfsdatum
+                    if (row.hatBestellung && row.erwarteteAnkunft && row.bedarfsdatum) {
+                      const ankunft = row.erwarteteAnkunft instanceof Date 
+                        ? row.erwarteteAnkunft 
+                        : new Date(row.erwarteteAnkunft)
+                      const bedarf = row.bedarfsdatum instanceof Date 
+                        ? row.bedarfsdatum 
+                        : new Date(row.bedarfsdatum)
+                      
+                      // Berechne Verspätung in Tagen
+                      const verspaetungTage = Math.floor((ankunft.getTime() - bedarf.getTime()) / (1000 * 60 * 60 * 24))
+                      
+                      if (verspaetungTage > 0) {
+                        // Verspätung: Rot/Orange je nach Schwere
+                        if (verspaetungTage > 5) {
+                          return {
+                            color: 'bg-red-100 hover:bg-red-200 border-l-4 border-red-500',
+                            tooltip: `⚠️ KRITISCHE VERSPÄTUNG: ${verspaetungTage} Tage zu spät!`
+                          }
+                        } else {
+                          return {
+                            color: 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500',
+                            tooltip: `⚠️ Verspätung: ${verspaetungTage} Tag(e) zu spät`
+                          }
+                        }
+                      }
+                    }
+                    return null
+                  }}
                 />
 
               {/* Info-Box unter der Tabelle */}

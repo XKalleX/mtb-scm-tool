@@ -44,6 +44,7 @@ interface ExcelTableProps {
   subtotalLabel?: string // Label für Zwischensummen (Standard: "Zwischensumme")
   useAverage?: boolean // Verwende Durchschnitt statt Summe (Standard: false)
   dateColumnKey?: string // Optional: Key der Datum-Spalte für farbliche Markierung von Wochenenden/Feiertagen
+  highlightRow?: (row: any) => { color: string; tooltip?: string } | null // Optional: Funktion zur Hervorhebung von Zeilen
 }
 
 /**
@@ -61,7 +62,8 @@ export default function ExcelTable({
   groupBy,
   subtotalLabel = 'Zwischensumme',
   useAverage = false,
-  dateColumnKey
+  dateColumnKey,
+  highlightRow
 }: ExcelTableProps) {
   const [selectedFormula, setSelectedFormula] = useState<string | null>(null)
   
@@ -189,7 +191,13 @@ export default function ExcelTable({
                     let bgClasses = rowCounter % 2 === 0 ? 'bg-slate-50' : 'bg-white'
                     let tooltipText: string | undefined = undefined
                     
-                    if (dateColumnKey && row[dateColumnKey] != null) {
+                    // Prüfe ob Zeile hervorgehoben werden soll (z.B. Verspätungen)
+                    const highlightInfo = highlightRow ? highlightRow(row) : null
+                    if (highlightInfo) {
+                      bgClasses = highlightInfo.color
+                      tooltipText = highlightInfo.tooltip
+                    } else if (dateColumnKey && row[dateColumnKey] != null) {
+                      // Fallback auf Datum-basierte Färbung wenn keine Hervorhebung
                       const date = row[dateColumnKey] instanceof Date 
                         ? row[dateColumnKey] 
                         : new Date(row[dateColumnKey])
@@ -300,6 +308,21 @@ export default function ExcelTable({
           </div>
         )}
       </div>
+      
+      {/* Legende für Verspätungen (nur wenn highlightRow gesetzt ist) */}
+      {highlightRow && (
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span className="font-semibold">Verspätungs-Markierungen:</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 bg-orange-100 border-l-4 border-orange-500 rounded"></div>
+            <span>1-5 Tage Verspätung</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 bg-red-100 border-l-4 border-red-500 rounded"></div>
+            <span>Kritische Verspätung (&gt;5 Tage)</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
