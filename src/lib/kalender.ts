@@ -576,9 +576,14 @@ export function berechneBestelldatum(
 
 /**
  * Berechnet Ankunftsdatum vorwärts vom Bestelldatum
+ * 
+ * KORRIGIERT: 
+ * - LKW-Transport in Deutschland nutzt DEUTSCHE Arbeitstage (nicht chinesische!)
+ * - Ankunftsdatum wird auf den nächsten deutschen Arbeitstag korrigiert
+ * 
  * @param bestelldatum - Wann wurde bestellt
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
- * @returns Ankunftsdatum in Deutschland
+ * @returns Ankunftsdatum in Deutschland (immer ein deutscher Arbeitstag)
  */
 export function berechneAnkunftsdatum(
   bestelldatum: Date,
@@ -591,17 +596,25 @@ export function berechneAnkunftsdatum(
   const LKW_CHINA_ARBEITSTAGE = 2
   const LKW_DEUTSCHLAND_ARBEITSTAGE = 2
   
-  // Schritt 1: Bearbeitung in China (5 AT)
+  // Schritt 1: Bearbeitung in China (5 AT) - nutzt CHINESISCHE Arbeitstage
   let nachBearbeitung = addArbeitstage(bestelldatum, BEARBEITUNG_ARBEITSTAGE, customFeiertage)
   
-  // Schritt 2: LKW-Transport China zum Hafen (2 AT)
+  // Schritt 2: LKW-Transport China zum Hafen (2 AT) - nutzt CHINESISCHE Arbeitstage
   let nachLKWChina = addArbeitstage(nachBearbeitung, LKW_CHINA_ARBEITSTAGE, customFeiertage)
   
-  // Schritt 3: Seefracht (30 KT)
+  // Schritt 3: Seefracht (30 KT) - Kalendertage (Schiff fährt 24/7)
   let nachSeefracht = addDays(nachLKWChina, SEEFRACHT_KALENDERTAGE)
   
   // Schritt 4: LKW-Transport Hamburg nach Dortmund (2 AT)
-  let ankunftsdatum = addArbeitstage(nachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE, customFeiertage)
+  // ✅ KORRIGIERT: Nutzt DEUTSCHE Arbeitstage (nicht chinesische!)
+  // LKW-Transport in Deutschland respektiert deutsche Feiertage
+  let ankunftsdatum = addArbeitstage_Deutschland(nachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE, customFeiertage)
+  
+  // ✅ NEU: Sicherstellen dass Ankunft an einem deutschen Arbeitstag ist
+  // Falls das berechnete Datum auf ein Wochenende/Feiertag fällt, verschiebe auf nächsten Arbeitstag
+  while (!istArbeitstag_Deutschland(ankunftsdatum, customFeiertage)) {
+    ankunftsdatum = addDays(ankunftsdatum, 1)
+  }
   
   return ankunftsdatum
 }

@@ -247,12 +247,19 @@ export default function InboundPage() {
       const feiertag = istDeutschlandFeiertag(bedarfsdatum)
       const istFeiertag = feiertag.length > 0
       
+      // ✅ NEU: An Feiertagen/Wochenenden gibt es KEINE Produktion, also auch keinen Bedarf!
+      // Ignoriere Bestellungen die auf Feiertage/Wochenenden fallen - das sind Berechnungsfehler
+      const istProduktionsTag = !istWochenende && !istFeiertag
+      
       // Suche ob es Bestellungen gibt, die diesen Bedarf decken
-      const bestellungenFuerTag = bestellungenNachBedarfsdatum.get(bedarfsdatumKey)
+      // ✅ NUR an Produktionstagen nach Bestellungen suchen!
+      const bestellungenFuerTag = istProduktionsTag 
+        ? bestellungenNachBedarfsdatum.get(bedarfsdatumKey) 
+        : undefined
       
       const bedarfsdatumStr = bedarfsdatum.toLocaleDateString('de-DE')
       
-      if (bestellungenFuerTag && bestellungenFuerTag.length > 0) {
+      if (istProduktionsTag && bestellungenFuerTag && bestellungenFuerTag.length > 0) {
         /**
          * 🎯 FIX: AGGREGIERE MEHRERE BESTELLUNGEN FÜR DENSELBEN TAG
          * 
