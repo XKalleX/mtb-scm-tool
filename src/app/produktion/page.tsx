@@ -178,8 +178,7 @@ export default function ProduktionPage() {
         zugang: b.zugang,
         verbrauch: b.verbrauch,
         endBestand: b.endBestand,
-        sicherheit: b.sicherheitsbestand,
-        verfuegbar: b.verfuegbarBestand,
+        // ✅ REMOVED: sicherheit & verfuegbar (nicht mehr in Tabelle verwendet)
         reichweite: b.reichweiteTage,
         status: mapStatus(b.status)
       }))
@@ -619,7 +618,7 @@ export default function ProduktionPage() {
             <FormulaCard
               title="Jahresbedarf Berechnung (aus Stückliste)"
               formula="Jahresbedarf(Komponente) = Σ(Produktion(Variante) × Menge in Stückliste) für alle Varianten die Komponente verwenden"
-              description={`Berechnet den Gesamtbedarf einer Komponente (z.B. Fizik Tundra Sattel) über alle MTB-Varianten die diese verwenden. Daten aus: src/data/stueckliste.json (Zuordnung MTB → Komponente), src/data/stammdaten.json → varianten (Anteile). Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion berechneLagerbestaende() → Bedarfsberechnung. Ermäßigung: Einfache 1:1 Stückliste (1 Sattel = 1 Bike)!`}
+              description={`Berechnet den Gesamtbedarf einer Komponente (z.B. Fizik Tundra Sattel) über alle MTB-Varianten die diese verwenden. Daten aus: src/data/stueckliste.json (Zuordnung MTB → Komponente), src/data/stammdaten.json → varianten (Anteile). Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion berechneLagerbestaende() → Bedarfsberechnung. Vereinfachung: Einfache 1:1 Stückliste (1 Sattel = 1 Bike) durch Code-Ermäßigung!`}
               example={`Fizik Tundra wird verwendet in: Downhill (${formatNumber(konfiguration.jahresproduktion * 0.10, 0)} Bikes), Freeride (${formatNumber(konfiguration.jahresproduktion * 0.05, 0)}), Performance (${formatNumber(konfiguration.jahresproduktion * 0.12, 0)}). Jahresbedarf = ${formatNumber(konfiguration.jahresproduktion * 0.10, 0)} + ${formatNumber(konfiguration.jahresproduktion * 0.05, 0)} + ${formatNumber(konfiguration.jahresproduktion * 0.12, 0)} = ${formatNumber(konfiguration.jahresproduktion * (0.10 + 0.05 + 0.12), 0)} Sättel/Jahr`}
             />
             <FormulaCard
