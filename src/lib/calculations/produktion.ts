@@ -115,7 +115,7 @@ export function bucheMaterialEin(
       lagerbestaende[kompId] = {
         komponentenId: kompId,
         bestand: 0,
-        sicherheitsbestand: 1000,
+        sicherheitsbestand: 0, // ✅ FIXED: Keine Sicherheitsbestände
         maximalbestand: 50000,
         letzteBewegung: datum
       }

@@ -384,21 +384,18 @@ export function berechneSattelLagerbestaende(
       tagesBewegungen: []
     }
     
-    // Startbestand: 14 Tage Puffer
-    const verwendendeVarianten = STUECKLISTE.filter(s => s.bauteilId === bauteil.id)
-    const durchschnittVerbrauchProTag = verwendendeVarianten.reduce((sum, s) => {
-      const variante = MTB_VARIANTEN.find(v => v.id === s.mtbVariante)
-      return sum + (variante ? variante.jahresProduktion / 250 : 0) // 250 Arbeitstage
-    }, 0)
-    
-    let bestand = Math.ceil(durchschnittVerbrauchProTag * 14) // 14 Tage Puffer
-    const sicherheitsbestand = Math.ceil(durchschnittVerbrauchProTag * 7) // 7 Tage
+    // ✅ FIXED: KEIN Startbestand (gemäß Anforderung)
+    // Begründung: "Tag 01-03 müssen 0 Bestand haben, keine imaginären Anfangsbestände"
+    // Material kommt erst durch reale Lieferungen (Losgröße 500, Vorlaufzeit 49 Tage)
+    let bestand = 0 // Start mit 0 Bestand (realistisch!)
     
     // Für jeden Tag
     for (let tagNr = 1; tagNr <= 365; tagNr++) {
       // Berechne Verbrauch dieses Tages
       let verbrauch = 0
       
+      
+      const verwendendeVarianten = STUECKLISTE.filter(s => s.bauteilId === bauteil.id)
       verwendendeVarianten.forEach(stueck => {
         const plan = produktionsplaene.find(p => p.varianteId === stueck.mtbVariante)
         if (plan) {
@@ -410,20 +407,18 @@ export function berechneSattelLagerbestaende(
       // Buche Verbrauch ab
       bestand -= verbrauch
       
-      // TODO: Hier Lieferungen einbuchen (aus Inbound China)
-      // Für jetzt: Vereinfachte Auffüllung wenn unter Sicherheitsbestand
-      if (bestand < sicherheitsbestand) {
-        bestand += Math.ceil(durchschnittVerbrauchProTag * 14) // Auffüllen auf 14 Tage
-      }
+      // ✅ FIXED: Keine automatische Auffüllung mehr
+      // Begründung: Material kommt NUR durch reale Lieferungen aus Inbound
+      // Diese Funktion wird deprecat → Nutze berechneIntegriertesWarehouse() stattdessen
       
-      const status = bestand >= sicherheitsbestand ? 'ok' : 'kritisch'
+      const status = bestand >= 0 ? 'ok' : 'kritisch'
       
       lagerbestaende[bauteil.id].tagesBewegungen.push({
         tag: tagNr,
         datum: new Date(new Date('2027-01-01').getTime() + (tagNr - 1) * 24 * 60 * 60 * 1000),
         verbrauch,
         bestand,
-        sicherheitsbestand,
+        sicherheitsbestand: 0, // ✅ FIXED: Keine Sicherheitsbestände
         status
       })
     }

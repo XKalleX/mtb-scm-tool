@@ -549,20 +549,31 @@ export function berechneSCORMetriken(
     ? durchlaufzeiten.reduce((sum, d) => sum + d, 0) / durchlaufzeiten.length
     : 0
 
-  // NEW: Lead Time Breakdown Logic
+  // ✅ FIXED: Nutze Standard-Werte aus Spezifikation (da konfiguration hier nicht verfügbar)
+  // Quelle: lieferant-china.json → 49 Tage Gesamtvorlaufzeit
+  // 
+  // WICHTIG: AT (Arbeitstage) müssen in KT (Kalendertage) umgerechnet werden:
+  // - 5 AT Produktion + 4 AT LKW Transport → ~13 KT (mit Wochenenden)
+  // - 30 KT Seefracht (24/7)
+  // - Gesamt: ~43 KT + Handling/Puffer → 49 Tage (7 Wochen laut Spezifikation)
+  const vorlaufzeitGesamt = 49 // 7 Wochen Gesamtvorlaufzeit (aus JSON)
+  const vorlaufzeitProduktion = 5 // 5 Arbeitstage Produktion
+  const vorlaufzeitSeefracht = 30 // 30 Kalendertage Seefracht
+  const vorlaufzeitLKW = 4 // 4 Arbeitstage LKW (2 China + 2 Deutschland)
+  
   const durchlaufzeitBreakdown = {
-     produktionChina: 5, 
-     transport: 42,      // 49 total - 5 production - 2 handling
-     verzollung: 2,
-     gesamt: 49
+     produktionChina: vorlaufzeitProduktion, 
+     transport: vorlaufzeitSeefracht + vorlaufzeitLKW, // Seefracht + LKW
+     verzollung: 0, // Keine separate Verzollung mehr (in Transport enthalten)
+     gesamt: vorlaufzeitGesamt
   };
 
   const avgActualDuration = bestellungen.length > 0 
     ? bestellungen.reduce((sum, b) => sum + daysBetween(b.bestelldatum, b.tatsaechlicheAnkunft || b.erwarteteAnkunft), 0) / bestellungen.length
-    : 49;
+    : vorlaufzeitGesamt;
 
-  if (avgActualDuration > 49) {
-     durchlaufzeitBreakdown.transport += (avgActualDuration - 49);
+  if (avgActualDuration > vorlaufzeitGesamt) {
+     durchlaufzeitBreakdown.transport += (avgActualDuration - vorlaufzeitGesamt);
      durchlaufzeitBreakdown.gesamt = avgActualDuration;
   }
   

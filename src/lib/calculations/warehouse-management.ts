@@ -70,15 +70,15 @@ export interface TaeglichesLager {
     endBestand: number             // Bestand zu Tagesende
     
     // SICHERHEIT & STATUS
-    sicherheitsbestand: number     // Minimum (7 Tage)
-    verfuegbarBestand: number      // endBestand - sicherheitsbestand (kann negativ sein!)
+    sicherheitsbestand: number     // Immer 0 (keine Sicherheitsbestände gemäß Anforderung)
+    verfuegbarBestand: number      // endBestand (= verfügbar, da kein Safety Stock)
     reichweiteTage: number         // Wie lange reicht der Bestand?
     status: 'ok' | 'niedrig' | 'kritisch' | 'negativ'
     
     // ATP CHECK
     atpCheck: {
       benoetigt: number            // Heute benötigt
-      verfuegbar: number           // Tatsächlich verfügbar (inkl. Safety Stock)
+      verfuegbar: number           // Tatsächlich verfügbar (= endBestand, kein Safety Stock)
       erfuellt: boolean            // Kann produziert werden?
       grund?: string               // Falls nicht erfüllt: Warum?
     }
@@ -103,8 +103,7 @@ export interface WarehouseJahresResult {
     durchschnittBestand: number
     minimalBestand: number
     maximalBestand: number
-    tageUnterSicherheit: number
-    tageNegativ: number
+    tageNegativ: number            // Tage mit negativem Bestand (sollte 0 sein durch ATP)
     liefertreue: number            // % pünktliche Lieferungen
   }
   warnungen: string[]              // Alle kritischen Ereignisse
@@ -258,18 +257,14 @@ export function berechneIntegriertesWarehouse(
   console.log(`📦 Initial-Bestand (Tag 1):`, aktuelleBestaende)
   
   // ═══════════════════════════════════════════════════════════════════════════════
-  // STEP 3: SICHERHEITSBESTÄNDE (auf 0 gesetzt gemäß Anforderung)
+  // STEP 3: KEINE SICHERHEITSBESTÄNDE (gemäß Anforderung)
   // ═══════════════════════════════════════════════════════════════════════════════
   
-  const sicherheitsbestaende: Record<string, number> = {}
+  // ✅ FIXED: Sicherheitsbestände wurden komplett entfernt
+  // Begründung: Anforderung "kein Sicherheitsbestand und keine Lageranhäufung"
+  // ATP-Check erfolgt nun direkt auf Lagerbestand ohne Safety-Buffer
   
-  // Sicherheitsbestand = 0 für alle Bauteile
-  // Gemäß Anforderung: "kein Sicherheitsbestand und keine Lageranhäufung"
-  bauteile.forEach(bauteil => {
-    sicherheitsbestaende[bauteil.id] = 0
-  })
-  
-  console.log(`🛡️ Sicherheitsbestände:`, sicherheitsbestaende)
+  console.log(`🛡️ Sicherheitsbestände: NICHT VERWENDET (gemäß Anforderung)`)
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // STEP 4: SIMULIERE JEDEN TAG (inkl. Vorjahr für Vorlauf-Bestellungen)
@@ -300,7 +295,6 @@ export function berechneIntegriertesWarehouse(
   let summeBestaende = 0
   let minimalBestand = Infinity
   let maximalBestand = -Infinity
-  let tageUnterSicherheit = 0
   let tageNegativ = 0
   
   while (aktuellesDatum <= simulationEnde) {
@@ -383,22 +377,21 @@ export function berechneIntegriertesWarehouse(
         // STEP 4c: ATP-CHECK (Available-to-Promise)
         // ═════════════════════════════════════════════════════════════════════════
         
-        const verfuegbarFuerProduktion = aktuelleBestaende[bauteilId] - sicherheitsbestaende[bauteilId]
+        // ✅ FIXED: Direkter Check auf Lagerbestand (OHNE Sicherheitsbestand)
+        // Begründung: Anforderung "kein Sicherheitsbestand"
+        const verfuegbarFuerProduktion = aktuelleBestaende[bauteilId]
         
         if (benoetigt > verfuegbarFuerProduktion) {
           // NICHT GENUG MATERIAL!
           atpErfuellt = false
           
-          if (aktuelleBestaende[bauteilId] < sicherheitsbestaende[bauteilId]) {
-            atpGrund = `Unter Sicherheitsbestand (${aktuelleBestaende[bauteilId]} < ${sicherheitsbestaende[bauteilId]})`
-            tageUnterSicherheit++
-          } else if (benoetigt > aktuelleBestaende[bauteilId]) {
+          if (benoetigt > aktuelleBestaende[bauteilId]) {
             atpGrund = `Nicht genug Material (Bedarf: ${benoetigt}, Verfügbar: ${aktuelleBestaende[bauteilId]})`
           } else {
-            atpGrund = `Würde Sicherheitsbestand unterschreiten`
+            atpGrund = `Material-Engpass erkannt`
           }
           
-          // Reduziere Verbrauch auf verfügbare Menge (respektiere Safety Stock!)
+          // Reduziere Verbrauch auf verfügbare Menge
           verbrauch = Math.max(0, verfuegbarFuerProduktion)
           
           warnungen.push(
@@ -420,8 +413,7 @@ export function berechneIntegriertesWarehouse(
       // ═══════════════════════════════════════════════════════════════════════════
       
       const endBestand = aktuelleBestaende[bauteilId]
-      const sicherheit = sicherheitsbestaende[bauteilId]
-      const verfuegbarBestand = endBestand - sicherheit
+      const verfuegbarBestand = endBestand // ✅ FIXED: Keine Sicherheitsbestände mehr
       
       // Reichweite berechnen
       const durchschnittVerbrauchProTag = gesamtVerbrauch / Math.max(1, tagIndex)
@@ -429,16 +421,18 @@ export function berechneIntegriertesWarehouse(
         ? endBestand / durchschnittVerbrauchProTag 
         : 999
       
-      // Status bestimmen
+      // Status bestimmen (ohne Sicherheitsbestand)
       let status: 'ok' | 'niedrig' | 'kritisch' | 'negativ' = 'ok'
       
       if (endBestand < 0) {
         status = 'negativ'
         tageNegativ++
         warnungen.push(`🔴 ${datumStr} (Tag ${tagImJahr}): NEGATIVER BESTAND für ${bauteil.name}! (${endBestand})`)
-      } else if (endBestand < sicherheit) {
+      } else if (endBestand < 500) {
+        // Kritisch wenn weniger als 1 Losgröße
         status = 'kritisch'
-      } else if (reichweiteTage < 14) {
+      } else if (reichweiteTage < 7) {
+        // Niedrig wenn weniger als 7 Tage Reichweite
         status = 'niedrig'
       }
       
@@ -458,7 +452,7 @@ export function berechneIntegriertesWarehouse(
         zugang,
         verbrauch,
         endBestand,
-        sicherheitsbestand: sicherheit,
+        sicherheitsbestand: 0, // ✅ FIXED: Immer 0 (keine Sicherheitsbestände)
         verfuegbarBestand,
         reichweiteTage: Math.round(reichweiteTage * 10) / 10,
         status,
@@ -515,7 +509,6 @@ export function berechneIntegriertesWarehouse(
       Minimal Bestand:           ${minimalBestand === Infinity ? 'N/A' : minimalBestand.toLocaleString('de-DE')} Stück
       Maximal Bestand:           ${maximalBestand === -Infinity ? 'N/A' : maximalBestand.toLocaleString('de-DE')} Stück
       
-      Tage unter Sicherheit:     ${tageUnterSicherheit}
       Tage mit negativem Bestand: ${tageNegativ}
       Liefertreue (ATP erfüllt): ${liefertreue.toFixed(1)}%
       
@@ -532,7 +525,6 @@ export function berechneIntegriertesWarehouse(
       durchschnittBestand,
       minimalBestand: minimalBestand === Infinity ? 0 : minimalBestand,
       maximalBestand: maximalBestand === -Infinity ? 0 : maximalBestand,
-      tageUnterSicherheit,
       tageNegativ,
       liefertreue
     },

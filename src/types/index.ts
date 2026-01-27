@@ -148,11 +148,14 @@ export interface Bestellung {
 
 /**
  * Lagerbestand für eine Komponente
+ * 
+ * ✅ FIXED: sicherheitsbestand auf 0 gesetzt (gemäß Anforderung)
+ * Begründung: "kein Sicherheitsbestand und keine Lageranhäufung"
  */
 export interface Lagerbestand {
   komponentenId: string;
   bestand: number;
-  sicherheitsbestand: number;
+  sicherheitsbestand: number; // Immer 0 (keine Sicherheitsbestände)
   maximalbestand: number;
   letzteBewegung: Date;
 }
