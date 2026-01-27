@@ -272,9 +272,9 @@ export function berechneIntegriertesWarehouse(
       }
     })
     
-    // Sicherheitsbestand = 7 Tage Bedarf
-    const tagesbedarf = jahresbedarf / 365
-    sicherheitsbestaende[bauteil.id] = Math.round(tagesbedarf * 7)
+    // Sicherheitsbestand = 0 (gemäß Anforderung: "kein Sicherheitsbestand und keine Lageranhäufung")
+    // Die Produktion beginnt am ersten Produktionstag ohne Puffer
+    sicherheitsbestaende[bauteil.id] = 0
   })
   
   console.log(`🛡️ Sicherheitsbestände:`, sicherheitsbestaende)
