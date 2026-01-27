@@ -220,7 +220,7 @@ export function berechneIntegriertesWarehouse(
     aktuelleBestaende[bauteil.id] = 0
   })
   
-  console.log(`📦 Initial-Bestand (Tag 1):`, aktuelleBestaende)
+  console.log(`📦 Startbestand (Tag 1):`, aktuelleBestaende)
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // STEP 3: SIMULIERE JEDEN TAG (inkl. Vorjahr für Vorlauf-Bestellungen)
