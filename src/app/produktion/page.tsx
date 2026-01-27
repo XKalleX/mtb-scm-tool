@@ -442,35 +442,7 @@ export default function ProduktionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Formel-Karte für Produktion */}
-          <div className="mb-6 space-y-4">
-            <FormulaCard
-              title="Tagesproduktion mit Error Management"
-              formula={`Jahresproduktion / Arbeitstage = ${formatNumber(konfiguration.jahresproduktion, 0)} / ${getArbeitstageProJahr()} = ${formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 2)} Bikes/Tag (Ø)`}
-              description={`Theoretische Tagesproduktion bei allen Arbeitstagen. Tatsächliche Produktion variiert durch Saisonalität und Error Management zur Vermeidung von Rundungsfehlern. Daten aus: src/data/stammdaten.json (jahresproduktion), src/data/feiertage-deutschland.json (Arbeitstage). Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion generiereTagesproduktion() → Error Management Logik.`}
-              example={`Jan-März (Q1): Saisonalität ${formatNumber((konfiguration.saisonalitaet[0].anteil + konfiguration.saisonalitaet[1].anteil + konfiguration.saisonalitaet[2].anteil), 1)}% = ca. ${formatNumber((konfiguration.jahresproduktion / getArbeitstageProJahr()) * ((konfiguration.saisonalitaet[0].anteil + konfiguration.saisonalitaet[1].anteil + konfiguration.saisonalitaet[2].anteil) / 100 / 3), 0)} Bikes/Tag durchschnittlich`}
-            />
-            <FormulaCard
-              title="Schichtplanung & Kapazität"
-              formula={`Benötigte Schichten = ⌈Plan-Menge / Kapazität pro Schicht⌉, wobei Kapazität = ${konfiguration.produktion.kapazitaetProStunde} Bikes/h × ${konfiguration.produktion.stundenProSchicht}h = ${konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht} Bikes`}
-              description={`Anzahl der erforderlichen Schichten basierend auf Tagesproduktion und Werkskapazität. Daten aus: src/data/stammdaten.json → produktion.kapazitaetProStunde und produktion.stundenProSchicht. Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion generiereTagesproduktion() → Schichten-Berechnung.`}
-              example={`${formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 0)} Bikes geplant → ${formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 0)} / ${konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht} = ${formatNumber((konfiguration.jahresproduktion / getArbeitstageProJahr()) / (konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht), 2)} → ${Math.ceil((konfiguration.jahresproduktion / getArbeitstageProJahr()) / (konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht))} Schichten nötig`}
-            />
-            <FormulaCard
-              title="Produktionsauslastung (Capacity Utilization)"
-              formula="Auslastung (%) = (Ist-Menge / Max. Kapazität) × 100, wobei Max. Kapazität = Schichten × Kapazität pro Schicht"
-              description={`Zeigt die tatsächliche Werksauslastung basierend auf produzierter Menge im Verhältnis zur theoretischen Maximalkapazität. Korrekte Berechnung: Nicht gegen Plan-Menge, sondern gegen maximale Kapazität der eingesetzten Schichten. Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion generiereTagesproduktion() → Auslastungs-Berechnung. SCOR-Metrik: Asset Management → Capacity Utilization.`}
-              example={`Tag mit 1.000 Bikes produziert, 1 Schicht (${konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht} Bikes Max.) → 1.000 / ${konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht} × 100 = ${formatNumber((1000 / (konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht)) * 100, 1)}% Auslastung`}
-            />
-            <FormulaCard
-              title="Error Management Konzept (Rundungsfehler-Korrektur)"
-              formula="Wenn kumulativer_Fehler ≥ 0.5 → Aufrunden | Wenn kumulativer_Fehler ≤ -0.5 → Abrunden | Sonst → Normal runden"
-              description={`KRITISCHES KONZEPT zur Vermeidung systematischer Jahresabweichungen. Problem: 370.000 / ${getArbeitstageProJahr()} = ${formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 5)} Bikes/Tag (Dezimal!). Naive Rundung würde zu ±100 Bikes Abweichung führen. Lösung: Kumulativer Fehler-Tracker pro Monat, der bei Überschreitung ±0.5 korrigiert. Validierung: Summe(Tagesproduktion[1..365]) === ${formatNumber(konfiguration.jahresproduktion, 0)} exakt! Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion generiereTagesproduktion() → Error Management Logik. Dokumentiert in: kontext/Spezifikation_SSOT_MR.ts → ERROR_MANAGEMENT_KONZEPT.`}
-              example={`Monat mit 20 Arbeitstagen, 22.000 Bikes geplant → 1.100,00 Bikes/Tag. Tag 1-19: je 1.100, Fehler = 0. Tag 20 mit Fehler: 1.100,00 - 1.100 = 0 → keine Korrektur. Jahressumme: exakt 370.000 Bikes ✓`}
-            />
-          </div>
-
-          {/* Tagesplanung Excel-Tabelle */}
+          {/* ✅ TABELLE ZUERST (User-Anforderung: Tabellen vor Erklärungen) */}
           <ExcelTable
             columns={[
               {
@@ -584,6 +556,32 @@ export default function ProduktionPage() {
             sumRowLabel={`SUMME (365 Tage, ${getArbeitstageProJahr()} Arbeitstage)`}
             dateColumnKey="datum"
           />
+          
+          {/* ✅ FORMEL-KARTEN NACH DER TABELLE (User-Anforderung: Tabellen vor Erklärungen) */}
+          <div className="mt-6">
+            <CollapsibleInfo title="📊 Berechnungsformeln und Konzepte">
+              <div className="space-y-4">
+                <FormulaCard
+                  title="Tagesproduktion mit Error Management"
+                  formula={`Jahresproduktion / Arbeitstage = ${formatNumber(konfiguration.jahresproduktion, 0)} / ${getArbeitstageProJahr()} = ${formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 2)} Bikes/Tag (Ø)`}
+                  description="Tatsächliche Produktion variiert durch Saisonalität und Error Management zur Vermeidung von Rundungsfehlern."
+                  example={`Jan-März (Q1): ca. ${formatNumber((konfiguration.jahresproduktion / getArbeitstageProJahr()) * 0.7, 0)} Bikes/Tag`}
+                />
+                <FormulaCard
+                  title="Schichtplanung & Kapazität"
+                  formula={`Schichten = ⌈Plan / ${konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht}⌉`}
+                  description="Berechnung der benötigten Schichten basierend auf Tagesproduktion und Werkskapazität."
+                  example={`${formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 0)} Bikes → ${Math.ceil((konfiguration.jahresproduktion / getArbeitstageProJahr()) / (konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht))} Schichten`}
+                />
+                <FormulaCard
+                  title="Error Management (Rundungsfehler-Korrektur)"
+                  formula="Kumulativer Fehler ≥ ±0.5 → Korrektur durch Auf-/Abrunden"
+                  description="Verhindert systematische Abweichung von ±100 Bikes. Validierung: Summe = exakt 370.000 Bikes."
+                  example="Jahressumme exakt 370.000 Bikes ✓"
+                />
+              </div>
+            </CollapsibleInfo>
+          </div>
         </CardContent>
       </Card>
 
@@ -596,45 +594,11 @@ export default function ProduktionPage() {
           </div>
           <CardDescription className="text-green-700">
             Tägliche Lagerbewegungen über 365 Tage: Anfangsbestand + Zugänge - Verbrauch = Endbestand. 
-            Mit ATP-Check, Sicherheitsbeständen und Reichweitenberechnung für alle 4 Sattel-Varianten.
+            Mit Reichweitenberechnung für alle 4 Sattel-Varianten.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Formel-Karten für Lager */}
-          <div className="mb-6 space-y-4">
-            <FormulaCard
-              title="ATP-Check Formel (Available-to-Promise)"
-              formula="ATP = Verfügbarer Bestand - Sicherheitsbestand ≥ Bedarf, wobei 1 Sattel = 1 Bike (Ermäßigung: Einfache 1:1 Stückliste)"
-              description={`Vor jeder Produktion wird geprüft, ob genug Sättel verfügbar sind. Einfache 1:1 Stückliste durch Code-Ermäßigung! Daten aus: src/data/stueckliste.json (Komponenten-Zuordnung), src/data/stammdaten.json (Bauteile). Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion berechneLagerbestaende(). Konzept dokumentiert in: kontext/Spezifikation_SSOT_MR.ts → ATP_CHECK_KONZEPT.`}
-              example={`Raceline Sattel: Verfügbar = 40.100 - 2.797 = 37.303, Bedarf = 400/Tag → ✓ 93,3 Tage Reichweite. Formel: (40.100 - 2.797) / 400 = 93,3 Tage`}
-            />
-            <FormulaCard
-              title="Reichweite (Days of Supply)"
-              formula="Reichweite (Tage) = (Bestand - Sicherheitsbestand) / Tagesbedarf"
-              description={`Zeigt an, wie lange der aktuelle Bestand bei gegebenem Verbrauch reicht. Sicherheitsbestand = 7 Tage Puffer. Tagesbedarf = Jahresbedarf / 365 Tage. Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion berechneLagerbestaende(). SCOR-Metrik: Asset Management → Inventory Days of Supply (Zielwert: 7-14 Tage).`}
-              example={`Fizik Tundra: Jahresbedarf = ${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52), 0)} Sättel (52% der Bikes). Tagesbedarf = ${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)}/Tag. Sicherheit = ${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 / 365 * 7), 0)} (7 Tage). Bestand = ${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 * 0.35), 0)} (35%). Reichweite = (${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 * 0.35), 0)} - ${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 / 365 * 7), 0)}) / ${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)} = ${formatNumber((Math.round(konfiguration.jahresproduktion * 0.52 * 0.35) - Math.round(konfiguration.jahresproduktion * 0.52 / 365 * 7)) / Math.round(konfiguration.jahresproduktion * 0.52 / 365), 1)} Tage`}
-            />
-            <FormulaCard
-              title="Kritischer Bestand & Status"
-              formula="Status = 'Kritisch' wenn Bestand < Sicherheitsbestand ODER Reichweite < 7 Tage | 'Niedrig' wenn Reichweite < 14 Tage | Sonst 'OK'"
-              description={`Warnsystem für Materialengpässe zur Vermeidung von Produktionsstopps. Sicherheitsbestand = 7 Tage Tagesbedarf als Puffer für unvorhergesehene Verzögerungen (z.B. Schiffsverspätung, Spring Festival). Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion berechneLagerbestaende() → Status-Logik. Datenquelle: Dynamisch berechnet aus Stückliste (src/data/stueckliste.json) und Produktionsplan.`}
-              example={`Sicherheitsbestand Logik: 7 Tage Puffer bei durchschnittlichem Verbrauch. Bei China-Vorlaufzeit 49 Tage (7 Wochen) ist dies kritischer Frühwarnindikator. Quelle: kontext/Spezifikation_SSOT_MR.ts → ZULIEFERER_CHINA.vorlaufzeit.`}
-            />
-            <FormulaCard
-              title="Jahresbedarf Berechnung (aus Stückliste)"
-              formula="Jahresbedarf(Komponente) = Σ(Produktion(Variante) × Menge in Stückliste) für alle Varianten die Komponente verwenden"
-              description={`Berechnet den Gesamtbedarf einer Komponente (z.B. Fizik Tundra Sattel) über alle MTB-Varianten die diese verwenden. Daten aus: src/data/stueckliste.json (Zuordnung MTB → Komponente), src/data/stammdaten.json → varianten (Anteile). Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion berechneLagerbestaende() → Bedarfsberechnung. Vereinfachung: Einfache 1:1 Stückliste (1 Sattel = 1 Bike) durch Code-Ermäßigung!`}
-              example={`Fizik Tundra wird verwendet in: Downhill (${formatNumber(konfiguration.jahresproduktion * 0.10, 0)} Bikes), Freeride (${formatNumber(konfiguration.jahresproduktion * 0.05, 0)}), Performance (${formatNumber(konfiguration.jahresproduktion * 0.12, 0)}). Jahresbedarf = ${formatNumber(konfiguration.jahresproduktion * 0.10, 0)} + ${formatNumber(konfiguration.jahresproduktion * 0.05, 0)} + ${formatNumber(konfiguration.jahresproduktion * 0.12, 0)} = ${formatNumber(konfiguration.jahresproduktion * (0.10 + 0.05 + 0.12), 0)} Sättel/Jahr`}
-            />
-            <FormulaCard
-              title="Lagerbewegung (Tagesbasis)"
-              formula="Endbestand = Anfangsbestand + Zugänge - Verbrauch, wobei Verbrauch = Σ(Produktion × Stücklistenmenge) für alle Varianten"
-              description={`Simuliert tägliche Lagerbewegungen über 365 Tage mit realistischen Losgrößen (500 Stück) und 49 Tage Vorlaufzeit. Verbrauch: Berechnet aus Tagesproduktion und Stückliste (1:1). Code-Referenz: src/lib/calculations/warehouse-management.ts → Funktion berechneIntegriertesWarehouse() → Komplette Tages-Simulation. Anfangsbestand: 0 (Just-in-Time, erste Lieferung trifft rechtzeitig ein).`}
-              example={`Tag 100 (Arbeitstag): Fizik Tundra Anfangsbestand 2.000, Zugang +0 (keine Lieferung), Verbrauch -${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)} → Endbestand ${formatNumber(2000 - Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)}`}
-            />
-          </div>
-
-          {/* Tägliche Lagerbestände für ALLE Bauteile - Excel-Tabelle */}
+          {/* ✅ TABELLE ZUERST (User-Anforderung: Tabellen vor Erklärungen) */}
           <div className="mb-6">
             <h4 className="font-semibold text-green-900 mb-3">🔍 Tägliche Lagerbestandsentwicklung (365 Tage × 4 Sattel-Varianten)</h4>
             <p className="text-sm text-green-700 mb-4">
@@ -760,6 +724,26 @@ export default function ProduktionPage() {
               <strong>✅ Realistische Bestandsführung:</strong> Losgröße 500 Stück, 49 Tage Vorlaufzeit, Anfangsbestand = 0.
               Code-Referenz: src/lib/calculations/warehouse-management.ts → Funktion berechneIntegriertesWarehouse()
             </p>
+          </div>
+
+          {/* ✅ FORMEL-KARTEN NACH DER TABELLE (User-Anforderung: Tabellen vor Erklärungen) */}
+          <div className="mt-6 space-y-4">
+            <CollapsibleInfo title="📊 Berechnungsformeln und Konzepte">
+              <div className="space-y-4">
+                <FormulaCard
+                  title="Lagerbewegung (Tagesbasis)"
+                  formula="Endbestand = Anfangsbestand + Zugänge - Verbrauch"
+                  description="Simuliert tägliche Lagerbewegungen über 365 Tage mit realistischen Losgrößen (500 Stück) und 49 Tage Vorlaufzeit. Anfangsbestand: 0 (Just-in-Time)."
+                  example={`Tag 100: Fizik Tundra Anfang 2.000, Zugang +0, Verbrauch -${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)} → Endbestand ${formatNumber(2000 - Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)}`}
+                />
+                <FormulaCard
+                  title="Reichweite (Days of Supply)"
+                  formula="Reichweite = Bestand / Tagesbedarf (in Tagen)"
+                  description="Zeigt wie lange der aktuelle Bestand bei gegebenem Verbrauch reicht. SCOR-Metrik: Asset Management → Inventory Days of Supply."
+                  example="Fizik Tundra: Bestand 2.000 / Tagesbedarf 527 = 3,8 Tage Reichweite"
+                />
+              </div>
+            </CollapsibleInfo>
           </div>
         </CardContent>
       </Card>
