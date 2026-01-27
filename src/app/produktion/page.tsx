@@ -30,11 +30,13 @@ import {
   generiereTagesproduktion, 
   berechneLagerbestaende,
   berechneProduktionsStatistiken,
-  berechneTagesLagerbestaende
+  berechneTagesLagerbestaende,
+  generiereAlleVariantenProduktionsplaene,
+  type TagesProduktionEntry
 } from '@/lib/calculations/zentrale-produktionsplanung'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport } from '@/lib/calculations/warehouse-management'
-import { generiereAlleVariantenProduktionsplaene } from '@/lib/calculations/zentrale-produktionsplanung'
+import { berechneBedarfsBacklog } from '@/lib/calculations/bedarfs-backlog-rechnung'
 
 /**
  * Produktion Hauptseite
@@ -118,6 +120,16 @@ export default function ProduktionPage() {
     return generiereAlleVariantenProduktionsplaene(konfiguration)
   }, [konfiguration])
   
+  // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung für korrekte Abweichungen
+  // Zeigt die tatsächliche Produktion basierend auf Materialverfügbarkeit
+  const backlogErgebnis = useMemo(() => {
+    const plaeneAlsEntries: Record<string, TagesProduktionEntry[]> = {}
+    Object.entries(variantenProduktionsplaeneForWarehouse).forEach(([varianteId, plan]) => {
+      plaeneAlsEntries[varianteId] = plan.tage
+    })
+    return berechneBedarfsBacklog(plaeneAlsEntries, konfiguration)
+  }, [variantenProduktionsplaeneForWarehouse, konfiguration])
+  
   // ✅ INTEGRIERTES WAREHOUSE: Realistische Bestandsführung
   const warehouseResult = useMemo(() => {
     return berechneIntegriertesWarehouse(
@@ -169,21 +181,36 @@ export default function ProduktionPage() {
   const warehouseStats = warehouseResult.jahresstatistik
   
   // Berechne Produktionsstatistiken dynamisch (szenario-aware)
+  // ✅ NEU: Nutze Backlog-Ergebnis für korrekte Abweichungen
   const produktionsStats = useMemo(() => {
+    // Berechne echte Abweichung aus Backlog-System
+    const backlogStats = backlogErgebnis.gesamtstatistik
+    const echteFehlmenge = backlogStats.totalFehlmenge
+    const echteProduziert = backlogStats.totalProduziert
+    const echteEngpassTage = Math.round(backlogStats.engpassQuote * 3.65) // 365 * (quote / 100)
+    
     if (hasSzenarien) {
       return {
         geplant: statistiken.geplant,
-        produziert: statistiken.produziert,
-        abweichung: statistiken.abweichung,
-        planerfuellungsgrad: statistiken.planerfuellungsgrad,
+        produziert: echteProduziert, // Nutze Backlog-Wert
+        abweichung: -echteFehlmenge, // Negativ = weniger produziert
+        planerfuellungsgrad: backlogStats.liefertreue,
         arbeitstage: statistiken.arbeitstage,
         schichtenGesamt: statistiken.schichtenGesamt,
-        mitMaterialmangel: statistiken.mitMaterialmangel,
+        mitMaterialmangel: echteEngpassTage,
         auslastung: statistiken.auslastung
       }
     }
-    return berechneProduktionsStatistiken(tagesProduktion)
-  }, [tagesProduktion, hasSzenarien, statistiken])
+    
+    const baseStats = berechneProduktionsStatistiken(tagesProduktion)
+    return {
+      ...baseStats,
+      produziert: echteProduziert,
+      abweichung: -echteFehlmenge,
+      planerfuellungsgrad: backlogStats.liefertreue,
+      mitMaterialmangel: echteEngpassTage
+    }
+  }, [tagesProduktion, hasSzenarien, statistiken, backlogErgebnis])
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
