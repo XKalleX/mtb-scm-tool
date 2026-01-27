@@ -229,9 +229,13 @@ function berechneTageslicherBedarf(
       stlPositionen.forEach(pos => {
         const aktuellerBedarf = bedarfAmTag[pos.bauteilId] || 0
         
-        // Bedarf = Produktionsmenge * Komponentenmenge
-        // (Normalerweise Menge = 1 für Sättel)
-        bedarfAmTag[pos.bauteilId] = aktuellerBedarf + (tagesPlan.istMenge * pos.menge)
+        // ✅ FIX: Nutze planMenge (NICHT istMenge!) für Bedarfsberechnung
+        // Begründung: Bestellungen müssen auf OEM PLAN basieren, nicht auf tatsächlicher
+        // Produktion (die erst NACH Material-Verfügbarkeit bekannt ist).
+        // Sonst entsteht Zirkelbezug: Bedarf → Bestellung → Material → Produktion → Bedarf
+        // 
+        // Korrekt: OEM Plant 370.000 → Bestelle für 370.000 → Produziere was möglich ist
+        bedarfAmTag[pos.bauteilId] = aktuellerBedarf + (tagesPlan.planMenge * pos.menge)
       })
       
       bedarfProTag.set(datumStr, bedarfAmTag)
