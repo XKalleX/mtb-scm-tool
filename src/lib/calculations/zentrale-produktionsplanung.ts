@@ -682,6 +682,37 @@ export function berechneLagerbestaende(
   return lagerbestaende.sort((a, b) => a.komponente.localeCompare(b.komponente))
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * DEPRECATED: berechneTagesLagerbestaende (OLD BROKEN VERSION)
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * ⚠️ DIESE FUNKTION ENTHÄLT KRITISCHE LOGIK-FEHLER:
+ * 
+ * ❌ FIX #1: Unrealistische tägliche Lieferungen (tagesbedarf * 1.1)
+ *    - Ignoriert 500-Stück Losgrößen
+ *    - Ignoriert 49-Tage Vorlaufzeit
+ *    - Ignoriert Spring Festival
+ * 
+ * ❌ FIX #2: Material-Verbrauch ab Tag 1 ohne Lieferung
+ *    - Initial-Bestand = 35% Jahresbedarf (unrealistisch hoch)
+ *    - Keine Prüfung ob erste Lieferung rechtzeitig ankommt
+ * 
+ * ❌ FIX #3: Math.max(0, ...) maskiert negative Bestände
+ *    - Keine ATP-Checks
+ *    - Stille Unterdrückung von Engpässen
+ * 
+ * ❌ FIX #4: Safety Stock nur für Warnung, nicht enforced
+ *    - Produktion kann unter Safety Stock konsumieren
+ *    - Keine harte Constraint
+ * 
+ * ✅ NEUE FUNKTION: berechneIntegriertesWarehouse()
+ *    in warehouse-management.ts
+ * 
+ * Diese Funktion bleibt für Backward-Compatibility, wird aber als
+ * DEPRECATED markiert. Bitte berechneIntegriertesWarehouse() verwenden!
+ */
+
 export interface TagesLagerbestand {
   tag: number
   datum: Date
@@ -702,10 +733,38 @@ export interface TagesLagerbestand {
   }[]
 }
 
+/**
+ * @deprecated BITTE VERWENDEN: berechneIntegriertesWarehouse() aus warehouse-management.ts
+ * 
+ * Diese Funktion enthält bekannte Logik-Fehler und wird nur für
+ * Backward-Compatibility beibehalten.
+ */
 export function berechneTagesLagerbestaende(
   konfiguration: KonfigurationData,
   tagesProduktion: TagesProduktionEntry[]
 ): TagesLagerbestand[] {
+  // Only log deprecation warning in development
+  if (process.env.NODE_ENV === 'development') {
+    console.warn(`
+      ⚠️⚠️⚠️ WARNUNG: berechneTagesLagerbestaende() ist DEPRECATED! ⚠️⚠️⚠️
+      
+      Diese Funktion enthält kritische Logik-Fehler:
+      - Unrealistische tägliche Lieferungen (ignoriert Losgrößen & Vorlaufzeit)
+      - Material-Verbrauch ab Tag 1 ohne realistische Lieferungen
+      - Math.max(0) maskiert negative Bestände
+      - Safety Stock wird nicht enforced
+      
+      Bitte verwenden Sie stattdessen:
+      → berechneIntegriertesWarehouse() aus warehouse-management.ts
+      
+      Diese neue Funktion behebt ALLE bekannten Fehler:
+      ✅ Realistische lot-basierte Lieferungen (500 Stück, 49 Tage)
+      ✅ ATP-Checks vor Verbrauch
+      ✅ Safety Stock enforcement
+      ✅ Vollständige OEM-Inbound-Warehouse Integration
+    `)
+  }
+  
   const variantenProduktion: Record<string, number> = {}
   konfiguration.varianten.forEach(v => {
     variantenProduktion[v.id] = Math.round(konfiguration.jahresproduktion * v.anteilPrognose)
@@ -741,6 +800,7 @@ export function berechneTagesLagerbestaende(
   const aktuelleBestaende: Record<string, number> = {}
   Object.keys(bauteilBedarfe).forEach(bauteilId => {
     const jahresbedarf = bauteilBedarfe[bauteilId].jahresbedarf
+    // ❌ FEHLER: 35% Initial-Bestand ist unrealistisch!
     aktuelleBestaende[bauteilId] = Math.round(jahresbedarf * 0.35)
   })
   
@@ -756,6 +816,8 @@ export function berechneTagesLagerbestaende(
       if (!info || info.jahresbedarf === 0) return
       
       const anfangsBestand = aktuelleBestaende[bauteilId]
+      // ❌ FEHLER: Tägliche Lieferungen sind unrealistisch!
+      // Sollte lot-basiert sein (500 Stück, 49 Tage Vorlauf)
       const zugang = tag.istArbeitstag ? Math.round(info.tagesbedarf * 1.1) : 0
       
       let verbrauch = 0
@@ -767,6 +829,8 @@ export function berechneTagesLagerbestaende(
         }
       })
       
+      // ❌ FEHLER: Math.max(0) maskiert negative Bestände!
+      // Sollte ATP-Check durchführen und Fehler werfen
       const endBestand = Math.max(0, anfangsBestand + zugang - verbrauch)
       aktuelleBestaende[bauteilId] = endBestand
       
@@ -774,6 +838,7 @@ export function berechneTagesLagerbestaende(
       const verfuegbar = Math.max(0, endBestand - sicherheit)
       const reichweite = info.tagesbedarf > 0 ? verfuegbar / info.tagesbedarf : 999
       
+      // ❌ FEHLER: Status ist nur Warnung, verhindert keine Produktion
       let status: 'ok' | 'niedrig' | 'kritisch' = 'ok'
       if (endBestand < sicherheit || reichweite < 7) {
         status = 'kritisch'
