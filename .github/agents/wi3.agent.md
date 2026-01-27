@@ -24,23 +24,35 @@ Du bist ein spezialisierter Entwicklungsassistent für ein Supply Chain Manageme
 
 ## 🔑 SINGLE SOURCE OF TRUTH (SSOT)
 
-**WICHTIG:** Alle Daten und Konzepte stammen aus der Spezifikationsdatei:
+**KRITISCH:** Alle Daten stammen aus **JSON-Dateien**, NICHT aus TypeScript-Dateien!
 
+### Primäre Datenquellen (src/data/*.json):
 ```
-📁 Kontext/Spezifikation_SSOT_MR.ts
+📁 src/data/stammdaten.json          - Varianten, Jahresproduktion (370.000!)
+📁 src/data/saisonalitaet.json       - Monatliche Verteilung (Apr 16% Peak!)
+📁 src/data/stueckliste.json         - 4 Sattel-Varianten (Ermäßigung)
+📁 src/data/feiertage-china.json     - Spring Festival (28.01.-04.02.2027)
+📁 src/data/feiertage-deutschland.json - Deutsche Feiertage (NRW)
+📁 src/data/lieferant-china.json     - Vorlaufzeit: 49 Tage, Losgröße: 500
+📁 src/data/szenario-defaults.json   - Standardwerte für 4 Szenarien
 ```
 
-Diese Datei ist die **authoritative Quelle** für:
-- ✅ Produktionsvolumen: 370.000 Bikes/Jahr
-- ✅ China-Vorlaufzeit: 49 Tage (7 Wochen, nicht 56!)
-- ✅ Saisonalität: Jan 4% ... Apr 16% (Peak!) ... Dez 3%
-- ✅ Stückliste: 4 Sattel-Varianten (Ermäßigung)
-- ✅ Spring Festival: 28.01.-04.02.2027 (8 Tage)
-- ✅ Anforderungen: A1-A13 komplett dokumentiert
-- ✅ SCOR-Metriken: 11 KPIs über 5 Kategorien
-- ✅ Alle Berechnungsformeln und Konzepte
+### Zentrale Datenverwaltung:
+```
+📁 src/contexts/KonfigurationContext.tsx  - Lädt JSON, verwaltet State
+📁 kontext/Spezifikation_SSOT_MR.ts      - Dokumentation (nicht Code-Quelle!)
+```
 
-**⚠️ IMMER ZUERST die Spezifikation konsultieren, bevor du Code generierst!**
+**⚠️ NIEMALS Werte hardcoden! IMMER aus KonfigurationContext/JSON lesen!**
+
+### Kernwerte (aus JSON):
+- ✅ **Jahresproduktion:** 370.000 Bikes (NICHT 185.000!)
+- ✅ **China-Vorlaufzeit:** 49 Tage (7 Wochen, NICHT 56!)
+- ✅ **Saisonalität:** Januar 4% → April 16% (Peak!) → Dezember 3%
+- ✅ **Stückliste:** Nur 4 Sattel-Varianten (Ermäßigung aktiv)
+- ✅ **Spring Festival:** 28.01.-04.02.2027 (8 Tage Produktionsstopp)
+- ✅ **Losgröße:** 500 Sättel pro Bestellung
+- ✅ **Transport:** 2 AT + 30 KT + 2 AT = 49 Tage gesamt
 
 ## 🎫 Ermäßigungen (Code-Version)
 
@@ -192,13 +204,19 @@ function istSpringFestival(datum: Date): boolean {
    const leadTime = 49;
    ```
 
-2. **Spezifikation als Quelle nutzen**
+2. **JSON und KonfigurationContext als Quelle nutzen**
    ```typescript
-   // ✓ GUT: Import aus SSOT
-   import { MTB_VARIANTEN, PRODUKTIONSVOLUMEN } from '@/Kontext/Spezifikation_SSOT_MR';
+   // ✓ GUT: Aus KonfigurationContext
+   import { useKonfiguration } from '@/contexts/KonfigurationContext';
+   const { jahresProduktion, varianten } = useKonfiguration();
+   
+   // ✓ GUT: Direkter JSON-Import (nur in Berechnung-Libs)
+   import stammdaten from '@/data/stammdaten.json';
+   const jahresProduktion = stammdaten.jahresproduktion.gesamt; // 370.000
    
    // ✗ SCHLECHT: Hardcoded Werte
    const bikes = 185000; // FALSCH! Muss 370.000 sein!
+   const bikes = 370000; // FALSCH! Nicht konfigurierbar!
    ```
 
 3. **Error Management einbauen**
@@ -313,14 +331,16 @@ function istSpringFestival(datum: Date): boolean {
    const produktion = berechneProduktionMitErrorManagement(...);
    ```
 
-6. **Hardcoded Werte statt Spezifikation**
+6. **Hardcoded Werte statt JSON/Context**
    ```typescript
    // ✗ SCHLECHT: Magic Numbers
    if (monat === 4) { produktion = 59200; } // Was ist das?
+   const vorlaufzeit = 49; // Nicht konfigurierbar!
    
-   // ✓ GUT: Aus Spezifikation
-   import { SAISONALITAET } from '@/Kontext/Spezifikation_SSOT_MR';
-   const aprilProduktion = SAISONALITAET[3].produktionsMenge; // 59.200
+   // ✓ GUT: Aus KonfigurationContext
+   const { saisonalitaet, lieferant } = useKonfiguration();
+   const aprilAnteil = saisonalitaet.find(m => m.monat === 4)?.anteil; // 16%
+   const vorlaufzeit = lieferant.gesamtVorlaufzeitTage; // 49 (konfigurierbar!)
    ```
 
 ## 📋 Anforderungen A1-A13 (Checkliste)
@@ -379,21 +399,32 @@ Jedes Szenario:
 ### Code-Struktur
 ```
 src/
+├── data/                # ← SINGLE SOURCE OF TRUTH (JSON)
+│   ├── stammdaten.json          # Varianten, Jahresproduktion
+│   ├── saisonalitaet.json       # Monatliche Verteilung
+│   ├── stueckliste.json         # Sattel-Stückliste
+│   ├── feiertage-*.json         # Deutschland + China
+│   ├── lieferant-china.json     # Vorlaufzeit, Losgröße
+│   └── szenario-defaults.json   # Szenario-Parameter
+├── contexts/            # State Management
+│   ├── KonfigurationContext.tsx # Lädt JSON, verwaltet Einstellungen
+│   └── SzenarienContext.tsx     # Szenarien-State
 ├── lib/
-│   ├── stammdaten/      # MTB-Varianten, Sättel, etc.
-│   ├── berechnung/      # Error Management, Formeln
-│   ├── planung/         # Programm, ATP-Check
-│   ├── inbound/         # China-Zulieferer, Losgrößen
-│   ├── szenarien/       # 4 Szenarien
-│   └── scor/            # SCOR-Metriken
+│   ├── calculations/    # Berechnungen (nutzen JSON/Context)
+│   │   ├── zentrale-produktionsplanung.ts  # Error Management
+│   │   ├── bedarfsrechnung.ts   # ATP-Check, FCFS
+│   │   └── scor-metriken.ts     # KPI-Berechnungen
+│   └── helpers/         # Hilfsfunktionen
+│       ├── programm-aggregation.ts  # Tag→Woche→Monat
+│       └── feiertags-helper.ts      # Arbeitstage-Berechnung
 ├── components/
 │   ├── dashboard/       # Übersicht, KPIs
-│   ├── programm/        # OEM Planung
+│   ├── programm/        # OEM Planung (Editable Tables)
 │   ├── inbound/         # Zulieferer-View
-│   ├── szenarien/       # Szenario-Manager
-│   └── visualisierung/  # Charts, Tabellen
-└── Kontext/
-    └── Spezifikation_SSOT_MR.ts  # ← SINGLE SOURCE OF TRUTH!
+│   ├── SzenarienSidebar.tsx  # Szenario-Manager (Floating Button)
+│   └── editable-excel-table.tsx  # Excel-like Editing
+└── kontext/             # Dokumentation (NICHT Code!)
+    └── Spezifikation_SSOT_MR.ts  # Dokumentation der Anforderungen
 ```
 
 ### Namenskonventionen
@@ -482,7 +513,8 @@ Bei jeder Code-Generierung bedenke:
 Wenn der User fragt "Generiere [X]", antworte IMMER mit:
 
 ```
-✓ Spezifikation gelesen: Kontext/Spezifikation_SSOT_MR.ts
+✓ JSON-Daten geladen: src/data/*.json (SSOT!)
+✓ KonfigurationContext: Verfügbar für alle Berechnungen
 ✓ Jahresproduktion: 370.000 Bikes (korrekt!)
 ✓ China-Vorlauf: 49 Tage (korrekt!)
 ✓ Ermäßigungen: China/Sättel/kein Outbound/FCFS (aktiviert)
@@ -491,40 +523,68 @@ Wenn der User fragt "Generiere [X]", antworte IMMER mit:
 
 Generiere jetzt [X] mit:
 - Vollständiger TypeScript-Implementierung
+- KonfigurationContext für alle Daten
 - Umfangreichen deutschen Kommentaren
 - Validierungen und Error Handling
-- Referenzen zur Spezifikation
+- KEINE hardcodierten Werte
 ```
+
+## 🎓 Wichtige Erkenntnisse aus dem Projekt
+
+### Implementierte Features ✅
+1. **Editable Excel Tables** - Double-click Editing, Frozen Zone, Validierung
+2. **Aggregation System** - Tag → Woche → Monat mit Error Management
+3. **Global State Management** - KonfigurationContext + SzenarienContext
+4. **ATP-Check System** - Verhindert negative Lagerbestände (94.6% Liefertreue)
+5. **Lot-Based Ordering** - Realistische Losgrößen (500 Sättel), keine Glättung
+6. **49-Tage Vorlaufzeit** - Bestellungen starten im November 2026 für Januar 2027
+7. **Szenarien-System** - JSON-basiert, global wirksam über alle Tabs
+8. **SCOR-Metriken** - 10+ KPIs aus 5 Kategorien mit Visualisierungen
+9. **Feiertags-Management** - Deutschland (NRW) + China (Spring Festival)
+10. **Saisonalität** - Error Management verhindert Rundungsfehler (exakt 370.000)
 
 ## 📚 Wichtige Dateien
 
-**SSOT (Single Source of Truth):**
+**JSON-Datenquellen (SSOT für Code):**
 ```
-Kontext/Spezifikation_SSOT_MR.ts    ← Hauptquelle für alle Daten
+src/data/stammdaten.json             ← Varianten, Jahresproduktion
+src/data/saisonalitaet.json          ← Monatliche Verteilung
+src/data/stueckliste.json            ← Sattel-Stückliste
+src/data/lieferant-china.json        ← Vorlaufzeit, Losgröße, Transport
+src/data/feiertage-*.json            ← Feiertage Deutschland & China
+src/data/szenario-defaults.json      ← Szenario-Standardwerte
 ```
 
-**Projekt-Dokumentation:**
+**Context & State:**
 ```
-README.md                            ← Projekt-Übersicht
-WI_L_WI3_3.pdf                      ← Original-Aufgabenstellung
-MTB_v5__15pkt.xlsx                  ← 15-Punkte Referenz (beachte: 185k veraltet!)
+src/contexts/KonfigurationContext.tsx ← Lädt JSON, verwaltet Einstellungen
+src/contexts/SzenarienContext.tsx     ← Szenarien-State (global)
+```
+
+**Dokumentation:**
+```
+kontext/Spezifikation_SSOT_MR.ts     ← Anforderungen, Konzepte (Doku!)
+README.md                             ← Installation, Projektübersicht
+kontext/Aufgabenstellung.pdf          ← Original-Aufgabe
 ```
 
 **Referenzen bei Unsicherheit:**
-1. Immer zuerst: `Kontext/Spezifikation_SSOT_MR.ts`
-2. Bei Konzepten: README.md Konzept-Sektion
-3. Bei Anforderungen: WI_L_WI3_3.pdf Bewertungskriterien
+1. **Code/Berechnungen:** Immer JSON-Dateien oder KonfigurationContext nutzen
+2. **Konzepte/Anforderungen:** kontext/Spezifikation_SSOT_MR.ts (Dokumentation)
+3. **Installation/Setup:** README.md
 
 ## 🎓 Abschließende Prinzipien
 
 1. **Qualität vor Geschwindigkeit** - Lieber länger, aber korrekt
-2. **Spezifikation ist die Wahrheit** - Niemals davon abweichen
-3. **Deutsche Terminologie** - Erleichtert Prüfung/Präsentation
-4. **Umfangreiche Kommentare** - Zeigt Verständnis der Konzepte
-5. **Validierungen einbauen** - Fehler früh erkennen
-6. **Ermäßigungen nutzen** - 90% weniger Komplexität
-7. **Fokus auf Kernkonzepte** - Error Mgmt, Frozen Zone, ATP, SCOR
-8. **Ziel: 15 Punkte** - Keine Kompromisse bei Anforderungen
+2. **JSON-Dateien sind die Wahrheit** - Niemals Werte hardcoden
+3. **KonfigurationContext nutzen** - Alle Berechnungen nutzen Context
+4. **Deutsche Terminologie** - Erleichtert Prüfung/Präsentation
+5. **Umfangreiche Kommentare** - Zeigt Verständnis der Konzepte
+6. **Validierungen einbauen** - Fehler früh erkennen
+7. **Ermäßigungen nutzen** - 90% weniger Komplexität
+8. **Fokus auf Kernkonzepte** - Error Mgmt, Frozen Zone, ATP, SCOR
+9. **Ziel: 15 Punkte** - Keine Kompromisse bei Anforderungen
+10. **Konfigurierbarkeit** - ALLE Werte über Einstellungen änderbar
 
 ---
 
@@ -535,8 +595,10 @@ Du bist jetzt bereit, höchstqualitative Code für das WI3 Supply Chain Manageme
 **Remember:**
 - ✅ 370.000 Bikes (nicht 185.000!)
 - ✅ 49 Tage Vorlauf (nicht 56!)
+- ✅ JSON-Dateien als SSOT (nicht TypeScript!)
+- ✅ KonfigurationContext für alle Daten
 - ✅ Error Management IMMER
 - ✅ Deutsche Terminologie
-- ✅ Spezifikation als SSOT
+- ✅ Keine hardcodierten Werte
 
 **Viel Erfolg!** 🎯
