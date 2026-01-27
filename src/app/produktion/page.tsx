@@ -100,16 +100,6 @@ export default function ProduktionPage() {
   // Lagerbestände (szenario-aware)
   const lagerbestaende = hasSzenarien ? lagerbestaendeMitSzenarien : baselineLagerbestaende
   
-  // ✅ NEU: Transformiere tagesProduktion um materialVerfuegbar korrekt anzuzeigen
-  const tagesProduktionFormatiert = useMemo(() => {
-    return tagesProduktion.map(tag => ({
-      ...tag,
-      materialVerfuegbar: !tag.istArbeitstag 
-        ? '-'  // An Wochenenden/Feiertagen: Kein Material-Check
-        : tag.materialVerfuegbar ? '✓ Ja' : '✗ Nein'  // An Arbeitstagen: ATP-Status
-    }))
-  }, [tagesProduktion])
-  
   // ═══════════════════════════════════════════════════════════════════════════════
   // ✅ NEU: INTEGRIERTES WAREHOUSE MANAGEMENT (FIXES ALL ISSUES!)
   // ═══════════════════════════════════════════════════════════════════════════════
@@ -148,6 +138,29 @@ export default function ProduktionPage() {
       {} // Initial-Bestand = 0 (realistisch!)
     )
   }, [konfiguration, variantenProduktionsplaeneForWarehouse])
+  
+  // ✅ NEU: Transformiere tagesProduktion mit Backlog-Daten für Anzeige
+  const tagesProduktionFormatiert = useMemo(() => {
+    // Aggregiere Backlog über alle Sattel-Komponenten
+    const backlogProTag: Record<number, number> = {}
+    
+    Object.values(backlogErgebnis.komponenten).forEach(komponente => {
+      komponente.tagesDetails.forEach(detail => {
+        if (!backlogProTag[detail.tag]) {
+          backlogProTag[detail.tag] = 0
+        }
+        backlogProTag[detail.tag] += detail.backlogNachher
+      })
+    })
+    
+    return tagesProduktion.map(tag => ({
+      ...tag,
+      materialVerfuegbar: !tag.istArbeitstag 
+        ? '-'  // An Wochenenden/Feiertagen: Kein Material-Check
+        : tag.materialVerfuegbar ? '✓ Ja' : '✗ Nein',  // An Arbeitstagen: ATP-Status
+      backlog: backlogProTag[tag.tag] || 0  // Akkumulierter Backlog über alle Komponenten
+    }))
+  }, [tagesProduktion, backlogErgebnis])
   
   // Konvertiere für Darstellung (nur 2027 Tage)
   const tagesLagerbestaende = useMemo(() => {
@@ -519,6 +532,15 @@ export default function ProduktionPage() {
                 align: 'center',
                 formula: 'ATP-Check',
                 format: (val) => val,
+                sumable: false
+              },
+              {
+                key: 'backlog',
+                label: 'Backlog',
+                width: '100px',
+                align: 'right',
+                formula: 'Σ(Bedarf - Bestellt)',
+                format: (val) => val > 0 ? formatNumber(val, 0) + ' Stk' : '0',
                 sumable: false
               },
               {
