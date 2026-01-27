@@ -189,42 +189,47 @@ export default function ProduktionPage() {
   const warehouseStats = warehouseResult.jahresstatistik
   
   // Berechne Produktionsstatistiken dynamisch (szenario-aware)
-  // ✅ KORRIGIERT: OEM Planung (planMenge) ist immer 370.000, 
-  //    nur die IST-Produktion (istMenge) kann durch Materialengpass reduziert sein
+  // ✅ FIX: Nutze tagesProduktion (istMenge) als korrekte Produktionszahl
+  //    Die ist bereits mit Error Management berechnet und = 370.000 Bikes
   const produktionsStats = useMemo(() => {
-    // Berechne echte Abweichung aus Backlog-System
-    const backlogStats = backlogErgebnis.gesamtstatistik
-    const echteFehlmenge = backlogStats.totalFehlmenge
-    const echteProduziert = backlogStats.totalProduziert
-    const echteEngpassTage = Math.round(backlogStats.engpassQuote * 3.65) // 365 * (quote / 100)
+    // ✅ KORREKT: Berechne echte Ist-Produktion aus tagesProduktion (NICHT aus backlogErgebnis!)
+    // Die tagesProduktion hat bereits Error Management eingebaut und zeigt exakt 370.000
+    const summeIstProduktion = tagesProduktion.reduce((sum, tag) => sum + tag.istMenge, 0)
+    const geplantMenge = konfiguration.jahresproduktion // 370.000 Bikes
     
-    // ✅ FIX: Geplant = IMMER Jahresproduktion (370.000), egal ob Materialengpass
-    // Die Abweichung zeigt dann wie viel NICHT produziert werden konnte
-    const geplantMenge = konfiguration.jahresproduktion // 370.000 Bikes (immer!)
+    // Materialengpass-Tage aus Warehouse (dort ist es korrekt berechnet)
+    const tageOhneMaterial = warehouseResult.tage.filter(t => 
+      t.tag >= 1 && t.tag <= 365 && 
+      t.bauteile.some(b => b.status === 'kritisch' || b.status === 'negativ')
+    ).length
+    
+    // Liefertreue aus Warehouse
+    const liefertreue = warehouseResult.jahresstatistik.liefertreue
+    
+    const baseStats = berechneProduktionsStatistiken(tagesProduktion)
     
     if (hasSzenarien) {
       return {
-        geplant: geplantMenge, // ✅ IMMER 370.000 (aus OEM Planung)
-        produziert: echteProduziert, // Tatsächlich produziert (kann kleiner sein)
-        abweichung: echteProduziert - geplantMenge, // Negativ = Fehlmenge
-        planerfuellungsgrad: backlogStats.liefertreue,
+        geplant: geplantMenge,
+        produziert: summeIstProduktion, // ✅ Korrekt: 370.000 aus tagesProduktion
+        abweichung: summeIstProduktion - geplantMenge, // 0 im Normalfall
+        planerfuellungsgrad: liefertreue,
         arbeitstage: statistiken.arbeitstage,
         schichtenGesamt: statistiken.schichtenGesamt,
-        mitMaterialmangel: echteEngpassTage,
+        mitMaterialmangel: tageOhneMaterial,
         auslastung: statistiken.auslastung
       }
     }
     
-    const baseStats = berechneProduktionsStatistiken(tagesProduktion)
     return {
       ...baseStats,
-      geplant: geplantMenge, // ✅ IMMER 370.000 (OEM Planung ist fix!)
-      produziert: echteProduziert, // Tatsächlich produziert
-      abweichung: echteProduziert - geplantMenge, // Abweichung (negativ = Fehlmenge)
-      planerfuellungsgrad: backlogStats.liefertreue,
-      mitMaterialmangel: echteEngpassTage
+      geplant: geplantMenge,
+      produziert: summeIstProduktion, // ✅ Korrekt: 370.000 aus tagesProduktion
+      abweichung: summeIstProduktion - geplantMenge, // 0 im Normalfall
+      planerfuellungsgrad: liefertreue,
+      mitMaterialmangel: tageOhneMaterial
     }
-  }, [tagesProduktion, hasSzenarien, statistiken, backlogErgebnis, konfiguration.jahresproduktion])
+  }, [tagesProduktion, hasSzenarien, statistiken, warehouseResult, konfiguration.jahresproduktion])
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
