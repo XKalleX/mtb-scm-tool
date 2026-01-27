@@ -101,6 +101,16 @@ export default function ProduktionPage() {
   // Lagerbestände (szenario-aware)
   const lagerbestaende = hasSzenarien ? lagerbestaendeMitSzenarien : baselineLagerbestaende
   
+  // ✅ NEU: Transformiere tagesProduktion um materialVerfuegbar korrekt anzuzeigen
+  const tagesProduktionFormatiert = useMemo(() => {
+    return tagesProduktion.map(tag => ({
+      ...tag,
+      materialVerfuegbar: !tag.istArbeitstag 
+        ? '-'  // An Wochenenden/Feiertagen: Kein Material-Check
+        : tag.materialVerfuegbar ? '✓ Ja' : '✗ Nein'  // An Arbeitstagen: ATP-Status
+    }))
+  }, [tagesProduktion])
+  
   // ═══════════════════════════════════════════════════════════════════════════════
   // ✅ NEU: INTEGRIERTES WAREHOUSE MANAGEMENT (FIXES ALL ISSUES!)
   // ═══════════════════════════════════════════════════════════════════════════════
@@ -368,138 +378,6 @@ export default function ProduktionPage() {
         </Card>
       </div>
 
-      {/* ✅ NEU: Backlog-System Hinweis */}
-      <CollapsibleInfo
-        title="📊 Backlog-System: Material-Engpässe durch Losgrößen"
-        variant="warning"
-        icon={<AlertTriangle className="h-5 w-5" />}
-        defaultOpen={true}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-orange-800">
-            <strong>Losgrößen-basierte Bestellungen führen zu temporären Engpässen!</strong> Da Bestellungen nur in Vielfachen von 500 Stück erfolgen, entsteht ein Backlog bis die Losgröße erreicht ist.
-          </p>
-          
-          <div className="grid md:grid-cols-4 gap-4">
-            <div className="bg-white border border-orange-200 rounded p-3">
-              <div className="text-xs text-orange-600">Liefertreue</div>
-              <div className={`text-xl font-bold ${backlogErgebnis.gesamtstatistik.liefertreue >= 95 ? 'text-green-600' : backlogErgebnis.gesamtstatistik.liefertreue >= 85 ? 'text-yellow-600' : 'text-red-600'}`}>
-                {formatNumber(backlogErgebnis.gesamtstatistik.liefertreue, 1)}%
-              </div>
-            </div>
-            <div className="bg-white border border-orange-200 rounded p-3">
-              <div className="text-xs text-orange-600">Ø Backlog</div>
-              <div className="text-xl font-bold text-orange-700">
-                {formatNumber(backlogErgebnis.gesamtstatistik.durchschnittlicherBacklog, 0)} Stk
-              </div>
-            </div>
-            <div className="bg-white border border-orange-200 rounded p-3">
-              <div className="text-xs text-orange-600">Engpass-Quote</div>
-              <div className="text-xl font-bold text-orange-700">
-                {formatNumber(backlogErgebnis.gesamtstatistik.engpassQuote, 1)}%
-              </div>
-            </div>
-            <div className="bg-white border border-orange-200 rounded p-3">
-              <div className="text-xs text-orange-600">Bestellungen</div>
-              <div className="text-xl font-bold text-blue-700">
-                {formatNumber(backlogErgebnis.gesamtstatistik.anzahlBestellungen, 0)}
-              </div>
-            </div>
-          </div>
-          
-          <div className="text-xs text-orange-700 bg-orange-50 p-2 rounded">
-            <strong>Hinweis:</strong> Die ersten ~49 Tage haben Material-Engpässe, da die erste Bestellung 49 Tage Vorlaufzeit benötigt. Dies ist realistisch und entspricht der Anforderung.
-          </div>
-        </div>
-      </CollapsibleInfo>
-
-      {/* ✅ NEUES WAREHOUSE SYSTEM BANNER */}
-      <CollapsibleInfo
-        title="✅ INTEGRIERTES WAREHOUSE MANAGEMENT (Alle Fehler behoben!)"
-        variant="success"
-        icon={<Package className="h-5 w-5" />}
-        defaultOpen={true}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-green-800">
-            <strong>✅ ALLE kritischen Warehouse-Fehler wurden behoben!</strong> Das neue integrierte 
-            Warehouse Management System ersetzt die fehlerhafte alte Logik und implementiert:
-          </p>
-          
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="bg-green-50 border border-green-200 rounded p-3">
-              <h4 className="font-semibold text-green-900 mb-2">✅ FIX #1: Realistische Lieferungen</h4>
-              <ul className="text-sm text-green-800 space-y-1">
-                <li>• <strong>Lot-basiert:</strong> 500-Stück Lose (nicht tägliche Glättung!)</li>
-                <li>• <strong>49-Tage Vorlauf:</strong> Bestellungen ab Oktober 2026</li>
-                <li>• <strong>Spring Festival:</strong> 8 Tage Produktionsstopp berücksichtigt</li>
-              </ul>
-              <div className="mt-2 text-xs text-green-600 font-mono bg-white p-2 rounded">
-                Lieferungen: {warehouseStats.gesamtLieferungen.toLocaleString('de-DE')} Sättel<br/>
-                (Lot-basiert, nicht geglättet!)
-              </div>
-            </div>
-            
-            <div className="bg-green-50 border border-green-200 rounded p-3">
-              <h4 className="font-semibold text-green-900 mb-2">✅ FIX #2: Vorlaufzeit respektiert</h4>
-              <ul className="text-sm text-green-800 space-y-1">
-                <li>• <strong>Initial-Bestand:</strong> Start mit 0 (realistisch!)</li>
-                <li>• <strong>Erste Lieferung:</strong> Vor Produktionsstart (49 Tage vorher)</li>
-                <li>• <strong>Kein Day-1 Verbrauch:</strong> ohne vorherige Lieferung</li>
-              </ul>
-              <div className="mt-2 text-xs text-green-600 font-mono bg-white p-2 rounded">
-                Min. Bestand: {warehouseStats.minimalBestand.toLocaleString('de-DE')}<br/>
-                Max. Bestand: {warehouseStats.maximalBestand.toLocaleString('de-DE')}
-              </div>
-            </div>
-            
-            <div className="bg-green-50 border border-green-200 rounded p-3">
-              <h4 className="font-semibold text-green-900 mb-2">✅ FIX #3: ATP-Checks aktiviert</h4>
-              <ul className="text-sm text-green-800 space-y-1">
-                <li>• <strong>Pre-Consumption Check:</strong> Vor jedem Verbrauch</li>
-                <li>• <strong>Keine negativen Bestände:</strong> Fehler statt Math.max(0)</li>
-                <li>• <strong>Explicit Warnings:</strong> Bei Materialengpässen</li>
-              </ul>
-              <div className="mt-2 text-xs text-green-600 font-mono bg-white p-2 rounded">
-                Liefertreue: {warehouseStats.liefertreue.toFixed(1)}%<br/>
-                (ATP erfüllt an {Math.round((warehouseStats.liefertreue / 100) * 365)} von 365 Tagen)
-              </div>
-            </div>
-            
-            <div className="bg-green-50 border border-green-200 rounded p-3">
-              <h4 className="font-semibold text-green-900 mb-2">✅ FIX #4: Safety Stock enforced</h4>
-              <ul className="text-sm text-green-800 space-y-1">
-                <li>• <strong>Hard Constraint:</strong> 7-Tage Sicherheitsbestand</li>
-                <li>• <strong>Nicht nur Warnung:</strong> Verhindert Produktion</li>
-                <li>• <strong>Tracking:</strong> Tage unter Sicherheitsbestand</li>
-              </ul>
-              <div className="mt-2 text-xs text-green-600 font-mono bg-white p-2 rounded">
-                Tage unter Sicherheit: {warehouseStats.tageUnterSicherheit}<br/>
-                Tage negativ: {warehouseStats.tageNegativ} ✅
-              </div>
-            </div>
-          </div>
-          
-          <div className="border-t border-green-300 pt-3 mt-3">
-            <h4 className="font-semibold text-green-900 mb-2">🎯 Ergebnis:</h4>
-            <div className="grid md:grid-cols-3 gap-2 text-sm">
-              <div className="bg-white border border-green-200 rounded p-2">
-                <div className="text-xs text-green-600">Gesamt Verbrauch</div>
-                <div className="font-bold text-green-900">{warehouseStats.gesamtVerbrauch.toLocaleString('de-DE')} Sättel</div>
-              </div>
-              <div className="bg-white border border-green-200 rounded p-2">
-                <div className="text-xs text-green-600">Durchschn. Bestand</div>
-                <div className="font-bold text-green-900">{warehouseStats.durchschnittBestand.toLocaleString('de-DE')} Sättel</div>
-              </div>
-              <div className="bg-white border border-green-200 rounded p-2">
-                <div className="text-xs text-green-600">Warnungen (gesamt)</div>
-                <div className="font-bold text-green-900">{warehouseResult.warnungen.length}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </CollapsibleInfo>
-
       {/* Produktionslogik ohne Solver - COLLAPSIBLE */}
       <CollapsibleInfo
         title="Produktionslogik (ohne Solver)"
@@ -659,7 +537,7 @@ export default function ProduktionPage() {
                 width: '100px',
                 align: 'center',
                 formula: 'ATP-Check',
-                format: (val) => val ? '✓ Ja' : '✗ Nein',
+                format: (val) => val,
                 sumable: false
               },
               {
@@ -690,7 +568,7 @@ export default function ProduktionPage() {
                 sumable: false
               }
             ]}
-            data={tagesProduktion}
+            data={tagesProduktionFormatiert}
             maxHeight="500px"
             showFormulas={true}
             showSums={true}
@@ -890,95 +768,6 @@ export default function ProduktionPage() {
               Zugang vereinfacht als Tagesbedarf × 1,1 (In Realität: Inbound mit Losgrößen 500 + Vorlaufzeit 49 Tage).
               Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion berechneTagesLagerbestaende()
             </p>
-          </div>
-
-          {/* Übersicht: Aggregierte Lagerbestände */}
-          <div>
-            <h4 className="font-semibold text-green-900 mb-3">Übersicht: Aggregierte Lagerbestände (Aktueller Stand)</h4>
-            <ExcelTable
-              columns={[
-                {
-                  key: 'komponente',
-                  label: 'Sattel-Variante',
-                  width: '150px',
-                  format: (val) => val.replace(/_/g, ' '),
-                  sumable: false
-                },
-                {
-                  key: 'verwendung',
-                  label: 'Verwendung (MTB-Varianten)',
-                  width: '250px',
-                  align: 'left',
-                  sumable: false
-                },
-                {
-                  key: 'bestand',
-                  label: 'Bestand',
-                  width: '110px',
-                  align: 'right',
-                  format: (val) => formatNumber(val, 0),
-                  sumable: true
-                },
-                {
-                  key: 'sicherheit',
-                  label: 'Sicherheitsbestand',
-                  width: '150px',
-                  align: 'right',
-                  format: (val) => formatNumber(val, 0),
-                  sumable: true
-                },
-                {
-                  key: 'bedarf',
-                  label: 'Tagesbedarf',
-                  width: '130px',
-                  align: 'right',
-                  format: (val) => formatNumber(val, 0) + ' /Tag',
-                  sumable: true
-                },
-                {
-                  key: 'verfuegbar',
-                  label: 'Verfügbar (ATP)',
-                  width: '140px',
-                  align: 'right',
-                  formula: 'Bestand - Sicherheitsbestand',
-                  format: (val) => formatNumber(val, 0),
-                  sumable: true
-                },
-                {
-                  key: 'reichweite',
-                  label: 'Reichweite',
-                  width: '110px',
-                  align: 'right',
-                  formula: 'Verfügbar / Tagesbedarf',
-                  format: (val) => formatNumber(val, 1) + ' Tage',
-                  sumable: false
-                },
-                {
-                  key: 'status',
-                  label: 'Status',
-                  width: '100px',
-                  align: 'center',
-                  format: (val) => val === 'ok' 
-                    ? '✓ OK' 
-                    : '⚠ Kritisch',
-                  sumable: false
-                }
-              ]}
-              data={lagerbestaende.map(l => ({
-                komponente: l.komponente,
-                verwendung: l.verwendung,
-                bestand: l.bestand,
-                sicherheit: l.sicherheit,
-                bedarf: l.bedarf,
-                verfuegbar: l.bestand - l.sicherheit,
-                reichweite: (l.bestand - l.sicherheit) / l.bedarf,
-                status: l.status
-              }))}
-              maxHeight="300px"
-              showFormulas={true}
-              showSums={true}
-              sumRowLabel="GESAMT Lagerbestand"
-            />
           </div>
         </CardContent>
       </Card>

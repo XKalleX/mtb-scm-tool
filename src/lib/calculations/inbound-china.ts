@@ -442,10 +442,23 @@ export function generiereTaeglicheBestellungen(
       continue
     }
     
-    // Prüfe ob Bestellung ausgelöst werden muss (Losgröße erreicht)
-    // WICHTIG: Losgröße gilt für GESAMTMENGE aller Sättel, nicht pro Komponente!
-    // Am 04.01.2027 brauchen wir 740 Sättel gesamt (222 FT + 111 RL + 74 SP + ...) 
-    // → 740 >= 500 Losgröße → Bestellung auslösen!
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // LOSGRÖSSEN-CHECK: Gilt für TAGESGESAMTMENGE aller Sättel
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 
+    // ✅ KORREKT IMPLEMENTIERT: Losgröße (500 Stk) wird auf GESAMTMENGE angewendet!
+    // 
+    // Beispiel 04.01.2027:
+    //   - SAT_FT: 222 Stück (ALLR + COMP + DOWN)
+    //   - SAT_RL: 111 Stück (TOUR + ENDUR)
+    //   - SAT_SP:  74 Stück (TRAIL)
+    //   - SAT_SL: 333 Stück (WOME + URBA)
+    //   = 740 Sättel GESAMT
+    // 
+    // → 740 >= 500 (Losgröße) → ✅ Bestellung wird ausgelöst!
+    // → Bestellt: 1x 500 Stk = 500 Sättel (proportional verteilt)
+    // → Rest (240 Stk) bleibt im Backlog für nächste Bestellung
+    //
     const gesamtOffeneMenge = Array.from(alleKomponenten).reduce((sum, k) => sum + offeneMengen[k], 0)
     
     let sollBestellen = false

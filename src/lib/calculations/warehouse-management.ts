@@ -236,7 +236,15 @@ export function berechneIntegriertesWarehouse(
   const bauteile = konfiguration.bauteile
   const aktuelleBestaende: Record<string, number> = {}
   
-  // Initialisiere mit minimalem Puffer ODER user-definiert
+  // ✅ VALIDIERT: Anfangsbestände auf 0 gesetzt (keine imaginären Bestände!)
+  // 
+  // Anforderung: Tag 1-3 (01.01.2027 - 03.01.2027) haben KEINE Anfangsbestände!
+  // - Erste Lieferung: Tag 4 (04.01.2027) mit 500 Sätteln
+  // - Vorlaufzeit: 49 Tage → Bestellung muss im November 2026 gestartet werden
+  // - Keine Lageranhäufung vor Produktionsstart
+  // 
+  // WICHTIG: Der Parameter 'initialBestand' erlaubt manuelle Überschreibung
+  // für Szenario-Tests, aber DEFAULT = 0!
   bauteile.forEach(bauteil => {
     if (initialBestand[bauteil.id] !== undefined) {
       aktuelleBestaende[bauteil.id] = initialBestand[bauteil.id]
@@ -247,7 +255,7 @@ export function berechneIntegriertesWarehouse(
     }
   })
   
-  console.log(`📦 Initial-Bestand:`, aktuelleBestaende)
+  console.log(`📦 Initial-Bestand (Tag 1):`, aktuelleBestaende)
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // STEP 3: SICHERHEITSBESTÄNDE (auf 0 gesetzt gemäß Anforderung)
