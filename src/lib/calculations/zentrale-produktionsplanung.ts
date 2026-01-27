@@ -549,8 +549,7 @@ export function berechneSCORMetriken(
     ? durchlaufzeiten.reduce((sum, d) => sum + d, 0) / durchlaufzeiten.length
     : 0
 
-  // ✅ FIXED: Nutze Standard-Werte aus Spezifikation (da konfiguration hier nicht verfügbar)
-  // Quelle: lieferant-china.json → 49 Tage Gesamtvorlaufzeit
+  // Nutze Standard-Werte aus Spezifikation (Quelle: lieferant-china.json → 49 Tage Gesamtvorlaufzeit)
   // 
   // WICHTIG: AT (Arbeitstage) müssen in KT (Kalendertage) umgerechnet werden:
   // - 5 AT Produktion + 4 AT LKW Transport → ~13 KT (mit Wochenenden)
@@ -700,22 +699,17 @@ export function berechneLagerbestaende(
  * 
  * ⚠️ DIESE FUNKTION ENTHÄLT KRITISCHE LOGIK-FEHLER:
  * 
- * ❌ FIX #1: Unrealistische tägliche Lieferungen (tagesbedarf * 1.1)
+ * ❌ Unrealistische tägliche Lieferungen (tagesbedarf * 1.1)
  *    - Ignoriert 500-Stück Losgrößen
  *    - Ignoriert 49-Tage Vorlaufzeit
  *    - Ignoriert Spring Festival
  * 
- * ❌ FIX #2: Material-Verbrauch ab Tag 1 ohne Lieferung
- *    - Initial-Bestand = 35% Jahresbedarf (unrealistisch hoch)
+ * ❌ Material-Verbrauch ab Tag 1 ohne Lieferung
  *    - Keine Prüfung ob erste Lieferung rechtzeitig ankommt
  * 
- * ❌ FIX #3: Math.max(0, ...) maskiert negative Bestände
+ * ❌ Math.max(0, ...) maskiert negative Bestände
  *    - Keine ATP-Checks
  *    - Stille Unterdrückung von Engpässen
- * 
- * ❌ FIX #4: Safety Stock nur für Warnung, nicht enforced
- *    - Produktion kann unter Safety Stock konsumieren
- *    - Keine harte Constraint
  * 
  * ✅ NEUE FUNKTION: berechneIntegriertesWarehouse()
  *    in warehouse-management.ts
@@ -763,7 +757,6 @@ export function berechneTagesLagerbestaende(
       - Unrealistische tägliche Lieferungen (ignoriert Losgrößen & Vorlaufzeit)
       - Material-Verbrauch ab Tag 1 ohne realistische Lieferungen
       - Math.max(0) maskiert negative Bestände
-      - Safety Stock wird nicht enforced
       
       Bitte verwenden Sie stattdessen:
       → berechneIntegriertesWarehouse() aus warehouse-management.ts
@@ -771,7 +764,6 @@ export function berechneTagesLagerbestaende(
       Diese neue Funktion behebt ALLE bekannten Fehler:
       ✅ Realistische lot-basierte Lieferungen (500 Stück, 49 Tage)
       ✅ ATP-Checks vor Verbrauch
-      ✅ Safety Stock enforcement
       ✅ Vollständige OEM-Inbound-Warehouse Integration
     `)
   }
@@ -811,8 +803,8 @@ export function berechneTagesLagerbestaende(
   const aktuelleBestaende: Record<string, number> = {}
   Object.keys(bauteilBedarfe).forEach(bauteilId => {
     const jahresbedarf = bauteilBedarfe[bauteilId].jahresbedarf
-    // ❌ FEHLER: 35% Initial-Bestand ist unrealistisch!
-    aktuelleBestaende[bauteilId] = Math.round(jahresbedarf * 0.35)
+    // Start mit 0 Bestand (realistisch)
+    aktuelleBestaende[bauteilId] = 0
   })
   
   const result: TagesLagerbestand[] = []

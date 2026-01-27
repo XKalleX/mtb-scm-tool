@@ -352,10 +352,13 @@ export function aggregiereProduktionsplaene(
 }
 
 /**
- * 🎯 Berechnet Lagerbestände für Sättel über 365 Tage
+ * Berechnet Lagerbestände für Sättel über 365 Tage
  * 
  * WICHTIG: Ermäßigung - Nur 4 Sattel-Varianten!
  * - 1 Sattel = 1 Bike (einfache Stückliste)
+ * 
+ * @deprecated Diese Funktion ist veraltet. Nutze berechneIntegriertesWarehouse() stattdessen,
+ *             da diese realistische Lieferungen aus Inbound berücksichtigt.
  * 
  * @param produktionsplaene - Produktionspläne aller Varianten
  * @returns Lagerbewegungen für jeden Sattel
@@ -370,7 +373,6 @@ export function berechneSattelLagerbestaende(
     datum: Date
     verbrauch: number
     bestand: number
-    sicherheitsbestand: number
     status: 'ok' | 'kritisch'
   }>
 }> {
@@ -384,10 +386,9 @@ export function berechneSattelLagerbestaende(
       tagesBewegungen: []
     }
     
-    // ✅ FIXED: KEIN Startbestand (gemäß Anforderung)
-    // Begründung: "Tag 01-03 müssen 0 Bestand haben, keine imaginären Anfangsbestände"
+    // Start mit 0 Bestand
     // Material kommt erst durch reale Lieferungen (Losgröße 500, Vorlaufzeit 49 Tage)
-    let bestand = 0 // Start mit 0 Bestand (realistisch!)
+    let bestand = 0
     
     // Für jeden Tag
     for (let tagNr = 1; tagNr <= 365; tagNr++) {
@@ -407,9 +408,8 @@ export function berechneSattelLagerbestaende(
       // Buche Verbrauch ab
       bestand -= verbrauch
       
-      // ✅ FIXED: Keine automatische Auffüllung mehr
-      // Begründung: Material kommt NUR durch reale Lieferungen aus Inbound
-      // Diese Funktion wird deprecat → Nutze berechneIntegriertesWarehouse() stattdessen
+      // Material kommt NUR durch reale Lieferungen aus Inbound
+      // Diese Funktion zeigt nur den theoretischen Verbrauch
       
       const status = bestand >= 0 ? 'ok' : 'kritisch'
       
@@ -418,7 +418,6 @@ export function berechneSattelLagerbestaende(
         datum: new Date(new Date('2027-01-01').getTime() + (tagNr - 1) * 24 * 60 * 60 * 1000),
         verbrauch,
         bestand,
-        sicherheitsbestand: 0, // ✅ FIXED: Keine Sicherheitsbestände
         status
       })
     }

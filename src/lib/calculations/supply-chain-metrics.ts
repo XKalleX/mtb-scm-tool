@@ -105,10 +105,10 @@ export const DURCHLAUFZEIT_PENALTY_FAKTOR = 100
 
 // <--- CHANGED: New Constant for "Lean" Inventory Goal
 /**
- * Ziel-Sicherheitsbestand: 3 Tage
- * Ersetzt die alte Annahme von 2 Wochen (Just-in-Time Ziel)
+ * Ziel-Lagerreichweite: 3 Tage
+ * Verwendet für Berechnung von Lagermetriken (kein erzwungener Sicherheitsbestand)
  */
-export const ZIEL_SICHERHEITSBESTAND_TAGE = 3 
+export const ZIEL_LAGERREICHWEITE_TAGE = 3 
 
 
 // ========================================
@@ -542,8 +542,8 @@ export function berechneLagerDaten(
 ): { monat: string; saettel: number }[] {
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
    
-  // <--- CHANGED: Updated to use 3-days safety stock logic instead of 2 weeks
-  const basisBestand = Math.round(auswirkungen.durchschnittProTag * ZIEL_SICHERHEITSBESTAND_TAGE)
+  // Updated: Use 3-days target inventory coverage
+  const basisBestand = Math.round(auswirkungen.durchschnittProTag * ZIEL_LAGERREICHWEITE_TAGE)
    
   // Materialverfügbarkeit beeinflusst Lagerbestand
   const verfuegbarkeitsFaktor = auswirkungen.materialverfuegbarkeit / 100
@@ -591,7 +591,7 @@ export function berechneGesamtMetriken(
   // If no real stock is provided, we simulate the "perfect" lean stock (3 days)
   const kalkulatorischerBestand = aktuellerLagerbestand !== undefined 
     ? aktuellerLagerbestand 
-    : (auswirkungen.durchschnittProTag * ZIEL_SICHERHEITSBESTAND_TAGE);
+    : (auswirkungen.durchschnittProTag * ZIEL_LAGERREICHWEITE_TAGE);
 
   const scor = berechneSCORMetriken(aktiveSzenarien, kalkulatorischerBestand) // <--- CHANGED: Passing the value
   
@@ -768,7 +768,7 @@ export function berechneGesamtMetrikenMitKonfig(
   // <--- CHANGED: Logic Updated to match the "Just-In-Time" goal (3 days default if no stock provided)
   const berechneterBestand = aktuellerLagerbestand !== undefined
     ? aktuellerLagerbestand
-    : (auswirkungen.durchschnittProTag * ZIEL_SICHERHEITSBESTAND_TAGE)
+    : (auswirkungen.durchschnittProTag * ZIEL_LAGERREICHWEITE_TAGE)
 
   const lagerreichweite = auswirkungen.durchschnittProTag > 0
     ? Math.round((berechneterBestand / auswirkungen.durchschnittProTag) * 10) / 10
@@ -883,7 +883,7 @@ export function berechneSCORMetrikenEntwicklung(
     )
     
     // Lagerreichweite: Niedriger in Peak-Monaten
-    const basisBestand = aktuellerLagerbestand || (auswirkungen.durchschnittProTag * ZIEL_SICHERHEITSBESTAND_TAGE)
+    const basisBestand = aktuellerLagerbestand || (auswirkungen.durchschnittProTag * ZIEL_LAGERREICHWEITE_TAGE)
     const lagerreichweite = Math.max(
       1,
       (basisBestand / (auswirkungen.durchschnittProTag * saisonFaktor))
@@ -1038,18 +1038,18 @@ export function berechneLagerreichweiteTrend(
   status: 'kritisch' | 'niedrig' | 'ok' | 'optimal'
 }[] {
   const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
-  const basisBestand = aktuellerLagerbestand || (auswirkungen.durchschnittProTag * ZIEL_SICHERHEITSBESTAND_TAGE)
+  const basisBestand = aktuellerLagerbestand || (auswirkungen.durchschnittProTag * ZIEL_LAGERREICHWEITE_TAGE)
   
   return saisonalitaetData.saisonalitaetMonatlich.map((saison, index) => {
     const saisonFaktor = saison.anteil / GLEICHMAESSIGER_MONATSANTEIL
     const tagesbedarf = auswirkungen.durchschnittProTag * saisonFaktor
     const lagerreichweite = tagesbedarf > 0 ? basisBestand / tagesbedarf : 0
     
-    // Status basierend auf Ziel-Sicherheitsbestand (3 Tage)
+    // Status basierend auf Ziel-Lagerreichweite (3 Tage)
     let status: 'kritisch' | 'niedrig' | 'ok' | 'optimal'
     if (lagerreichweite < 2) {
       status = 'kritisch'
-    } else if (lagerreichweite < ZIEL_SICHERHEITSBESTAND_TAGE) {
+    } else if (lagerreichweite < ZIEL_LAGERREICHWEITE_TAGE) {
       status = 'niedrig'
     } else if (lagerreichweite <= 5) {
       status = 'optimal'
@@ -1061,7 +1061,7 @@ export function berechneLagerreichweiteTrend(
       monat: MONATSNAMEN_KURZ[index],
       monatNr: index + 1,
       lagerreichweite: Math.round(lagerreichweite * 10) / 10,
-      zielWert: ZIEL_SICHERHEITSBESTAND_TAGE,
+      zielWert: ZIEL_LAGERREICHWEITE_TAGE,
       status
     }
   })

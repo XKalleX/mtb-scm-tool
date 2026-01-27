@@ -103,8 +103,7 @@ export default function InboundPage() {
     )
     
     setZusatzBestellungen(prev => [...prev, neueBestellung])
-    // ✅ FIX: Datum NICHT zurücksetzen, damit Benutzer sieht welches Datum gewählt wurde
-    // und einfacher weitere Bestellungen mit ähnlichem Datum eingeben kann
+    // Datum NICHT zurücksetzen, damit weitere Bestellungen mit ähnlichem Datum einfacher sind
     setNeueBestellungMenge('500')  // Nur Menge zurücksetzen
   }, [neueBestellungDatum, neueBestellungMenge, konfiguration.lieferant.gesamtVorlaufzeitTage])
   

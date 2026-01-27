@@ -111,11 +111,10 @@ export function bucheMaterialEin(
 ): void {
   Object.entries(komponenten).forEach(([kompId, menge]) => {
     if (!lagerbestaende[kompId]) {
-      // Initialisiere Lagerbestand
+      // Initialisiere Lagerbestand (Start bei 0)
       lagerbestaende[kompId] = {
         komponentenId: kompId,
         bestand: 0,
-        sicherheitsbestand: 0, // ✅ FIXED: Keine Sicherheitsbestände
         maximalbestand: 50000,
         letzteBewegung: datum
       }
@@ -200,26 +199,6 @@ export function produziereMitFCFS(
   })
   
   return auftraege
-}
-
-/**
- * Findet Komponenten unter Sicherheitsbestand (kritische Bestände)
- * 
- * @param lagerbestaende - Lagerbestände
- * @returns Array von kritischen Komponenten
- */
-export function findeKritischeBestaende(
-  lagerbestaende: Record<string, Lagerbestand>
-): string[] {
-  const kritisch: string[] = []
-  
-  Object.entries(lagerbestaende).forEach(([kompId, lager]) => {
-    if (lager.bestand < lager.sicherheitsbestand) {
-      kritisch.push(kompId)
-    }
-  })
-  
-  return kritisch
 }
 
 /**
