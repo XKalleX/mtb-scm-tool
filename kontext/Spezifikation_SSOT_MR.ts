@@ -5,20 +5,41 @@
  * Adventure Works AG - Mountain Bike Production 2027
  * ═══════════════════════════════════════════════════════════════════════════════
  * 
- * VERSION: FINAL - Korrekte Daten aus aktueller Aufgabenstellung
+ * VERSION: FINAL - Dokumentation der Anforderungen und Konzepte
  * DATUM: Januar 2027 (Planungszeitraum: 01.01.2027 - 31.12.2027)
  * TEAM: Pascal Wagner (Lead), Da Yeon Kang, Shauna Ré Erfurth, Taha Wischmann
  * ZIEL: 15 Punkte (Note 1+ / A+)
  * 
  * ═══════════════════════════════════════════════════════════════════════════════
- * WICHTIG: KONFIGURIERBARKEIT
+ * ⚠️ WICHTIG: DIESE DATEI IST DOKUMENTATION, NICHT CODE-QUELLE!
  * ═══════════════════════════════════════════════════════════════════════════════
  * 
- * ✅ ALLE Werte in diesem System MÜSSEN durch Einstellungen änderbar sein!
- * ✅ KEINE hardcodierten Werte in Pages oder Komponenten
- * ✅ Einzige Datenquelle: JSON-Konfiguration (src/data/*.json)
- * ✅ Werte werden über KonfigurationContext verwaltet
+ * Diese Datei dokumentiert die ANFORDERUNGEN und KONZEPTE des Systems.
+ * Für tatsächliche Berechnungen und Code IMMER folgende Quellen nutzen:
+ * 
+ * 📁 src/data/*.json                     ← SINGLE SOURCE OF TRUTH (Daten)
+ * 📁 src/contexts/KonfigurationContext   ← State Management (lädt JSON)
+ * 
+ * NIEMALS Werte aus dieser Datei direkt importieren oder hardcoden!
+ * Diese Datei dient zur Dokumentation der Anforderungen für das Team.
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * WICHTIG: KONFIGURIERBARKEIT über JSON + KonfigurationContext
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * ✅ ALLE Werte MÜSSEN aus JSON-Dateien kommen (src/data/*.json)
+ * ✅ KEINE hardcodierten Werte in Code
+ * ✅ KonfigurationContext lädt JSON und verwaltet State
  * ✅ Änderungen in Einstellungen wirken sich sofort auf alle Berechnungen aus
+ * 
+ * JSON-Datenquellen:
+ * - src/data/stammdaten.json          → Varianten, Jahresproduktion (370.000)
+ * - src/data/saisonalitaet.json       → Monatliche Verteilung (Apr 16% Peak)
+ * - src/data/stueckliste.json         → 4 Sattel-Varianten
+ * - src/data/feiertage-china.json     → Spring Festival (28.01.-04.02.2027)
+ * - src/data/feiertage-deutschland.json → Deutsche Feiertage (NRW)
+ * - src/data/lieferant-china.json     → Vorlaufzeit 49 Tage, Losgröße 500
+ * - src/data/szenario-defaults.json   → Szenario-Standardwerte
  * 
  * ═══════════════════════════════════════════════════════════════════════════════
  * WICHTIG: ERMÄSSIGUNGEN AKTIV (Code-Version)
@@ -36,7 +57,7 @@
  * - Schnellere Implementierung
  * - Bessere Präsentierbarkeit
  * 
- * ALLE anderen Anforderungen bleiben bestehen!
+ * ALLE anderen Anforderungen (A1-A13) bleiben vollständig bestehen!
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
@@ -50,8 +71,13 @@
  * Die alte Lösung (MTB_v5) von vor 2 Jahren hatte 185.000 Bikes.
  * Die AKTUELLE Aufgabenstellung verlangt 370.000 Bikes pro Jahr!
  * 
- * Quelle: WI_L_WI3_3.pdf Seite "Daten zum Produktionsnetzwerk"
- * "Gesamtvolumen Fahrräder: 370.000 p.a."
+ * ⚠️ ACHTUNG: Diese Konstanten dienen nur zur DOKUMENTATION!
+ * 
+ * Für Code/Berechnungen nutze:
+ * - useKonfiguration() Hook → const { jahresProduktion } = useKonfiguration()
+ * - Oder direkter JSON-Import → import stammdaten from '@/data/stammdaten.json'
+ * 
+ * Die tatsächlichen Werte kommen aus: src/data/stammdaten.json
  */
 
 export const PROJEKT_INFO = {
@@ -90,8 +116,14 @@ export const PROJEKT_INFO = {
 /**
  * JAHRESMENGE: 370.000 BIKES
  * 
- * Dies ist die zentrale Zahl für alle Berechnungen!
- * Saisonale Verteilung und Varianten-Mix basieren auf dieser Gesamtmenge.
+ * ⚠️ DOKUMENTATION: Diese Konstanten dienen zur Dokumentation der Anforderungen!
+ * 
+ * Für Code/Berechnungen IMMER nutzen:
+ * - useKonfiguration() → const { jahresProduktion, varianten } = useKonfiguration()
+ * - JSON direkt → import stammdaten from '@/data/stammdaten.json'
+ * 
+ * Die tatsächlichen konfigurierbaren Werte kommen aus:
+ * 📁 src/data/stammdaten.json → jahresproduktion.gesamt = 370000
  */
 
 export const PRODUKTIONSVOLUMEN = {
