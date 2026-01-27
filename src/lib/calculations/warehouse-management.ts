@@ -3,38 +3,18 @@
  * INTEGRIERTES WAREHOUSE MANAGEMENT SYSTEM
  * ═══════════════════════════════════════════════════════════════════════════════
  * 
- * 🎯 FIXES ALL CRITICAL LOGIC ERRORS:
- * 
- * ✅ FIX #1: REALISTIC LOT-BASED DELIVERIES
- *    - No more fake daily smoothed deliveries (tagesbedarf * 1.1)
- *    - Uses ACTUAL inbound orders from inbound-china.ts
- *    - Respects 500-unit lot sizes and 49-day lead times
- * 
- * ✅ FIX #2: LEAD TIME RESPECTING (No Day 1 Consumption Without Delivery)
- *    - First order placed ~49 days before Jan 1st (mid-October 2026)
- *    - Initial inventory set to ZERO (or minimal buffer)
- *    - First delivery arrives just before production starts
- * 
- * ✅ FIX #3: ATP (AVAILABLE-TO-PROMISE) CHECKS
- *    - Checks BEFORE consumption if materials available
- *    - Never allows negative inventory
- *    - Throws explicit errors instead of silent Math.max(0)
- * 
- * ✅ FIX #4: SAFETY STOCK ENFORCEMENT
- *    - Safety stock = 7 days demand (configurable)
- *    - Production CANNOT consume below safety stock
- *    - Hard constraint, not just warning
- * 
- * ✅ FIX #5: FULL OEM-INBOUND-WAREHOUSE INTEGRATION
- *    - Single unified calculation
- *    - Inbound deliveries → Warehouse → Production consumption
- *    - Synchronized timeline
+ * Berechnet realistische Lagerbestandsentwicklung mit:
+ * - Realistischen Losgrößen-basierten Lieferungen (500 Stück)
+ * - 49 Tage Vorlaufzeit respektiert
+ * - ATP (Available-to-Promise) Checks vor Verbrauch
+ * - Start mit 0 Lagerbestand
+ * - Volle OEM-Inbound-Warehouse Integration
  * 
  * KONZEPT:
- * 1. Start with ZERO/minimal initial inventory
- * 2. Process inbound deliveries (from generiereTaeglicheBestellungen)
- * 3. For each production day: ATP check → consume if available
- * 4. Track cumulative inventory over 365+ days (including pre-year deliveries)
+ * 1. Start mit 0 Lagerbestand
+ * 2. Verarbeite Inbound-Lieferungen von generiereTaeglicheBestellungen
+ * 3. Für jeden Produktionstag: ATP-Check → Verbrauch falls verfügbar
+ * 4. Sammle Statistiken und Warnungen
  */
 
 import type { KonfigurationData } from '@/contexts/KonfigurationContext'
@@ -69,16 +49,15 @@ export interface TaeglichesLager {
     verbrauch: number              // Produktion verbraucht
     endBestand: number             // Bestand zu Tagesende
     
-    // SICHERHEIT & STATUS
-    sicherheitsbestand: number     // Immer 0 (keine Sicherheitsbestände gemäß Anforderung)
-    verfuegbarBestand: number      // endBestand (= verfügbar, da kein Safety Stock)
+    // STATUS
+    verfuegbarBestand: number      // endBestand (verfügbar für Produktion)
     reichweiteTage: number         // Wie lange reicht der Bestand?
     status: 'ok' | 'niedrig' | 'kritisch' | 'negativ'
     
     // ATP CHECK
     atpCheck: {
       benoetigt: number            // Heute benötigt
-      verfuegbar: number           // Tatsächlich verfügbar (= endBestand, kein Safety Stock)
+      verfuegbar: number           // Tatsächlich verfügbar
       erfuellt: boolean            // Kann produziert werden?
       grund?: string               // Falls nicht erfüllt: Warum?
     }
@@ -166,8 +145,8 @@ function gruppiereBestellungenNachAnkunft(
  * Berechnet realistische Lagerbestandsentwicklung über das ganze Jahr
  * 
  * ABLAUF:
- * 1. Generiere inbound orders mit 49 Tagen Vorlauf (Start ~Mitte Oktober 2026)
- * 2. Initialisiere Lagerbestände mit ZERO oder minimalem Puffer
+ * 1. Generiere Inbound-Bestellungen mit 49 Tage Vorlauf (Start Mitte Oktober 2026)
+ * 2. Initialisiere Lagerbestände mit 0
  * 3. Simuliere jeden Tag:
  *    a) Buche eingehende Lieferungen (LOT-BASED!)
  *    b) ATP-Check: Ist Material für Produktion verfügbar?
@@ -177,14 +156,12 @@ function gruppiereBestellungenNachAnkunft(
  * @param konfiguration - System-Konfiguration
  * @param variantenProduktionsplaene - Tägliche Produktionspläne aller Varianten
  * @param zusatzBestellungen - Optionale manuelle Zusatzbestellungen
- * @param initialBestand - Initial-Bestand pro Bauteil (default: 0 = realistisch)
  * @returns WarehouseJahresResult mit detaillierter Tages-Bestandsführung
  */
 export function berechneIntegriertesWarehouse(
   konfiguration: KonfigurationData,
   variantenProduktionsplaene: Record<string, { tage: TagesProduktionEntry[] }>,
-  zusatzBestellungen: TaeglicheBestellung[] = [],
-  initialBestand: Record<string, number> = {}
+  zusatzBestellungen: TaeglicheBestellung[] = []
 ): WarehouseJahresResult {
   
   const warnungen: string[] = []
@@ -229,45 +206,24 @@ export function berechneIntegriertesWarehouse(
   const lieferungenProTag = gruppiereBestellungenNachAnkunft(bestellungen)
   
   // ═══════════════════════════════════════════════════════════════════════════════
-  // STEP 2: INITIALISIERE LAGERBESTÄNDE
+  // STEP 2: INITIALISIERE LAGERBESTÄNDE MIT 0
   // ═══════════════════════════════════════════════════════════════════════════════
   
   const bauteile = konfiguration.bauteile
   const aktuelleBestaende: Record<string, number> = {}
   
-  // ✅ VALIDIERT: Anfangsbestände auf 0 gesetzt (keine imaginären Bestände!)
-  // 
-  // Anforderung: Tag 1-3 (01.01.2027 - 03.01.2027) haben KEINE Anfangsbestände!
-  // - Erste Lieferung: Tag 4 (04.01.2027) mit 500 Sätteln
-  // - Vorlaufzeit: 49 Tage → Bestellung muss im November 2026 gestartet werden
-  // - Keine Lageranhäufung vor Produktionsstart
-  // 
-  // WICHTIG: Der Parameter 'initialBestand' erlaubt manuelle Überschreibung
-  // für Szenario-Tests, aber DEFAULT = 0!
+  // Start mit 0 Lagerbestand (keine imaginären Anfangsbestände)
+  // Anforderung: Tag 1-3 (01.01.-03.01.2027) haben KEINE Anfangsbestände
+  // Erste Lieferung: Tag 4 (04.01.2027) mit 500 Sätteln
+  // Vorlaufzeit: 49 Tage → Bestellung muss im November 2026 gestartet werden
   bauteile.forEach(bauteil => {
-    if (initialBestand[bauteil.id] !== undefined) {
-      aktuelleBestaende[bauteil.id] = initialBestand[bauteil.id]
-    } else {
-      // DEFAULT: Start with ZERO inventory (realistic!)
-      // First deliveries should arrive BEFORE production starts
-      aktuelleBestaende[bauteil.id] = 0
-    }
+    aktuelleBestaende[bauteil.id] = 0
   })
   
   console.log(`📦 Initial-Bestand (Tag 1):`, aktuelleBestaende)
   
   // ═══════════════════════════════════════════════════════════════════════════════
-  // STEP 3: KEINE SICHERHEITSBESTÄNDE (gemäß Anforderung)
-  // ═══════════════════════════════════════════════════════════════════════════════
-  
-  // ✅ FIXED: Sicherheitsbestände wurden komplett entfernt
-  // Begründung: Anforderung "kein Sicherheitsbestand und keine Lageranhäufung"
-  // ATP-Check erfolgt nun direkt auf Lagerbestand ohne Safety-Buffer
-  
-  console.log(`🛡️ Sicherheitsbestände: NICHT VERWENDET (gemäß Anforderung)`)
-  
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // STEP 4: SIMULIERE JEDEN TAG (inkl. Vorjahr für Vorlauf-Bestellungen)
+  // STEP 3: SIMULIERE JEDEN TAG (inkl. Vorjahr für Vorlauf-Bestellungen)
   // ═══════════════════════════════════════════════════════════════════════════════
   
   const tageErgebnisse: TaeglichesLager[] = []
@@ -317,7 +273,7 @@ export function berechneIntegriertesWarehouse(
     const tagImJahr = Math.floor((aktuellesDatum.getTime() - jahresAnfang.getTime()) / (1000 * 60 * 60 * 24)) + 1
     
     // ═════════════════════════════════════════════════════════════════════════════
-    // STEP 4a: BUCHE EINGEHENDE LIEFERUNGEN (LOT-BASED!)
+    // STEP 3a: BUCHE EINGEHENDE LIEFERUNGEN (LOT-BASED!)
     // ═════════════════════════════════════════════════════════════════════════════
     
     const heutigeLieferungen = lieferungenProTag.get(datumStr) || []
@@ -349,7 +305,7 @@ export function berechneIntegriertesWarehouse(
       aktuelleBestaende[bauteilId] += zugang
       
       // ═══════════════════════════════════════════════════════════════════════════
-      // STEP 4b: BERECHNE VERBRAUCH (nur an Arbeitstagen mit Produktion)
+      // STEP 3b: BERECHNE VERBRAUCH (nur an Arbeitstagen mit Produktion)
       // ═══════════════════════════════════════════════════════════════════════════
       
       let verbrauch = 0
@@ -374,11 +330,10 @@ export function berechneIntegriertesWarehouse(
         })
         
         // ═════════════════════════════════════════════════════════════════════════
-        // STEP 4c: ATP-CHECK (Available-to-Promise)
+        // STEP 3c: ATP-CHECK (Available-to-Promise)
         // ═════════════════════════════════════════════════════════════════════════
         
-        // ✅ FIXED: Direkter Check auf Lagerbestand (OHNE Sicherheitsbestand)
-        // Begründung: Anforderung "kein Sicherheitsbestand"
+        // Direkter Check auf Lagerbestand
         const verfuegbarFuerProduktion = aktuelleBestaende[bauteilId]
         
         if (benoetigt > verfuegbarFuerProduktion) {
@@ -409,11 +364,11 @@ export function berechneIntegriertesWarehouse(
       }
       
       // ═══════════════════════════════════════════════════════════════════════════
-      // STEP 4d: BERECHNE ENDBESTAND & STATUS
+      // STEP 3d: BERECHNE ENDBESTAND & STATUS
       // ═══════════════════════════════════════════════════════════════════════════
       
       const endBestand = aktuelleBestaende[bauteilId]
-      const verfuegbarBestand = endBestand // ✅ FIXED: Keine Sicherheitsbestände mehr
+      const verfuegbarBestand = endBestand
       
       // Reichweite berechnen
       const durchschnittVerbrauchProTag = gesamtVerbrauch / Math.max(1, tagIndex)
@@ -421,7 +376,7 @@ export function berechneIntegriertesWarehouse(
         ? endBestand / durchschnittVerbrauchProTag 
         : 999
       
-      // Status bestimmen (ohne Sicherheitsbestand)
+      // Status bestimmen
       let status: 'ok' | 'niedrig' | 'kritisch' | 'negativ' = 'ok'
       
       if (endBestand < 0) {
@@ -442,7 +397,7 @@ export function berechneIntegriertesWarehouse(
       maximalBestand = Math.max(maximalBestand, endBestand)
       
       // ═══════════════════════════════════════════════════════════════════════════
-      // STEP 4e: SPEICHERE TAGES-DETAILS
+      // STEP 3e: SPEICHERE TAGES-DETAILS
       // ═══════════════════════════════════════════════════════════════════════════
       
       bauteileHeuteDetails.push({
@@ -452,7 +407,6 @@ export function berechneIntegriertesWarehouse(
         zugang,
         verbrauch,
         endBestand,
-        sicherheitsbestand: 0, // ✅ FIXED: Immer 0 (keine Sicherheitsbestände)
         verfuegbarBestand,
         reichweiteTage: Math.round(reichweiteTage * 10) / 10,
         status,
@@ -482,7 +436,7 @@ export function berechneIntegriertesWarehouse(
   }
   
   // ═══════════════════════════════════════════════════════════════════════════════
-  // STEP 5: BERECHNE JAHRESSTATISTIK
+  // STEP 4: BERECHNE JAHRESSTATISTIK
   // ═══════════════════════════════════════════════════════════════════════════════
   
   const anzahlTage = tageErgebnisse.length
@@ -556,7 +510,6 @@ export function konvertiereWarehouseZuExport(result: WarehouseJahresResult) {
         [`${prefix}_Zugang`]: bauteil.zugang,
         [`${prefix}_Verbrauch`]: bauteil.verbrauch,
         [`${prefix}_EndBestand`]: bauteil.endBestand,
-        [`${prefix}_Sicherheit`]: bauteil.sicherheitsbestand,
         [`${prefix}_Verfuegbar`]: bauteil.verfuegbarBestand,
         [`${prefix}_Reichweite`]: bauteil.reichweiteTage,
         [`${prefix}_Status`]: bauteil.status,
