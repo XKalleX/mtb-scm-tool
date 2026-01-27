@@ -111,7 +111,7 @@ export function bucheMaterialEin(
 ): void {
   Object.entries(komponenten).forEach(([kompId, menge]) => {
     if (!lagerbestaende[kompId]) {
-      // Initialisiere Lagerbestand
+      // Initialisiere Lagerbestand (Start bei 0)
       lagerbestaende[kompId] = {
         komponentenId: kompId,
         bestand: 0,

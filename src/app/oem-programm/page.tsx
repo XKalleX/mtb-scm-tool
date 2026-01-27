@@ -743,7 +743,7 @@ export default function OEMProgrammPage() {
                     ]}
                     data={(() => {
                       let kumulativPlan = 0
-                      // ✅ FIX: Zeige ALLE Tage (inkl. Wochenenden/Feiertage)
+                      // Zeige ALLE Tage (inkl. Wochenenden/Feiertage)
                       return produktionsplaene[selectedVariante]?.tage
                         ?.map(tag => {
                           const date = tag.datum
@@ -755,7 +755,7 @@ export default function OEMProgrammPage() {
                           
                           kumulativPlan += tag.planMenge
                           
-                          // ✅ FIX: Status für Wochenenden/Feiertage/Arbeitstage
+                          // Status für Wochenenden/Feiertage/Arbeitstage
                           let status = '🟢 Produktionstag'
                           const wochentag = date.getDay()
                           const istWochenende = wochentag === 0 || wochentag === 6
@@ -861,7 +861,7 @@ export default function OEMProgrammPage() {
 
               {/* Alle-Varianten Tabelle */}
               {produktionsplaene && (() => {
-                // ✅ FIX: Zeige ALLE Tage (inkl. Wochenenden/Feiertage)
+                // Zeige ALLE Tage (inkl. Wochenenden/Feiertage)
                 const referenzVariante = Object.values(produktionsplaene)[0]
                 const alleTage = referenzVariante.tage
                 
@@ -920,7 +920,7 @@ export default function OEMProgrammPage() {
                   }
                 ]
                 
-                // ✅ FIX: Erstelle Daten für ALLE Tage
+                // Erstelle Daten für ALLE Tage
                 const data = alleTage.map(refTag => {
                   const wochentag = refTag.datum.getDay()
                   const istWochenende = wochentag === 0 || wochentag === 6

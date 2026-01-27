@@ -111,7 +111,6 @@ export default function ProduktionPage() {
   // - Realistische lot-basierte Lieferungen (500 Stück, 49 Tage)
   // - Keine Verbrauch ab Tag 1 ohne Lieferung
   // - ATP-Checks vor jedem Verbrauch
-  // - Safety Stock enforcement
   // - Full OEM-Inbound-Warehouse Integration
   
   // Generiere Varianten-Produktionspläne für Warehouse
@@ -134,8 +133,7 @@ export default function ProduktionPage() {
     return berechneIntegriertesWarehouse(
       konfiguration,
       variantenProduktionsplaeneForWarehouse,
-      [], // Keine Zusatzbestellungen hier (TODO: Aus Inbound-Seite übernehmen)
-      {} // Initial-Bestand = 0 (realistisch!)
+      [] // Keine Zusatzbestellungen hier
     )
   }, [konfiguration, variantenProduktionsplaeneForWarehouse])
   
@@ -191,7 +189,6 @@ export default function ProduktionPage() {
         zugang: b.zugang,
         verbrauch: b.verbrauch,
         endBestand: b.endBestand,
-        // ✅ REMOVED: sicherheit & verfuegbar (nicht mehr in Tabelle verwendet)
         reichweite: b.reichweiteTage,
         status: mapStatus(b.status)
       }))
@@ -202,8 +199,7 @@ export default function ProduktionPage() {
   const warehouseStats = warehouseResult.jahresstatistik
   
   // Berechne Produktionsstatistiken dynamisch (szenario-aware)
-  // ✅ FIX: Nutze tagesProduktion (istMenge) als korrekte Produktionszahl
-  //    Die ist bereits mit Error Management berechnet und = 370.000 Bikes
+  // Nutze tagesProduktion (istMenge) als korrekte Produktionszahl
   const produktionsStats = useMemo(() => {
     // ✅ KORREKT: Berechne echte Ist-Produktion aus tagesProduktion (NICHT aus backlogErgebnis!)
     // Die tagesProduktion hat bereits Error Management eingebaut und zeigt exakt 370.000
@@ -696,8 +692,6 @@ export default function ProduktionPage() {
                   format: (val) => formatNumber(val, 0),
                   sumable: false
                 },
-                // ✅ REMOVED: Sicherheit Spalte (Sicherheitsbestand = 0 gemäß Anforderung)
-                // ✅ REMOVED: Verfügbar (ATP) Spalte (redundant da Sicherheit = 0, verfuegbar = endBestand)
                 {
                   key: 'reichweite',
                   label: 'Reichweite',
@@ -730,7 +724,6 @@ export default function ProduktionPage() {
                   zugang: bauteil.zugang,
                   verbrauch: bauteil.verbrauch,
                   endBestand: bauteil.endBestand,
-                  // ✅ REMOVED: sicherheit & verfuegbar (Sicherheitsbestand = 0)
                   reichweite: bauteil.reichweite,
                   status: bauteil.status
                 }))

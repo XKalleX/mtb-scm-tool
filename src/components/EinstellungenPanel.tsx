@@ -499,17 +499,7 @@ export function EinstellungenPanel() {
                   />
                 </div>
 
-                {/* 
-                  ✅ FIX: Number Input Leading Zeros Prevention
-                  
-                  Pattern: value={field ?? ''} statt value={field ?? 0}
-                  Grund: Verhindert führende Nullen beim Tippen (z.B. "01" statt "1")
-                  
-                  Type Safety: HTML Input value prop akzeptiert string | number | readonly string[]
-                  Der Browser konvertiert automatisch zwischen String und Number bei type="number"
-                  
-                  onChange: Explizite Behandlung von leeren Strings → 0
-                */}
+                {/* Number Input Pattern: value={field ?? ''} prevents leading zeros */}
 
                 <div className="space-y-2">
                   <Label>Vorlaufzeit Arbeitstage (Produktion)</Label>

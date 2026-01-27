@@ -856,7 +856,7 @@ function SupplyChainDashboard({
   
   // Basis-Lagerwert für Sättel
   const basisLagerSaettel = useMemo(() => {
-    // Durchschnittlicher Bedarf pro Tag * Vorlaufzeit als Sicherheitsbestand
+    // Durchschnittlicher Bedarf pro Tag * Vorlaufzeit als Basiswert
     const tagesBedarf = konfiguration.jahresproduktion / 365
     return Math.round(tagesBedarf * konfiguration.lieferant.gesamtVorlaufzeitTage / 2)
   }, [konfiguration])
