@@ -250,30 +250,14 @@ export function berechneIntegriertesWarehouse(
   console.log(`📦 Initial-Bestand:`, aktuelleBestaende)
   
   // ═══════════════════════════════════════════════════════════════════════════════
-  // STEP 3: BERECHNE SICHERHEITSBESTÄNDE (7 Tage Bedarf)
+  // STEP 3: SICHERHEITSBESTÄNDE (auf 0 gesetzt gemäß Anforderung)
   // ═══════════════════════════════════════════════════════════════════════════════
   
   const sicherheitsbestaende: Record<string, number> = {}
   
-  // Berechne Jahresbedarf pro Bauteil
+  // Sicherheitsbestand = 0 für alle Bauteile
+  // Gemäß Anforderung: "kein Sicherheitsbestand und keine Lageranhäufung"
   bauteile.forEach(bauteil => {
-    let jahresbedarf = 0
-    
-    konfiguration.stueckliste.forEach(position => {
-      if (position.bauteilId === bauteil.id) {
-        // Finde Varianten-Produktion
-        const variante = konfiguration.varianten.find(v => v.id === position.mtbVariante)
-        if (variante) {
-          const variantenJahresproduktion = Math.round(
-            konfiguration.jahresproduktion * variante.anteilPrognose
-          )
-          jahresbedarf += variantenJahresproduktion * position.menge
-        }
-      }
-    })
-    
-    // Sicherheitsbestand = 0 (gemäß Anforderung: "kein Sicherheitsbestand und keine Lageranhäufung")
-    // Die Produktion beginnt am ersten Produktionstag ohne Puffer
     sicherheitsbestaende[bauteil.id] = 0
   })
   

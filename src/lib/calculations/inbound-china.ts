@@ -458,28 +458,24 @@ export function generiereTaeglicheBestellungen(
       const bestellMengeGesamt = anzahlLose * LOSGROESSE
       
       // Verteile die Bestellmenge proportional auf alle Komponenten
-      // Jede Komponente bekommt ihren Anteil der Bestellung
-      const anteile: Record<string, number> = {}
-      let anteilSumme = 0
-      alleKomponenten.forEach(kompId => {
-        anteile[kompId] = offeneMengen[kompId] / gesamtOffeneMenge
-        anteilSumme += anteile[kompId]
-      })
-      
-      // Verteile Bestellmenge proportional
+      // Jede Komponente bekommt ihren Anteil der Bestellung (maximal die offene Menge)
       let verteilt = 0
       const komponentenArray = Array.from(alleKomponenten)
       komponentenArray.forEach((kompId, idx) => {
         if (idx === komponentenArray.length - 1) {
           // Letzte Komponente bekommt den Rest (vermeidet Rundungsfehler)
-          bestellKomponenten[kompId] = bestellMengeGesamt - verteilt
+          const rest = bestellMengeGesamt - verteilt
+          bestellKomponenten[kompId] = Math.min(rest, offeneMengen[kompId])
+          verteilt += bestellKomponenten[kompId]
         } else {
-          const anteil = Math.round(bestellMengeGesamt * anteile[kompId])
-          bestellKomponenten[kompId] = anteil
-          verteilt += anteil
+          // Proportionaler Anteil, maximal die offene Menge
+          const anteil = offeneMengen[kompId] / gesamtOffeneMenge
+          const menge = Math.min(Math.round(bestellMengeGesamt * anteil), offeneMengen[kompId])
+          bestellKomponenten[kompId] = menge
+          verteilt += menge
         }
         // Reduziere offene Menge um bestellte Menge
-        offeneMengen[kompId] = Math.max(0, offeneMengen[kompId] - bestellKomponenten[kompId])
+        offeneMengen[kompId] -= bestellKomponenten[kompId]
       })
     }
     
