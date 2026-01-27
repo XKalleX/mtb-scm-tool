@@ -307,6 +307,11 @@ export function berechneBedarfsBacklog(
   // Losgröße aus Lieferant-Konfiguration
   const LOSGROESSE = konfiguration.lieferant.losgroesse // 500 Sättel
   
+  // Validierung: Losgröße muss > 0 sein (verhindert Division by Zero)
+  if (LOSGROESSE <= 0) {
+    throw new Error(`Ungültige Losgröße: ${LOSGROESSE}. Muss größer als 0 sein.`)
+  }
+  
   // Ergebnis-Struktur
   const ergebnis: BedarfsBacklogErgebnis = {
     komponenten: {},
