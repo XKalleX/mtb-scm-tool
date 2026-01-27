@@ -29,8 +29,9 @@ import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { DeltaCell, DeltaBadge } from '@/components/DeltaCell'
 import { useMemo, useState, useCallback } from 'react'
-import { generiereAlleVariantenProduktionsplaene } from '@/lib/calculations/zentrale-produktionsplanung'
+import { generiereAlleVariantenProduktionsplaene, type TagesProduktionEntry } from '@/lib/calculations/zentrale-produktionsplanung'
 import { generiereTaeglicheBestellungen, erstelleZusatzbestellung, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
+import { berechneBedarfsBacklog, type BedarfsBacklogErgebnis } from '@/lib/calculations/bedarfs-backlog-rechnung'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { istDeutschlandFeiertag, ladeDeutschlandFeiertage } from '@/lib/kalender'
 import { isWeekend } from '@/lib/utils'
@@ -154,6 +155,17 @@ export default function InboundPage() {
       lieferant.gesamtVorlaufzeitTage // Fixe Vorlaufzeit aus Konfiguration (49 Tage)
     )
   }, [produktionsplaeneFormatiert, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage])
+  
+  // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung mit dem neuen System
+  // Zeigt für jeden Tag: Bedarf, Backlog, Bestellung, Materialverfügbarkeit
+  const backlogErgebnis = useMemo(() => {
+    // Konvertiere Produktionspläne zum richtigen Format (TagesProduktionEntry[])
+    const plaeneAlsEntries: Record<string, TagesProduktionEntry[]> = {}
+    Object.entries(produktionsplaene).forEach(([varianteId, plan]) => {
+      plaeneAlsEntries[varianteId] = plan.tage
+    })
+    return berechneBedarfsBacklog(plaeneAlsEntries, konfiguration)
+  }, [produktionsplaene, konfiguration])
   
   // ✅ Kombiniere generierte + Zusatzbestellungen
   const taeglicheBestellungen = useMemo(() => {
@@ -549,31 +561,37 @@ export default function InboundPage() {
 
             <Card className="bg-white">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Vorjahr (2026)</CardTitle>
+                <CardTitle className="text-sm font-medium">Liefertreue</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{bestellStatistik.vorjahr}</div>
-                <p className="text-xs text-muted-foreground">Vorlauf-Bestellungen</p>
+                <div className={`text-2xl font-bold ${backlogErgebnis.gesamtstatistik.liefertreue >= 95 ? 'text-green-600' : backlogErgebnis.gesamtstatistik.liefertreue >= 85 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  {formatNumber(backlogErgebnis.gesamtstatistik.liefertreue, 1)}%
+                </div>
+                <p className="text-xs text-muted-foreground">Produziert / Bedarf</p>
               </CardContent>
             </Card>
 
             <Card className="bg-white">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Planungsjahr {konfiguration.planungsjahr}</CardTitle>
+                <CardTitle className="text-sm font-medium">Ø Backlog</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{bestellStatistik.planungsjahr}</div>
-                <p className="text-xs text-muted-foreground">Laufende Bestellungen</p>
+                <div className={`text-2xl font-bold ${backlogErgebnis.gesamtstatistik.durchschnittlicherBacklog < 250 ? 'text-green-600' : 'text-orange-600'}`}>
+                  {formatNumber(backlogErgebnis.gesamtstatistik.durchschnittlicherBacklog, 0)}
+                </div>
+                <p className="text-xs text-muted-foreground">Sättel nicht sofort bestellt</p>
               </CardContent>
             </Card>
 
             <Card className="bg-white">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Gesamt-Menge</CardTitle>
+                <CardTitle className="text-sm font-medium">Engpass-Quote</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatNumber(bestellStatistik.gesamtMenge, 0)}</div>
-                <p className="text-xs text-muted-foreground">Sättel bestellt</p>
+                <div className={`text-2xl font-bold ${backlogErgebnis.gesamtstatistik.engpassQuote < 10 ? 'text-green-600' : backlogErgebnis.gesamtstatistik.engpassQuote < 20 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  {formatNumber(backlogErgebnis.gesamtstatistik.engpassQuote, 1)}%
+                </div>
+                <p className="text-xs text-muted-foreground">Tage mit Material-Engpass</p>
               </CardContent>
             </Card>
           </div>
@@ -582,7 +600,8 @@ export default function InboundPage() {
           <div className="bg-white rounded-lg p-4">
             <h3 className="text-lg font-semibold mb-2">Tägliche Bestelllogik (Daily Ordering)</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Gemäß PDF-Anforderung: Tägliche Bedarfsermittlung + Bestellung bei Losgröße {lieferant.losgroesse}
+              Gemäß PDF-Anforderung: Tägliche Bedarfsermittlung + Bestellung bei Losgröße {lieferant.losgroesse}. 
+              Backlog akkumuliert wenn Losgröße nicht erreicht wird.
             </p>
 
             {/* ✅ NEU: Zusatzbestellungs-Formular */}

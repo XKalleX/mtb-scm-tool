@@ -443,20 +443,41 @@ export function generiereTaeglicheBestellungen(
     }
     
     // Prüfe ob Bestellung ausgelöst werden muss (Losgröße erreicht)
+    // WICHTIG: Losgröße gilt für GESAMTMENGE aller Sättel, nicht pro Komponente!
+    // Am 04.01.2027 brauchen wir 740 Sättel gesamt (222 FT + 111 RL + 74 SP + ...) 
+    // → 740 >= 500 Losgröße → Bestellung auslösen!
+    const gesamtOffeneMenge = Array.from(alleKomponenten).reduce((sum, k) => sum + offeneMengen[k], 0)
+    
     let sollBestellen = false
     const bestellKomponenten: Record<string, number> = {}
     
-    alleKomponenten.forEach(kompId => {
-      // Bestelle wenn Losgröße erreicht (exakt, kein Aufrunden über Bedarf!)
-      if (offeneMengen[kompId] >= LOSGROESSE) {
-        sollBestellen = true
-        // Bestelle nur ganze Lose, behalte Rest für nächste Bestellung
-        const anzahlLose = Math.floor(offeneMengen[kompId] / LOSGROESSE)
-        const bestellMenge = anzahlLose * LOSGROESSE
-        bestellKomponenten[kompId] = bestellMenge
-        offeneMengen[kompId] -= bestellMenge // Rest bleibt für nächste Bestellung
-      }
-    })
+    if (gesamtOffeneMenge >= LOSGROESSE) {
+      sollBestellen = true
+      // Berechne wie viele ganze Lose bestellt werden können
+      const anzahlLose = Math.floor(gesamtOffeneMenge / LOSGROESSE)
+      const bestellMengeGesamt = anzahlLose * LOSGROESSE
+      
+      // Verteile die Bestellmenge proportional auf alle Komponenten
+      // Jede Komponente bekommt ihren Anteil der Bestellung (maximal die offene Menge)
+      let verteilt = 0
+      const komponentenArray = Array.from(alleKomponenten)
+      komponentenArray.forEach((kompId, idx) => {
+        if (idx === komponentenArray.length - 1) {
+          // Letzte Komponente bekommt den Rest (vermeidet Rundungsfehler)
+          const rest = bestellMengeGesamt - verteilt
+          bestellKomponenten[kompId] = Math.min(rest, offeneMengen[kompId])
+          verteilt += bestellKomponenten[kompId]
+        } else {
+          // Proportionaler Anteil, maximal die offene Menge
+          const anteil = offeneMengen[kompId] / gesamtOffeneMenge
+          const menge = Math.min(Math.round(bestellMengeGesamt * anteil), offeneMengen[kompId])
+          bestellKomponenten[kompId] = menge
+          verteilt += menge
+        }
+        // Reduziere offene Menge um bestellte Menge
+        offeneMengen[kompId] -= bestellKomponenten[kompId]
+      })
+    }
     
     if (sollBestellen) {
       const bestelldatum = new Date(aktuellerTag)

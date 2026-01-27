@@ -30,11 +30,13 @@ import {
   generiereTagesproduktion, 
   berechneLagerbestaende,
   berechneProduktionsStatistiken,
-  berechneTagesLagerbestaende
+  berechneTagesLagerbestaende,
+  generiereAlleVariantenProduktionsplaene,
+  type TagesProduktionEntry
 } from '@/lib/calculations/zentrale-produktionsplanung'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport } from '@/lib/calculations/warehouse-management'
-import { generiereAlleVariantenProduktionsplaene } from '@/lib/calculations/zentrale-produktionsplanung'
+import { berechneBedarfsBacklog } from '@/lib/calculations/bedarfs-backlog-rechnung'
 
 /**
  * Produktion Hauptseite
@@ -118,6 +120,16 @@ export default function ProduktionPage() {
     return generiereAlleVariantenProduktionsplaene(konfiguration)
   }, [konfiguration])
   
+  // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung für korrekte Abweichungen
+  // Zeigt die tatsächliche Produktion basierend auf Materialverfügbarkeit
+  const backlogErgebnis = useMemo(() => {
+    const plaeneAlsEntries: Record<string, TagesProduktionEntry[]> = {}
+    Object.entries(variantenProduktionsplaeneForWarehouse).forEach(([varianteId, plan]) => {
+      plaeneAlsEntries[varianteId] = plan.tage
+    })
+    return berechneBedarfsBacklog(plaeneAlsEntries, konfiguration)
+  }, [variantenProduktionsplaeneForWarehouse, konfiguration])
+  
   // ✅ INTEGRIERTES WAREHOUSE: Realistische Bestandsführung
   const warehouseResult = useMemo(() => {
     return berechneIntegriertesWarehouse(
@@ -169,21 +181,36 @@ export default function ProduktionPage() {
   const warehouseStats = warehouseResult.jahresstatistik
   
   // Berechne Produktionsstatistiken dynamisch (szenario-aware)
+  // ✅ NEU: Nutze Backlog-Ergebnis für korrekte Abweichungen
   const produktionsStats = useMemo(() => {
+    // Berechne echte Abweichung aus Backlog-System
+    const backlogStats = backlogErgebnis.gesamtstatistik
+    const echteFehlmenge = backlogStats.totalFehlmenge
+    const echteProduziert = backlogStats.totalProduziert
+    const echteEngpassTage = Math.round(backlogStats.engpassQuote * 3.65) // 365 * (quote / 100)
+    
     if (hasSzenarien) {
       return {
         geplant: statistiken.geplant,
-        produziert: statistiken.produziert,
-        abweichung: statistiken.abweichung,
-        planerfuellungsgrad: statistiken.planerfuellungsgrad,
+        produziert: echteProduziert, // Nutze Backlog-Wert
+        abweichung: -echteFehlmenge, // Negativ = weniger produziert
+        planerfuellungsgrad: backlogStats.liefertreue,
         arbeitstage: statistiken.arbeitstage,
         schichtenGesamt: statistiken.schichtenGesamt,
-        mitMaterialmangel: statistiken.mitMaterialmangel,
+        mitMaterialmangel: echteEngpassTage,
         auslastung: statistiken.auslastung
       }
     }
-    return berechneProduktionsStatistiken(tagesProduktion)
-  }, [tagesProduktion, hasSzenarien, statistiken])
+    
+    const baseStats = berechneProduktionsStatistiken(tagesProduktion)
+    return {
+      ...baseStats,
+      produziert: echteProduziert,
+      abweichung: -echteFehlmenge,
+      planerfuellungsgrad: backlogStats.liefertreue,
+      mitMaterialmangel: echteEngpassTage
+    }
+  }, [tagesProduktion, hasSzenarien, statistiken, backlogErgebnis])
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
@@ -340,6 +367,51 @@ export default function ProduktionPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ✅ NEU: Backlog-System Hinweis */}
+      <CollapsibleInfo
+        title="📊 Backlog-System: Material-Engpässe durch Losgrößen"
+        variant="warning"
+        icon={<AlertTriangle className="h-5 w-5" />}
+        defaultOpen={true}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-orange-800">
+            <strong>Losgrößen-basierte Bestellungen führen zu temporären Engpässen!</strong> Da Bestellungen nur in Vielfachen von 500 Stück erfolgen, entsteht ein Backlog bis die Losgröße erreicht ist.
+          </p>
+          
+          <div className="grid md:grid-cols-4 gap-4">
+            <div className="bg-white border border-orange-200 rounded p-3">
+              <div className="text-xs text-orange-600">Liefertreue</div>
+              <div className={`text-xl font-bold ${backlogErgebnis.gesamtstatistik.liefertreue >= 95 ? 'text-green-600' : backlogErgebnis.gesamtstatistik.liefertreue >= 85 ? 'text-yellow-600' : 'text-red-600'}`}>
+                {formatNumber(backlogErgebnis.gesamtstatistik.liefertreue, 1)}%
+              </div>
+            </div>
+            <div className="bg-white border border-orange-200 rounded p-3">
+              <div className="text-xs text-orange-600">Ø Backlog</div>
+              <div className="text-xl font-bold text-orange-700">
+                {formatNumber(backlogErgebnis.gesamtstatistik.durchschnittlicherBacklog, 0)} Stk
+              </div>
+            </div>
+            <div className="bg-white border border-orange-200 rounded p-3">
+              <div className="text-xs text-orange-600">Engpass-Quote</div>
+              <div className="text-xl font-bold text-orange-700">
+                {formatNumber(backlogErgebnis.gesamtstatistik.engpassQuote, 1)}%
+              </div>
+            </div>
+            <div className="bg-white border border-orange-200 rounded p-3">
+              <div className="text-xs text-orange-600">Bestellungen</div>
+              <div className="text-xl font-bold text-blue-700">
+                {formatNumber(backlogErgebnis.gesamtstatistik.anzahlBestellungen, 0)}
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-xs text-orange-700 bg-orange-50 p-2 rounded">
+            <strong>Hinweis:</strong> Die ersten ~49 Tage haben Material-Engpässe, da die erste Bestellung 49 Tage Vorlaufzeit benötigt. Dies ist realistisch und entspricht der Anforderung.
+          </div>
+        </div>
+      </CollapsibleInfo>
 
       {/* ✅ NEUES WAREHOUSE SYSTEM BANNER */}
       <CollapsibleInfo
