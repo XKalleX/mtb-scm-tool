@@ -26,7 +26,6 @@ import {
   generiereAlleVariantenProduktionsplaene,
   berechneLagerbestaende,
   berechneProduktionsStatistiken,
-  berechneTagesLagerbestaende,
   berechneSaisonaleVerteilung
 } from './zentrale-produktionsplanung'
 

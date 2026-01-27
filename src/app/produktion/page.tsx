@@ -30,7 +30,6 @@ import {
   generiereTagesproduktion, 
   berechneLagerbestaende,
   berechneProduktionsStatistiken,
-  berechneTagesLagerbestaende,
   generiereAlleVariantenProduktionsplaene,
   type TagesProduktionEntry
 } from '@/lib/calculations/zentrale-produktionsplanung'
@@ -191,7 +190,8 @@ export default function ProduktionPage() {
   const warehouseStats = warehouseResult.jahresstatistik
   
   // Berechne Produktionsstatistiken dynamisch (szenario-aware)
-  // ✅ NEU: Nutze Backlog-Ergebnis für korrekte Abweichungen
+  // ✅ KORRIGIERT: OEM Planung (planMenge) ist immer 370.000, 
+  //    nur die IST-Produktion (istMenge) kann durch Materialengpass reduziert sein
   const produktionsStats = useMemo(() => {
     // Berechne echte Abweichung aus Backlog-System
     const backlogStats = backlogErgebnis.gesamtstatistik
@@ -199,11 +199,15 @@ export default function ProduktionPage() {
     const echteProduziert = backlogStats.totalProduziert
     const echteEngpassTage = Math.round(backlogStats.engpassQuote * 3.65) // 365 * (quote / 100)
     
+    // ✅ FIX: Geplant = IMMER Jahresproduktion (370.000), egal ob Materialengpass
+    // Die Abweichung zeigt dann wie viel NICHT produziert werden konnte
+    const geplantMenge = konfiguration.jahresproduktion // 370.000 Bikes (immer!)
+    
     if (hasSzenarien) {
       return {
-        geplant: statistiken.geplant,
-        produziert: echteProduziert, // Nutze Backlog-Wert
-        abweichung: -echteFehlmenge, // Negativ = weniger produziert
+        geplant: geplantMenge, // ✅ IMMER 370.000 (aus OEM Planung)
+        produziert: echteProduziert, // Tatsächlich produziert (kann kleiner sein)
+        abweichung: echteProduziert - geplantMenge, // Negativ = Fehlmenge
         planerfuellungsgrad: backlogStats.liefertreue,
         arbeitstage: statistiken.arbeitstage,
         schichtenGesamt: statistiken.schichtenGesamt,
@@ -215,12 +219,13 @@ export default function ProduktionPage() {
     const baseStats = berechneProduktionsStatistiken(tagesProduktion)
     return {
       ...baseStats,
-      produziert: echteProduziert,
-      abweichung: -echteFehlmenge,
+      geplant: geplantMenge, // ✅ IMMER 370.000 (OEM Planung ist fix!)
+      produziert: echteProduziert, // Tatsächlich produziert
+      abweichung: echteProduziert - geplantMenge, // Abweichung (negativ = Fehlmenge)
       planerfuellungsgrad: backlogStats.liefertreue,
       mitMaterialmangel: echteEngpassTage
     }
-  }, [tagesProduktion, hasSzenarien, statistiken, backlogErgebnis])
+  }, [tagesProduktion, hasSzenarien, statistiken, backlogErgebnis, konfiguration.jahresproduktion])
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
@@ -620,8 +625,8 @@ export default function ProduktionPage() {
             <FormulaCard
               title="Lagerbewegung (Tagesbasis)"
               formula="Endbestand = Anfangsbestand + Zugänge - Verbrauch, wobei Verbrauch = Σ(Produktion × Stücklistenmenge) für alle Varianten"
-              description={`Simuliert tägliche Lagerbewegungen über 365 Tage. Zugänge: Vereinfacht als konstante Nachlieferung (Tagesbedarf × 1,1). In Realität: Inbound-Logik mit Losgrößen 500 und Vorlaufzeit 49 Tage. Verbrauch: Berechnet aus Tagesproduktion und Stückliste (1:1). Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion berechneTagesLagerbestaende() → Komplette Tages-Simulation. Anfangsbestand: 35% des Jahresbedarfs am 01.01.2027.`}
-              example={`Tag 100 (Arbeitstag): Fizik Tundra Anfangsbestand 50.000, Zugang +${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 / 365 * 1.1), 0)}, Verbrauch -${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)} → Endbestand ${formatNumber(50000 + Math.round(konfiguration.jahresproduktion * 0.52 / 365 * 1.1) - Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)}`}
+              description={`Simuliert tägliche Lagerbewegungen über 365 Tage mit realistischen Losgrößen (500 Stück) und 49 Tage Vorlaufzeit. Verbrauch: Berechnet aus Tagesproduktion und Stückliste (1:1). Code-Referenz: src/lib/calculations/warehouse-management.ts → Funktion berechneIntegriertesWarehouse() → Komplette Tages-Simulation. Anfangsbestand: 0 (Just-in-Time, erste Lieferung trifft rechtzeitig ein).`}
+              example={`Tag 100 (Arbeitstag): Fizik Tundra Anfangsbestand 2.000, Zugang +0 (keine Lieferung), Verbrauch -${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)} → Endbestand ${formatNumber(2000 - Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)}`}
             />
           </div>
 
@@ -701,30 +706,14 @@ export default function ProduktionPage() {
                   format: (val) => formatNumber(val, 0),
                   sumable: false
                 },
-                {
-                  key: 'sicherheit',
-                  label: 'Sicherheit',
-                  width: '90px',
-                  align: 'right',
-                  formula: '7 Tage Puffer',
-                  format: (val) => formatNumber(val, 0),
-                  sumable: false
-                },
-                {
-                  key: 'verfuegbar',
-                  label: 'Verfügbar (ATP)',
-                  width: '120px',
-                  align: 'right',
-                  formula: 'Endbestand - Sicherheit',
-                  format: (val) => formatNumber(val, 0),
-                  sumable: false
-                },
+                // ✅ REMOVED: Sicherheit Spalte (Sicherheitsbestand = 0 gemäß Anforderung)
+                // ✅ REMOVED: Verfügbar (ATP) Spalte (redundant da Sicherheit = 0, verfuegbar = endBestand)
                 {
                   key: 'reichweite',
                   label: 'Reichweite',
                   width: '90px',
                   align: 'right',
-                  formula: 'Verfügbar / Tagesbedarf',
+                  formula: 'Endbestand / Tagesbedarf',
                   format: (val) => formatNumber(val, 1) + ' Tage',
                   sumable: false
                 },
@@ -751,8 +740,7 @@ export default function ProduktionPage() {
                   zugang: bauteil.zugang,
                   verbrauch: bauteil.verbrauch,
                   endBestand: bauteil.endBestand,
-                  sicherheit: bauteil.sicherheit,
-                  verfuegbar: bauteil.verfuegbar,
+                  // ✅ REMOVED: sicherheit & verfuegbar (Sicherheitsbestand = 0)
                   reichweite: bauteil.reichweite,
                   status: bauteil.status
                 }))
@@ -765,8 +753,8 @@ export default function ProduktionPage() {
             
             <p className="text-xs text-green-600 mt-3">
               💡 <strong>Hinweis:</strong> Zeigt alle 365 Tage × 4 Komponenten = 1.460 Zeilen. 
-              Zugang vereinfacht als Tagesbedarf × 1,1 (In Realität: Inbound mit Losgrößen 500 + Vorlaufzeit 49 Tage).
-              Code-Referenz: src/lib/calculations/zentrale-produktionsplanung.ts → Funktion berechneTagesLagerbestaende()
+              <strong>✅ Realistische Bestandsführung:</strong> Losgröße 500 Stück, 49 Tage Vorlaufzeit, Anfangsbestand = 0.
+              Code-Referenz: src/lib/calculations/warehouse-management.ts → Funktion berechneIntegriertesWarehouse()
             </p>
           </div>
         </CardContent>
