@@ -313,14 +313,6 @@ export default function InboundPage() {
           grundFormatiert = '✓ Bestellung'
         }
         
-        // ✅ NEU: Aggregiere Komponenten-Details für alle Bestellungen
-        const komponentenAggregiert: Record<string, number> = {}
-        bestellungenFuerTag.forEach(b => {
-          Object.entries(b.komponenten).forEach(([kompId, menge]) => {
-            komponentenAggregiert[kompId] = (komponentenAggregiert[kompId] || 0) + menge
-          })
-        })
-        
         alleTage.push({
           bedarfsdatum,
           bedarfsdatumFormatiert,
@@ -331,11 +323,6 @@ export default function InboundPage() {
           vorlaufzeitFormatiert: `${vorlaufzeit} Tage`,
           menge: gesamtMenge,  // ✅ AGGREGIERTE MENGE!
           mengeFormatiert: formatNumber(gesamtMenge, 0) + ' Stk',
-          // ✅ NEU: Komponenten-Details einzeln
-          SAT_FT_bestellt: komponentenAggregiert['SAT_FT'] || 0,
-          SAT_RL_bestellt: komponentenAggregiert['SAT_RL'] || 0,
-          SAT_SP_bestellt: komponentenAggregiert['SAT_SP'] || 0,
-          SAT_SL_bestellt: komponentenAggregiert['SAT_SL'] || 0,
           grund: bestellung.grund,
           grundFormatiert,
           erwarteteAnkunft,
@@ -371,11 +358,6 @@ export default function InboundPage() {
           vorlaufzeitFormatiert: '-',
           menge: 0,
           mengeFormatiert: '-',
-          // ✅ NEU: Komponenten-Details für Tage ohne Bestellung = 0
-          SAT_FT_bestellt: 0,
-          SAT_RL_bestellt: 0,
-          SAT_SP_bestellt: 0,
-          SAT_SL_bestellt: 0,
           grund,
           grundFormatiert,
           erwarteteAnkunft: null,
@@ -697,7 +679,7 @@ export default function InboundPage() {
                     {
                       key: 'bedarfsdatumFormatiert',
                       label: 'Bedarfsdatum',
-                      width: '100px',
+                      width: '130px',
                       align: 'center',
                       sumable: false
                     },
@@ -715,39 +697,6 @@ export default function InboundPage() {
                       align: 'right',
                       sumable: true,
                       format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-'
-                    },
-                    // ✅ NEU: Komponenten-Details anzeigen
-                    {
-                      key: 'SAT_FT_bestellt',
-                      label: 'SAT_FT bestellt',
-                      width: '110px',
-                      align: 'right',
-                      sumable: true,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) : '-'
-                    },
-                    {
-                      key: 'SAT_RL_bestellt',
-                      label: 'SAT_RL bestellt',
-                      width: '110px',
-                      align: 'right',
-                      sumable: true,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) : '-'
-                    },
-                    {
-                      key: 'SAT_SP_bestellt',
-                      label: 'SAT_SP bestellt',
-                      width: '110px',
-                      align: 'right',
-                      sumable: true,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) : '-'
-                    },
-                    {
-                      key: 'SAT_SL_bestellt',
-                      label: 'SAT_SL bestellt',
-                      width: '110px',
-                      align: 'right',
-                      sumable: true,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) : '-'
                     },
                     {
                       key: 'grundFormatiert',

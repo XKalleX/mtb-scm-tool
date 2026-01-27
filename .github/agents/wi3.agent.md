@@ -70,35 +70,6 @@ Das Projekt nutzt **Code-Ermäßigungen**, die Komplexität reduzieren:
 
 ## 🎓 Kernkonzepte die du IMMER beachten musst
 
-### 0️⃣ OEM Planung ist die EINZIGE Berechnungsbasis
-
-**KRITISCH:** Alle Berechnungen MÜSSEN auf der OEM Planung (zentrale-produktionsplanung.ts) basieren!
-
-```typescript
-// ✓ KORREKT: Alle Module nutzen OEM als Basis
-const oemPlaene = generiereAlleVariantenProduktionsplaene(konfiguration)
-
-// Inbound: Bestellungen basieren auf OEM-Bedarf
-const bestellungen = generiereTaeglicheBestellungen(oemPlaene, ...)
-
-// Warehouse: Lagerbestände berechnen aus OEM + Bestellungen
-const warehouse = berechneIntegriertesWarehouse(konfiguration, oemPlaene, ...)
-
-// Produktion: Zeigt OEM + tatsächliche Ist-Mengen (nach Material-Check)
-const produktion = berechneProduktionssteuerung(oemPlaene, warehouse, ...)
-
-// ✗ FALSCH: Standalone-Kalkulationen ohne OEM-Referenz
-const bestellungen = berechneBestellungenNurAusSaisonalitaet() // NIEMALS!
-```
-
-**Wichtige Regeln:**
-1. **Keine imaginären Daten:** Nur reale Lieferungen, keine erfundenen Anfangsbestände
-2. **Keine Glättung:** Losgrößen-basierte Bestellungen (500 Stück), NICHT tägliche glatte Mengen
-3. **Losgröße auf TAGESGESAMTMENGE:** 740 Sättel/Tag → 1 Bestellung, NICHT pro Variante
-4. **Material-Check nur an Arbeitstagen:** Wochenenden/Feiertage = "-" (nicht "Nein")
-5. **Keine Sicherheitsbestände:** Sicherheitsbestand = 0, Just-in-Time soweit möglich
-6. **Keine Lageranhäufung:** Tag 1-3 = 0 Bestand, erste Lieferung Tag 4
-
 ### 1️⃣ Error Management (Rundungsfehler-Korrektur)
 
 **Problem:** 
@@ -536,26 +507,6 @@ Bei jeder Code-Generierung bedenke:
    - Ermäßigungen dokumentiert
    - SCOR-Metriken komplett
    - Szenarien funktionsfähig
-
-## 🚫 Verbotene Praktiken
-
-**NIEMALS tun:**
-1. ❌ "Was wurde gefixed" Info-Boxen im Frontend - IMMER sofort entfernen
-2. ❌ Standalone Markdown-Dokumentationen erstellen (z.B. FIXING_NOTES.md)
-3. ❌ Imaginäre Anfangsbestände erfinden
-4. ❌ Tägliche geglättete Bestellungen statt Losgrößen
-5. ❌ Material-Check an Wochenenden/Feiertagen anzeigen
-6. ❌ Bestellungen pro Variante aufrunden (muss TAGESGESAMTMENGE sein)
-7. ❌ Sicherheitsbestände > 0 setzen (muss 0 sein gemäß Anforderung)
-8. ❌ Lageranhäufung durch Überbestellung
-
-**IMMER tun:**
-1. ✅ OEM Planung als EINZIGE Berechnungsbasis nutzen
-2. ✅ Alle Zahlen müssen konsistent sein (wie Zahnräder ineinandergreifen)
-3. ✅ Settings + Szenarien in ALLEN Berechnungen berücksichtigen
-4. ✅ Nur REALE Daten anzeigen (keine Schätzungen oder Überschläge)
-5. ✅ Tabellen VOR Info-Boxen positionieren (Tabellen = wichtig, Info = sekundär)
-6. ✅ Deutsche Kommentare für Prüfung (erklärt WARUM, nicht nur WAS)
 
 ## 🚀 Initialisierungs-Prompt
 
