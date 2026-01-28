@@ -223,13 +223,31 @@ export function berechneIntegriertesWarehouse(
     ...zusatzBestellungen
   ]
   
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // GUARD: Prüfe ob Bestellungen vorhanden sind
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // Falls keine Bestellungen generiert wurden (z.B. leerer Produktionsplan),
+  // geben wir ein leeres Ergebnis zurück um Abstürze zu vermeiden.
+  if (bestellungen.length === 0) {
+    console.warn('⚠️ Warehouse Management: Keine Bestellungen vorhanden! Rückgabe leerer Statistik.')
+    return {
+      tage: [],
+      jahresstatistik: {
+        gesamtLieferungen: 0,
+        gesamtVerbrauch: 0,
+        durchschnittBestand: 0,
+        minimalBestand: 0,
+        maximalBestand: 0,
+        tageNegativ: 0,
+        liefertreue: 100
+      },
+      warnungen: ['Keine Bestellungen vorhanden - Produktionspläne prüfen!']
+    }
+  }
+  
   console.log(`🏭 Warehouse Management: ${bestellungen.length} Bestellungen generiert`)
-  const zeitraumStart = bestellungen[0]?.bestelldatum instanceof Date 
-    ? bestellungen[0].bestelldatum.toLocaleDateString('de-DE') 
-    : 'N/A'
-  const zeitraumEnde = bestellungen[bestellungen.length - 1]?.bestelldatum instanceof Date 
-    ? bestellungen[bestellungen.length - 1].bestelldatum.toLocaleDateString('de-DE') 
-    : 'N/A'
+  const zeitraumStart = bestellungen[0].bestelldatum.toLocaleDateString('de-DE')
+  const zeitraumEnde = bestellungen[bestellungen.length - 1].bestelldatum.toLocaleDateString('de-DE')
   console.log(`   Zeitraum: ${zeitraumStart} - ${zeitraumEnde}`)
   
   // Gruppiere Bestellungen nach Ankunftsdatum
@@ -257,28 +275,6 @@ export function berechneIntegriertesWarehouse(
   // ═══════════════════════════════════════════════════════════════════════════════
   
   const tageErgebnisse: TaeglichesLager[] = []
-  
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // GUARD: Prüfe ob Bestellungen vorhanden sind
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // Falls keine Bestellungen generiert wurden (z.B. leerer Produktionsplan),
-  // geben wir ein leeres Ergebnis zurück um Abstürze zu vermeiden.
-  if (bestellungen.length === 0) {
-    console.warn('⚠️ Warehouse Management: Keine Bestellungen vorhanden! Rückgabe leerer Statistik.')
-    return {
-      tage: [],
-      jahresstatistik: {
-        gesamtLieferungen: 0,
-        gesamtVerbrauch: 0,
-        durchschnittBestand: 0,
-        minimalBestand: 0,
-        maximalBestand: 0,
-        tageNegativ: 0,
-        liefertreue: 100
-      },
-      warnungen: ['Keine Bestellungen vorhanden - Produktionspläne prüfen!']
-    }
-  }
   
   // Finde früheste Bestellung (kann in 2026 sein!)
   const fruehestesBestelldatum = bestellungen.reduce((min, b) => {
