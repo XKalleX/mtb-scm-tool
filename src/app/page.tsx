@@ -22,7 +22,6 @@ import {
   Factory,
   BarChart3,
   Package,
-  AlertTriangle,
   TrendingUp,
   Calendar,
   ArrowRight,
@@ -45,7 +44,7 @@ const DEFAULT_ARBEITSTAGE_FALLBACK = 252
  * Dashboard Hauptkomponente mit Szenarien-Integration und Live-Berechnungen
  */
 export default function Dashboard() {
-  const { szenarien, getAktiveSzenarien } = useSzenarien()
+  const { getAktiveSzenarien } = useSzenarien()
   const { konfiguration, isInitialized, getArbeitstageProJahr } = useKonfiguration()
   const aktiveSzenarien = getAktiveSzenarien()
   
@@ -204,6 +203,8 @@ export default function Dashboard() {
   )
 }
 
+import { LucideIcon } from 'lucide-react'
+
 /**
  * KPI Card Komponente
  * Zeigt eine einzelne Kennzahl mit Trend-Indikator
@@ -219,7 +220,7 @@ function KPICard({
   title: string
   value: string
   unit: string
-  icon: any
+  icon: LucideIcon
   trend?: string
   trendUp: boolean
 }) {
@@ -257,7 +258,7 @@ function ModulCard({
 }: { 
   title: string
   description: string
-  icon: any
+  icon: LucideIcon
   href: string
   color: string
 }) {

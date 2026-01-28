@@ -126,7 +126,7 @@ function StammdatenCard() {
             <InfoItem label="Peak-Monat" value={data.saisonalitaet.peakMonth} />
             <InfoItem 
               label="Peak-Anteil" 
-              value={Math.round((data.saisonalitaet.monatlicheVerteilung.april || 0.16) * 100) + '%'} 
+              value={Math.round((data.saisonalitaet.monatlicheVerteilung.april) * 100) + '%'} 
             />
           </div>
         </div>
