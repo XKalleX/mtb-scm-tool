@@ -75,6 +75,14 @@ export interface TaeglichesLager {
       grund?: string               // Falls nicht erfüllt: Warum?
     }
     
+    // BACKLOG MANAGEMENT
+    produktionsBacklog: {
+      backlogVorher: number        // Unerfüllter Bedarf aus Vortagen
+      nichtProduziertHeute: number // Bedarf der heute nicht produziert werden konnte
+      backlogNachher: number       // Backlog am Ende des Tages
+      nachgeholt: number           // Aus Backlog nachgeholte Produktion heute
+    }
+    
     // LIEFERUNGEN
     lieferungen: {
       bestellungId: string
@@ -97,6 +105,12 @@ export interface WarehouseJahresResult {
     maximalBestand: number
     tageNegativ: number            // Tage mit negativem Bestand (sollte 0 sein durch ATP)
     liefertreue: number            // % pünktliche Lieferungen
+    // NEU: Produktions-Backlog Statistiken
+    gesamtBedarf: number           // Gesamtbedarf über alle Tage
+    gesamtProduziertTatsaechlich: number // Tatsächlich produziert (mit Material-Check)
+    gesamtBacklogEndstand: number  // Backlog am Jahresende
+    maximalerBacklog: number       // Höchster Backlog im Jahr
+    tageMitBacklog: number         // Anzahl Tage mit nicht erfülltem Bedarf
   }
   warnungen: string[]              // Alle kritischen Ereignisse
 }
@@ -239,7 +253,13 @@ export function berechneIntegriertesWarehouse(
         minimalBestand: 0,
         maximalBestand: 0,
         tageNegativ: 0,
-        liefertreue: 100
+        liefertreue: 100,
+        // NEU: Backlog-Statistiken
+        gesamtBedarf: 0,
+        gesamtProduziertTatsaechlich: 0,
+        gesamtBacklogEndstand: 0,
+        maximalerBacklog: 0,
+        tageMitBacklog: 0
       },
       warnungen: ['Keine Bestellungen vorhanden - Produktionspläne prüfen!']
     }
@@ -301,6 +321,18 @@ export function berechneIntegriertesWarehouse(
   let maximalBestand = -Infinity
   let tageNegativ = 0
   
+  // NEU: Backlog-Tracker pro Bauteil
+  const produktionsBacklog: Record<string, number> = {}
+  bauteile.forEach(bauteil => {
+    produktionsBacklog[bauteil.id] = 0
+  })
+  
+  // NEU: Tracking für Statistiken
+  let gesamtBedarf = 0
+  let gesamtProduziertTatsaechlich = 0
+  let maximalerBacklog = 0
+  let tageMitBacklog = 0
+  
   while (aktuellesDatum <= simulationEnde) {
     tagIndex++
     
@@ -356,15 +388,19 @@ export function berechneIntegriertesWarehouse(
       let atpErfuellt = true
       let atpGrund: string | undefined
       let benoetigt = 0
+      let backlogVorher = produktionsBacklog[bauteilId]
+      let nichtProduziertHeute = 0
+      let nachgeholt = 0
       
       if (istArbeitstag && tagImJahr >= 1 && tagImJahr <= 365) {
-        // Summiere Verbrauch über alle Varianten
+        // Summiere PLAN-Verbrauch über alle Varianten (was produziert werden SOLLTE)
         Object.entries(variantenProduktionsplaene).forEach(([varianteId, plan]) => {
           const tagesIndex = tagImJahr - 1 // Array ist 0-basiert
           if (tagesIndex >= 0 && tagesIndex < plan.tage.length) {
             const tagesProduktion = plan.tage[tagesIndex]
+            // Nutze planMenge für Bedarfsermittlung (was eigentlich geplant war)
             const verbrauchVariante = berechneVerbrauchProBauteil(
-              tagesProduktion.istMenge,
+              tagesProduktion.planMenge, // WICHTIG: Nutze PLAN, nicht IST
               varianteId,
               bauteilId,
               konfiguration
@@ -373,34 +409,59 @@ export function berechneIntegriertesWarehouse(
           }
         })
         
+        // Track für Statistiken
+        gesamtBedarf += benoetigt
+        
         // ═════════════════════════════════════════════════════════════════════════
-        // STEP 3c: ATP-CHECK (Available-to-Promise)
+        // STEP 3c: ATP-CHECK MIT BACKLOG MANAGEMENT
         // ═════════════════════════════════════════════════════════════════════════
         
-        // Direkter Check auf Lagerbestand
+        // Gesamtbedarf = heutiger Bedarf + offener Backlog
+        const gesamtBedarfHeute = benoetigt + backlogVorher
         const verfuegbarFuerProduktion = aktuelleBestaende[bauteilId]
         
-        if (benoetigt > verfuegbarFuerProduktion) {
-          // NICHT GENUG MATERIAL!
+        if (gesamtBedarfHeute > verfuegbarFuerProduktion) {
+          // NICHT GENUG MATERIAL für alles!
           atpErfuellt = false
           
-          if (benoetigt > aktuelleBestaende[bauteilId]) {
-            atpGrund = `Nicht genug Material (Bedarf: ${benoetigt}, Verfügbar: ${aktuelleBestaende[bauteilId]})`
-          } else {
-            atpGrund = `Material-Engpass erkannt`
-          }
-          
-          // Reduziere Verbrauch auf verfügbare Menge
+          // Produziere was möglich ist
           verbrauch = Math.max(0, verfuegbarFuerProduktion)
           
-          warnungen.push(
-            `⚠️ ${datumStr} (Tag ${tagImJahr}): ATP-Check fehlgeschlagen für ${bauteil.name}! ${atpGrund}`
-          )
+          // Berechne wie viel vom Backlog nachgeholt wurde
+          if (verbrauch > benoetigt) {
+            // Mehr als heute benötigt → Backlog wird teilweise abgebaut
+            nachgeholt = verbrauch - benoetigt
+            nichtProduziertHeute = 0
+          } else if (verbrauch < benoetigt) {
+            // Weniger als heute benötigt → Backlog wächst
+            nichtProduziertHeute = benoetigt - verbrauch
+            nachgeholt = 0
+          } else {
+            // Genau so viel wie heute benötigt → Backlog bleibt gleich
+            nichtProduziertHeute = 0
+            nachgeholt = 0
+          }
+          
+          atpGrund = `Nicht genug Material (Bedarf: ${benoetigt}, Backlog: ${backlogVorher}, Verfügbar: ${verfuegbarFuerProduktion})`
+          
+          if (nichtProduziertHeute > 0) {
+            warnungen.push(
+              `⚠️ ${datumStr} (Tag ${tagImJahr}): ATP-Check fehlgeschlagen für ${bauteil.name}! Fehlmenge: ${nichtProduziertHeute}`
+            )
+          }
         } else {
-          // GENUG MATERIAL - volle Produktion möglich
-          verbrauch = benoetigt
+          // GENUG MATERIAL - volle Produktion + Backlog-Abbau möglich
+          verbrauch = gesamtBedarfHeute
           atpErfuellt = true
+          nachgeholt = backlogVorher // Kompletter Backlog wird abgebaut
+          nichtProduziertHeute = 0
         }
+        
+        // Update Backlog
+        produktionsBacklog[bauteilId] = backlogVorher + nichtProduziertHeute - nachgeholt
+        
+        // Track tatsächliche Produktion (für Statistiken)
+        gesamtProduziertTatsaechlich += verbrauch
         
         // Buche Verbrauch
         aktuelleBestaende[bauteilId] -= verbrauch
@@ -440,6 +501,13 @@ export function berechneIntegriertesWarehouse(
       minimalBestand = Math.min(minimalBestand, endBestand)
       maximalBestand = Math.max(maximalBestand, endBestand)
       
+      // Backlog Statistiken
+      const backlogNachher = produktionsBacklog[bauteilId]
+      maximalerBacklog = Math.max(maximalerBacklog, backlogNachher)
+      if (backlogNachher > 0 && tagImJahr >= 1 && tagImJahr <= 365) {
+        tageMitBacklog++
+      }
+      
       // ═══════════════════════════════════════════════════════════════════════════
       // STEP 3e: SPEICHERE TAGES-DETAILS
       // ═══════════════════════════════════════════════════════════════════════════
@@ -459,6 +527,12 @@ export function berechneIntegriertesWarehouse(
           verfuegbar: verfuegbarBestand,
           erfuellt: atpErfuellt,
           grund: atpGrund
+        },
+        produktionsBacklog: {
+          backlogVorher,
+          nichtProduziertHeute,
+          backlogNachher,
+          nachgeholt
         },
         lieferungen: lieferungsDetails
       })
@@ -494,6 +568,9 @@ export function berechneIntegriertesWarehouse(
   
   // Logging nur in development mode
   if (process.env.NODE_ENV === 'development') {
+    // Berechne End-Backlog über alle Bauteile
+    const gesamtBacklogEndstand = Object.values(produktionsBacklog).reduce((sum, b) => sum + b, 0)
+    
     console.log(`
       ═══════════════════════════════════════════════════════════════════════════════
       WAREHOUSE MANAGEMENT - JAHRESSTATISTIK
@@ -501,7 +578,10 @@ export function berechneIntegriertesWarehouse(
       Simulierte Tage:           ${anzahlTage}
       Gesamt Lieferungen:        ${gesamtLieferungen.toLocaleString('de-DE')} Stück
       Gesamt Verbrauch:          ${gesamtVerbrauch.toLocaleString('de-DE')} Stück
-      Differenz:                 ${(gesamtLieferungen - gesamtVerbrauch).toLocaleString('de-DE')} Stück
+      Differenz (Lager Ende):    ${(gesamtLieferungen - gesamtVerbrauch).toLocaleString('de-DE')} Stück
+      
+      Gesamt Bedarf (Plan):      ${gesamtBedarf.toLocaleString('de-DE')} Stück
+      Tatsächl. produziert:      ${gesamtProduziertTatsaechlich.toLocaleString('de-DE')} Stück
       
       Durchschn. Bestand:        ${durchschnittBestand.toLocaleString('de-DE')} Stück
       Minimal Bestand:           ${minimalBestand === Infinity ? 'N/A' : minimalBestand.toLocaleString('de-DE')} Stück
@@ -510,10 +590,18 @@ export function berechneIntegriertesWarehouse(
       Tage mit negativem Bestand: ${tageNegativ}
       Liefertreue (ATP erfüllt): ${liefertreue.toFixed(1)}%
       
+      BACKLOG-STATISTIKEN:
+      Backlog am Jahresende:     ${gesamtBacklogEndstand.toLocaleString('de-DE')} Stück
+      Maximaler Backlog:         ${maximalerBacklog.toLocaleString('de-DE')} Stück
+      Tage mit Backlog:          ${tageMitBacklog}
+      
       Warnungen:                 ${warnungen.length}
       ═══════════════════════════════════════════════════════════════════════════════
     `)
   }
+  
+  // Berechne End-Backlog über alle Bauteile
+  const gesamtBacklogEndstand = Object.values(produktionsBacklog).reduce((sum, b) => sum + b, 0)
   
   return {
     tage: tageErgebnisse,
@@ -524,7 +612,13 @@ export function berechneIntegriertesWarehouse(
       minimalBestand: minimalBestand === Infinity ? 0 : minimalBestand,
       maximalBestand: maximalBestand === -Infinity ? 0 : maximalBestand,
       tageNegativ,
-      liefertreue
+      liefertreue,
+      // NEU: Backlog-Statistiken
+      gesamtBedarf,
+      gesamtProduziertTatsaechlich,
+      gesamtBacklogEndstand,
+      maximalerBacklog,
+      tageMitBacklog
     },
     warnungen
   }
@@ -557,7 +651,12 @@ export function konvertiereWarehouseZuExport(result: WarehouseJahresResult) {
         [`${prefix}_Verfuegbar`]: bauteil.verfuegbarBestand,
         [`${prefix}_Reichweite`]: bauteil.reichweiteTage,
         [`${prefix}_Status`]: bauteil.status,
-        [`${prefix}_ATP_Erfuellt`]: bauteil.atpCheck.erfuellt ? 'Ja' : 'Nein'
+        [`${prefix}_ATP_Erfuellt`]: bauteil.atpCheck.erfuellt ? 'Ja' : 'Nein',
+        // NEU: Backlog-Informationen
+        [`${prefix}_Backlog_Vorher`]: bauteil.produktionsBacklog.backlogVorher,
+        [`${prefix}_Backlog_Nachher`]: bauteil.produktionsBacklog.backlogNachher,
+        [`${prefix}_Nicht_Produziert`]: bauteil.produktionsBacklog.nichtProduziertHeute,
+        [`${prefix}_Nachgeholt`]: bauteil.produktionsBacklog.nachgeholt
       }
     }, {})
   }))

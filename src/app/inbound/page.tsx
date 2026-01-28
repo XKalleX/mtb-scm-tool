@@ -63,6 +63,9 @@ interface InboundTableRow {
   istWochenende: boolean
   istFeiertag: boolean
   feiertagName?: string
+  // NEU: Backlog-Tracking
+  tagesBedarf: number           // Bedarf für diesen Tag (aus OEM-Plan)
+  akkumulierterBacklog: number  // Backlog der sich bis zu diesem Tag angehäuft hat
 }
 
 /**
@@ -247,6 +250,7 @@ export default function InboundPage() {
    * - Bedarfsdatum = wann Sättel im Werk benötigt werden (01.01.2027 - 31.12.2027)
    * - Bestelldatum = wann bestellt werden muss (49 Tage VOR Bedarfsdatum)
    * - Tatsächliche Ankunft = berechnet aus Bestelldatum + Vorlaufzeit
+   * - NEU: Backlog = akkumulierte unbestellte Mengen
    */
   const alleTageMitBestellungen = useMemo(() => {
     const jahr = konfiguration.planungsjahr
@@ -254,6 +258,21 @@ export default function InboundPage() {
     // Deutsche Feiertage für Produktionsbedarf (Produktion findet in DEUTSCHLAND statt)
     const feiertage = ladeDeutschlandFeiertage()
     const alleTage: InboundTableRow[] = []
+    
+    // NEU: Berechne Backlog aus backlogErgebnis (Order-Backlog = warten auf Losgröße)
+    const backlogProTag: Record<number, number> = {}
+    const bedarfProTag: Record<number, number> = {}
+    
+    Object.values(backlogErgebnis.komponenten).forEach(komponente => {
+      komponente.tagesDetails.forEach(detail => {
+        if (!backlogProTag[detail.tag]) {
+          backlogProTag[detail.tag] = 0
+          bedarfProTag[detail.tag] = 0
+        }
+        backlogProTag[detail.tag] += detail.backlogNachher
+        bedarfProTag[detail.tag] += detail.bedarf
+      })
+    })
     
     /**
      * Mehrere Bestellungen pro Bedarfsdatum aggregieren:
@@ -294,6 +313,10 @@ export default function InboundPage() {
         : undefined
       
       const bedarfsdatumStr = bedarfsdatum.toLocaleDateString('de-DE')
+      
+      // NEU: Hole Backlog und Bedarf für diesen Tag
+      const tagesBedarf = bedarfProTag[tag] || 0
+      const akkumulierterBacklog = backlogProTag[tag] || 0
       
       if (istProduktionsTag && bestellungenFuerTag && bestellungenFuerTag.length > 0) {
         /**
@@ -363,7 +386,10 @@ export default function InboundPage() {
           hatBestellung: true,
           istWochenende,
           istFeiertag,
-          feiertagName: istFeiertag ? feiertag[0].name : undefined
+          feiertagName: istFeiertag ? feiertag[0].name : undefined,
+          // NEU: Backlog-Tracking
+          tagesBedarf,
+          akkumulierterBacklog
         })
       } else {
         // Kein Bedarf/Keine Bestellung für dieses Datum - ermittle Grund
@@ -403,13 +429,16 @@ export default function InboundPage() {
           hatBestellung: false,
           istWochenende,
           istFeiertag,
-          feiertagName: istFeiertag ? feiertag[0].name : undefined
+          feiertagName: istFeiertag ? feiertag[0].name : undefined,
+          // NEU: Backlog-Tracking
+          tagesBedarf,
+          akkumulierterBacklog
         })
       }
     }
     
     return alleTage
-  }, [taeglicheBestellungen, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage])
+  }, [taeglicheBestellungen, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage, backlogErgebnis])
   
   /**
    * Exportiert Lieferanten-Daten als JSON
@@ -784,6 +813,23 @@ export default function InboundPage() {
                       width: '220px',
                       align: 'left',
                       sumable: false
+                    },
+                    // NEU: Backlog-Spalten
+                    {
+                      key: 'tagesBedarf',
+                      label: 'Tagesbedarf',
+                      width: '100px',
+                      align: 'right',
+                      sumable: true,
+                      format: (v: number) => v > 0 ? formatNumber(v, 0) : '-'
+                    },
+                    {
+                      key: 'akkumulierterBacklog',
+                      label: 'Backlog',
+                      width: '100px',
+                      align: 'right',
+                      sumable: false,
+                      format: (v: number) => v > 0 ? formatNumber(v, 0) : '0'
                     },
                     {
                       key: 'vorlaufzeitFormatiert',
