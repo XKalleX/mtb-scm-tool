@@ -39,8 +39,13 @@ import {
 } from 'lucide-react'
 import { useKonfiguration, FeiertagConfig, STANDARD_KONFIGURATION, KonfigurationData, ProduktionConfig, LieferantConfig } from '@/contexts/KonfigurationContext'
 import { formatNumber } from '@/lib/utils'
-import { DEFAULT_HEUTE_DATUM } from '@/lib/constants'
+import stammdatenData from '@/data/stammdaten.json'
 import * as Dialog from '@radix-ui/react-dialog'
+
+/**
+ * Konstanten aus JSON-Dateien (SINGLE SOURCE OF TRUTH)
+ */
+const DEFAULT_HEUTE_DATUM = stammdatenData.projekt.heuteDatum // '2027-04-15' aus JSON
 
 /**
  * Hauptkomponente für Einstellungen

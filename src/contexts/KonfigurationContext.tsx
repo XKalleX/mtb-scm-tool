@@ -33,8 +33,15 @@ import feiertageChinaData from '@/data/feiertage-china.json'
 import feiertageDeutschlandData from '@/data/feiertage-deutschland.json'
 import lieferantChinaData from '@/data/lieferant-china.json'
 import stuecklisteData from '@/data/stueckliste.json'
-import { DEFAULT_HEUTE_DATUM, PLANUNGSJAHR, KONFIGURATION_STORAGE_KEY, isValidDate, parseDateSafe } from '@/lib/constants'
+import { isValidDate, parseDateSafe } from '@/lib/date-helpers'
 import { toLocalISODateString } from '@/lib/utils'
+
+/**
+ * Konstanten aus JSON-Dateien (SINGLE SOURCE OF TRUTH)
+ */
+const DEFAULT_HEUTE_DATUM = stammdatenData.projekt.heuteDatum // '2027-04-15' aus JSON
+const PLANUNGSJAHR = stammdatenData.projekt.planungsjahr // 2027 aus JSON
+const KONFIGURATION_STORAGE_KEY = 'mtb-konfiguration' // localStorage-Key (kein Datenwert)
 
 // ========================================
 // TYPEN FÜR KONFIGURATION
@@ -354,7 +361,7 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
    */
   const setHeuteDatum = useCallback((value: string) => {
     // Nutze parseDateSafe für Validierung (vermeidet Code-Duplikation)
-    const datum = parseDateSafe(value, value) // Fallback = value selbst für Prüfung
+    const datum = parseDateSafe(value, DEFAULT_HEUTE_DATUM)
     
     // Falls parseDateSafe einen Fallback verwendet hat, war das Original ungültig
     // Verwende toLocalISODateString um Timezone-Probleme zu vermeiden
@@ -379,7 +386,7 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
    */
   const getHeuteDatumAsDate = useCallback((): Date => {
     // Verwendet shared utility für sichere Datums-Validierung
-    return parseDateSafe(konfiguration.heuteDatum)
+    return parseDateSafe(konfiguration.heuteDatum, DEFAULT_HEUTE_DATUM)
   }, [konfiguration.heuteDatum])
 
   const updateVariante = useCallback((id: string, updates: Partial<MTBVarianteConfig>) => {
