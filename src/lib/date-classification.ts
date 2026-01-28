@@ -1,23 +1,25 @@
 /**
  * ========================================
- * DATUM-KLASSIFIZIERUNG
+ * DATUM-KLASSIFIZIERUNG (DYNAMISCH)
  * ========================================
  * 
  * Utility-Funktionen zur Klassifizierung von Daten:
  * - Wochenenden (Samstag/Sonntag)
- * - Deutsche Feiertage (NRW) - aus JSON geladen
- * - Chinesische Feiertage - aus JSON geladen
+ * - Deutsche Feiertage (NRW) - dynamisch generiert oder aus JSON
+ * - Chinesische Feiertage - dynamisch generiert oder aus JSON
  * 
  * Wird verwendet für farbliche Markierung in Tabellen
  * 
- * WICHTIG: Feiertage werden aus den JSON-Dateien geladen:
- * - feiertage-deutschland.json
- * - feiertage-china.json
+ * WICHTIG: 
+ * - Feiertage werden DYNAMISCH basierend auf Jahr geladen
+ * - Unterstützt JSON-Daten (2026-2028) + dynamische Generierung
+ * - Funktioniert mit BELIEBIGEN Jahren
  */
 
 import { Feiertag } from '@/types'
 import feiertageDeutschlandData from '@/data/feiertage-deutschland.json'
 import feiertageChinaData from '@/data/feiertage-china.json'
+import { generiereAlleFeiertage } from './holiday-generator'
 
 /**
  * Klassifizierung eines Datums
@@ -31,51 +33,69 @@ export type DateClassification = {
 }
 
 /**
- * Lädt deutsche Feiertage aus JSON (2026, 2027, 2028)
+ * Lädt deutsche Feiertage aus JSON oder generiert sie dynamisch
+ * @param jahr - Jahr für das Feiertage geladen werden sollen
  */
-function ladeDeutscheFeiertage(): Feiertag[] {
-  const feiertage2028 = (feiertageDeutschlandData as any).feiertage2028 || []
-  return [
-    ...feiertageDeutschlandData.feiertage2026.map(f => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich'
-    })),
-    ...feiertageDeutschlandData.feiertage2027.map(f => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich'
-    })),
-    ...feiertage2028.map((f: any) => ({
+function ladeDeutscheFeiertage(jahr: number): Feiertag[] {
+  // Versuche JSON-Daten zu laden für bekannte Jahre
+  const verfuegbareJahre: Record<number, any[]> = {
+    2026: feiertageDeutschlandData.feiertage2026 || [],
+    2027: feiertageDeutschlandData.feiertage2027 || [],
+    2028: (feiertageDeutschlandData as any).feiertage2028 || []
+  }
+  
+  const jsonData = verfuegbareJahre[jahr]
+  
+  if (jsonData && jsonData.length > 0) {
+    // Nutze JSON-Daten
+    return jsonData.map(f => ({
       ...f,
       datum: new Date(f.datum),
       typ: f.typ as 'gesetzlich'
     }))
-  ]
+  }
+  
+  // Fallback: Generiere dynamisch
+  console.info(`Deutsche Feiertage für ${jahr} nicht in JSON vorhanden, generiere dynamisch`)
+  const generiert = generiereAlleFeiertage(jahr).filter(f => f.land === 'Deutschland')
+  return generiert.map(f => ({
+    ...f,
+    datum: new Date(f.datum),
+    typ: f.typ as 'gesetzlich'
+  }))
 }
 
 /**
- * Lädt chinesische Feiertage aus JSON (2026, 2027, 2028)
+ * Lädt chinesische Feiertage aus JSON oder generiert sie dynamisch
+ * @param jahr - Jahr für das Feiertage geladen werden sollen
  */
-function ladeChinaFeiertage(): Feiertag[] {
-  const feiertage2028 = (feiertageChinaData as any).feiertage2028 || []
-  return [
-    ...feiertageChinaData.feiertage2026.map(f => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich'
-    })),
-    ...feiertageChinaData.feiertage2027.map(f => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich'
-    })),
-    ...feiertage2028.map((f: any) => ({
+function ladeChinaFeiertage(jahr: number): Feiertag[] {
+  // Versuche JSON-Daten zu laden für bekannte Jahre
+  const verfuegbareJahre: Record<number, any[]> = {
+    2026: feiertageChinaData.feiertage2026 || [],
+    2027: feiertageChinaData.feiertage2027 || [],
+    2028: (feiertageChinaData as any).feiertage2028 || []
+  }
+  
+  const jsonData = verfuegbareJahre[jahr]
+  
+  if (jsonData && jsonData.length > 0) {
+    // Nutze JSON-Daten
+    return jsonData.map(f => ({
       ...f,
       datum: new Date(f.datum),
       typ: f.typ as 'gesetzlich'
     }))
-  ]
+  }
+  
+  // Fallback: Generiere dynamisch
+  console.info(`Chinesische Feiertage für ${jahr} nicht in JSON vorhanden, generiere dynamisch`)
+  const generiert = generiereAlleFeiertage(jahr).filter(f => f.land === 'China')
+  return generiert.map(f => ({
+    ...f,
+    datum: new Date(f.datum),
+    typ: f.typ as 'gesetzlich'
+  }))
 }
 
 /**
@@ -94,7 +114,8 @@ export function istWochenende(date: Date): boolean {
  * @returns Feiertag-Objekt oder undefined
  */
 export function istDeutscherFeiertag(date: Date): Feiertag | undefined {
-  const feiertage = ladeDeutscheFeiertage()
+  const jahr = date.getFullYear()
+  const feiertage = ladeDeutscheFeiertage(jahr)
   return feiertage.find(f => 
     f.datum.toDateString() === date.toDateString()
   )
@@ -106,7 +127,8 @@ export function istDeutscherFeiertag(date: Date): Feiertag | undefined {
  * @returns Feiertag-Objekt oder undefined
  */
 export function istChinesischerFeiertag(date: Date): Feiertag | undefined {
-  const feiertage = ladeChinaFeiertage()
+  const jahr = date.getFullYear()
+  const feiertage = ladeChinaFeiertage(jahr)
   return feiertage.find(f => 
     f.datum.toDateString() === date.toDateString()
   )
@@ -180,16 +202,42 @@ export function getDateTooltip(date: Date): string | undefined {
 
 /**
  * Exportiert alle deutschen Feiertage für externe Verwendung
- * @returns Array von deutschen Feiertagen (beide Jahre)
+ * @param jahr - Jahr (optional, lädt alle verfügbaren Jahre wenn nicht angegeben)
+ * @returns Array von deutschen Feiertagen
  */
-export function getDeutscheFeiertage(): Feiertag[] {
-  return ladeDeutscheFeiertage()
+export function getDeutscheFeiertage(jahr?: number): Feiertag[] {
+  if (jahr) {
+    return ladeDeutscheFeiertage(jahr)
+  }
+  
+  // Lade für 3 Jahre (2026-2028 falls verfügbar, sonst generiert)
+  const jahre = [2026, 2027, 2028]
+  const alleFeiertage: Feiertag[] = []
+  
+  for (const j of jahre) {
+    alleFeiertage.push(...ladeDeutscheFeiertage(j))
+  }
+  
+  return alleFeiertage
 }
 
 /**
  * Exportiert alle chinesischen Feiertage für externe Verwendung
- * @returns Array von chinesischen Feiertagen (beide Jahre)
+ * @param jahr - Jahr (optional, lädt alle verfügbaren Jahre wenn nicht angegeben)
+ * @returns Array von chinesischen Feiertagen
  */
-export function getChinesischeFeiertage(): Feiertag[] {
-  return ladeChinaFeiertage()
+export function getChinesischeFeiertage(jahr?: number): Feiertag[] {
+  if (jahr) {
+    return ladeChinaFeiertage(jahr)
+  }
+  
+  // Lade für 3 Jahre (2026-2028 falls verfügbar, sonst generiert)
+  const jahre = [2026, 2027, 2028]
+  const alleFeiertage: Feiertag[] = []
+  
+  for (const j of jahre) {
+    alleFeiertage.push(...ladeChinaFeiertage(j))
+  }
+  
+  return alleFeiertage
 }

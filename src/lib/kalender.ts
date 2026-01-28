@@ -1,11 +1,12 @@
 /**
  * ========================================
- * KALENDER-MANAGEMENT (NUR CHINA)
+ * KALENDER-MANAGEMENT (DYNAMISCH)
  * ========================================
  * 
- * Verwaltet den Jahreskalender 2027 mit:
+ * Verwaltet den Jahreskalender mit DYNAMISCHEN Jahren:
  * - Wochenenden
  * - Chinesische Feiertage (einziger Lieferant!)
+ * - Deutsche Feiertage (NRW)
  * - Arbeitstagen vs. Kalendertagen
  * - Vorlaufzeiten-Berechnungen
  * - 'Heute'-Datum für Frozen Zone Konzept
@@ -13,8 +14,8 @@
  * WICHTIG: 
  * - Transport nutzt Kalendertage (24/7, Schiff fährt immer)
  * - Produktion nutzt Arbeitstage (Mo-Fr ohne Feiertage)
- * - Feiertage werden aus JSON-Dateien geladen, können aber durch 
- *   benutzerdefinierte Feiertage aus KonfigurationContext überschrieben werden
+ * - Feiertage werden DYNAMISCH generiert oder aus JSON geladen
+ * - Unterstützt BELIEBIGE Planungsjahre (nicht nur 2027)
  * - 'Heute'-Datum wird aus globaler Konfiguration gelesen
  */
 
@@ -22,7 +23,8 @@ import { Kalendertag, Feiertag } from '@/types'
 import { addDays, isWeekend, getDayOfYear, getWeekNumber, toLocalISODateString } from './utils'
 import feiertagsData from '@/data/feiertage-china.json'
 import feiertagsDeutschlandData from '@/data/feiertage-deutschland.json'
-import { DEFAULT_HEUTE_DATUM, KONFIGURATION_STORAGE_KEY, parseDateSafe } from './constants'
+import { DEFAULT_PLANUNGSJAHR, getDefaultHeuteDatum, KONFIGURATION_STORAGE_KEY, parseDateSafe } from './constants'
+import { generiereAlleFeiertage, getSpringFestivalPeriode } from './holiday-generator'
 
 /**
  * Interface für Feiertags-Konfiguration (aus KonfigurationContext)
@@ -42,8 +44,9 @@ export interface FeiertagsKonfiguration {
  */
 export function getHeuteDatum(): Date {
   if (typeof window === 'undefined') {
-    // Server-Side: Standard-Datum
-    return new Date(DEFAULT_HEUTE_DATUM)
+    // Server-Side: Standard-Datum basierend auf Planungsjahr
+    const planungsjahr = getPlanungsjahr()
+    return new Date(getDefaultHeuteDatum(planungsjahr))
   }
   
   try {
@@ -59,62 +62,128 @@ export function getHeuteDatum(): Date {
     console.warn('Fehler beim Laden des Heute-Datums aus Konfiguration:', error)
   }
   
-  // Fallback: Standard-Datum
-  return new Date(DEFAULT_HEUTE_DATUM)
+  // Fallback: Standard-Datum basierend auf Planungsjahr
+  const planungsjahr = getPlanungsjahr()
+  return new Date(getDefaultHeuteDatum(planungsjahr))
 }
 
 /**
- * Lädt alle deutschen Feiertage für drei Jahre (2026, 2027, 2028)
- * Wichtig für Vorlaufzeit-Berechnungen (49 Tage können bis 2026 zurückreichen,
- * und bis Februar 2028 hineinreichen)
- * @returns Array von Feiertagen
+ * Liest das Planungsjahr aus der globalen Konfiguration
+ * Fallback: DEFAULT_PLANUNGSJAHR falls nicht gesetzt
+ * @returns Planungsjahr (z.B. 2027)
  */
-export function ladeDeutschlandFeiertage(): Feiertag[] {
-  const feiertage2028 = (feiertagsDeutschlandData as any).feiertage2028 || []
-  return [
-    ...feiertagsDeutschlandData.feiertage2026.map(f => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
-    })),
-    ...feiertagsDeutschlandData.feiertage2027.map(f => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
-    })),
-    ...feiertage2028.map((f: any) => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
-    }))
-  ]
+export function getPlanungsjahr(): number {
+  if (typeof window === 'undefined') {
+    // Server-Side: Standard-Jahr
+    return DEFAULT_PLANUNGSJAHR
+  }
+  
+  try {
+    const konfigString = localStorage.getItem(KONFIGURATION_STORAGE_KEY)
+    if (konfigString) {
+      const konfiguration = JSON.parse(konfigString)
+      if (konfiguration.planungsjahr && typeof konfiguration.planungsjahr === 'number') {
+        return konfiguration.planungsjahr
+      }
+    }
+  } catch (error) {
+    console.warn('Fehler beim Laden des Planungsjahres aus Konfiguration:', error)
+  }
+  
+  // Fallback: Standard-Jahr
+  return DEFAULT_PLANUNGSJAHR
 }
 
 /**
- * Lädt alle chinesischen Feiertage für drei Jahre (2026, 2027, 2028)
- * Wichtig für Vorlaufzeit-Berechnungen (49 Tage können bis 2026 zurückreichen,
- * und bis Februar 2028 hineinreichen)
+ * Lädt alle deutschen Feiertage für einen Jahresbereich
+ * 
+ * Strategie:
+ * 1. Versucht zuerst JSON-Dateien zu laden (für bekannte Jahre 2026-2028)
+ * 2. Falls Jahr nicht in JSON verfügbar: Generiert Feiertage dynamisch
+ * 
+ * @param jahr - Zentrales Jahr
+ * @param jahresSpanne - Wie viele Jahre vor/nach (default: 1 → lädt jahr-1, jahr, jahr+1)
  * @returns Array von Feiertagen
  */
-export function ladeChinaFeiertage(): Feiertag[] {
-  const feiertage2028 = (feiertagsData as any).feiertage2028 || []
-  return [
-    ...feiertagsData.feiertage2026.map(f => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
-    })),
-    ...feiertagsData.feiertage2027.map(f => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
-    })),
-    ...feiertage2028.map((f: any) => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
-    }))
-  ]
+export function ladeDeutschlandFeiertage(jahr: number = DEFAULT_PLANUNGSJAHR, jahresSpanne: number = 1): Feiertag[] {
+  const feiertage: Feiertag[] = []
+  
+  // Versuche JSON-Daten zu laden für bekannte Jahre
+  const verfuegbareJahre: Record<number, any[]> = {
+    2026: feiertagsDeutschlandData.feiertage2026 || [],
+    2027: feiertagsDeutschlandData.feiertage2027 || [],
+    2028: (feiertagsDeutschlandData as any).feiertage2028 || []
+  }
+  
+  for (let j = jahr - jahresSpanne; j <= jahr + jahresSpanne; j++) {
+    const jsonData = verfuegbareJahre[j]
+    
+    if (jsonData && jsonData.length > 0) {
+      // Nutze JSON-Daten
+      feiertage.push(...jsonData.map(f => ({
+        ...f,
+        datum: new Date(f.datum),
+        typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
+      })))
+    } else {
+      // Generiere dynamisch
+      console.info(`Deutsche Feiertage für ${j} nicht in JSON vorhanden, generiere dynamisch`)
+      const generiert = generiereAlleFeiertage(j).filter(f => f.land === 'Deutschland')
+      feiertage.push(...generiert.map(f => ({
+        ...f,
+        datum: new Date(f.datum),
+        typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
+      })))
+    }
+  }
+  
+  return feiertage
+}
+
+/**
+ * Lädt alle chinesischen Feiertage für einen Jahresbereich
+ * 
+ * Strategie:
+ * 1. Versucht zuerst JSON-Dateien zu laden (für bekannte Jahre 2026-2028)
+ * 2. Falls Jahr nicht in JSON verfügbar: Generiert Feiertage dynamisch
+ * 
+ * @param jahr - Zentrales Jahr
+ * @param jahresSpanne - Wie viele Jahre vor/nach (default: 1 → lädt jahr-1, jahr, jahr+1)
+ * @returns Array von Feiertagen
+ */
+export function ladeChinaFeiertage(jahr: number = DEFAULT_PLANUNGSJAHR, jahresSpanne: number = 1): Feiertag[] {
+  const feiertage: Feiertag[] = []
+  
+  // Versuche JSON-Daten zu laden für bekannte Jahre
+  const verfuegbareJahre: Record<number, any[]> = {
+    2026: feiertagsData.feiertage2026 || [],
+    2027: feiertagsData.feiertage2027 || [],
+    2028: (feiertagsData as any).feiertage2028 || []
+  }
+  
+  for (let j = jahr - jahresSpanne; j <= jahr + jahresSpanne; j++) {
+    const jsonData = verfuegbareJahre[j]
+    
+    if (jsonData && jsonData.length > 0) {
+      // Nutze JSON-Daten
+      feiertage.push(...jsonData.map(f => ({
+        ...f,
+        datum: new Date(f.datum),
+        typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
+      })))
+    } else {
+      // Generiere dynamisch
+      console.info(`Chinesische Feiertage für ${j} nicht in JSON vorhanden, generiere dynamisch`)
+      const generiert = generiereAlleFeiertage(j).filter(f => f.land === 'China')
+      feiertage.push(...generiert.map(f => ({
+        ...f,
+        datum: new Date(f.datum),
+        typ: f.typ as 'gesetzlich' | 'regional' | 'betrieblich'
+      })))
+    }
+  }
+  
+  return feiertage
 }
 
 /**
@@ -140,8 +209,9 @@ export function istDeutschlandFeiertag(
     }))
   }
   
-  // Fallback: Lade aus JSON-Dateien
-  const alleFeiertage = ladeDeutschlandFeiertage()
+  // Fallback: Lade aus JSON-Dateien (dynamisch basierend auf Datum-Jahr)
+  const jahr = datum.getFullYear()
+  const alleFeiertage = ladeDeutschlandFeiertage(jahr, 0) // nur das Jahr des Datums
   
   return alleFeiertage.filter(f => 
     f.datum.toDateString() === datum.toDateString()
@@ -171,8 +241,9 @@ export function istChinaFeiertag(
     }))
   }
   
-  // Fallback: Lade aus JSON-Dateien
-  const alleFeiertage = ladeChinaFeiertage()
+  // Fallback: Lade aus JSON-Dateien (dynamisch basierend auf Datum-Jahr)
+  const jahr = datum.getFullYear()
+  const alleFeiertage = ladeChinaFeiertage(jahr, 0) // nur das Jahr des Datums
   
   return alleFeiertage.filter(f => 
     f.datum.toDateString() === datum.toDateString()
@@ -272,33 +343,64 @@ export function istArbeitstag(
 }
 
 /**
- * Prüft ob Datum im Spring Festival liegt (5.2.-12.2.2027)
+ * Prüft ob Datum im Spring Festival liegt (DYNAMISCH)
+ * 
  * WICHTIG: 8 Tage kompletter Produktionsstopp in China!
+ * 
+ * Nutzt:
+ * 1. Custom-Feiertage falls übergeben
+ * 2. JSON-Daten falls verfügbar
+ * 3. Dynamische Generierung als Fallback
+ * 
  * @param datum - Zu prüfendes Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns True wenn Spring Festival
  */
-export function istSpringFestival(datum: Date): boolean {
-  const springStart = new Date(2027, 1, 5) // 5. Februar
-  const springEnd = new Date(2027, 1, 12)    // 12. Februar
+export function istSpringFestival(datum: Date, customFeiertage?: FeiertagsKonfiguration[]): boolean {
+  const jahr = datum.getFullYear()
   
-  return datum >= springStart && datum <= springEnd
+  // Methode 1: Custom-Feiertage prüfen
+  if (customFeiertage) {
+    const datumStr = toLocalISODateString(datum)
+    const springFestivalTage = customFeiertage.filter(f => 
+      f.land === 'China' && f.name.includes('Spring Festival')
+    )
+    return springFestivalTage.some(f => f.datum === datumStr)
+  }
+  
+  // Methode 2: Nutze getSpringFestivalPeriode (prüft JSON + Generierung)
+  const periode = getSpringFestivalPeriode(jahr)
+  if (periode) {
+    return datum >= periode.start && datum <= periode.ende
+  }
+  
+  // Methode 3: Fallback - prüfe in geladenen China-Feiertagen
+  const chinaFeiertage = istChinaFeiertag(datum, customFeiertage)
+  return chinaFeiertage.some(f => f.name.includes('Spring Festival'))
 }
 
 /**
- * Generiert einen vollständigen Jahreskalender für 2027
- * @param jahr - Das Jahr für den Kalender (default: 2027)
+ * Generiert einen vollständigen Jahreskalender für ein gegebenes Jahr
+ * @param jahr - Das Jahr für den Kalender (default: aktuelles Planungsjahr aus Konfiguration)
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
- * @returns Array von Kalendertagen (365 Tage)
+ * @returns Array von Kalendertagen (365 oder 366 Tage)
  */
 export function generiereJahreskalender(
-  jahr: number = 2027,
+  jahr?: number,
   customFeiertage?: FeiertagsKonfiguration[]
 ): Kalendertag[] {
-  const kalender: Kalendertag[] = []
-  const startDatum = new Date(jahr, 0, 1) // 1. Januar
+  // Nutze Planungsjahr aus Konfiguration wenn nicht explizit angegeben
+  const planungsjahr = jahr ?? getPlanungsjahr()
   
-  // Alle 365 Tage des Jahres
-  for (let i = 0; i < 365; i++) {
+  const kalender: Kalendertag[] = []
+  const startDatum = new Date(planungsjahr, 0, 1) // 1. Januar
+  
+  // Prüfe ob Schaltjahr
+  const istSchaltjahr = (planungsjahr % 4 === 0 && planungsjahr % 100 !== 0) || (planungsjahr % 400 === 0)
+  const anzahlTage = istSchaltjahr ? 366 : 365
+  
+  // Alle Tage des Jahres
+  for (let i = 0; i < anzahlTage; i++) {
     const datum = addDays(startDatum, i)
     
     kalender.push({
@@ -615,14 +717,17 @@ export function berechneAnkunftsdatum(
 }
 
 /**
- * Zählt Arbeitstage pro Monat im Jahr 2027 (China)
+ * Zählt Arbeitstage pro Monat (China)
+ * @param jahr - Jahr (default: aktuelles Planungsjahr)
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Array mit 12 Zahlen (Arbeitstage pro Monat, China)
  */
 export function zaehleArbeitstageProMonat(
+  jahr?: number,
   customFeiertage?: FeiertagsKonfiguration[]
 ): number[] {
-  const kalender = generiereJahreskalender(2027, customFeiertage)
+  const planungsjahr = jahr ?? getPlanungsjahr()
+  const kalender = generiereJahreskalender(planungsjahr, customFeiertage)
   const arbeitstageProMonat: number[] = Array(12).fill(0)
   
   kalender.forEach(tag => {
@@ -635,14 +740,17 @@ export function zaehleArbeitstageProMonat(
 }
 
 /**
- * Zählt Arbeitstage pro Monat im Jahr 2027 (Deutschland)
+ * Zählt Arbeitstage pro Monat (Deutschland)
+ * @param jahr - Jahr (default: aktuelles Planungsjahr)
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Array mit 12 Zahlen (Arbeitstage pro Monat, Deutschland)
  */
 export function zaehleArbeitstageProMonat_Deutschland(
+  jahr?: number,
   customFeiertage?: FeiertagsKonfiguration[]
 ): number[] {
-  const kalender = generiereJahreskalender(2027, customFeiertage)
+  const planungsjahr = jahr ?? getPlanungsjahr()
+  const kalender = generiereJahreskalender(planungsjahr, customFeiertage)
   const arbeitstageProMonat: number[] = Array(12).fill(0)
   
   kalender.forEach(tag => {
@@ -656,22 +764,23 @@ export function zaehleArbeitstageProMonat_Deutschland(
 
 /**
  * Gibt Statistiken zum Kalender zurück
- * @param jahr - Jahr (default: 2027)
+ * @param jahr - Jahr (default: aktuelles Planungsjahr)
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @returns Kalender-Statistiken
  */
 export function kalenderStatistik(
-  jahr: number = 2027,
+  jahr?: number,
   customFeiertage?: FeiertagsKonfiguration[]
 ) {
-  const kalender = generiereJahreskalender(jahr, customFeiertage)
-  const feiertageDeutschland = ladeDeutschlandFeiertage()
-  const feiertageChina = ladeChinaFeiertage()
+  const planungsjahr = jahr ?? getPlanungsjahr()
+  const kalender = generiereJahreskalender(planungsjahr, customFeiertage)
+  const feiertageDeutschland = ladeDeutschlandFeiertage(planungsjahr, 0)
+  const feiertageChina = ladeChinaFeiertage(planungsjahr, 0)
   
   const arbeitstageChina = kalender.filter(k => istArbeitstag_China(k.datum, customFeiertage)).length
   const arbeitstageDeutschland = kalender.filter(k => istArbeitstag_Deutschland(k.datum, customFeiertage)).length
   const wochenenden = kalender.filter(k => isWeekend(k.datum)).length
-  const springFestivalTage = kalender.filter(k => istSpringFestival(k.datum)).length
+  const springFestivalTage = kalender.filter(k => istSpringFestival(k.datum, customFeiertage)).length
   
   return {
     gesamt: kalender.length,

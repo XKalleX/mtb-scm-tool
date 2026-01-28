@@ -386,6 +386,28 @@ Dieses Projekt wurde für akademische Zwecke entwickelt.
 
 ---
 
+## 🔄 Dynamic Date Handling
+
+Das System unterstützt **dynamische Jahresplanung** - nicht mehr auf 2027 beschränkt!
+
+### Features
+- ✅ Konfigurierbares Planungsjahr (beliebiges Jahr)
+- ✅ Automatische Feiertagsgenerierung für unbekannte Jahre
+- ✅ Spring Festival Unterstützung (2024-2033)
+- ✅ Schaltjahr-kompatibel
+- ✅ Rückwärtskompatibel mit bestehendem Code
+
+### Nutzung
+```typescript
+// Planungsjahr ändern
+const { setPlanungsjahr } = useKonfiguration()
+setPlanungsjahr(2028)  // Feiertage + 'Heute'-Datum werden automatisch angepasst
+```
+
+Siehe [DYNAMIC_DATES_IMPLEMENTATION.md](./DYNAMIC_DATES_IMPLEMENTATION.md) für Details.
+
+---
+
 ## 🆘 Support
 
 Bei Fragen zur Implementierung:

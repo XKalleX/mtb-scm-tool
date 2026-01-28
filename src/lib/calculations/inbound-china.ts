@@ -159,11 +159,24 @@ export function erstelleBestellung(
  * - Bestelle jeweils am Monatsanfang für den Monat + 49 Tage Vorlauf
  * 
  * @param alleProduktionsplaene - Pläne aller Varianten
+ * @param planungsjahr - Planungsjahr (optional, wird aus Produktionsplänen ermittelt)
  * @returns Array von Bestellungen
  */
 export function generiereJahresbestellungen(
-  alleProduktionsplaene: Record<string, TagesProduktionsplan[]>
+  alleProduktionsplaene: Record<string, TagesProduktionsplan[]>,
+  planungsjahr?: number
 ): Bestellung[] {
+  // Ermittle Planungsjahr aus den Produktionsplänen falls nicht angegeben
+  let jahr = planungsjahr
+  if (!jahr) {
+    const erstePlaene = Object.values(alleProduktionsplaene)[0]
+    if (erstePlaene && erstePlaene.length > 0) {
+      jahr = new Date(erstePlaene[0].datum).getFullYear()
+    } else {
+      jahr = 2027 // Fallback
+    }
+  }
+  
   const bestellungen: Bestellung[] = []
   const stuecklisten = stuecklistenData.stuecklisten
   
@@ -197,7 +210,7 @@ export function generiereJahresbestellungen(
     })
     
     // Bedarfsdatum = 1. Tag des Monats
-    const bedarfsdatum = new Date(2027, monat - 1, 1)
+    const bedarfsdatum = new Date(jahr, monat - 1, 1)
     
     // Erstelle Bestellung
     const bestellung = erstelleBestellung(monatsBedarf, bedarfsdatum)

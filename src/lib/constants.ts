@@ -7,17 +7,42 @@
  */
 
 /**
+ * Standard-Planungsjahr für das System
+ * Kann über KonfigurationContext überschrieben werden
+ * 
+ * DYNAMISCH: Wird als Default verwendet, System funktioniert mit jedem Jahr
+ */
+export const DEFAULT_PLANUNGSJAHR = 2027
+
+/**
  * Standard 'Heute'-Datum für Frozen Zone Konzept
  * Verwendet wenn keine Konfiguration vorhanden oder ungültig
  * 
- * Datum: 15. April 2027 (Mitte der Saison, nach Peak im April)
+ * DYNAMISCH: Wird basierend auf Planungsjahr angepasst
+ * Datum: 15. April (Mitte der Saison, nach Peak im April)
  */
-export const DEFAULT_HEUTE_DATUM = '2027-04-15'
+export const DEFAULT_HEUTE_DATUM_RELATIV = '04-15'  // Monat-Tag ohne Jahr
 
 /**
- * Planungsjahr für das gesamte System
+ * Generiert Standard-'Heute'-Datum für ein gegebenes Planungsjahr
+ * @param jahr - Planungsjahr
+ * @returns ISO-Datum-String (YYYY-MM-DD)
  */
-export const PLANUNGSJAHR = 2027
+export function getDefaultHeuteDatum(jahr: number = DEFAULT_PLANUNGSJAHR): string {
+  return `${jahr}-${DEFAULT_HEUTE_DATUM_RELATIV}`
+}
+
+/**
+ * @deprecated Nutze getDefaultHeuteDatum() für dynamisches Datum
+ * Legacy-Konstante für Rückwärtskompatibilität
+ */
+export const DEFAULT_HEUTE_DATUM = getDefaultHeuteDatum(DEFAULT_PLANUNGSJAHR)
+
+/**
+ * @deprecated Nutze DEFAULT_PLANUNGSJAHR
+ * Legacy-Export für Rückwärtskompatibilität
+ */
+export const PLANUNGSJAHR = DEFAULT_PLANUNGSJAHR
 
 /**
  * Jahresproduktion - Standard-Wert

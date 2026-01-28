@@ -33,8 +33,9 @@ import feiertageChinaData from '@/data/feiertage-china.json'
 import feiertageDeutschlandData from '@/data/feiertage-deutschland.json'
 import lieferantChinaData from '@/data/lieferant-china.json'
 import stuecklisteData from '@/data/stueckliste.json'
-import { DEFAULT_HEUTE_DATUM, PLANUNGSJAHR, KONFIGURATION_STORAGE_KEY, isValidDate, parseDateSafe } from '@/lib/constants'
+import { DEFAULT_PLANUNGSJAHR, getDefaultHeuteDatum, KONFIGURATION_STORAGE_KEY, isValidDate, parseDateSafe } from '@/lib/constants'
 import { toLocalISODateString } from '@/lib/utils'
+import { generiereAlleFeiertage } from '@/lib/holiday-generator'
 
 // ========================================
 // TYPEN FÜR KONFIGURATION
@@ -191,53 +192,67 @@ const STANDARD_SAISONALITAET: SaisonalitaetMonatConfig[] = saisonalitaetData.sai
 const STANDARD_VARIANTEN: MTBVarianteConfig[] = stammdatenData.varianten as MTBVarianteConfig[]
 
 /**
- * Feiertage aus JSON laden (Deutschland + China)
- * Lädt für beide Jahre 2026 und 2027 zur Berücksichtigung von Vorlaufzeiten
+ * Lädt Feiertage aus JSON für bekannte Jahre, generiert dynamisch für andere
+ * @param planungsjahr - Zentales Planungsjahr
+ * @returns Array von Feiertagen für 3 Jahre (jahr-1, jahr, jahr+1)
  */
-const STANDARD_FEIERTAGE: FeiertagConfig[] = [
-  // Deutschland (NRW) - 2026
-  ...feiertageDeutschlandData.feiertage2026.map(f => ({
-    datum: f.datum,
-    name: f.name,
-    typ: f.typ as 'gesetzlich',
-    land: 'Deutschland' as const
-  })),
-  // Deutschland (NRW) - 2027
-  ...feiertageDeutschlandData.feiertage2027.map(f => ({
-    datum: f.datum,
-    name: f.name,
-    typ: f.typ as 'gesetzlich',
-    land: 'Deutschland' as const
-  })),
-  // Deutschland (NRW) - 2028 (Januar-Februar für Vorlaufzeiten)
-  ...(feiertageDeutschlandData.feiertage2028 || []).map(f => ({
-    datum: f.datum,
-    name: f.name,
-    typ: f.typ as 'gesetzlich',
-    land: 'Deutschland' as const
-  })),
-  // China - 2026
-  ...feiertageChinaData.feiertage2026.map(f => ({
-    datum: f.datum,
-    name: f.name,
-    typ: (f.typ === 'gesetzlich' ? 'gesetzlich' : 'Festival') as 'gesetzlich' | 'Festival',
-    land: 'China' as const
-  })),
-  // China - 2027
-  ...feiertageChinaData.feiertage2027.map(f => ({
-    datum: f.datum,
-    name: f.name,
-    typ: (f.typ === 'gesetzlich' ? 'gesetzlich' : 'Festival') as 'gesetzlich' | 'Festival',
-    land: 'China' as const
-  })),
-  // China - 2028 (Januar-Februar für Vorlaufzeiten)
-  ...(feiertageChinaData.feiertage2028 || []).map(f => ({
-    datum: f.datum,
-    name: f.name,
-    typ: (f.typ === 'gesetzlich' ? 'gesetzlich' : 'Festival') as 'gesetzlich' | 'Festival',
-    land: 'China' as const
-  }))
-]
+function ladeFeiertageFuerPlanungsjahr(planungsjahr: number): FeiertagConfig[] {
+  const feiertage: FeiertagConfig[] = []
+  
+  // Versuche JSON-Daten zu laden für bekannte Jahre (2026-2028)
+  const verfuegbareJahreDeutschland: Record<number, any[]> = {
+    2026: feiertageDeutschlandData.feiertage2026 || [],
+    2027: feiertageDeutschlandData.feiertage2027 || [],
+    2028: (feiertageDeutschlandData as any).feiertage2028 || []
+  }
+  
+  const verfuegbareJahreChina: Record<number, any[]> = {
+    2026: feiertageChinaData.feiertage2026 || [],
+    2027: feiertageChinaData.feiertage2027 || [],
+    2028: (feiertageChinaData as any).feiertage2028 || []
+  }
+  
+  // Lade 3 Jahre: vorheriges Jahr, Planungsjahr, nächstes Jahr
+  for (let jahr = planungsjahr - 1; jahr <= planungsjahr + 1; jahr++) {
+    // Deutschland
+    const deutschlandJSON = verfuegbareJahreDeutschland[jahr]
+    if (deutschlandJSON && deutschlandJSON.length > 0) {
+      feiertage.push(...deutschlandJSON.map(f => ({
+        datum: f.datum,
+        name: f.name,
+        typ: f.typ as 'gesetzlich',
+        land: 'Deutschland' as const
+      })))
+    } else {
+      // Generiere dynamisch
+      const generiert = generiereAlleFeiertage(jahr).filter(f => f.land === 'Deutschland')
+      feiertage.push(...generiert)
+    }
+    
+    // China
+    const chinaJSON = verfuegbareJahreChina[jahr]
+    if (chinaJSON && chinaJSON.length > 0) {
+      feiertage.push(...chinaJSON.map(f => ({
+        datum: f.datum,
+        name: f.name,
+        typ: (f.typ === 'gesetzlich' ? 'gesetzlich' : 'Festival') as 'gesetzlich' | 'Festival',
+        land: 'China' as const
+      })))
+    } else {
+      // Generiere dynamisch
+      const generiert = generiereAlleFeiertage(jahr).filter(f => f.land === 'China')
+      feiertage.push(...generiert)
+    }
+  }
+  
+  return feiertage
+}
+
+/**
+ * Feiertage basierend auf Planungsjahr laden
+ * Nutzt JSON für bekannte Jahre (2026-2028), generiert dynamisch für andere
+ */
+const STANDARD_FEIERTAGE: FeiertagConfig[] = ladeFeiertageFuerPlanungsjahr(DEFAULT_PLANUNGSJAHR)
 
 /**
  * Lieferant aus JSON laden
@@ -277,8 +292,8 @@ const STANDARD_STUECKLISTE: StuecklistenPosition[] = Object.entries(stuecklisteD
 
 const STANDARD_KONFIGURATION: KonfigurationData = {
   jahresproduktion: (stammdatenData as any).jahresproduktion?.gesamt || 370000,
-  planungsjahr: stammdatenData.projekt.planungsjahr,
-  heuteDatum: (stammdatenData.projekt as any).heuteDatum || DEFAULT_HEUTE_DATUM,  // Standard 'Heute'-Datum aus constants
+  planungsjahr: stammdatenData.projekt.planungsjahr || DEFAULT_PLANUNGSJAHR,
+  heuteDatum: (stammdatenData.projekt as any).heuteDatum || getDefaultHeuteDatum(stammdatenData.projekt.planungsjahr || DEFAULT_PLANUNGSJAHR),  // Dynamisch basierend auf Planungsjahr
   varianten: STANDARD_VARIANTEN,
   saisonalitaet: STANDARD_SAISONALITAET,
   feiertage: STANDARD_FEIERTAGE,
@@ -303,14 +318,17 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
       if (gespeicherteKonfiguration) {
         const parsed = JSON.parse(gespeicherteKonfiguration) as KonfigurationData
         
-        // ✅ WICHTIG: Feiertage IMMER aus aktuellen JSON-Dateien laden!
+        // ✅ WICHTIG: Feiertage IMMER basierend auf Planungsjahr neu laden!
         // Dies verhindert, dass alte/fehlende Feiertage aus dem localStorage 
         // die Produktionsplanung verfälschen.
         // Feiertage werden NICHT aus localStorage übernommen, sondern immer
-        // aus STANDARD_FEIERTAGE (JSON-Dateien = Single Source of Truth)
+        // neu generiert/geladen basierend auf dem aktuellen Planungsjahr.
+        const planungsjahr = parsed.planungsjahr || DEFAULT_PLANUNGSJAHR
+        const aktuelleFeiertage = ladeFeiertageFuerPlanungsjahr(planungsjahr)
+        
         const konfigurationMitAktuellenFeiertagen: KonfigurationData = {
           ...parsed,
-          feiertage: STANDARD_FEIERTAGE // IMMER aktuelle Feiertage aus JSON!
+          feiertage: aktuelleFeiertage // IMMER aktuelle Feiertage basierend auf Planungsjahr!
         }
         
         setKonfiguration(konfigurationMitAktuellenFeiertagen)
@@ -342,7 +360,18 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const setPlanungsjahr = useCallback((value: number) => {
-    setKonfiguration(prev => ({ ...prev, planungsjahr: value }))
+    setKonfiguration(prev => {
+      // Wenn Planungsjahr sich ändert, aktualisiere auch Feiertage und 'Heute'-Datum
+      const neueFeiertage = ladeFeiertageFuerPlanungsjahr(value)
+      const neuesHeuteDatum = getDefaultHeuteDatum(value)
+      
+      return {
+        ...prev,
+        planungsjahr: value,
+        feiertage: neueFeiertage,
+        heuteDatum: neuesHeuteDatum
+      }
+    })
   }, [])
 
   /**
@@ -362,9 +391,10 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
     }
     
     // Prüfe ob Datum im Planungsjahr liegt (Warnung, aber erlauben)
-    if (datum.getFullYear() !== PLANUNGSJAHR) {
-      console.warn(`⚠️ Datum außerhalb des Planungsjahres ${PLANUNGSJAHR}: ${value}`)
-      console.warn('Dies kann zu inkonsistentem Verhalten führen. Bitte wählen Sie ein Datum in 2027.')
+    const planungsjahr = konfiguration.planungsjahr || DEFAULT_PLANUNGSJAHR
+    if (datum.getFullYear() !== planungsjahr) {
+      console.warn(`⚠️ Datum außerhalb des Planungsjahres ${planungsjahr}: ${value}`)
+      console.warn(`Dies kann zu inkonsistentem Verhalten führen. Bitte wählen Sie ein Datum in ${planungsjahr}.`)
     }
     
     setKonfiguration(prev => ({ ...prev, heuteDatum: value }))

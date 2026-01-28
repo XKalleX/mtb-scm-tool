@@ -71,9 +71,9 @@ export function generiereProduktionsplan(
   jahresproduktion: number,
   customFeiertage?: FeiertagsKonfiguration[]
 ): TagesProduktionsplan[] {
-  const kalender = generiereJahreskalender(2027, customFeiertage)
+  const kalender = generiereJahreskalender(undefined, customFeiertage) // verwendet Planungsjahr aus Konfiguration
   const monatsproduktionen = berechneMonatsproduktionen(jahresproduktion)
-  const arbeitstageProMonat = zaehleArbeitstageProMonat_Deutschland(customFeiertage) // ✅ DEUTSCHE Feiertage!
+  const arbeitstageProMonat = zaehleArbeitstageProMonat_Deutschland(undefined, customFeiertage) // ✅ DEUTSCHE Feiertage!
   
   const tagesplaene: TagesProduktionsplan[] = []
   
@@ -226,7 +226,7 @@ export function gesamtProduktionAmTag(
 export function findeMaxProduktionsTag(
   allePlayne: Record<string, TagesProduktionsplan[]>
 ): { datum: Date, menge: number } {
-  const kalender = generiereJahreskalender(2027)
+  const kalender = generiereJahreskalender() // verwendet Planungsjahr aus Konfiguration
   let maxDatum = kalender[0].datum
   let maxMenge = 0
   
