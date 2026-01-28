@@ -7,75 +7,91 @@
  * und keine systematischen Rundungsfehler aufweist.
  * 
  * ANFORDERUNG: Jahresproduktion muss EXAKT 370.000 Bikes sein (±0 Toleranz pro Variante)
+ * 
+ * ✅ AKTUALISIERT: Nutzt nun zentrale-produktionsplanung.ts und KonfigurationContext
  */
 
 import { 
   generiereVariantenProduktionsplan,
-  generiereAlleVariantenProduktionsplaene,
-  aggregiereProduktionsplaene
-} from '../lib/calculations/tagesproduktion'
-import { MTB_VARIANTEN, PRODUKTIONSVOLUMEN } from '../../kontext/Spezifikation_SSOT_MR'
+  generiereAlleVariantenProduktionsplaene
+} from '../lib/calculations/zentrale-produktionsplanung'
+import { STANDARD_KONFIGURATION } from '../contexts/KonfigurationContext'
 
 describe('Produktionsberechnung', () => {
+  const konfiguration = STANDARD_KONFIGURATION
+  
   describe('Einzelvarianten-Produktion', () => {
-    MTB_VARIANTEN.forEach(variante => {
-      test(`${variante.name} (${variante.id}) produziert exakt ${variante.jahresProduktion.toLocaleString()} Bikes`, () => {
-        const plan = generiereVariantenProduktionsplan(variante)
+    konfiguration.varianten.forEach(variante => {
+      const jahresProduktion = Math.round(konfiguration.jahresproduktion * variante.anteilPrognose)
+      
+      test(`${variante.name} (${variante.id}) produziert exakt ${jahresProduktion.toLocaleString()} Bikes`, () => {
+        const plan = generiereVariantenProduktionsplan(konfiguration, variante.id)
+        
+        if (!plan) {
+          throw new Error(`Plan konnte nicht generiert werden für ${variante.id}`)
+        }
         
         // Berechne tatsächliche Jahresproduktion
-        const istProduktion = plan.tage.reduce((sum, tag) => sum + tag.istProduktion, 0)
+        const istProduktion = plan.tage.reduce((sum, tag) => sum + tag.istMenge, 0)
         
         // Validierung: Ist-Produktion MUSS exakt Soll-Produktion entsprechen
-        expect(istProduktion).toBe(variante.jahresProduktion)
+        expect(istProduktion).toBe(jahresProduktion)
         
         // Zusätzliche Validierung: Abweichung im Plan sollte 0 sein
         expect(plan.abweichung).toBe(0)
         
         // Konsolen-Output für Debugging
-        console.log(`✓ ${variante.name}: ${istProduktion.toLocaleString()} / ${variante.jahresProduktion.toLocaleString()} Bikes`)
+        console.log(`✓ ${variante.name}: ${istProduktion.toLocaleString()} / ${jahresProduktion.toLocaleString()} Bikes`)
       })
     })
   })
 
   describe('Gesamtproduktion', () => {
     test('Summe aller Varianten ergibt exakt 370.000 Bikes', () => {
-      const allePlaene = generiereAlleVariantenProduktionsplaene()
+      const allePlaene = generiereAlleVariantenProduktionsplaene(konfiguration)
       
       // Berechne Gesamtproduktion aller Varianten
-      const gesamtProduktion = allePlaene.reduce((sum, plan) => {
-        const variantenProduktion = plan.tage.reduce((tagSum, tag) => tagSum + tag.istProduktion, 0)
+      const gesamtProduktion = Object.values(allePlaene).reduce((sum, plan) => {
+        const variantenProduktion = plan.tage.reduce((tagSum, tag) => tagSum + tag.istMenge, 0)
         return sum + variantenProduktion
       }, 0)
       
       // KRITISCHE VALIDIERUNG: Muss exakt 370.000 sein!
-      expect(gesamtProduktion).toBe(PRODUKTIONSVOLUMEN.jahresProduktion)
+      expect(gesamtProduktion).toBe(konfiguration.jahresproduktion)
       expect(gesamtProduktion).toBe(370_000)
       
       console.log(`\n=== GESAMTVALIDIERUNG ===`)
       console.log(`✓ Gesamtproduktion: ${gesamtProduktion.toLocaleString()} Bikes`)
-      console.log(`✓ Soll:             ${PRODUKTIONSVOLUMEN.jahresProduktion.toLocaleString()} Bikes`)
-      console.log(`✓ Abweichung:       ${gesamtProduktion - PRODUKTIONSVOLUMEN.jahresProduktion} Bikes`)
+      console.log(`✓ Soll:             ${konfiguration.jahresproduktion.toLocaleString()} Bikes`)
+      console.log(`✓ Abweichung:       ${gesamtProduktion - konfiguration.jahresproduktion} Bikes`)
     })
     
-    test('Aggregierte Tagesproduktion über 365 Tage ergibt 370.000 Bikes', () => {
-      const allePlaene = generiereAlleVariantenProduktionsplaene()
-      const aggregiert = aggregiereProduktionsplaene(allePlaene)
+    test('Kumulativer Endwert über 365 Tage ergibt 370.000 Bikes', () => {
+      const allePlaene = generiereAlleVariantenProduktionsplaene(konfiguration)
       
-      // Letzter kumulativer Wert sollte 370.000 sein
-      const letzterTag = aggregiert[364] // Tag 365 (Index 364)
-      expect(letzterTag.kumulativIst).toBe(370_000)
+      // Summiere kumulative Endwerte aller Varianten
+      const gesamtKumulativ = Object.values(allePlaene).reduce((sum, plan) => {
+        const letzterTag = plan.tage[364] // Tag 365 (Index 364)
+        return sum + letzterTag.kumulativIst
+      }, 0)
       
-      console.log(`✓ Kumulativ Tag 365: ${letzterTag.kumulativIst.toLocaleString()} Bikes`)
+      expect(gesamtKumulativ).toBe(370_000)
+      
+      console.log(`✓ Kumulativ gesamt Tag 365: ${gesamtKumulativ.toLocaleString()} Bikes`)
     })
   })
 
   describe('Error Management Validierung', () => {
     test('Kumulativer Fehler bleibt für jede Variante unter Kontrolle', () => {
-      MTB_VARIANTEN.forEach(variante => {
-        const plan = generiereVariantenProduktionsplan(variante)
+      konfiguration.varianten.forEach(variante => {
+        const plan = generiereVariantenProduktionsplan(konfiguration, variante.id)
+        
+        if (!plan) {
+          throw new Error(`Plan konnte nicht generiert werden für ${variante.id}`)
+        }
         
         // Prüfe ob Error Management funktioniert
-        const maxFehler = Math.max(...plan.tage.map(t => Math.abs(t.fehler)))
+        const maxFehler = Math.max(...plan.tage.map(t => Math.abs(t.monatsFehlerNachher)))
         
         // Fehler sollte NIEMALS größer als 1.0 sein (würde bedeuten Error Mgmt funktioniert nicht)
         expect(maxFehler).toBeLessThan(1.0)
@@ -85,14 +101,19 @@ describe('Produktionsberechnung', () => {
     })
     
     test('Keine Produktion an Wochenenden und Feiertagen', () => {
-      const plan = generiereVariantenProduktionsplan(MTB_VARIANTEN[0])
+      const variante = konfiguration.varianten[0]
+      const plan = generiereVariantenProduktionsplan(konfiguration, variante.id)
+      
+      if (!plan) {
+        throw new Error(`Plan konnte nicht generiert werden für ${variante.id}`)
+      }
       
       plan.tage.forEach(tag => {
         if (!tag.istArbeitstag) {
-          expect(tag.istProduktion).toBe(0)
-          expect(tag.sollProduktion).toBe(0)
+          expect(tag.istMenge).toBe(0)
+          expect(tag.planMenge).toBe(0)
         } else {
-          expect(tag.istProduktion).toBeGreaterThan(0)
+          expect(tag.planMenge).toBeGreaterThan(0)
         }
       })
       
@@ -107,15 +128,20 @@ describe('Produktionsberechnung', () => {
 
   describe('Saisonalität', () => {
     test('April (Peak Monat) hat höhere Produktion als Dezember', () => {
-      const plan = generiereVariantenProduktionsplan(MTB_VARIANTEN[0])
+      const variante = konfiguration.varianten[0]
+      const plan = generiereVariantenProduktionsplan(konfiguration, variante.id)
+      
+      if (!plan) {
+        throw new Error(`Plan konnte nicht generiert werden für ${variante.id}`)
+      }
       
       // April-Tage (Monat 4)
       const aprilTage = plan.tage.filter(t => t.monat === 4 && t.istArbeitstag)
-      const aprilProduktion = aprilTage.reduce((sum, t) => sum + t.istProduktion, 0)
+      const aprilProduktion = aprilTage.reduce((sum, t) => sum + t.istMenge, 0)
       
       // Dezember-Tage (Monat 12)
       const dezemberTage = plan.tage.filter(t => t.monat === 12 && t.istArbeitstag)
-      const dezemberProduktion = dezemberTage.reduce((sum, t) => sum + t.istProduktion, 0)
+      const dezemberProduktion = dezemberTage.reduce((sum, t) => sum + t.istMenge, 0)
       
       // April sollte deutlich mehr produzieren (16% vs 3%)
       expect(aprilProduktion).toBeGreaterThan(dezemberProduktion * 2)

@@ -3,6 +3,22 @@
  * TAGESPRODUKTION - 365 TAGE GRANULARE PLANUNG
  * ═══════════════════════════════════════════════════════════════════════════════
  * 
+ * ⚠️ DEPRECATED: Diese Datei ist veraltet!
+ * ⚠️ Bitte nutzen Sie stattdessen: src/lib/calculations/zentrale-produktionsplanung.ts
+ * 
+ * Diese Datei verwendet hardcodierte Werte aus Spezifikation_SSOT_MR.ts (Dokumentation).
+ * Die neue zentrale-produktionsplanung.ts nutzt KonfigurationContext und JSON-Dateien
+ * als Single Source of Truth.
+ * 
+ * Migration:
+ * - Alt: generiereVariantenProduktionsplan(variante, feiertage?)
+ * - Neu: generiereVariantenProduktionsplan(konfiguration, varianteId, wochenPlanung?)
+ * 
+ * - Alt: generiereAlleVariantenProduktionsplaene(feiertage?)
+ * - Neu: generiereAlleVariantenProduktionsplaene(konfiguration, wochenPlanungen?)
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 
  * 🎯 ANFORDERUNG A2: Saisonale Programmplanung mit Error Management
  * 
  * Berechnet die Tagesproduktion für das gesamte Jahr 2027 unter Berücksichtigung:
@@ -12,7 +28,7 @@
  * - MTB-Varianten mit korrekten Marktanteilen
  * - Nur Sättel gemäß Ermäßigung
  * 
- * QUELLE: kontext/Spezifikation_SSOT_MR.ts
+ * QUELLE: kontext/Spezifikation_SSOT_MR.ts (DOKUMENTATION - nicht für Code verwenden!)
  */
 
 import { 
