@@ -184,6 +184,20 @@ export function berechneIntegriertesWarehouse(
   // STEP 1: GENERIERE INBOUND BESTELLUNGEN (mit 49 Tage Vorlauf!)
   // ═══════════════════════════════════════════════════════════════════════════════
   
+  // Bereite Stücklisten-Map vor (für generiereTaeglicheBestellungen)
+  // Transformiere stueckliste[] aus Konfiguration in das erwartete Format
+  const stuecklistenMap: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }> = {}
+  konfiguration.stueckliste.forEach(s => {
+    if (!stuecklistenMap[s.mtbVariante]) {
+      stuecklistenMap[s.mtbVariante] = { komponenten: {} }
+    }
+    stuecklistenMap[s.mtbVariante].komponenten[s.bauteilId] = {
+      name: s.bauteilName,
+      menge: s.menge,
+      einheit: s.einheit || 'Stück'
+    }
+  })
+  
   // Konvertiere Produktionspläne zu TagesProduktionsplan Format
   const produktionsplaeneFormatiert: Record<string, any[]> = {}
   Object.entries(variantenProduktionsplaene).forEach(([varianteId, plan]) => {
@@ -201,7 +215,10 @@ export function berechneIntegriertesWarehouse(
       produktionsplaeneFormatiert,
       planungsjahr,
       konfiguration.lieferant.gesamtVorlaufzeitTage,
-      konfiguration.feiertage
+      konfiguration.feiertage,
+      stuecklistenMap,  // Stücklisten aus Konfiguration
+      konfiguration.lieferant.losgroesse,  // Losgröße aus Konfiguration
+      konfiguration.lieferant.lieferintervall  // Lieferintervall aus Konfiguration
     ),
     ...zusatzBestellungen
   ]
