@@ -23,22 +23,29 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
-import { Calendar, TrendingUp, AlertCircle, Download, AlertTriangle, Zap } from 'lucide-react'
+import { TrendingUp, AlertCircle, Download, Zap } from 'lucide-react'
 import { formatNumber, formatDate, toLocalISODateString } from '@/lib/utils'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import { showError, showSuccess } from '@/lib/notifications'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
-import { DeltaCell, DeltaBadge, SzenarioHinweis } from '@/components/DeltaCell'
+import { DeltaCell, DeltaBadge } from '@/components/DeltaCell'
 import React, { useState, useMemo } from 'react'
 import { 
   generiereAlleVariantenProduktionsplaene,
-  berechneProduktionsStatistiken,
-  type TagesProduktionEntry
+  berechneProduktionsStatistiken
 } from '@/lib/calculations/zentrale-produktionsplanung'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { getDateRowBackgroundClasses, getDateTooltip } from '@/lib/date-classification'
+
+/**
+ * Type für Stücklisten-Komponenten
+ */
+interface StuecklistenKomponente {
+  name: string
+  menge: number
+}
 
 /**
  * OEM Programm Hauptseite
@@ -50,7 +57,6 @@ import { getDateRowBackgroundClasses, getDateTooltip } from '@/lib/date-classifi
  */
 export default function OEMProgrammPage() {
   const [selectedVariante, setSelectedVariante] = useState('MTBAllrounder')
-  const [viewMode, setViewMode] = useState<'single' | 'all'>('single')
   
   // Hole Konfiguration aus Context
   const { konfiguration, isInitialized, getArbeitstageProJahr, getJahresproduktionProVariante } = useKonfiguration()
@@ -61,9 +67,7 @@ export default function OEMProgrammPage() {
     aktiveSzenarienCount,
     aktiveSzenarien,
     variantenPlaene,
-    statistiken,
-    formatDelta,
-    getDeltaColorClass
+    statistiken
   } = useSzenarioBerechnung()
 
   // Baseline-Produktionspläne (für Vergleich wenn keine Szenarien aktiv)
@@ -326,7 +330,7 @@ export default function OEMProgrammPage() {
               <div>
                 <h4 className="text-sm font-semibold mb-3">Saisonale Produktionsverteilung (% der Jahresproduktion)</h4>
                 <div className="space-y-2">
-                  {konfiguration.saisonalitaet.map((s, index) => {
+                  {konfiguration.saisonalitaet.map((s) => {
                     const bikes = Math.round(konfiguration.jahresproduktion * (s.anteil / 100))
                     const peakMonat = konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max)
                     const isPeak = s.monat === peakMonat.monat
@@ -380,7 +384,7 @@ export default function OEMProgrammPage() {
                         <strong>Schritt 4:</strong> Error-Management korrigiert Rundungsfehler → exakt {formatNumber(peakProduktion, 0)} Bikes am Monatsende
                       </p>
                       <p className="pt-2 border-t border-blue-300 mt-3">
-                        → Diese Logik sehen Sie detailliert im Tab <strong>"Tagesplanung"</strong> für jede der {konfiguration.varianten.length} Varianten!
+                        → Diese Logik sehen Sie detailliert im Tab <strong>&quot;Tagesplanung&quot;</strong> für jede der {konfiguration.varianten.length} Varianten!
                       </p>
                     </div>
                   )
@@ -415,7 +419,7 @@ export default function OEMProgrammPage() {
                     const peakMonat = konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max)
                     const peakProduktion = jahresprod * (peakMonat.anteil / 100)
                     const stl = stuecklistenMap[v.id]
-                    const sattel = stl ? Object.values(stl.komponenten)[0] as any : null
+                    const sattel = stl ? Object.values(stl.komponenten)[0] as StuecklistenKomponente : null
                     
                     return (
                       <TableRow key={v.id}>
@@ -468,7 +472,7 @@ export default function OEMProgrammPage() {
                     if (!stl) return null
                     
                     // Nur Sattel extrahieren
-                    const sattel = Object.values(stl.komponenten)[0] as any
+                    const sattel = Object.values(stl.komponenten)[0] as StuecklistenKomponente
                     const jahresprod = jahresproduktionProVariante[v.id] || Math.round(konfiguration.jahresproduktion * v.anteilPrognose)
                     
                     return (
@@ -531,9 +535,8 @@ export default function OEMProgrammPage() {
           {produktionsplaene && selectedVariante && (() => {
             const variantePlan = produktionsplaene[selectedVariante]
             const stats = berechneProduktionsStatistiken(variantePlan.tage)
-            const varianteInfo = konfiguration.varianten.find(v => v.id === selectedVariante)
             const stl = stuecklistenMap[selectedVariante]
-            const sattel = stl ? Object.values(stl.komponenten)[0] as any : null
+            const sattel = stl ? Object.values(stl.komponenten)[0] as StuecklistenKomponente : null
             const peakMonat = konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max)
             
             return (
@@ -628,9 +631,6 @@ export default function OEMProgrammPage() {
 
               {/* Excel-ähnliche Tabelle mit allen Tagen */}
               {produktionsplaene && (() => {
-                const stl = stuecklistenMap[selectedVariante]
-                const sattel = stl ? Object.values(stl.komponenten)[0] as any : null
-                
                 return (
                   <ExcelTable
                     columns={[
@@ -865,61 +865,6 @@ export default function OEMProgrammPage() {
                 const referenzVariante = Object.values(produktionsplaene)[0]
                 const alleTage = referenzVariante.tage
                 
-                // Erstelle Spalten: Datum + Status + eine Spalte pro Variante + Gesamt
-                const variantenSpalten = konfiguration.varianten.flatMap(v => [
-                  {
-                    key: `${v.id}_menge`,
-                    label: `${v.name.replace('MTB ', '')}`,
-                    width: '90px',
-                    align: 'right' as const,
-                    format: (val: number) => val === 0 ? '-' : formatNumber(val, 0),
-                    sumable: true
-                  },
-                  {
-                    key: `${v.id}_error`,
-                    label: `Error`,
-                    width: '70px',
-                    align: 'right' as const,
-                    format: (val: number) => formatNumber(val, 2),
-                    sumable: false,
-                    className: (val: number) => Math.abs(val) > 0.5 ? 'text-orange-600 font-semibold' : ''
-                  }
-                ])
-                
-                const columns = [
-                  {
-                    key: 'datum',
-                    label: 'Datum',
-                    width: '100px',
-                    format: (val: Date) => formatDate(val),
-                    sumable: false
-                  },
-                  {
-                    key: 'wochentag',
-                    label: 'Tag',
-                    width: '60px',
-                    align: 'center' as const,
-                    sumable: false
-                  },
-                  {
-                    key: 'status',
-                    label: 'Status',
-                    width: '140px',
-                    align: 'left' as const,
-                    sumable: false
-                  },
-                  ...variantenSpalten,
-                  {
-                    key: 'gesamt',
-                    label: 'Gesamt',
-                    width: '100px',
-                    align: 'right' as const,
-                    format: (val: number) => val === 0 ? '-' : formatNumber(val, 0),
-                    sumable: true,
-                    className: 'font-bold bg-slate-100'
-                  }
-                ]
-                
                 // Erstelle Daten für ALLE Tage
                 const data = alleTage.map(refTag => {
                   const wochentag = refTag.datum.getDay()
@@ -933,7 +878,7 @@ export default function OEMProgrammPage() {
                     status = wochentag === 0 ? '🟡 Sonntag' : '🟡 Samstag'
                   }
                   
-                  const row: Record<string, any> = {
+                  const row: Record<string, string | number | Date> = {
                     datum: refTag.datum,
                     wochentag: refTag.wochentag,
                     status: status
@@ -1001,18 +946,18 @@ export default function OEMProgrammPage() {
                         <tbody>
                           {data.map((row, idx) => {
                             // Bestimme Hintergrundfarbe basierend auf Datum
-                            const date = row.datum
+                            const date = row.datum as Date
                             const dateClasses = getDateRowBackgroundClasses(date) || 'hover:bg-slate-50'
                             const tooltip = getDateTooltip(date)
                             
                             return (
                               <tr key={idx} className={`border-b ${dateClasses}`} title={tooltip}>
-                                <td className="p-2 text-left">{formatDate(row.datum)}</td>
-                                <td className="p-2 text-center">{row.wochentag}</td>
-                                <td className="p-2 text-left text-xs">{row.status}</td>
+                                <td className="p-2 text-left">{formatDate(row.datum as Date)}</td>
+                                <td className="p-2 text-center">{row.wochentag as string}</td>
+                                <td className="p-2 text-left text-xs">{row.status as string}</td>
                                 {konfiguration.varianten.map(v => {
-                                  const menge = row[`${v.id}_menge`]
-                                  const error = row[`${v.id}_error`]
+                                  const menge = row[`${v.id}_menge`] as number
+                                  const error = row[`${v.id}_error`] as number
                                   const errorClass = Math.abs(error) > 0.5 ? 'text-orange-600 font-semibold' : ''
                                   
                                   return (
@@ -1022,7 +967,7 @@ export default function OEMProgrammPage() {
                                     </React.Fragment>
                                   )
                                 })}
-                                <td className="p-2 text-right font-bold border-l bg-slate-50">{row.gesamt === 0 ? '-' : formatNumber(row.gesamt, 0)}</td>
+                                <td className="p-2 text-right font-bold border-l bg-slate-50">{(row.gesamt as number) === 0 ? '-' : formatNumber(row.gesamt as number, 0)}</td>
                               </tr>
                             )
                           })}
