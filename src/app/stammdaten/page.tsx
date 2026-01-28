@@ -23,6 +23,13 @@ import { Badge } from '@/components/ui/badge'
 import { Database, Package, Calendar, TrendingUp, Factory, Globe, AlertTriangle, FileJson } from 'lucide-react'
 import { formatNumber } from '@/lib/utils'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
+import { 
+  SaisonalitaetChart, 
+  VariantenPieChart, 
+  VorlaufzeitChart, 
+  KomponentenBarChart, 
+  FeiertageChart 
+} from '@/components/ui/table-charts'
 
 // Import aller JSON-Dateien
 import stammdatenData from '@/data/stammdaten.json'
@@ -164,6 +171,14 @@ function MTBVariantenCard() {
   const data = stammdatenData as any
   const varianten = data.varianten
 
+  // Bereite Daten für VariantenPieChart vor
+  const chartData = varianten.map((v: any) => ({
+    id: v.id,
+    name: v.name,
+    anteil: v.anteilPrognose,
+    menge: data.jahresproduktion.proVariante[v.id]
+  }))
+
   return (
     <Card>
       <CardHeader>
@@ -173,7 +188,8 @@ function MTBVariantenCard() {
         </CardTitle>
         <CardDescription>stammdaten.json - Alle Mountain Bike Varianten</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-6">
+        {/* Tabelle */}
         <div className="space-y-3">
           {varianten.map((v: any) => (
             <div key={v.id} className="border rounded-lg p-4 hover:bg-slate-50 transition-colors">
@@ -199,6 +215,9 @@ function MTBVariantenCard() {
             </div>
           ))}
         </div>
+
+        {/* Visualisierung */}
+        <VariantenPieChart daten={chartData} height={350} />
       </CardContent>
     </Card>
   )
@@ -210,6 +229,15 @@ function MTBVariantenCard() {
 function SaisonalitaetCard() {
   const data = saisonalitaetData as any
   const monatlich = data.saisonalitaetMonatlich
+  const jahresproduktion = stammdatenData.jahresproduktion.gesamt
+
+  // Bereite Daten für SaisonalitaetChart vor
+  const chartData = monatlich.map((m: any) => ({
+    monat: m.monat.toString(),
+    name: m.name,
+    anteil: m.anteil,
+    bikes: Math.round(jahresproduktion * (m.anteil / 100))
+  }))
 
   return (
     <Card>
@@ -220,7 +248,8 @@ function SaisonalitaetCard() {
         </CardTitle>
         <CardDescription>saisonalitaet.json - Monatliche Produktionsanteile</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-6">
+        {/* Tabelle */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {monatlich.map((m: any) => {
             const isPeak = m.anteil >= 14
@@ -256,11 +285,19 @@ function SaisonalitaetCard() {
             )
           })}
         </div>
-        <div className="mt-4 p-3 bg-slate-100 rounded">
+
+        <div className="p-3 bg-slate-100 rounded">
           <p className="text-sm">
             <strong>Summe:</strong> {data.summeCheck}% • <strong>Hinweis:</strong> {data.hinweis}
           </p>
         </div>
+
+        {/* Visualisierung */}
+        <SaisonalitaetChart 
+          daten={chartData} 
+          jahresproduktion={jahresproduktion} 
+          height={320} 
+        />
       </CardContent>
     </Card>
   )
@@ -272,6 +309,28 @@ function SaisonalitaetCard() {
 function StuecklisteCard() {
   const data = stuecklisteData as any
   const stuecklisten = data.stuecklisten
+  const jahresproduktion = stammdatenData.jahresproduktion.gesamt
+
+  // Berechne Komponentenbedarf für Chart
+  const sattelBedarf: Record<string, { name: string; menge: number }> = {}
+  
+  Object.entries(stuecklisten).forEach(([bikeId, value]: [string, any]) => {
+    const proVariante = stammdatenData.jahresproduktion.proVariante as Record<string, number>
+    const bikeProduktion = proVariante[bikeId] || 0
+    
+    Object.entries(value.komponenten).forEach(([sattelId, sattel]: [string, any]) => {
+      if (!sattelBedarf[sattelId]) {
+        sattelBedarf[sattelId] = { name: sattel.name, menge: 0 }
+      }
+      sattelBedarf[sattelId].menge += bikeProduktion * sattel.menge
+    })
+  })
+
+  const chartData = Object.entries(sattelBedarf).map(([id, data]) => ({
+    id,
+    name: data.name,
+    bedarf: data.menge
+  }))
 
   return (
     <Card>
@@ -282,12 +341,15 @@ function StuecklisteCard() {
         </CardTitle>
         <CardDescription>stueckliste.json - Ermäßigung: Nur 4 Sattel-Varianten</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+      <CardContent className="space-y-6">
+        {/* Hinweis */}
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded">
           <p className="text-sm text-blue-800">
             <strong>ℹ️ Hinweis:</strong> {data.hinweis}
           </p>
         </div>
+
+        {/* Tabelle */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {Object.entries(stuecklisten).map(([key, value]: [string, any]) => (
             <div key={key} className="border rounded-lg p-3">
@@ -304,6 +366,9 @@ function StuecklisteCard() {
             </div>
           ))}
         </div>
+
+        {/* Visualisierung */}
+        <KomponentenBarChart daten={chartData} height={200} />
       </CardContent>
     </Card>
   )
@@ -349,6 +414,16 @@ function LieferantChinaCard() {
             </p>
           </div>
         </div>
+
+        {/* Visualisierung: Vorlaufzeit Breakdown */}
+        <VorlaufzeitChart 
+          produktion={lieferant.vorlaufzeitArbeitstage}
+          lkwChina={lieferant.lkwTransportChinaArbeitstage}
+          seefracht={lieferant.vorlaufzeitKalendertage}
+          lkwDeutschland={lieferant.lkwTransportDeutschlandArbeitstage}
+          gesamt={lieferant.gesamtVorlaufzeitTage}
+          height={220}
+        />
 
         {/* Transport-Sequenz */}
         <div className="border-t pt-4">
@@ -409,9 +484,6 @@ function LieferantChinaCard() {
 }
 
 /**
- * 6. Feiertage China
- */
-/**
  * 6. Feiertage (Deutschland + China)
  */
 function FeiertageCard() {
@@ -428,6 +500,27 @@ function FeiertageCard() {
   
   const springFestival2026 = feiertage2026CN.filter((f: any) => f.name.includes('Spring Festival'))
   const springFestival2027 = feiertage2027CN.filter((f: any) => f.name.includes('Spring Festival'))
+
+  // Bereite Daten für FeiertageChart vor (monatliche Verteilung 2027)
+  const monatNamen = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+  const monatlicheVerteilung = monatNamen.map((name, index) => {
+    const monatNummer = index + 1
+    const anzahlDE = feiertage2027DE.filter((f: any) => {
+      const datum = new Date(f.datum)
+      return datum.getMonth() + 1 === monatNummer
+    }).length
+    const anzahlCN = feiertage2027CN.filter((f: any) => {
+      const datum = new Date(f.datum)
+      return datum.getMonth() + 1 === monatNummer
+    }).length
+
+    return {
+      monat: monatNummer,
+      name,
+      anzahlDE,
+      anzahlCN
+    }
+  })
 
   return (
     <div className="space-y-6">
@@ -528,6 +621,9 @@ function FeiertageCard() {
               ))}
             </div>
           </div>
+
+          {/* Visualisierung: Monatliche Verteilung 2027 */}
+          <FeiertageChart daten={monatlicheVerteilung} height={220} />
 
           {/* Alle Feiertage 2026 */}
           <div className="border-t pt-4">
