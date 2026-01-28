@@ -25,6 +25,7 @@
 
 import { Bestellung, TagesProduktionsplan, Stueckliste, Maschinenausfall } from '@/types'
 import { addDays, generateId, isWeekend } from '@/lib/utils'
+import { DEFAULT_PLANUNGSJAHR } from '@/lib/constants'
 import { 
   berechneBestelldatum, 
   berechneAnkunftsdatum, 
@@ -173,7 +174,7 @@ export function generiereJahresbestellungen(
     if (erstePlaene && erstePlaene.length > 0) {
       jahr = new Date(erstePlaene[0].datum).getFullYear()
     } else {
-      jahr = 2027 // Fallback
+      jahr = DEFAULT_PLANUNGSJAHR // Fallback auf dynamisches Planungsjahr
     }
   }
   
