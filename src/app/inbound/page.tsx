@@ -16,15 +16,14 @@
  */
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Ship, AlertTriangle, Package, Download, Calendar, Zap, Plus } from 'lucide-react'
+import { Ship, Package, Download, Calendar, Zap, Plus } from 'lucide-react'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { formatNumber, addDays, toLocalISODateString } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
-import ExcelTable, { FormulaCard } from '@/components/excel-table'
+import ExcelTable from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { DeltaCell, DeltaBadge } from '@/components/DeltaCell'
@@ -35,6 +34,35 @@ import { berechneBedarfsBacklog, type BedarfsBacklogErgebnis } from '@/lib/calcu
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { istDeutschlandFeiertag, ladeDeutschlandFeiertage } from '@/lib/kalender'
 import { isWeekend } from '@/lib/utils'
+import type { TagesProduktionsplan } from '@/types'
+
+/**
+ * Typ für eine Zeile in der Inbound-Tabelle
+ */
+interface InboundTableRow {
+  bedarfsdatum: Date
+  bedarfsdatumFormatiert: string
+  bestelldatum: Date
+  bestelldatumFormatiert: string
+  istVorjahr: boolean
+  vorlaufzeit: number | null
+  vorlaufzeitFormatiert: string
+  menge: number
+  mengeFormatiert: string
+  SAT_FT_bestellt: number
+  SAT_RL_bestellt: number
+  SAT_SP_bestellt: number
+  SAT_SL_bestellt: number
+  grund: string
+  grundFormatiert: string
+  erwarteteAnkunft: Date | null
+  erwarteteAnkunftFormatiert: string
+  status: string
+  hatBestellung: boolean
+  istWochenende: boolean
+  istFeiertag: boolean
+  feiertagName?: string
+}
 
 /**
  * Inbound Logistik Hauptseite
@@ -133,13 +161,16 @@ export default function InboundPage() {
   
   // Konvertiere zu TagesProduktionsplan Format für Inbound-Berechnung
   const produktionsplaeneFormatiert = useMemo(() => {
-    const result: Record<string, any[]> = {}
+    const result: Record<string, TagesProduktionsplan[]> = {}
     Object.entries(produktionsplaene).forEach(([varianteId, plan]) => {
       result[varianteId] = plan.tage.map(tag => ({
         datum: tag.datum,
         varianteId: varianteId,
+        sollMenge: tag.planMenge,
         istMenge: tag.istMenge,
-        planMenge: tag.planMenge
+        kumulierterError: tag.monatsFehlerNachher,
+        istMarketing: tag.istMarketing || false,
+        marketingMenge: tag.marketingMenge
       }))
     })
     return result
@@ -217,7 +248,7 @@ export default function InboundPage() {
     // ✅ KORRIGIERT: Deutsche Feiertage für Produktionsbedarf (nicht chinesische!)
     // Produktion findet in DEUTSCHLAND statt → deutsche Feiertage relevant
     const feiertage = ladeDeutschlandFeiertage()
-    const alleTage: any[] = []
+    const alleTage: InboundTableRow[] = []
     
     /**
      * 🎯 FIX #1: MEHRERE BESTELLUNGEN PRO BEDARFSDATUM AGGREGIEREN
