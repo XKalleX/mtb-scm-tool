@@ -23,7 +23,14 @@ import { addDays, isWeekend, getDayOfYear, getWeekNumber, toLocalISODateString }
 import feiertagsData from '@/data/feiertage-china.json'
 import feiertagsDeutschlandData from '@/data/feiertage-deutschland.json'
 import lieferantChinaData from '@/data/lieferant-china.json'
-import { DEFAULT_HEUTE_DATUM, KONFIGURATION_STORAGE_KEY, parseDateSafe } from './constants'
+import stammdatenData from '@/data/stammdaten.json'
+import { isValidDate, parseDateSafe } from './date-helpers'
+
+/**
+ * Konstanten aus JSON-Dateien (SINGLE SOURCE OF TRUTH)
+ */
+const DEFAULT_HEUTE_DATUM = stammdatenData.projekt.heuteDatum // '2027-04-15' aus JSON
+const KONFIGURATION_STORAGE_KEY = 'mtb-konfiguration' // localStorage-Key (kein Datenwert)
 
 /**
  * Interface für Lieferant-Vorlaufzeiten-Konfiguration
@@ -61,12 +68,12 @@ export interface FeiertagsKonfiguration {
 
 /**
  * Liest das 'Heute'-Datum aus der globalen Konfiguration
- * Fallback: DEFAULT_HEUTE_DATUM falls nicht gesetzt oder ungültig
+ * Fallback: DEFAULT_HEUTE_DATUM aus stammdaten.json falls nicht gesetzt oder ungültig
  * @returns Date-Objekt des 'Heute'-Datums (garantiert gültig)
  */
 export function getHeuteDatum(): Date {
   if (typeof window === 'undefined') {
-    // Server-Side: Standard-Datum
+    // Server-Side: Standard-Datum aus JSON
     return new Date(DEFAULT_HEUTE_DATUM)
   }
   
@@ -76,14 +83,14 @@ export function getHeuteDatum(): Date {
       const konfiguration = JSON.parse(konfigString)
       if (konfiguration.heuteDatum) {
         // Verwendet shared utility für sichere Datums-Validierung
-        return parseDateSafe(konfiguration.heuteDatum)
+        return parseDateSafe(konfiguration.heuteDatum, DEFAULT_HEUTE_DATUM)
       }
     }
   } catch (error) {
     console.warn('Fehler beim Laden des Heute-Datums aus Konfiguration:', error)
   }
   
-  // Fallback: Standard-Datum
+  // Fallback: Standard-Datum aus JSON
   return new Date(DEFAULT_HEUTE_DATUM)
 }
 
