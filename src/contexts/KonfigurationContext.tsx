@@ -102,6 +102,7 @@ export interface StuecklistenPosition {
   bauteilId: string
   bauteilName: string
   menge: number
+  einheit: string  // z.B. "Stück" - aus stueckliste.json
 }
 
 export interface BauteilConfig {
@@ -271,7 +272,8 @@ const STANDARD_STUECKLISTE: StuecklistenPosition[] = Object.entries(stuecklisteD
     mtbVariante: varianteId,
     bauteilId: bauteilId,
     bauteilName: bauteilData.name,
-    menge: bauteilData.menge
+    menge: bauteilData.menge,
+    einheit: bauteilData.einheit || 'Stück'  // Default: "Stück" falls nicht vorhanden
   }))
 )
 
