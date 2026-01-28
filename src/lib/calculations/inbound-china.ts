@@ -99,7 +99,7 @@ export function berechneGesamtbedarfKomponente(
 }
 
 /**
- * Rundet Bestellmenge auf Losgröße auf (min. 500 Stück Sättel)
+ * Rundet Bestellmenge auf Losgröße auf (aus Konfiguration)
  * 
  * @param menge - Benötigte Menge
  * @returns Aufgerundete Bestellmenge
@@ -149,7 +149,7 @@ export function erstelleBestellung(
  * 
  * Strategie: Monatliche Bestellungen
  * - Berechne Sattel-Bedarf pro Monat (1 Sattel = 1 Bike)
- * - Bestelle jeweils am Monatsanfang für den Monat + 49 Tage Vorlauf
+ * - Bestelle jeweils am Monatsanfang für den Monat + Vorlauf aus Konfiguration
  * 
  * @param alleProduktionsplaene - Pläne aller Varianten
  * @returns Array von Bestellungen
@@ -419,7 +419,7 @@ export function generiereTaeglicheBestellungen(
      */
     
     // Berechne welcher Produktionstag in der Zukunft beliefert werden soll
-    // (heute + 49 Tage Vorlaufzeit)
+    // (heute + Vorlaufzeit aus Konfiguration)
     const lieferTag = addDays(aktuellerTag, VORLAUFZEIT_TAGE)
     const lieferTagIndex = Math.floor((lieferTag.getTime() - produktionsStart.getTime()) / (1000 * 60 * 60 * 24))
     
@@ -445,17 +445,17 @@ export function generiereTaeglicheBestellungen(
     // LOSGRÖSSEN-CHECK: Gilt für TAGESGESAMTMENGE aller Sättel
     // ═══════════════════════════════════════════════════════════════════════════════
     // 
-    // ✅ KORREKT IMPLEMENTIERT: Losgröße (500 Stk) wird auf GESAMTMENGE angewendet!
+    // ✅ KORREKT IMPLEMENTIERT: Losgröße wird auf GESAMTMENGE angewendet!
     // 
-    // Beispiel 04.01.2027:
+    // Beispiel: Tagesbedarf verschiedener Sattel-Varianten
     //   - SAT_FT: 222 Stück (ALLR + COMP + DOWN)
     //   - SAT_RL: 111 Stück (TOUR + ENDUR)
     //   - SAT_SP:  74 Stück (TRAIL)
     //   - SAT_SL: 333 Stück (WOME + URBA)
     //   = 740 Sättel GESAMT
     // 
-    // → 740 >= 500 (Losgröße) → ✅ Bestellung wird ausgelöst!
-    // → Bestellt: 1x 500 Stk = 500 Sättel (proportional verteilt)
+    // → Wenn Losgröße = 500: 740 >= 500 → ✅ Bestellung wird ausgelöst!
+    // → Bestellt: 1x Losgröße = 500 Sättel (proportional verteilt)
     // → Rest (240 Stk) bleibt im Backlog für nächste Bestellung
     //
     const gesamtOffeneMenge = Array.from(alleKomponenten).reduce((sum, k) => sum + offeneMengen[k], 0)
