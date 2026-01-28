@@ -16,11 +16,12 @@
  * Speicherung erfolgt in localStorage für Persistenz.
  * 
  * SINGLE SOURCE OF TRUTH: JSON-Dateien in src/data/
- * - saisonalitaet.json
- * - stammdaten.json
- * - feiertage-china.json
- * - lieferant-china.json
- * - stueckliste.json
+ * - stammdaten.json (Projekt-Meta, Varianten, Jahresproduktion, Produktion)
+ * - saisonalitaet.json (Monatliche Verteilung)
+ * - lieferant-china.json (Lieferant, Bauteile, Vorlaufzeiten)
+ * - stueckliste.json (Stückliste)
+ * - feiertage-china.json (Chinesische Feiertage)
+ * - feiertage-deutschland.json (Deutsche Feiertage)
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'

@@ -127,206 +127,12 @@
       "MTBTrail": 48100
     }
   },
-  "saisonalitaet": {
-    "beschreibung": "Saisonaler Verlauf der Produktion (nicht Absatz in den Märkten!)",
-    "monatlicheVerteilung": {
-      "januar": 0.04,
-      "februar": 0.06,
-      "maerz": 0.1,
-      "april": 0.16,
-      "mai": 0.14,
-      "juni": 0.13,
-      "juli": 0.12,
-      "august": 0.09,
-      "september": 0.06,
-      "oktober": 0.03,
-      "november": 0.04,
-      "dezember": 0.03
-    },
-    "peakMonth": "april",
-    "lowSeasonMonths": [
-      "oktober",
-      "dezember"
-    ]
-  },
   "produktion": {
     "standort": "Dortmund",
-    "kapazitaet": {
-      "proStunde": 130,
-      "beschreibung": "130 Fahrräder pro Stunde Produktionskapazität"
-    },
-    "schichten": {
-      "variabel": true,
-      "beschreibung": "Anzahl Schichten wochenweise variabel",
-      "stundenProSchicht": 8
-    },
-    "durchlaufzeit": {
-      "montage": 325,
-      "einheit": "Minuten",
-      "beschreibung": "Maximale Durchlaufzeit für Montage"
-    }
-  },
-  "zulieferer": {
-    "china": {
-      "name": "Dengwong Manufacturing Ltd.",
-      "standort": "Dengwong, China",
-      "liefert": [
-        "Sättel"
-      ],
-      "beschreibung": "Einziger Zulieferer - Nur 4 Sattel-Varianten",
-      "vorlaufzeit": {
-        "tage": 5,
-        "typ": "Arbeitstage",
-        "beschreibung": "Zeit von Bestelleingang bis Ende der Produktion"
-      },
-      "transportwege": [
-        {
-          "typ": "LKW",
-          "von": "Dengwong",
-          "nach": "Hafen Shanghai",
-          "dauer": 2,
-          "einheit": "Arbeitstage"
-        },
-        {
-          "typ": "Schiff",
-          "von": "Hafen Shanghai",
-          "nach": "Hafen Hamburg",
-          "dauer": 30,
-          "einheit": "Kalendertage",
-          "fahrplan": "Mittwochs",
-          "frequenz": "1x pro Woche"
-        },
-        {
-          "typ": "LKW",
-          "von": "Hafen Hamburg",
-          "nach": "Dortmund",
-          "dauer": 2,
-          "einheit": "Arbeitstage"
-        }
-      ],
-      "losgroessen": {
-        "saettel": 500
-      },
-      "gesamtDurchlaufzeit": {
-        "minimum": 49,
-        "einheit": "Kalendertage",
-        "beschreibung": "Gesamte Durchlaufzeit von Bestellung bis Ankunft (7 Wochen): 5 AT Produktion + 2 AT + 30 KT + 2 AT Transport"
-      },
-      "springFestival": {
-        "datum": "05.01.-12.02.2027",
-        "dauer": 8,
-        "beschreibung": "Kein Betrieb während Spring Festival"
-      }
-    }
-  },
-  "transportmittel": {
-    "lkw": {
-      "name": "LKW",
-      "betriebstage": "Montag-Freitag",
-      "ruhetage": [
-        "Samstag",
-        "Sonntag"
-      ],
-      "beschreibung": "LKWs fahren Sa und So nicht"
-    },
-    "zug": {
-      "name": "Güterzug",
-      "fahrplan": ["Montag", "Donnerstag"],
-      "beschreibung": "Züge fahren Montags und Donnerstags ab"
-    },
-    "schiff": {
-      "name": "Container-Schiff",
-      "fahrplan": [
-        "Mittwoch"
-      ],
-      "frequenz": "wöchentlich",
-      "beschreibung": "Schiffe fahren einmal pro Woche Mittwochs"
-    }
-  },
-  "feiertage": {
-    "china": {
-      "beschreibung": "Chinesische Feiertage, insbesondere Spring Festival (Chinesisches Neujahr)",
-      "wichtigeEreignisse": [
-        {
-          "name": "Spring Festival",
-          "beschreibung": "Chinesisches Neujahr - Produktionsstopp",
-          "dauer": "ca. 2 Wochen",
-          "auswirkung": "Keine Produktion, keine Lieferungen"
-        }
-      ]
-    },
-    "deutschland": {
-      "beschreibung": "Deutsche gesetzliche Feiertage",
-      "auswirkung": "Keine LKW-Transporte an Feiertagen"
-    }
-  },
-  "szenarien": {
-    "beschreibung": "Mögliche operative Szenarien zur Simulation",
-    "verfuegbar": [
-      {
-        "id": "marketingaktion",
-        "name": "Marketingaktion",
-        "beschreibung": "Kurzfristige Nachfrageerhöhung durch erfolgreiche Marketing-Kampagne in Mountain Biker Zeitschrift",
-        "auswirkung": "Zusätzliche Nachfrage, Materialengpässe möglich",
-        "prioritaet": "Keine höhere Priorität für Zusatzmengen; Abarbeitung im Rahmen vorhandener Restkapazitäten"
-      },
-      {
-        "id": "maschinenausfall",
-        "name": "Maschinenausfall beim Zulieferer",
-        "beschreibung": "Zulieferer kann georderte Menge nicht rechtzeitig liefern",
-        "auswirkung": "Reduzierte Lagerbestände beim Zulieferer, Lieferverzögerungen",
-        "betroffen": "Beliebiger Zulieferer"
-      },
-      {
-        "id": "wasserschaden",
-        "name": "Wasserschaden im Lager / Sturm und Ladungsverlust",
-        "beschreibung": "Bestandsverlust durch Wasserschaden oder Container-Verlust auf See",
-        "auswirkung": "Plötzlicher Bestandsabbau, Materialengpässe",
-        "beispiel": "Container geht auf MSC Mara verloren"
-      },
-      {
-        "id": "schiffsverspaetung",
-        "name": "Verspätete Ankunft bei den Schiffen",
-        "beschreibung": "Lieferzeiten im maritimen Bereich werden durch Wetterverhältnisse beeinflusst",
-        "auswirkung": "Verlängerte Durchlaufzeiten, verzögerte Materialankunft",
-        "gegenmaßnahme": "Sondertransporte (z.B. Luftfracht)"
-      }
-    ]
-  },
-  "scorMetrics": {
-    "beschreibung": "SCOR Metriken - Supply Chain Operations Reference Model",
-    "kategorien": [
-      {
-        "name": "Reliability (Zuverlässigkeit)",
-        "metriken": [
-          "RL.1.1 Perfect Order Fulfillment",
-          "RL.2.1 % Orders Delivered in Full"
-        ]
-      },
-      {
-        "name": "Responsiveness (Reaktionsfähigkeit)",
-        "metriken": [
-          "RS.1.1 Order Fulfillment Cycle Time",
-          "RS.2.2 Make Cycle Time"
-        ]
-      },
-      {
-        "name": "Agility (Anpassungsfähigkeit)",
-        "metriken": [
-          "AG.1.1 Upside Supply Chain Flexibility",
-          "AG.1.2 Supply Chain Upside Adaptability"
-        ]
-      },
-      {
-        "name": "Assets (Vermögenswerte)",
-        "metriken": [
-          "AM.1.1 Cash-to-Cash Cycle Time",
-          "AM.1.2 Return on Supply Chain Fixed Assets"
-        ]
-      }
-    ],
-    "mindestanzahl": 5,
-    "beschreibungBewertung": "Mind. 5 SCOR Metriken aus den 5 Leistungsmerkmalen implementieren"
+    "kapazitaetProStunde": 130,
+    "stundenProSchicht": 8,
+    "durchlaufzeitMontageMinuten": 325,
+    "beschreibung": "130 Fahrräder pro Stunde Produktionskapazität, 8h Schichten, Durchlaufzeit Montage 325 Minuten"
   },
   "hinweise": {
     "codeLoesung": "ERMÄSSIGUNG: Nur Sättel von China-Zulieferer, Transport per Schiff + LKW, kein Outbound zu Märkten",
@@ -338,6 +144,15 @@
       "Kein Outbound zu 6 internationalen Märkten",
       "FCFS statt Solver-Optimierung (First-Come-First-Serve)",
       "Vorlaufzeit: 49 Tage (7 Wochen), Losgröße: 500 Sättel"
-    ]
+    ],
+    "datenquellen": {
+      "beschreibung": "SINGLE SOURCE OF TRUTH - Alle anderen Daten in separaten JSON-Dateien",
+      "saisonalitaet": "src/data/saisonalitaet.json",
+      "lieferant": "src/data/lieferant-china.json",
+      "stueckliste": "src/data/stueckliste.json",
+      "feiertageChina": "src/data/feiertage-china.json",
+      "feiertageDeutschland": "src/data/feiertage-deutschland.json",
+      "szenarien": "src/data/szenario-defaults.json"
+    }
   }
 }

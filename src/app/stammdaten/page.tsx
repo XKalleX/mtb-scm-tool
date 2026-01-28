@@ -5,12 +5,13 @@
  * STAMMDATEN VISUALISIERUNG
  * ========================================
  * 
- * Diese Seite visualisiert alle Stammdaten aus den JSON-Dateien:
- * - stammdaten.json (Projekt, MTB-Varianten, Produktion, Zulieferer, Szenarien)
- * - saisonalitaet.json (Monatliche Verteilung)
- * - stueckliste.json (Bike-Sattel-Zuordnung)
- * - lieferant-china.json (Lieferant Details, Komponenten)
- * - feiertage-china.json (Chinesische Feiertage 2027)
+ * Diese Seite visualisiert alle Stammdaten aus den JSON-Dateien (SSOT):
+ * - stammdaten.json (Projekt-Meta, MTB-Varianten, Jahresproduktion, Produktion)
+ * - saisonalitaet.json (Monatliche Verteilung, Saisonalität)
+ * - stueckliste.json (Bike → Sattel Zuordnung)
+ * - lieferant-china.json (Lieferant, Komponenten, Vorlaufzeiten)
+ * - feiertage-china.json (Chinesische Feiertage 2026-2028)
+ * - feiertage-deutschland.json (Deutsche Feiertage NRW 2026-2028)
  * - szenario-defaults.json (Standard-Parameter für Szenarien)
  * 
  * ZWECK: Schnelles Erkennen von fehlenden oder falschen Daten
@@ -123,11 +124,6 @@ function StammdatenCard() {
               value={formatNumber(data.jahresproduktion.gesamt, 0) + ' Bikes'} 
               highlight={true}
             />
-            <InfoItem label="Peak-Monat" value={data.saisonalitaet.peakMonth} />
-            <InfoItem 
-              label="Peak-Anteil" 
-              value={Math.round((data.saisonalitaet.monatlicheVerteilung.april) * 100) + '%'} 
-            />
           </div>
         </div>
 
@@ -136,19 +132,8 @@ function StammdatenCard() {
           <h4 className="font-semibold mb-3">Produktionskapazität</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <InfoItem label="Standort" value={data.produktion.standort} />
-            <InfoItem label="Kapazität" value={data.produktion.kapazitaet.proStunde + ' Bikes/h'} />
-            <InfoItem label="Stunden/Schicht" value={data.produktion.schichten.stundenProSchicht + 'h'} />
-          </div>
-        </div>
-
-        {/* Zulieferer Kurzinfo */}
-        <div className="border-t pt-4">
-          <h4 className="font-semibold mb-3">Zulieferer</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <InfoItem label="Name" value={data.zulieferer.china.name} />
-            <InfoItem label="Standort" value={data.zulieferer.china.standort} />
-            <InfoItem label="Vorlaufzeit" value={data.zulieferer.china.gesamtDurchlaufzeit.minimum + ' Tage'} highlight={true} />
-            <InfoItem label="Losgröße" value={data.zulieferer.china.losgroessen.saettel + ' Stück'} />
+            <InfoItem label="Kapazität" value={data.produktion.kapazitaetProStunde + ' Bikes/h'} />
+            <InfoItem label="Stunden/Schicht" value={data.produktion.stundenProSchicht + 'h'} />
           </div>
         </div>
 
