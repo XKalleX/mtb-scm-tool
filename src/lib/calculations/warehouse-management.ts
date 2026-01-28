@@ -17,10 +17,23 @@
  * 4. Sammle Statistiken und Warnungen
  */
 
-import type { KonfigurationData } from '@/contexts/KonfigurationContext'
+import type { KonfigurationData, FeiertagConfig } from '@/contexts/KonfigurationContext'
 import type { TagesProduktionEntry } from './zentrale-produktionsplanung'
 import { addDays, toLocalISODateString } from '@/lib/utils'
 import { generiereTaeglicheBestellungen, type TaeglicheBestellung } from './inbound-china'
+import { istArbeitstag_Deutschland, FeiertagsKonfiguration } from '@/lib/kalender'
+
+/**
+ * Konvertiert FeiertagConfig[] zu FeiertagsKonfiguration[] für kalender.ts Funktionen
+ */
+function konvertiereFeiertage(feiertage: FeiertagConfig[]): FeiertagsKonfiguration[] {
+  return feiertage.map(f => ({
+    datum: f.datum,
+    name: f.name,
+    typ: f.typ,
+    land: f.land
+  }))
+}
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
@@ -259,14 +272,10 @@ export function berechneIntegriertesWarehouse(
     const datumStr = toLocalISODateString(aktuellesDatum)
     const wochentag = aktuellesDatum.toLocaleDateString('de-DE', { weekday: 'short' })
     const monat = aktuellesDatum.getMonth() + 1
-    const istWochenende = aktuellesDatum.getDay() === 0 || aktuellesDatum.getDay() === 6
     
-    // Prüfe Feiertag
-    const deutscheFeiertage = konfiguration.feiertage
-      .filter(f => f.land === 'Deutschland')
-      .map(f => f.datum)
-    const istFeiertag = deutscheFeiertage.includes(datumStr)
-    const istArbeitstag = !istWochenende && !istFeiertag
+    // Prüfe Arbeitstag mit kalender.ts (nutzt globale Feiertage)
+    const customFeiertage = konvertiereFeiertage(konfiguration.feiertage)
+    const istArbeitstag = istArbeitstag_Deutschland(aktuellesDatum, customFeiertage)
     
     // Berechne Tag im Jahr (1-365 für 2027, kann negativ sein für 2026)
     const jahresAnfang = new Date(planungsjahr, 0, 1)

@@ -98,18 +98,9 @@ export default function InboundPage() {
     if (isNaN(menge) || menge < 1) return
     
     /**
-     * 🎯 FIX: EXAKTE Mengenverteilung (kein Aufrunden!)
-     * 
-     * Problem: Bei 5000 Sätteln würde rundeAufLosgroesse() pro Variante aufrunden:
-     *   - 1250 → 1500 (pro Variante)
-     *   - 1500 * 4 = 6000 (1000 zu viel!)
-     * 
-     * Lösung: Menge wird hier bereits EXAKT verteilt
-     *   - 1250 + 1250 + 1250 + 1250 = 5000 (korrekt!)
-     * 
-     * WICHTIG: Die Eingabe-Menge wird vom Benutzer bereits auf Losgröße 
-     * gerundet (via step={losgroesse} im Input), daher keine weitere 
-     * Aufrundung nötig!
+     * Exakte Mengenverteilung (kein Aufrunden!)
+     * Die Eingabe-Menge wird vom Benutzer bereits auf Losgröße gerundet 
+     * (via step={losgroesse} im Input), daher keine weitere Aufrundung nötig.
      */
     const basisMenge = Math.floor(menge / 4)
     const restMenge = menge - (basisMenge * 3)  // Rest geht an die letzte Variante
@@ -176,8 +167,7 @@ export default function InboundPage() {
     return result
   }, [produktionsplaene])
   
-  // ✅ KORRIGIERT: Berechne tägliche Bestellungen mit fixer Vorlaufzeit aus Konfiguration
-  // Vorlaufzeit ist IMMER 49 Tage (konfigurierbar in Einstellungen, aber fix - nicht dynamisch kalkuliert)
+  // Berechne tägliche Bestellungen mit fixer Vorlaufzeit aus Konfiguration
   const generierteBestellungen = useMemo(() => {
     return generiereTaeglicheBestellungen(
       produktionsplaeneFormatiert, 
@@ -230,43 +220,27 @@ export default function InboundPage() {
   }, [taeglicheBestellungen])
   
   /**
-   * 🎯 FIX: KORRIGIERTE Bestelllogik - Iteriere durch BEDARFSDATUM
-   * 
-   * Konzept (gemäß Issue):
+   * Bestelllogik iteriert durch BEDARFSDATUM:
    * - Bedarfsdatum = wann Sättel im Werk benötigt werden (01.01.2027 - 31.12.2027)
-   * - Bestelldatum = wann bestellt werden muss (49 Tage VOR Bedarfsdatum, z.B. 16.11.2026)
+   * - Bestelldatum = wann bestellt werden muss (49 Tage VOR Bedarfsdatum)
    * - Tatsächliche Ankunft = berechnet aus Bestelldatum + Vorlaufzeit
-   * 
-   * Die Tabelle iteriert durch ALLE Bedarfsdaten des Jahres und zeigt:
-   * - An welchem Tag wurde/wird bestellt (Bestelldatum)
-   * - Wann wird die Lieferung erwartet (Ankunft)
-   * - Status der Bestellung für diesen Bedarf
    */
   const alleTageMitBestellungen = useMemo(() => {
     const jahr = konfiguration.planungsjahr
     const vorlaufzeit = lieferant.gesamtVorlaufzeitTage
-    // ✅ KORRIGIERT: Deutsche Feiertage für Produktionsbedarf (nicht chinesische!)
-    // Produktion findet in DEUTSCHLAND statt → deutsche Feiertage relevant
+    // Deutsche Feiertage für Produktionsbedarf (Produktion findet in DEUTSCHLAND statt)
     const feiertage = ladeDeutschlandFeiertage()
     const alleTage: InboundTableRow[] = []
     
     /**
-     * 🎯 FIX #1: MEHRERE BESTELLUNGEN PRO BEDARFSDATUM AGGREGIEREN
-     * 
-     * Problem: Map überschreibt Bestellungen mit gleichem Key (Bedarfsdatum)
-     * Lösung: Aggregiere Mengen wenn mehrere Bestellungen am selben Tag
-     * 
-     * Beispiel:
-     * - Bestellung 1: 500 Sättel für 15.04.2027
-     * - Bestellung 2: 500 Sättel für 15.04.2027
-     * → Gesamt: 1000 Sättel am 15.04.2027 (NICHT nur 500!)
+     * Mehrere Bestellungen pro Bedarfsdatum aggregieren:
+     * Sammle alle Bestellungen für denselben Tag, nicht überschreiben
      */
     const bestellungenNachBedarfsdatum = new Map<string, TaeglicheBestellung[]>()
     taeglicheBestellungen.forEach(b => {
       const bedarfsdatum = b.bedarfsdatum instanceof Date ? b.bedarfsdatum : new Date(b.bedarfsdatum)
       const key = toLocalISODateString(bedarfsdatum)
       
-      // Sammle ALLE Bestellungen für dieses Datum (nicht überschreiben!)
       const existing = bestellungenNachBedarfsdatum.get(key) || []
       existing.push(b)
       bestellungenNachBedarfsdatum.set(key, existing)
@@ -283,19 +257,15 @@ export default function InboundPage() {
       // Berechne wann für diesen Bedarf bestellt werden müsste (49 Tage vorher)
       const theoretischesBestelldatum = addDays(bedarfsdatum, -vorlaufzeit)
       
-      // Prüfe Tag-Typ (für Bedarfsdatum - Produktion in DEUTSCHLAND!)
-      // ✅ KORRIGIERT: Deutsche Feiertage prüfen (nicht chinesische!)
-      // Die Produktion findet in Deutschland statt → Keine Produktion an deutschen Feiertagen
+      // Prüfe Tag-Typ für Bedarfsdatum (Produktion in DEUTSCHLAND)
       const istWochenende = isWeekend(bedarfsdatum)
       const feiertag = istDeutschlandFeiertag(bedarfsdatum)
       const istFeiertag = feiertag.length > 0
       
-      // ✅ NEU: An Feiertagen/Wochenenden gibt es KEINE Produktion, also auch keinen Bedarf!
-      // Ignoriere Bestellungen die auf Feiertage/Wochenenden fallen - das sind Berechnungsfehler
+      // An Feiertagen/Wochenenden gibt es keine Produktion, also auch keinen Bedarf
       const istProduktionsTag = !istWochenende && !istFeiertag
       
-      // Suche ob es Bestellungen gibt, die diesen Bedarf decken
-      // ✅ NUR an Produktionstagen nach Bestellungen suchen!
+      // Nur an Produktionstagen nach Bestellungen suchen
       const bestellungenFuerTag = istProduktionsTag 
         ? bestellungenNachBedarfsdatum.get(bedarfsdatumKey) 
         : undefined
@@ -304,12 +274,8 @@ export default function InboundPage() {
       
       if (istProduktionsTag && bestellungenFuerTag && bestellungenFuerTag.length > 0) {
         /**
-         * 🎯 FIX: AGGREGIERE MEHRERE BESTELLUNGEN FÜR DENSELBEN TAG
-         * 
-         * Wenn mehrere Bestellungen für dasselbe Bedarfsdatum existieren:
-         * - Summiere alle Mengen
-         * - Zeige frühestes Bestelldatum
-         * - Zeige kombinierte Gründe
+         * Aggregiere mehrere Bestellungen für denselben Tag:
+         * Summiere alle Mengen, zeige frühestes Bestelldatum
          */
         const gesamtMenge = bestellungenFuerTag.reduce((sum, b) => {
           return sum + Object.values(b.komponenten).reduce((s, m) => s + m, 0)

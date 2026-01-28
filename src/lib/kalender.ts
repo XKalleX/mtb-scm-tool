@@ -22,7 +22,31 @@ import { Kalendertag, Feiertag } from '@/types'
 import { addDays, isWeekend, getDayOfYear, getWeekNumber, toLocalISODateString } from './utils'
 import feiertagsData from '@/data/feiertage-china.json'
 import feiertagsDeutschlandData from '@/data/feiertage-deutschland.json'
+import lieferantChinaData from '@/data/lieferant-china.json'
 import { DEFAULT_HEUTE_DATUM, KONFIGURATION_STORAGE_KEY, parseDateSafe } from './constants'
+
+/**
+ * Interface für Lieferant-Vorlaufzeiten-Konfiguration
+ * Ermöglicht es, konfigurierbare Vorlaufzeiten zu übergeben (aus KonfigurationContext)
+ * Falls nicht übergeben, werden die Standardwerte aus lieferant-china.json verwendet
+ */
+export interface LieferantVorlaufzeitKonfiguration {
+  vorlaufzeitKalendertage: number      // Seefracht: 30 KT (Shanghai → Hamburg, 24/7)
+  vorlaufzeitArbeitstage: number       // Produktion: 5 AT
+  lkwTransportChinaArbeitstage: number // LKW China → Hafen: 2 AT
+  lkwTransportDeutschlandArbeitstage: number // LKW Hamburg → Dortmund: 2 AT
+}
+
+/**
+ * Standard-Vorlaufzeiten aus lieferant-china.json (SINGLE SOURCE OF TRUTH)
+ * Diese Werte werden verwendet, wenn keine custom Konfiguration übergeben wird
+ */
+export const STANDARD_VORLAUFZEITEN: LieferantVorlaufzeitKonfiguration = {
+  vorlaufzeitKalendertage: lieferantChinaData.lieferant.vorlaufzeitKalendertage,
+  vorlaufzeitArbeitstage: lieferantChinaData.lieferant.vorlaufzeitArbeitstage,
+  lkwTransportChinaArbeitstage: lieferantChinaData.lieferant.lkwTransportChinaArbeitstage,
+  lkwTransportDeutschlandArbeitstage: lieferantChinaData.lieferant.lkwTransportDeutschlandArbeitstage
+}
 
 /**
  * Interface für Feiertags-Konfiguration (aus KonfigurationContext)
@@ -252,12 +276,7 @@ export function istArbeitstag_China(
 
 /**
  * Prüft ob ein Datum ein Arbeitstag ist (Mo-Fr, kein Feiertag)
- * 
- * @deprecated Nutze stattdessen istArbeitstag_Deutschland() oder istArbeitstag_China()
- *             je nachdem für welches Land die Prüfung erfolgen soll!
- * 
- * Legacy-Funktion: Prüft CHINESISCHE Feiertage (für Rückwärtskompatibilität)
- * Relevant für China-Produktion
+ * Prüft CHINESISCHE Feiertage (für China-Produktion)
  * 
  * @param datum - Zu prüfendes Datum
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
@@ -267,19 +286,19 @@ export function istArbeitstag(
   datum: Date,
   customFeiertage?: FeiertagsKonfiguration[]
 ): boolean {
-  // Legacy: Nutzt China-Logik für Rückwärtskompatibilität
   return istArbeitstag_China(datum, customFeiertage)
 }
 
 /**
- * Prüft ob Datum im Spring Festival liegt (5.2.-12.2.2027)
- * WICHTIG: 8 Tage kompletter Produktionsstopp in China!
+ * Prüft ob Datum im Spring Festival liegt (28.01.-04.02.2027)
+ * Gemäß SSOT: 8 Tage kompletter Produktionsstopp in China!
  * @param datum - Zu prüfendes Datum
  * @returns True wenn Spring Festival
  */
 export function istSpringFestival(datum: Date): boolean {
-  const springStart = new Date(2027, 1, 5) // 5. Februar
-  const springEnd = new Date(2027, 1, 12)    // 12. Februar
+  // Spring Festival 2027 gemäß feiertage-china.json: 28.01. - 04.02.2027
+  const springStart = new Date(2027, 0, 28) // 28. Januar
+  const springEnd = new Date(2027, 1, 4)    // 4. Februar
   
   return datum >= springStart && datum <= springEnd
 }
@@ -524,49 +543,42 @@ export function subtractArbeitstage_Deutschland(
 /**
  * Berechnet Bestelldatum rückwärts vom Bedarfsdatum
  * 
- * WICHTIG FÜR CHINA:
- * - Transport: 35 Kalendertage (Schiff fährt 24/7)
- * - Bearbeitung: 21 Arbeitstage (Mo-Fr ohne Feiertage)
+ * Vorlaufzeiten werden aus der Konfiguration geladen (SINGLE SOURCE OF TRUTH: lieferant-china.json)
+ * - Seefracht: 30 KT (Shanghai → Hamburg, 24/7)
+ * - Produktion: 5 AT (Mo-Fr ohne Feiertage)
+ * - LKW China → Hafen: 2 AT
+ * - LKW Hamburg → Dortmund: 2 AT
  * 
  * @param bedarfsdatum - Wann Material in Deutschland benötigt wird
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
+ * @param lieferantKonfiguration - Optionale Vorlaufzeiten-Konfiguration (aus KonfigurationContext)
  * @returns Bestelldatum bei China
  */
 export function berechneBestelldatum(
   bedarfsdatum: Date,
-  customFeiertage?: FeiertagsKonfiguration[]
+  customFeiertage?: FeiertagsKonfiguration[],
+  lieferantKonfiguration?: LieferantVorlaufzeitKonfiguration
 ): Date {
-  // China-spezifische Vorlaufzeiten gemäß SSOT-Spezifikation und Anforderungen
-  // TOTAL: 49 Tage = 7 Wochen Vorlaufzeit
-  // Aufschlüsselung gemäß Anforderungen (Bild):
-  // - 5 AT Produktion in China
-  // - 2 AT LKW-Transport China → Hafen Shanghai
-  // - 30 KT Seefracht Shanghai → Hamburg
-  // - 2 AT LKW-Transport Hamburg → Dortmund
-  const SEEFRACHT_KALENDERTAGE = 30  // Schiff-Transport (24/7)
-  const BEARBEITUNG_ARBEITSTAGE = 5  // Produktion in China
-  const LKW_CHINA_ARBEITSTAGE = 2    // LKW China → Hafen
-  const LKW_DEUTSCHLAND_ARBEITSTAGE = 2  // LKW Hamburg → Dortmund
+  // Vorlaufzeiten aus Konfiguration oder Standard-Werte aus JSON (SSOT)
+  const vorlaufzeiten = lieferantKonfiguration || STANDARD_VORLAUFZEITEN
   
   // Schritt 1: Vom Bedarfsdatum die Seefracht-Zeit (Kalendertage) abziehen
   // Transport läuft 24/7, also einfach Kalendertage subtrahieren
-  let datumNachSeefracht = addDays(bedarfsdatum, -SEEFRACHT_KALENDERTAGE)
+  let datumNachSeefracht = addDays(bedarfsdatum, -vorlaufzeiten.vorlaufzeitKalendertage)
   
-  // Schritt 2: LKW-Transport Deutschland (2 AT) abziehen
-  datumNachSeefracht = subtractArbeitstage(datumNachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE, customFeiertage)
+  // Schritt 2: LKW-Transport Deutschland abziehen
+  datumNachSeefracht = subtractArbeitstage(datumNachSeefracht, vorlaufzeiten.lkwTransportDeutschlandArbeitstage, customFeiertage)
   
-  // Schritt 3: Von diesem Datum die Bearbeitungszeit (5 AT) abziehen
-  // Dies berücksichtigt Wochenenden und chinesische Feiertage
-  let nachProduktion = subtractArbeitstage(datumNachSeefracht, BEARBEITUNG_ARBEITSTAGE, customFeiertage)
+  // Schritt 3: Bearbeitungszeit abziehen (berücksichtigt chinesische Feiertage)
+  let nachProduktion = subtractArbeitstage(datumNachSeefracht, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
   
-  // Schritt 4: LKW-Transport China (2 AT) abziehen
-  let bestelldatum = subtractArbeitstage(nachProduktion, LKW_CHINA_ARBEITSTAGE, customFeiertage)
+  // Schritt 4: LKW-Transport China abziehen
+  let bestelldatum = subtractArbeitstage(nachProduktion, vorlaufzeiten.lkwTransportChinaArbeitstage, customFeiertage)
   
   // Schritt 5: Einen zusätzlichen Tag Puffer (Best Practice)
   bestelldatum = addDays(bestelldatum, -1)
   
   // Schritt 6: Sicherstellen dass Bestelldatum ein Arbeitstag ist (China!)
-  // Falls Wochenende/Feiertag -> vorheriger Arbeitstag
   while (!istArbeitstag_China(bestelldatum, customFeiertage)) {
     bestelldatum = addDays(bestelldatum, -1)
   }
@@ -577,39 +589,33 @@ export function berechneBestelldatum(
 /**
  * Berechnet Ankunftsdatum vorwärts vom Bestelldatum
  * 
- * KORRIGIERT: 
- * - LKW-Transport in Deutschland nutzt DEUTSCHE Arbeitstage (nicht chinesische!)
- * - Ankunftsdatum wird auf den nächsten deutschen Arbeitstag korrigiert
+ * Vorlaufzeiten werden aus der Konfiguration geladen (SINGLE SOURCE OF TRUTH: lieferant-china.json)
+ * LKW-Transport in Deutschland nutzt DEUTSCHE Arbeitstage
  * 
  * @param bestelldatum - Wann wurde bestellt
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
+ * @param lieferantKonfiguration - Optionale Vorlaufzeiten-Konfiguration (aus KonfigurationContext)
  * @returns Ankunftsdatum in Deutschland (immer ein deutscher Arbeitstag)
  */
 export function berechneAnkunftsdatum(
   bestelldatum: Date,
-  customFeiertage?: FeiertagsKonfiguration[]
+  customFeiertage?: FeiertagsKonfiguration[],
+  lieferantKonfiguration?: LieferantVorlaufzeitKonfiguration
 ): Date {
-  // Vorlaufzeit gemäß SSOT: 49 Tage
-  // Aufschlüsselung: 5 AT Produktion + 2 AT + 30 KT + 2 AT Transport
-  const SEEFRACHT_KALENDERTAGE = 30
-  const BEARBEITUNG_ARBEITSTAGE = 5
-  const LKW_CHINA_ARBEITSTAGE = 2
-  const LKW_DEUTSCHLAND_ARBEITSTAGE = 2
+  // Vorlaufzeiten aus Konfiguration oder Standard-Werte aus JSON (SSOT)
+  const vorlaufzeiten = lieferantKonfiguration || STANDARD_VORLAUFZEITEN
   
-  // Schritt 1: Bearbeitung in China (5 AT) - nutzt CHINESISCHE Arbeitstage
-  let nachBearbeitung = addArbeitstage(bestelldatum, BEARBEITUNG_ARBEITSTAGE, customFeiertage)
+  // Schritt 1: Bearbeitung in China - nutzt CHINESISCHE Arbeitstage
+  let nachBearbeitung = addArbeitstage(bestelldatum, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
   
-  // Schritt 2: LKW-Transport China zum Hafen (2 AT) - nutzt CHINESISCHE Arbeitstage
-  let nachLKWChina = addArbeitstage(nachBearbeitung, LKW_CHINA_ARBEITSTAGE, customFeiertage)
+  // Schritt 2: LKW-Transport China zum Hafen - nutzt CHINESISCHE Arbeitstage
+  let nachLKWChina = addArbeitstage(nachBearbeitung, vorlaufzeiten.lkwTransportChinaArbeitstage, customFeiertage)
   
-  // Schritt 3: Seefracht (30 KT) - Kalendertage (Schiff fährt 24/7)
-  let nachSeefracht = addDays(nachLKWChina, SEEFRACHT_KALENDERTAGE)
+  // Schritt 3: Seefracht - Kalendertage (Schiff fährt 24/7)
+  let nachSeefracht = addDays(nachLKWChina, vorlaufzeiten.vorlaufzeitKalendertage)
   
-  // Schritt 4: LKW-Transport Hamburg nach Dortmund (2 AT)
-  // ✅ KORRIGIERT: Nutzt DEUTSCHE Arbeitstage (nicht chinesische!)
-  // LKW-Transport in Deutschland respektiert deutsche Feiertage
-  // addArbeitstage_Deutschland garantiert bereits dass das Ergebnis ein deutscher Arbeitstag ist
-  let ankunftsdatum = addArbeitstage_Deutschland(nachSeefracht, LKW_DEUTSCHLAND_ARBEITSTAGE, customFeiertage)
+  // Schritt 4: LKW-Transport Hamburg nach Dortmund - nutzt DEUTSCHE Arbeitstage
+  let ankunftsdatum = addArbeitstage_Deutschland(nachSeefracht, vorlaufzeiten.lkwTransportDeutschlandArbeitstage, customFeiertage)
   
   return ankunftsdatum
 }
@@ -681,7 +687,7 @@ export function kalenderStatistik(
     feiertageDeutschland: feiertageDeutschland.length,
     feiertageChina: feiertageChina.length,
     springFestivalTage,
-    produktionstage: arbeitstageChina // = Arbeitstage in China (Legacy)
+    produktionstage: arbeitstageChina
   }
 }
 
