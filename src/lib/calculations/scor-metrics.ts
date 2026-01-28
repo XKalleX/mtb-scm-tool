@@ -22,9 +22,7 @@
 
 import { SCORMetriken, Produktionsauftrag, Lagerbestand, Bestellung } from '@/types'
 import { daysBetween } from '@/lib/utils'
-
-// Standard Vorlaufzeit (sollte aus KonfigurationContext kommen)
-const DEFAULT_VORLAUFZEIT_TAGE = 49
+import lieferantChinaData from '@/data/lieferant-china.json'
 
 /**
  * Berechnet alle SCOR-Metriken
@@ -32,14 +30,14 @@ const DEFAULT_VORLAUFZEIT_TAGE = 49
  * @param produktionsauftraege - Alle Produktionsaufträge
  * @param lagerbestaende - Lagerbestände
  * @param bestellungen - Bestellungen
- * @param vorlaufzeitTage - Vorlaufzeit in Tagen (default: 49 Tage aus DEFAULT_VORLAUFZEIT_TAGE)
+ * @param vorlaufzeitTage - Vorlaufzeit in Tagen (aus KonfigurationContext oder JSON-Referenz)
  * @returns SCOR-Metriken
  */
 export function berechneSCORMetriken(
   produktionsauftraege: Produktionsauftrag[],
   lagerbestaende: Record<string, Lagerbestand>,
   bestellungen: Bestellung[],
-  vorlaufzeitTage: number = DEFAULT_VORLAUFZEIT_TAGE
+  vorlaufzeitTage: number = lieferantChinaData.lieferant.gesamtVorlaufzeitTage
 ): SCORMetriken {
   // ==========================================
   // RELIABILITY (Zuverlässigkeit)

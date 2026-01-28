@@ -5,9 +5,9 @@
  * 
  * Bestellungen beim einzigen Lieferanten (China) - nur Sättel!
  * 
- * REFACTORED: Alle Parameter aus KonfigurationContext statt JSON-Imports
- * - Losgröße, Lieferintervall aus Config
- * - Stückliste aus Config
+ * Alle Parameter aus KonfigurationContext oder JSON-Referenzen
+ * - Losgröße, Lieferintervall aus JSON als Referenz
+ * - Stückliste aus Config/Parameter
  * - Feiertage über Parameter
  */
 
@@ -21,10 +21,7 @@ import {
   naechsterArbeitstag_Deutschland,
   FeiertagsKonfiguration 
 } from '@/lib/kalender'
-
-// Standard-Werte als Fallback (sollten aus KonfigurationContext kommen)
-const DEFAULT_LOSGROESSE = 500
-const DEFAULT_LIEFERINTERVALL = 7
+import lieferantChinaData from '@/data/lieferant-china.json'
 
 // Type für Komponente
 type Komponente = {
@@ -98,10 +95,10 @@ export function berechneGesamtbedarfKomponente(
  * Rundet Bestellmenge auf Losgröße auf
  * 
  * @param menge - Benötigte Menge
- * @param losgroesse - Losgröße (default: 500)
+ * @param losgroesse - Losgröße (aus KonfigurationContext oder JSON-Referenz)
  * @returns Aufgerundete Bestellmenge
  */
-export function rundeAufLosgroesse(menge: number, losgroesse: number = DEFAULT_LOSGROESSE): number {
+export function rundeAufLosgroesse(menge: number, losgroesse: number = lieferantChinaData.lieferant.losgroesse): number {
   if (menge === 0) return 0
   
   // Aufrunden auf nächstes Vielfaches der Losgröße
@@ -348,8 +345,8 @@ export function generiereTaeglicheBestellungen(
   vorlaufzeitTage: number,
   customFeiertage?: FeiertagsKonfiguration[],
   stuecklisten?: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }>,
-  losgroesse: number = DEFAULT_LOSGROESSE,
-  lieferintervall: number = DEFAULT_LIEFERINTERVALL
+  losgroesse: number = lieferantChinaData.lieferant.losgroesse,
+  lieferintervall: number = lieferantChinaData.lieferant.lieferintervall
 ): TaeglicheBestellung[] {
   const bestellungen: TaeglicheBestellung[] = []
   
@@ -603,7 +600,7 @@ export function erstelleZusatzbestellung(
   vorlaufzeitTage: number,
   skipLosgroessenRundung: boolean = false,
   customFeiertage?: FeiertagsKonfiguration[],
-  losgroesse: number = DEFAULT_LOSGROESSE
+  losgroesse: number = lieferantChinaData.lieferant.losgroesse
 ): TaeglicheBestellung {
   const LOSGROESSE = losgroesse
   const finalKomponenten: Record<string, number> = skipLosgroessenRundung

@@ -13,6 +13,7 @@ import type { KonfigurationData, FeiertagConfig } from '@/contexts/Konfiguration
 import { daysBetween, toLocalISODateString } from '@/lib/utils'
 import { istArbeitstag_Deutschland, istDeutschlandFeiertag, FeiertagsKonfiguration } from '@/lib/kalender'
 import type { Bestellung, Produktionsauftrag, Lagerbestand, MarketingAuftrag } from '@/types' // Assumed types
+import lieferantChinaData from '@/data/lieferant-china.json'
 
 /**
  * Konvertiert FeiertagConfig[] zu FeiertagsKonfiguration[] für kalender.ts Funktionen
@@ -538,7 +539,8 @@ export function berechneSCORMetriken(
     ? (puenktlicheBestellungen / bestellungen.length) * 100
     : 100
   
-  const CHINA_VORLAUFZEIT_TAGE = 49
+  // Vorlaufzeit aus JSON (keine Duplikate!)
+  const CHINA_VORLAUFZEIT_TAGE = lieferantChinaData.lieferant.gesamtVorlaufzeitTage
   const TOLERANZ_TAGE = 2
   const lieferungenInVorlaufzeit = bestellungen.filter(b => {
     if (!b.tatsaechlicheAnkunft) return true
@@ -567,10 +569,12 @@ export function berechneSCORMetriken(
   // - 5 AT Produktion + 4 AT LKW Transport → ~13 KT (mit Wochenenden)
   // - 30 KT Seefracht (24/7)
   // - Gesamt: ~43 KT + Handling/Puffer → 49 Tage (7 Wochen laut Spezifikation)
-  const vorlaufzeitGesamt = 49 // 7 Wochen Gesamtvorlaufzeit (aus JSON)
-  const vorlaufzeitProduktion = 5 // 5 Arbeitstage Produktion
-  const vorlaufzeitSeefracht = 30 // 30 Kalendertage Seefracht
-  const vorlaufzeitLKW = 4 // 4 Arbeitstage LKW (2 China + 2 Deutschland)
+  
+  // Vorlaufzeiten aus JSON (keine Duplikate!)
+  const vorlaufzeitGesamt = lieferantChinaData.lieferant.gesamtVorlaufzeitTage
+  const vorlaufzeitProduktion = lieferantChinaData.lieferant.vorlaufzeitArbeitstage
+  const vorlaufzeitSeefracht = lieferantChinaData.lieferant.vorlaufzeitKalendertage
+  const vorlaufzeitLKW = lieferantChinaData.lieferant.lkwTransportArbeitstage
   
   const durchlaufzeitBreakdown = {
      produktionChina: vorlaufzeitProduktion, 

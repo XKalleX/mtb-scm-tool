@@ -8,35 +8,37 @@
  * - Aktive Szenarien (Marketing, Maschinenausfall, etc.)
  * * Alle Seiten (Dashboard, Reporting, etc.) MÜSSEN diese
  * Berechnungen nutzen für konsistente Daten!
- * * Datenquellen: Alle Werte über KonfigurationContext (DynamicConfig)
- * * REFACTORED: Keine direkten JSON-Imports mehr!
+ * * Datenquellen: JSON-Dateien als Referenz, überschreibbar durch KonfigurationContext
  */
 
 import { SzenarioConfig } from '@/contexts/SzenarienContext'
+import saisonalitaetData from '@/data/saisonalitaet.json'
+import stammdatenData from '@/data/stammdaten.json'
+import lieferantChinaData from '@/data/lieferant-china.json'
 
 // ========================================
-// STANDARD-KONSTANTEN (Default-Werte)
+// KONSTANTEN AUS JSON (SINGLE SOURCE)
 // ========================================
-// Diese Werte werden NUR als Fallback verwendet wenn keine Konfiguration übergeben wird
-// In produktivem Code sollten IMMER die *MitKonfig Funktionen verwendet werden!
+// Diese Werte werden aus JSON geladen - keine Duplikate!
+// Können durch KonfigurationContext/DynamicConfig überschrieben werden
 
 /**
  * KRITISCH: 370.000 Bikes pro Jahr (NICHT 185.000!)
- * Standard-Wert - sollte aus KonfigurationContext kommen!
+ * Geladen aus stammdaten.json
  */
-export const JAHRESPRODUKTION_SSOT = 370_000
+export const JAHRESPRODUKTION_SSOT = (stammdatenData as any).jahresproduktion?.gesamt || 370_000
 
 /**
  * China Vorlaufzeit: 49 Tage
- * Standard-Wert - sollte aus KonfigurationContext kommen!
+ * Geladen aus lieferant-china.json
  */
-export const CHINA_VORLAUFZEIT_TAGE = 49
+export const CHINA_VORLAUFZEIT_TAGE = lieferantChinaData.lieferant.gesamtVorlaufzeitTage
 
 /**
  * Losgröße Sättel: 500 Stück
- * Standard-Wert - sollte aus KonfigurationContext kommen!
+ * Geladen aus lieferant-china.json
  */
-export const LOSGROESSE_SAETTEL = 500
+export const LOSGROESSE_SAETTEL = lieferantChinaData.lieferant.losgroesse
 
 /**
  * Arbeitstage pro Jahr (Mo-Fr ohne Feiertage)
@@ -185,27 +187,12 @@ export interface MonatsProduktion {
 
 /**
  * Berechnet die monatliche Produktionsverteilung
- * WARNUNG: Verwendet Standard-Saisonalitätsdaten! Besser: berechneMonatlicheProduktionMitKonfig() verwenden!
+ * HINWEIS: Verwendet Saisonalität aus JSON. Besser: berechneMonatlicheProduktionMitKonfig() mit Config verwenden!
  * @deprecated Verwende stattdessen berechneMonatlicheProduktionMitKonfig() mit Config aus KonfigurationContext
  */
 export function berechneMonatlicheProduktion(jahresproduktion: number): MonatsProduktion[] {
-  // Standard-Saisonalitätsdaten (aus JSON-Dateien extrahiert als Fallback)
-  const standardSaisonalitaet = [
-    { monat: 1, name: 'Januar', anteil: 4 },
-    { monat: 2, name: 'Februar', anteil: 6 },
-    { monat: 3, name: 'März', anteil: 10 },
-    { monat: 4, name: 'April', anteil: 16 },
-    { monat: 5, name: 'Mai', anteil: 12 },
-    { monat: 6, name: 'Juni', anteil: 10 },
-    { monat: 7, name: 'Juli', anteil: 8 },
-    { monat: 8, name: 'August', anteil: 7 },
-    { monat: 9, name: 'September', anteil: 10 },
-    { monat: 10, name: 'Oktober', anteil: 9 },
-    { monat: 11, name: 'November', anteil: 5 },
-    { monat: 12, name: 'Dezember', anteil: 3 }
-  ]
-  
-  return berechneMonatlicheProduktionMitKonfig(jahresproduktion, standardSaisonalitaet)
+  // Saisonalitätsdaten direkt aus JSON (keine Duplikate!)
+  return berechneMonatlicheProduktionMitKonfig(jahresproduktion, saisonalitaetData.saisonalitaetMonatlich)
 }
 
 // ========================================
@@ -221,23 +208,12 @@ export interface VariantenProduktion {
 
 /**
  * Berechnet die Produktion pro MTB-Variante
- * WARNUNG: Verwendet Standard-Variantendaten! Besser: berechneVariantenProduktionMitKonfig() verwenden!
+ * HINWEIS: Verwendet Varianten aus JSON. Besser: berechneVariantenProduktionMitKonfig() mit Config verwenden!
  * @deprecated Verwende stattdessen berechneVariantenProduktionMitKonfig() mit Config aus KonfigurationContext
  */
 export function berechneVariantenProduktion(jahresproduktion: number): VariantenProduktion[] {
-  // Standard-Varianten (aus JSON-Dateien extrahiert als Fallback)
-  const standardVarianten = [
-    { id: 'MTBAllrounder', name: 'Allrounder', anteilPrognose: 0.30 },
-    { id: 'MTBCompetition', name: 'Competition', anteilPrognose: 0.15 },
-    { id: 'MTBDownhill', name: 'Downhill', anteilPrognose: 0.10 },
-    { id: 'MTBEnduro', name: 'Enduro', anteilPrognose: 0.15 },
-    { id: 'MTBCrossCountry', name: 'Cross Country', anteilPrognose: 0.10 },
-    { id: 'MTBTrail', name: 'Trail', anteilPrognose: 0.10 },
-    { id: 'MTBFreeride', name: 'Freeride', anteilPrognose: 0.05 },
-    { id: 'MTBDirt', name: 'Dirt', anteilPrognose: 0.05 }
-  ]
-  
-  return berechneVariantenProduktionMitKonfig(jahresproduktion, standardVarianten)
+  // Varianten direkt aus JSON (keine Duplikate!)
+  return berechneVariantenProduktionMitKonfig(jahresproduktion, stammdatenData.varianten)
 }
 
 // ========================================
@@ -558,13 +534,11 @@ export function berechneLagerDaten(
    
   // Materialverfügbarkeit beeinflusst Lagerbestand
   const verfuegbarkeitsFaktor = auswirkungen.materialverfuegbarkeit / 100
-  
-  // Standard-Saisonalität für Lagerberechnung (Fallback)
-  const standardSaisonalitaet = [4, 6, 10, 16, 12, 10, 8, 7, 10, 9, 5, 3]
    
   return MONATSNAMEN_KURZ.map((monat, i) => {
     // Saisonale Schwankung im Lager (invers zur Produktion)
-    const saisonAnteil = standardSaisonalitaet[i]
+    // Daten direkt aus JSON (keine Duplikate!)
+    const saisonAnteil = saisonalitaetData.saisonalitaetMonatlich[i].anteil
     // Hohe Produktion = niedriger Lagerbestand
     const saisonFaktor = 1 - ((saisonAnteil - GLEICHMAESSIGER_MONATSANTEIL) / 100)
      
