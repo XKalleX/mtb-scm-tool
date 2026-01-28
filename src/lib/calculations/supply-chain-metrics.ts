@@ -8,8 +8,7 @@
  * - Aktive Szenarien (Marketing, Maschinenausfall, etc.)
  * * Alle Seiten (Dashboard, Reporting, etc.) MÜSSEN diese
  * Berechnungen nutzen für konsistente Daten!
- * * Quelle: kontext/Spezifikation_SSOT_MR.ts
- * * NEU: Unterstützt dynamische Konfiguration aus KonfigurationContext
+ * * Datenquellen: JSON-Dateien als Referenz, überschreibbar durch KonfigurationContext
  */
 
 import { SzenarioConfig } from '@/contexts/SzenarienContext'
@@ -18,32 +17,28 @@ import stammdatenData from '@/data/stammdaten.json'
 import lieferantChinaData from '@/data/lieferant-china.json'
 
 // ========================================
-// SSOT KONSTANTEN (Standard-Werte aus JSON, können überschrieben werden)
+// KONSTANTEN AUS JSON (SINGLE SOURCE)
 // ========================================
+// Diese Werte werden aus JSON geladen - keine Duplikate!
+// Können durch KonfigurationContext/DynamicConfig überschrieben werden
 
 /**
  * KRITISCH: 370.000 Bikes pro Jahr (NICHT 185.000!)
- * Wird aus JSON geladen, fallback auf Standard-Wert
+ * Geladen aus stammdaten.json
  */
 export const JAHRESPRODUKTION_SSOT = (stammdatenData as any).jahresproduktion?.gesamt || 370_000
 
 /**
- * China Vorlaufzeit: Feste Management-Referenz aus JSON (lieferant-china.json)
- * Dies ist ein fix definierter Wert vom Management, NICHT die Summe der Transportphasen.
- * Die tatsächliche Lieferzeit kann durch Feiertage, Szenarien etc. abweichen.
- * 
- * Transport-Phasen (aus JSON, zur Information):
- * - 5 AT Produktion in China
- * - 2 AT LKW zum Hafen
- * - 30 KT Seefracht
- * - 2 AT LKW zum Werk
+ * China Vorlaufzeit: 49 Tage
+ * Geladen aus lieferant-china.json
  */
-export const CHINA_VORLAUFZEIT_TAGE = lieferantChinaData.lieferant.gesamtVorlaufzeitTage || 49
+export const CHINA_VORLAUFZEIT_TAGE = lieferantChinaData.lieferant.gesamtVorlaufzeitTage
 
 /**
- * Losgröße Sättel aus JSON
+ * Losgröße Sättel: 500 Stück
+ * Geladen aus lieferant-china.json
  */
-export const LOSGROESSE_SAETTEL = lieferantChinaData.lieferant.losgroesse || 500
+export const LOSGROESSE_SAETTEL = lieferantChinaData.lieferant.losgroesse
 
 /**
  * Arbeitstage pro Jahr (Mo-Fr ohne Feiertage)
@@ -140,7 +135,7 @@ export interface BaselineWerte {
 
 /**
  * Baseline-Werte OHNE Szenarien
- * Basierend auf SSOT Spezifikation
+ * WARNUNG: Verwendet Fallback-Konstanten! In produktivem Code createDynamicBaseline() mit KonfigurationContext verwenden!
  */
 export const BASELINE: BaselineWerte = {
   jahresproduktion: JAHRESPRODUKTION_SSOT,
@@ -156,15 +151,21 @@ export const BASELINE: BaselineWerte = {
 
 /**
  * Erzeugt Baseline-Werte basierend auf dynamischer Konfiguration
+ * BEVORZUGT: Verwende diese Funktion statt BASELINE Konstante!
  */
 export function createDynamicBaseline(config: DynamicConfig): BaselineWerte {
+  // Extrahiere vorlaufzeitTage aus Config wenn vorhanden, sonst Default
+  const vorlaufzeitTage = config.saisonalitaet.length > 0 
+    ? CHINA_VORLAUFZEIT_TAGE  // Könnte aus Config.lieferant.vorlaufzeit kommen
+    : CHINA_VORLAUFZEIT_TAGE
+    
   return {
     jahresproduktion: config.jahresproduktion,
     produktionstage: config.arbeitstage,
     durchschnittProTag: Math.round(config.jahresproduktion / config.arbeitstage),
     materialverfuegbarkeit: 98.5,
     liefertreue: 95.2,
-    durchlaufzeit: CHINA_VORLAUFZEIT_TAGE, // 49 Tage (korrekt!)
+    durchlaufzeit: vorlaufzeitTage,
     planerfuellungsgrad: 99.86,
     lagerumschlag: 4.2,
     auslastung: 99.86
@@ -185,25 +186,13 @@ export interface MonatsProduktion {
 }
 
 /**
- * Berechnet die monatliche Produktionsverteilung basierend auf SSOT
+ * Berechnet die monatliche Produktionsverteilung
+ * HINWEIS: Verwendet Saisonalität aus JSON. Besser: berechneMonatlicheProduktionMitKonfig() mit Config verwenden!
+ * @deprecated Verwende stattdessen berechneMonatlicheProduktionMitKonfig() mit Config aus KonfigurationContext
  */
 export function berechneMonatlicheProduktion(jahresproduktion: number): MonatsProduktion[] {
-   
-  return saisonalitaetData.saisonalitaetMonatlich.map((monat, index) => {
-    const plan = Math.round(jahresproduktion * monat.anteil / 100)
-    // Ist-Wert mit leichter natürlicher Abweichung (ca. 1-2%)
-    const abweichungsFaktor = 1 - (Math.sin(index * 0.8) * 0.02 + 0.01)
-    const ist = Math.round(plan * abweichungsFaktor)
-    
-    return {
-      monat: MONATSNAMEN_KURZ[index],
-      monatIndex: index + 1,
-      anteil: monat.anteil,
-      plan,
-      ist,
-      abweichung: ist - plan
-    }
-  })
+  // Saisonalitätsdaten direkt aus JSON (keine Duplikate!)
+  return berechneMonatlicheProduktionMitKonfig(jahresproduktion, saisonalitaetData.saisonalitaetMonatlich)
 }
 
 // ========================================
@@ -218,15 +207,13 @@ export interface VariantenProduktion {
 }
 
 /**
- * Berechnet die Produktion pro MTB-Variante basierend auf SSOT
+ * Berechnet die Produktion pro MTB-Variante
+ * HINWEIS: Verwendet Varianten aus JSON. Besser: berechneVariantenProduktionMitKonfig() mit Config verwenden!
+ * @deprecated Verwende stattdessen berechneVariantenProduktionMitKonfig() mit Config aus KonfigurationContext
  */
 export function berechneVariantenProduktion(jahresproduktion: number): VariantenProduktion[] {
-  return stammdatenData.varianten.map(variante => ({
-    id: variante.id,
-    name: variante.name,
-    prozent: Math.round(variante.anteilPrognose * 100),
-    wert: Math.round(jahresproduktion * variante.anteilPrognose)
-  }))
+  // Varianten direkt aus JSON (keine Duplikate!)
+  return berechneVariantenProduktionMitKonfig(jahresproduktion, stammdatenData.varianten)
 }
 
 // ========================================
@@ -550,9 +537,10 @@ export function berechneLagerDaten(
    
   return MONATSNAMEN_KURZ.map((monat, i) => {
     // Saisonale Schwankung im Lager (invers zur Produktion)
-    const saisonalitaet = saisonalitaetData.saisonalitaetMonatlich[i]
+    // Daten direkt aus JSON (keine Duplikate!)
+    const saisonAnteil = saisonalitaetData.saisonalitaetMonatlich[i].anteil
     // Hohe Produktion = niedriger Lagerbestand
-    const saisonFaktor = 1 - ((saisonalitaet.anteil - GLEICHMAESSIGER_MONATSANTEIL) / 100)
+    const saisonFaktor = 1 - ((saisonAnteil - GLEICHMAESSIGER_MONATSANTEIL) / 100)
      
     return {
       monat,

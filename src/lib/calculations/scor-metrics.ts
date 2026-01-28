@@ -22,7 +22,7 @@
 
 import { SCORMetriken, Produktionsauftrag, Lagerbestand, Bestellung } from '@/types'
 import { daysBetween } from '@/lib/utils'
-import { CHINA_VORLAUFZEIT_TAGE } from '@/lib/calculations/supply-chain-metrics'
+import lieferantChinaData from '@/data/lieferant-china.json'
 
 /**
  * Berechnet alle SCOR-Metriken
@@ -30,12 +30,14 @@ import { CHINA_VORLAUFZEIT_TAGE } from '@/lib/calculations/supply-chain-metrics'
  * @param produktionsauftraege - Alle Produktionsaufträge
  * @param lagerbestaende - Lagerbestände
  * @param bestellungen - Bestellungen
+ * @param vorlaufzeitTage - Vorlaufzeit in Tagen (aus KonfigurationContext oder JSON-Referenz)
  * @returns SCOR-Metriken
  */
 export function berechneSCORMetriken(
   produktionsauftraege: Produktionsauftrag[],
   lagerbestaende: Record<string, Lagerbestand>,
-  bestellungen: Bestellung[]
+  bestellungen: Bestellung[],
+  vorlaufzeitTage: number = lieferantChinaData.lieferant.gesamtVorlaufzeitTage
 ): SCORMetriken {
   // ==========================================
   // RELIABILITY (Zuverlässigkeit)
@@ -59,12 +61,11 @@ export function berechneSCORMetriken(
     : 100
   
   // NEU: Delivery Performance - Lieferungen innerhalb Vorlaufzeit
-  // Verwendet CHINA_VORLAUFZEIT_TAGE aus dem shared constants
   const TOLERANZ_TAGE = 2 // +2 Tage Toleranz
   const lieferungenInVorlaufzeit = bestellungen.filter(b => {
     if (!b.tatsaechlicheAnkunft) return true
     const tatsaechlicheDauer = daysBetween(b.bestelldatum, b.tatsaechlicheAnkunft)
-    return tatsaechlicheDauer <= CHINA_VORLAUFZEIT_TAGE + TOLERANZ_TAGE
+    return tatsaechlicheDauer <= vorlaufzeitTage + TOLERANZ_TAGE
   }).length
   
   const deliveryPerformance = bestellungen.length > 0
