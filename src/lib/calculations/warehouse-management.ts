@@ -184,6 +184,20 @@ export function berechneIntegriertesWarehouse(
   // STEP 1: GENERIERE INBOUND BESTELLUNGEN (mit 49 Tage Vorlauf!)
   // ═══════════════════════════════════════════════════════════════════════════════
   
+  // Bereite Stücklisten-Map vor (für generiereTaeglicheBestellungen)
+  // Transformiere stueckliste[] aus Konfiguration in das erwartete Format
+  const stuecklistenMap: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }> = {}
+  konfiguration.stueckliste.forEach(s => {
+    if (!stuecklistenMap[s.mtbVariante]) {
+      stuecklistenMap[s.mtbVariante] = { komponenten: {} }
+    }
+    stuecklistenMap[s.mtbVariante].komponenten[s.bauteilId] = {
+      name: s.bauteilName,
+      menge: s.menge,
+      einheit: s.einheit || 'Stück'
+    }
+  })
+  
   // Konvertiere Produktionspläne zu TagesProduktionsplan Format
   const produktionsplaeneFormatiert: Record<string, any[]> = {}
   Object.entries(variantenProduktionsplaene).forEach(([varianteId, plan]) => {
@@ -201,18 +215,39 @@ export function berechneIntegriertesWarehouse(
       produktionsplaeneFormatiert,
       planungsjahr,
       konfiguration.lieferant.gesamtVorlaufzeitTage,
-      konfiguration.feiertage
+      konfiguration.feiertage,
+      stuecklistenMap,  // Stücklisten aus Konfiguration
+      konfiguration.lieferant.losgroesse,  // Losgröße aus Konfiguration
+      konfiguration.lieferant.lieferintervall  // Lieferintervall aus Konfiguration
     ),
     ...zusatzBestellungen
   ]
   
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // GUARD: Prüfe ob Bestellungen vorhanden sind
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // Falls keine Bestellungen generiert wurden (z.B. leerer Produktionsplan),
+  // geben wir ein leeres Ergebnis zurück um Abstürze zu vermeiden.
+  if (bestellungen.length === 0) {
+    console.warn('⚠️ Warehouse Management: Keine Bestellungen vorhanden! Rückgabe leerer Statistik.')
+    return {
+      tage: [],
+      jahresstatistik: {
+        gesamtLieferungen: 0,
+        gesamtVerbrauch: 0,
+        durchschnittBestand: 0,
+        minimalBestand: 0,
+        maximalBestand: 0,
+        tageNegativ: 0,
+        liefertreue: 100
+      },
+      warnungen: ['Keine Bestellungen vorhanden - Produktionspläne prüfen!']
+    }
+  }
+  
   console.log(`🏭 Warehouse Management: ${bestellungen.length} Bestellungen generiert`)
-  const zeitraumStart = bestellungen[0]?.bestelldatum instanceof Date 
-    ? bestellungen[0].bestelldatum.toLocaleDateString('de-DE') 
-    : 'N/A'
-  const zeitraumEnde = bestellungen[bestellungen.length - 1]?.bestelldatum instanceof Date 
-    ? bestellungen[bestellungen.length - 1].bestelldatum.toLocaleDateString('de-DE') 
-    : 'N/A'
+  const zeitraumStart = bestellungen[0].bestelldatum.toLocaleDateString('de-DE')
+  const zeitraumEnde = bestellungen[bestellungen.length - 1].bestelldatum.toLocaleDateString('de-DE')
   console.log(`   Zeitraum: ${zeitraumStart} - ${zeitraumEnde}`)
   
   // Gruppiere Bestellungen nach Ankunftsdatum
