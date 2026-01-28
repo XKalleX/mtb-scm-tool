@@ -33,7 +33,8 @@ import {
   Factory,
   BarChart,
   Package,
-  AlertCircle
+  AlertCircle,
+  Trash
 } from 'lucide-react'
 import { useKonfiguration, FeiertagConfig, STANDARD_KONFIGURATION, KonfigurationData, ProduktionConfig, LieferantConfig } from '@/contexts/KonfigurationContext'
 import { formatNumber } from '@/lib/utils'
@@ -69,6 +70,7 @@ export function EinstellungenPanel() {
 
   const [activeTab, setActiveTab] = useState('grunddaten')
   const [showConfirmReset, setShowConfirmReset] = useState(false)
+  const [showConfirmCacheClear, setShowConfirmCacheClear] = useState(false)
   
   // ========================================
   // DRAFT STATE - Lokale Kopie für Bearbeitung
@@ -173,6 +175,37 @@ export function EinstellungenPanel() {
     setHasUnsavedChanges(false)
   }
 
+  /**
+   * Cache leeren - Löscht ALLE gespeicherten Daten im localStorage
+   * und lädt die Seite neu um Standardwerte aus JSON-Dateien zu laden.
+   * 
+   * WICHTIG: Dies löscht:
+   * - mtb-konfiguration (alle Einstellungen)
+   * - mtb-szenarien (alle Szenarien)
+   * - Alle anderen localStorage-Einträge dieser Domain
+   * 
+   * Nach dem Löschen wird die Seite neu geladen und alle Daten
+   * werden aus den Standard-JSON-Dateien geladen (SSOT).
+   */
+  const handleCacheClear = () => {
+    setShowConfirmCacheClear(false)
+    
+    try {
+      // Lösche kompletten localStorage für diese Domain
+      localStorage.clear()
+      
+      // Optional: Lösche auch sessionStorage falls vorhanden
+      sessionStorage.clear()
+      
+      // Lade Seite neu um Standardwerte aus JSON-Dateien zu laden
+      // Dies stellt sicher, dass alle Komponenten neu initialisiert werden
+      window.location.reload()
+    } catch (error) {
+      console.error('Fehler beim Löschen des Caches:', error)
+      alert('Fehler beim Löschen des Caches. Bitte versuchen Sie es erneut.')
+    }
+  }
+
   const arbeitstage = getArbeitstageProJahr()
   const produktionProVariante = getJahresproduktionProVariante()
   
@@ -232,6 +265,31 @@ export function EinstellungenPanel() {
 
         {/* Reset Button */}
         <div className="flex gap-2">
+          {/* Cache leeren Button - Löscht ALLES */}
+          {showConfirmCacheClear ? (
+            <>
+              <Button variant="destructive" size="sm" onClick={handleCacheClear}>
+                <Check className="h-4 w-4 mr-1" />
+                Wirklich löschen
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowConfirmCacheClear(false)}>
+                <X className="h-4 w-4 mr-1" />
+                Abbrechen
+              </Button>
+            </>
+          ) : (
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={() => setShowConfirmCacheClear(true)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              Cache leeren
+            </Button>
+          )}
+          
+          {/* Standard zurücksetzen Button */}
           {showConfirmReset ? (
             <>
               <Button variant="destructive" size="sm" onClick={handleReset}>
@@ -371,6 +429,43 @@ export function EinstellungenPanel() {
                 </div>
               </div>
             </div>
+
+            {/* Cache leeren Information Box */}
+            <Card className="border-red-200 bg-red-50">
+              <CardHeader>
+                <CardTitle className="text-red-900 flex items-center gap-2">
+                  <Trash className="h-5 w-5" />
+                  Cache komplett löschen
+                </CardTitle>
+                <CardDescription className="text-red-700">
+                  Nutzen Sie diese Funktion, um alle gespeicherten Daten zu löschen und Standardwerte wiederherzustellen
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-sm space-y-2 text-red-800">
+                  <p>
+                    <strong>Diese Funktion löscht ALLE gespeicherten Daten:</strong>
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Alle Konfigurationseinstellungen (Jahresproduktion, Saisonalität, etc.)</li>
+                    <li>Alle aktiven und inaktiven Szenarien</li>
+                    <li>Alle anderen lokalen Speicherdaten</li>
+                  </ul>
+                  <p className="mt-3">
+                    <strong>Nach dem Löschen:</strong>
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Die Seite wird automatisch neu geladen</li>
+                    <li>Alle Werte werden aus den Standard-JSON-Dateien geladen (SSOT)</li>
+                    <li>Fehlerhafte oder alte Daten werden entfernt</li>
+                  </ul>
+                  <div className="mt-4 p-3 bg-red-100 border border-red-300 rounded">
+                    <p className="font-semibold">⚠️ Achtung: Diese Aktion kann nicht rückgängig gemacht werden!</p>
+                    <p className="text-xs mt-1">Stellen Sie sicher, dass Sie alle wichtigen Änderungen gespeichert haben.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* SAISONALITÄT TAB */}
