@@ -33,11 +33,14 @@ import {
   Factory,
   BarChart,
   Package,
-  AlertCircle
+  AlertCircle,
+  Trash,
+  AlertTriangle
 } from 'lucide-react'
 import { useKonfiguration, FeiertagConfig, STANDARD_KONFIGURATION, KonfigurationData, ProduktionConfig, LieferantConfig } from '@/contexts/KonfigurationContext'
 import { formatNumber } from '@/lib/utils'
 import { DEFAULT_HEUTE_DATUM } from '@/lib/constants'
+import * as Dialog from '@radix-ui/react-dialog'
 
 /**
  * Hauptkomponente für Einstellungen
@@ -69,6 +72,7 @@ export function EinstellungenPanel() {
 
   const [activeTab, setActiveTab] = useState('grunddaten')
   const [showConfirmReset, setShowConfirmReset] = useState(false)
+  const [showCacheClearDialog, setShowCacheClearDialog] = useState(false)
   
   // ========================================
   // DRAFT STATE - Lokale Kopie für Bearbeitung
@@ -173,6 +177,37 @@ export function EinstellungenPanel() {
     setHasUnsavedChanges(false)
   }
 
+  /**
+   * Cache leeren - Löscht ALLE gespeicherten Daten im localStorage
+   * und lädt die Seite neu um Standardwerte aus JSON-Dateien zu laden.
+   * 
+   * WICHTIG: Dies löscht:
+   * - mtb-konfiguration (alle Einstellungen)
+   * - mtb-szenarien (alle Szenarien)
+   * - Alle anderen localStorage-Einträge dieser Domain
+   * 
+   * Nach dem Löschen wird die Seite neu geladen und alle Daten
+   * werden aus den Standard-JSON-Dateien geladen (SSOT).
+   */
+  const handleCacheClear = () => {
+    setShowCacheClearDialog(false)
+    
+    try {
+      // Lösche kompletten localStorage für diese Domain
+      localStorage.clear()
+      
+      // Optional: Lösche auch sessionStorage falls vorhanden
+      sessionStorage.clear()
+      
+      // Lade Seite neu um Standardwerte aus JSON-Dateien zu laden
+      // Dies stellt sicher, dass alle Komponenten neu initialisiert werden
+      window.location.reload()
+    } catch (error) {
+      console.error('Fehler beim Löschen des Caches:', error)
+      alert('Fehler beim Löschen des Caches. Bitte versuchen Sie es erneut.')
+    }
+  }
+
   const arbeitstage = getArbeitstageProJahr()
   const produktionProVariante = getJahresproduktionProVariante()
   
@@ -232,6 +267,18 @@ export function EinstellungenPanel() {
 
         {/* Reset Button */}
         <div className="flex gap-2">
+          {/* Cache leeren Button - Opens Dialog for confirmation */}
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={() => setShowCacheClearDialog(true)}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            <Trash className="h-4 w-4 mr-2" />
+            Cache leeren
+          </Button>
+          
+          {/* Standard zurücksetzen Button */}
           {showConfirmReset ? (
             <>
               <Button variant="destructive" size="sm" onClick={handleReset}>
@@ -610,6 +657,90 @@ export function EinstellungenPanel() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Cache Clear Confirmation Dialog */}
+        <Dialog.Root open={showCacheClearDialog} onOpenChange={setShowCacheClearDialog}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
+            <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto z-50 p-6">
+              <div className="space-y-4">
+                {/* Header */}
+                <div className="flex items-start gap-3">
+                  <div className="p-3 bg-red-100 rounded-full">
+                    <AlertTriangle className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <Dialog.Title className="text-xl font-semibold text-red-900">
+                      Cache komplett löschen
+                    </Dialog.Title>
+                    <Dialog.Description className="text-sm text-red-700 mt-1">
+                      Nutzen Sie diese Funktion, um alle gespeicherten Daten zu löschen und Standardwerte wiederherzustellen
+                    </Dialog.Description>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="space-y-4 text-sm">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
+                    <div>
+                      <p className="font-semibold text-red-900 mb-2">
+                        Diese Funktion löscht ALLE gespeicherten Daten:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1 text-red-800 ml-2">
+                        <li>Alle Konfigurationseinstellungen (Jahresproduktion, Saisonalität, etc.)</li>
+                        <li>Alle aktiven und inaktiven Szenarien</li>
+                        <li>Alle anderen lokalen Speicherdaten</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <p className="font-semibold text-red-900 mb-2">
+                        Nach dem Löschen:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1 text-red-800 ml-2">
+                        <li>Die Seite wird automatisch neu geladen</li>
+                        <li>Alle Werte werden aus den Standard-JSON-Dateien geladen (SSOT)</li>
+                        <li>Fehlerhafte oder alte Daten werden entfernt</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-yellow-900">
+                          Achtung: Diese Aktion kann nicht rückgängig gemacht werden!
+                        </p>
+                        <p className="text-sm text-yellow-800 mt-1">
+                          Stellen Sie sicher, dass Sie alle wichtigen Änderungen gespeichert haben.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2 pt-4">
+                  <Dialog.Close asChild>
+                    <Button variant="outline">
+                      <X className="h-4 w-4 mr-2" />
+                      Abbrechen
+                    </Button>
+                  </Dialog.Close>
+                  <Button 
+                    variant="destructive" 
+                    onClick={handleCacheClear}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    <Trash className="h-4 w-4 mr-2" />
+                    Jetzt Cache löschen
+                  </Button>
+                </div>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
       </div>
     )
   }
