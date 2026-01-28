@@ -34,11 +34,13 @@ import {
   BarChart,
   Package,
   AlertCircle,
-  Trash
+  Trash,
+  AlertTriangle
 } from 'lucide-react'
 import { useKonfiguration, FeiertagConfig, STANDARD_KONFIGURATION, KonfigurationData, ProduktionConfig, LieferantConfig } from '@/contexts/KonfigurationContext'
 import { formatNumber } from '@/lib/utils'
 import { DEFAULT_HEUTE_DATUM } from '@/lib/constants'
+import * as Dialog from '@radix-ui/react-dialog'
 
 /**
  * Hauptkomponente für Einstellungen
@@ -70,7 +72,7 @@ export function EinstellungenPanel() {
 
   const [activeTab, setActiveTab] = useState('grunddaten')
   const [showConfirmReset, setShowConfirmReset] = useState(false)
-  const [showConfirmCacheClear, setShowConfirmCacheClear] = useState(false)
+  const [showCacheClearDialog, setShowCacheClearDialog] = useState(false)
   
   // ========================================
   // DRAFT STATE - Lokale Kopie für Bearbeitung
@@ -188,7 +190,7 @@ export function EinstellungenPanel() {
    * werden aus den Standard-JSON-Dateien geladen (SSOT).
    */
   const handleCacheClear = () => {
-    setShowConfirmCacheClear(false)
+    setShowCacheClearDialog(false)
     
     try {
       // Lösche kompletten localStorage für diese Domain
@@ -265,29 +267,16 @@ export function EinstellungenPanel() {
 
         {/* Reset Button */}
         <div className="flex gap-2">
-          {/* Cache leeren Button - Löscht ALLES */}
-          {showConfirmCacheClear ? (
-            <>
-              <Button variant="destructive" size="sm" onClick={handleCacheClear}>
-                <Check className="h-4 w-4 mr-1" />
-                Wirklich löschen
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowConfirmCacheClear(false)}>
-                <X className="h-4 w-4 mr-1" />
-                Abbrechen
-              </Button>
-            </>
-          ) : (
-            <Button 
-              variant="destructive" 
-              size="sm" 
-              onClick={() => setShowConfirmCacheClear(true)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              <Trash className="h-4 w-4 mr-2" />
-              Cache leeren
-            </Button>
-          )}
+          {/* Cache leeren Button - Opens Dialog for confirmation */}
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={() => setShowCacheClearDialog(true)}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            <Trash className="h-4 w-4 mr-2" />
+            Cache leeren
+          </Button>
           
           {/* Standard zurücksetzen Button */}
           {showConfirmReset ? (
@@ -429,43 +418,6 @@ export function EinstellungenPanel() {
                 </div>
               </div>
             </div>
-
-            {/* Cache leeren Information Box */}
-            <Card className="border-red-200 bg-red-50">
-              <CardHeader>
-                <CardTitle className="text-red-900 flex items-center gap-2">
-                  <Trash className="h-5 w-5" />
-                  Cache komplett löschen
-                </CardTitle>
-                <CardDescription className="text-red-700">
-                  Nutzen Sie diese Funktion, um alle gespeicherten Daten zu löschen und Standardwerte wiederherzustellen
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-sm space-y-2 text-red-800">
-                  <p>
-                    <strong>Diese Funktion löscht ALLE gespeicherten Daten:</strong>
-                  </p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>Alle Konfigurationseinstellungen (Jahresproduktion, Saisonalität, etc.)</li>
-                    <li>Alle aktiven und inaktiven Szenarien</li>
-                    <li>Alle anderen lokalen Speicherdaten</li>
-                  </ul>
-                  <p className="mt-3">
-                    <strong>Nach dem Löschen:</strong>
-                  </p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>Die Seite wird automatisch neu geladen</li>
-                    <li>Alle Werte werden aus den Standard-JSON-Dateien geladen (SSOT)</li>
-                    <li>Fehlerhafte oder alte Daten werden entfernt</li>
-                  </ul>
-                  <div className="mt-4 p-3 bg-red-100 border border-red-300 rounded">
-                    <p className="font-semibold">⚠️ Achtung: Diese Aktion kann nicht rückgängig gemacht werden!</p>
-                    <p className="text-xs mt-1">Stellen Sie sicher, dass Sie alle wichtigen Änderungen gespeichert haben.</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* SAISONALITÄT TAB */}
@@ -705,6 +657,90 @@ export function EinstellungenPanel() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Cache Clear Confirmation Dialog */}
+        <Dialog.Root open={showCacheClearDialog} onOpenChange={setShowCacheClearDialog}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
+            <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto z-50 p-6">
+              <div className="space-y-4">
+                {/* Header */}
+                <div className="flex items-start gap-3">
+                  <div className="p-3 bg-red-100 rounded-full">
+                    <AlertTriangle className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <Dialog.Title className="text-xl font-semibold text-red-900">
+                      Cache komplett löschen
+                    </Dialog.Title>
+                    <Dialog.Description className="text-sm text-red-700 mt-1">
+                      Nutzen Sie diese Funktion, um alle gespeicherten Daten zu löschen und Standardwerte wiederherzustellen
+                    </Dialog.Description>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="space-y-4 text-sm">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
+                    <div>
+                      <p className="font-semibold text-red-900 mb-2">
+                        Diese Funktion löscht ALLE gespeicherten Daten:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1 text-red-800 ml-2">
+                        <li>Alle Konfigurationseinstellungen (Jahresproduktion, Saisonalität, etc.)</li>
+                        <li>Alle aktiven und inaktiven Szenarien</li>
+                        <li>Alle anderen lokalen Speicherdaten</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <p className="font-semibold text-red-900 mb-2">
+                        Nach dem Löschen:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1 text-red-800 ml-2">
+                        <li>Die Seite wird automatisch neu geladen</li>
+                        <li>Alle Werte werden aus den Standard-JSON-Dateien geladen (SSOT)</li>
+                        <li>Fehlerhafte oder alte Daten werden entfernt</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-yellow-900">
+                          Achtung: Diese Aktion kann nicht rückgängig gemacht werden!
+                        </p>
+                        <p className="text-sm text-yellow-800 mt-1">
+                          Stellen Sie sicher, dass Sie alle wichtigen Änderungen gespeichert haben.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2 pt-4">
+                  <Dialog.Close asChild>
+                    <Button variant="outline">
+                      <X className="h-4 w-4 mr-2" />
+                      Abbrechen
+                    </Button>
+                  </Dialog.Close>
+                  <Button 
+                    variant="destructive" 
+                    onClick={handleCacheClear}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    <Trash className="h-4 w-4 mr-2" />
+                    Jetzt Cache löschen
+                  </Button>
+                </div>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
       </div>
     )
   }
