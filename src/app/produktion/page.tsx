@@ -480,8 +480,6 @@ export default function ProduktionPage() {
         </Card>
       </div>
 
-      {/* Produktionslogik ohne Solver - ENTFERNT (jetzt in CollapsibleInfoGroup oben) */}
-
       {/* SEKTION 1: PRODUKTIONSSTEUERUNG */}
       <Card className="border-purple-200 bg-purple-50">
         <CardHeader>

@@ -94,7 +94,7 @@ export function SaisonalitaetChart({ daten, jahresproduktion, height = 300 }: Sa
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={height}>
-          <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+          <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
             <XAxis dataKey="name" tick={{ fontSize: 11 }} />
             <YAxis 
@@ -132,7 +132,7 @@ export function SaisonalitaetChart({ daten, jahresproduktion, height = 300 }: Sa
               dot={{ fill: COLORS.primary }}
               name="Bikes"
             />
-          </BarChart>
+          </ComposedChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>
@@ -545,7 +545,18 @@ export function BestellungenChart({
   }, [daten, aggregation])
 
   if (chartData.length === 0) {
-    return null
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">📦 Bestellungen</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+            Keine Bestelldaten verfügbar
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -555,7 +566,7 @@ export function BestellungenChart({
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={height}>
-          <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+          <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
             <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={aggregation === 'woche' ? 3 : 0} />
             <YAxis 
@@ -594,7 +605,7 @@ export function BestellungenChart({
               dot={{ fill: COLORS.warning }}
               name="Anzahl Bestellungen"
             />
-          </BarChart>
+          </ComposedChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>
