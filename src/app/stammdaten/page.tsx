@@ -5,12 +5,13 @@
  * STAMMDATEN VISUALISIERUNG
  * ========================================
  * 
- * Diese Seite visualisiert alle Stammdaten aus den JSON-Dateien:
- * - stammdaten.json (Projekt, MTB-Varianten, Produktion, Zulieferer, Szenarien)
- * - saisonalitaet.json (Monatliche Verteilung)
- * - stueckliste.json (Bike-Sattel-Zuordnung)
- * - lieferant-china.json (Lieferant Details, Komponenten)
- * - feiertage-china.json (Chinesische Feiertage 2027)
+ * Diese Seite visualisiert alle Stammdaten aus den JSON-Dateien (SSOT):
+ * - stammdaten.json (Projekt-Meta, MTB-Varianten, Jahresproduktion, Produktion)
+ * - saisonalitaet.json (Monatliche Verteilung, Saisonalität)
+ * - stueckliste.json (Bike → Sattel Zuordnung)
+ * - lieferant-china.json (Lieferant, Komponenten, Vorlaufzeiten)
+ * - feiertage-china.json (Chinesische Feiertage 2026-2028)
+ * - feiertage-deutschland.json (Deutsche Feiertage NRW 2026-2028)
  * - szenario-defaults.json (Standard-Parameter für Szenarien)
  * 
  * ZWECK: Schnelles Erkennen von fehlenden oder falschen Daten
