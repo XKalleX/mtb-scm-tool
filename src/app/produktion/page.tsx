@@ -17,8 +17,8 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Factory, AlertTriangle, TrendingUp, Package, Download, Zap } from 'lucide-react'
-import { CollapsibleInfo } from '@/components/ui/collapsible-info'
+import { Factory, AlertTriangle, TrendingUp, Package, Download, Zap, Info } from 'lucide-react'
+import { CollapsibleInfo, CollapsibleInfoGroup, type InfoItem } from '@/components/ui/collapsible-info'
 import { formatNumber } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
@@ -36,6 +36,7 @@ import {
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport } from '@/lib/calculations/warehouse-management'
 import { berechneBedarfsBacklog } from '@/lib/calculations/bedarfs-backlog-rechnung'
+import { TagesproduktionChart, LagerbestandChart } from '@/components/ui/table-charts'
 
 /**
  * Produktion Hauptseite
@@ -240,6 +241,32 @@ export default function ProduktionPage() {
     }
   }, [tagesProduktion, hasSzenarien, statistiken, warehouseResult, konfiguration.jahresproduktion])
   
+  // ✅ Aggregierte Lagerbestandsdaten für Chart (außerhalb JSX)
+  const lagerbestandChartDaten = useMemo(() => {
+    const aggregierteDaten: Record<number, { bestand: number; zugang: number; abgang: number }> = {}
+    
+    tagesLagerbestaende.forEach(tag => {
+      if (!aggregierteDaten[tag.tag]) {
+        aggregierteDaten[tag.tag] = { bestand: 0, zugang: 0, abgang: 0 }
+      }
+      
+      tag.bauteile.forEach(b => {
+        aggregierteDaten[tag.tag].bestand += b.endBestand
+        aggregierteDaten[tag.tag].zugang += b.zugang
+        aggregierteDaten[tag.tag].abgang += b.verbrauch
+      })
+    })
+    
+    return Object.entries(aggregierteDaten).map(([tagStr, data]) => ({
+      tag: parseInt(tagStr),
+      datum: tagesLagerbestaende.find(t => t.tag === parseInt(tagStr))?.datum,
+      bestand: data.bestand,
+      zugang: data.zugang,
+      abgang: data.abgang,
+      status: 'ok' as const
+    }))
+  }, [tagesLagerbestaende])
+  
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
     return <div className="flex items-center justify-center h-screen">Lade Konfiguration...</div>
@@ -320,6 +347,63 @@ export default function ProduktionPage() {
         </CollapsibleInfo>
       )}
 
+      {/* ✅ KONSOLIDIERTE INFO-BOXEN */}
+      <CollapsibleInfoGroup
+        groupTitle="Produktionslogik & Konzepte"
+        items={[
+          {
+            id: 'fcfs',
+            title: 'FCFS-Regel (First-Come-First-Serve)',
+            icon: <Factory className="h-4 w-4" />,
+            variant: 'info',
+            content: (
+              <div className="space-y-3">
+                <p className="text-sm text-blue-700">
+                  Einfache First-Come-First-Serve Regel statt mathematischer Optimierung
+                </p>
+                <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
+                  <li>
+                    <strong>Schritt 1: ATP-Check</strong> - Prüfe für jeden Produktionsauftrag: 
+                    Ist genug Material im Lager?
+                  </li>
+                  <li>
+                    <strong>Schritt 2a: JA</strong> - Produziere die volle Menge & buche Material ab
+                  </li>
+                  <li>
+                    <strong>Schritt 2b: NEIN</strong> - Auftrag zurückstellen oder Teilproduktion
+                  </li>
+                  <li>
+                    <strong>Keine Optimierung:</strong> Kein Solver, keine Prioritäten nach Deckungsbeitrag
+                  </li>
+                </ol>
+              </div>
+            )
+          },
+          {
+            id: 'atp',
+            title: 'ATP-Check (Available-to-Promise)',
+            icon: <Package className="h-4 w-4" />,
+            variant: 'info',
+            content: (
+              <div className="text-sm text-blue-800">
+                <p className="mb-2">
+                  Für jede Komponente in der Stückliste wird geprüft:
+                </p>
+                <code className="bg-blue-100 px-3 py-2 rounded block">
+                  Verfügbar im Lager ≥ Benötigt für Auftrag
+                </code>
+                <p className="mt-2 text-xs text-blue-600">
+                  Diese Prüfung erfolgt VOR jedem Produktionsstart und verhindert negative Lagerbestände.
+                </p>
+              </div>
+            )
+          }
+        ]}
+        variant="info"
+        icon={<Info className="h-5 w-5" />}
+        defaultOpen={false}
+      />
+
       {/* Übersicht Cards - MIT SZENARIO-DELTAS */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card className={hasSzenarien ? 'border-green-200' : ''}>
@@ -395,49 +479,6 @@ export default function ProduktionPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Produktionslogik ohne Solver - COLLAPSIBLE */}
-      <CollapsibleInfo
-        title="Produktionslogik (ohne Solver)"
-        variant="info"
-        icon={<Factory className="h-5 w-5" />}
-        defaultOpen={false}
-      >
-        <p className="text-sm text-blue-700 mb-4">
-          Einfache First-Come-First-Serve Regel statt mathematischer Optimierung
-        </p>
-        
-        <div className="space-y-4">
-          <div>
-            <h4 className="font-semibold text-blue-900 mb-2">FCFS-Regel (First-Come-First-Serve)</h4>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
-              <li>
-                <strong>Schritt 1: ATP-Check</strong> - Prüfe für jeden Produktionsauftrag: 
-                Ist genug Material im Lager?
-              </li>
-              <li>
-                <strong>Schritt 2a: JA</strong> - Produziere die volle Menge & buche Material ab
-              </li>
-              <li>
-                <strong>Schritt 2b: NEIN</strong> - Auftrag zurückstellen oder Teilproduktion
-              </li>
-              <li>
-                <strong>Keine Optimierung:</strong> Kein Solver, keine Prioritäten nach Deckungsbeitrag
-              </li>
-            </ol>
-          </div>
-
-          <div className="border-t border-blue-200 pt-4">
-            <h4 className="font-semibold text-blue-900 mb-2">ATP-Check (Available-to-Promise)</h4>
-            <p className="text-sm text-blue-800">
-              Für jede Komponente in der Stückliste wird geprüft:<br/>
-              <code className="bg-blue-100 px-2 py-1 rounded mt-2 inline-block">
-                Verfügbar im Lager ≥ Benötigt für Auftrag
-              </code>
-            </p>
-          </div>
-        </div>
-      </CollapsibleInfo>
 
       {/* SEKTION 1: PRODUKTIONSSTEUERUNG */}
       <Card className="border-purple-200 bg-purple-50">
@@ -575,30 +616,89 @@ export default function ProduktionPage() {
             dateColumnKey="datum"
           />
           
-          {/* ✅ FORMEL-KARTEN NACH DER TABELLE (User-Anforderung: Tabellen vor Erklärungen) */}
+          {/* ✅ VISUALISIERUNG: Produktionsverlauf */}
           <div className="mt-6">
-            <CollapsibleInfo title="📊 Berechnungsformeln und Konzepte">
-              <div className="space-y-4">
-                <FormulaCard
-                  title="Tagesproduktion mit Error Management"
-                  formula={`Jahresproduktion / Arbeitstage = ${formatNumber(konfiguration.jahresproduktion, 0)} / ${getArbeitstageProJahr()} = ${formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 2)} Bikes/Tag (Ø)`}
-                  description="Tatsächliche Produktion variiert durch Saisonalität und Error Management zur Vermeidung von Rundungsfehlern."
-                  example={`Jan-März (Q1): ca. ${formatNumber((konfiguration.jahresproduktion / getArbeitstageProJahr()) * 0.7, 0)} Bikes/Tag`}
-                />
-                <FormulaCard
-                  title="Schichtplanung & Kapazität"
-                  formula={`Schichten = ⌈Plan / ${konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht}⌉`}
-                  description="Berechnung der benötigten Schichten basierend auf Tagesproduktion und Werkskapazität."
-                  example={`${formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 0)} Bikes → ${Math.ceil((konfiguration.jahresproduktion / getArbeitstageProJahr()) / (konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht))} Schichten`}
-                />
-                <FormulaCard
-                  title="Error Management (Rundungsfehler-Korrektur)"
-                  formula="Kumulativer Fehler ≥ ±0.5 → Korrektur durch Auf-/Abrunden"
-                  description="Verhindert systematische Abweichung von ±100 Bikes. Validierung: Summe = exakt 370.000 Bikes."
-                  example="Jahressumme exakt 370.000 Bikes ✓"
-                />
-              </div>
-            </CollapsibleInfo>
+            <TagesproduktionChart
+              daten={tagesProduktionFormatiert.map(t => ({
+                tag: t.tag,
+                datum: t.datum,
+                planMenge: t.planMenge,
+                istMenge: t.istMenge,
+                monat: t.monat
+              }))}
+              aggregation="woche"
+              height={300}
+              showDelta={false}
+            />
+          </div>
+          
+          {/* ✅ FORMEL-KARTEN NACH DER TABELLE UND CHART (User-Anforderung: Tabellen vor Erklärungen) */}
+          <div className="mt-6">
+            <CollapsibleInfoGroup
+              groupTitle="Berechnungsformeln und Konzepte"
+              items={[
+                {
+                  id: 'tagesproduktion',
+                  title: 'Tagesproduktion mit Error Management',
+                  icon: <Factory className="h-4 w-4" />,
+                  variant: 'info',
+                  content: (
+                    <div className="space-y-2 text-sm">
+                      <div className="bg-blue-100 px-3 py-2 rounded font-mono text-xs">
+                        Jahresproduktion / Arbeitstage = {formatNumber(konfiguration.jahresproduktion, 0)} / {getArbeitstageProJahr()} = {formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 2)} Bikes/Tag (Ø)
+                      </div>
+                      <p className="text-blue-800">
+                        Tatsächliche Produktion variiert durch Saisonalität und Error Management zur Vermeidung von Rundungsfehlern.
+                      </p>
+                      <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        <strong>Beispiel:</strong> Jan-März (Q1): ca. {formatNumber((konfiguration.jahresproduktion / getArbeitstageProJahr()) * 0.7, 0)} Bikes/Tag
+                      </div>
+                    </div>
+                  )
+                },
+                {
+                  id: 'schichtplanung',
+                  title: 'Schichtplanung & Kapazität',
+                  icon: <Factory className="h-4 w-4" />,
+                  variant: 'info',
+                  content: (
+                    <div className="space-y-2 text-sm">
+                      <div className="bg-blue-100 px-3 py-2 rounded font-mono text-xs">
+                        Schichten = ⌈Plan / {konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht}⌉
+                      </div>
+                      <p className="text-blue-800">
+                        Berechnung der benötigten Schichten basierend auf Tagesproduktion und Werkskapazität.
+                      </p>
+                      <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        <strong>Beispiel:</strong> {formatNumber(konfiguration.jahresproduktion / getArbeitstageProJahr(), 0)} Bikes → {Math.ceil((konfiguration.jahresproduktion / getArbeitstageProJahr()) / (konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht))} Schichten
+                      </div>
+                    </div>
+                  )
+                },
+                {
+                  id: 'error-management',
+                  title: 'Error Management (Rundungsfehler-Korrektur)',
+                  icon: <AlertTriangle className="h-4 w-4" />,
+                  variant: 'success',
+                  content: (
+                    <div className="space-y-2 text-sm">
+                      <div className="bg-green-100 px-3 py-2 rounded font-mono text-xs">
+                        Kumulativer Fehler ≥ ±0.5 → Korrektur durch Auf-/Abrunden
+                      </div>
+                      <p className="text-green-800">
+                        Verhindert systematische Abweichung von ±100 Bikes. Validierung: Summe = exakt 370.000 Bikes.
+                      </p>
+                      <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                        <strong>Validierung:</strong> Jahressumme exakt 370.000 Bikes ✓
+                      </div>
+                    </div>
+                  )
+                }
+              ]}
+              variant="info"
+              icon={<Info className="h-5 w-5" />}
+              defaultOpen={false}
+            />
           </div>
         </CardContent>
       </Card>
@@ -734,6 +834,15 @@ export default function ProduktionPage() {
               dateColumnKey="datum"
             />
             
+            {/* ✅ VISUALISIERUNG: Lagerbestandsentwicklung */}
+            <div className="mt-6">
+              <LagerbestandChart
+                daten={lagerbestandChartDaten}
+                aggregation="woche"
+                height={300}
+              />
+            </div>
+            
             <p className="text-xs text-green-600 mt-3">
               💡 <strong>Hinweis:</strong> Zeigt alle 365 Tage × 4 Komponenten = 1.460 Zeilen. 
               <strong>✅ Realistische Bestandsführung:</strong> Losgröße 500 Stück, 49 Tage Vorlaufzeit, Anfangsbestand = 0.
@@ -743,22 +852,52 @@ export default function ProduktionPage() {
 
           {/* ✅ FORMEL-KARTEN NACH DER TABELLE (User-Anforderung: Tabellen vor Erklärungen) */}
           <div className="mt-6 space-y-4">
-            <CollapsibleInfo title="📊 Berechnungsformeln und Konzepte">
-              <div className="space-y-4">
-                <FormulaCard
-                  title="Lagerbewegung (Tagesbasis)"
-                  formula="Endbestand = Anfangsbestand + Zugänge - Verbrauch"
-                  description="Simuliert tägliche Lagerbewegungen über 365 Tage mit realistischen Losgrößen (500 Stück) und 49 Tage Vorlaufzeit. Anfangsbestand: 0 (Just-in-Time)."
-                  example={`Tag 100: Fizik Tundra Anfang 2.000, Zugang +0, Verbrauch -${formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)} → Endbestand ${formatNumber(2000 - Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)}`}
-                />
-                <FormulaCard
-                  title="Reichweite (Days of Supply)"
-                  formula="Reichweite = Bestand / Tagesbedarf (in Tagen)"
-                  description="Zeigt wie lange der aktuelle Bestand bei gegebenem Verbrauch reicht. SCOR-Metrik: Asset Management → Inventory Days of Supply."
-                  example="Fizik Tundra: Bestand 2.000 / Tagesbedarf 527 = 3,8 Tage Reichweite"
-                />
-              </div>
-            </CollapsibleInfo>
+            <CollapsibleInfoGroup
+              groupTitle="Berechnungsformeln und Konzepte"
+              items={[
+                {
+                  id: 'lagerbewegung',
+                  title: 'Lagerbewegung (Tagesbasis)',
+                  icon: <Package className="h-4 w-4" />,
+                  variant: 'success',
+                  content: (
+                    <div className="space-y-2 text-sm">
+                      <div className="bg-green-100 px-3 py-2 rounded font-mono text-xs">
+                        Endbestand = Anfangsbestand + Zugänge - Verbrauch
+                      </div>
+                      <p className="text-green-800">
+                        Simuliert tägliche Lagerbewegungen über 365 Tage mit realistischen Losgrößen (500 Stück) und 49 Tage Vorlaufzeit. Anfangsbestand: 0 (Just-in-Time).
+                      </p>
+                      <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                        <strong>Beispiel:</strong> Tag 100: Fizik Tundra Anfang 2.000, Zugang +0, Verbrauch -{formatNumber(Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)} → Endbestand {formatNumber(2000 - Math.round(konfiguration.jahresproduktion * 0.52 / 365), 0)}
+                      </div>
+                    </div>
+                  )
+                },
+                {
+                  id: 'reichweite',
+                  title: 'Reichweite (Days of Supply)',
+                  icon: <TrendingUp className="h-4 w-4" />,
+                  variant: 'success',
+                  content: (
+                    <div className="space-y-2 text-sm">
+                      <div className="bg-green-100 px-3 py-2 rounded font-mono text-xs">
+                        Reichweite = Bestand / Tagesbedarf (in Tagen)
+                      </div>
+                      <p className="text-green-800">
+                        Zeigt wie lange der aktuelle Bestand bei gegebenem Verbrauch reicht. SCOR-Metrik: Asset Management → Inventory Days of Supply.
+                      </p>
+                      <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                        <strong>Beispiel:</strong> Fizik Tundra: Bestand 2.000 / Tagesbedarf 527 = 3,8 Tage Reichweite
+                      </div>
+                    </div>
+                  )
+                }
+              ]}
+              variant="success"
+              icon={<Info className="h-5 w-5" />}
+              defaultOpen={false}
+            />
           </div>
         </CardContent>
       </Card>

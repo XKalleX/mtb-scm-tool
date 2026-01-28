@@ -19,8 +19,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Ship, Package, Download, Calendar, Zap, Plus } from 'lucide-react'
-import { CollapsibleInfo } from '@/components/ui/collapsible-info'
+import { Ship, Package, Download, Calendar, Zap, Plus, Info } from 'lucide-react'
+import { CollapsibleInfo, CollapsibleInfoGroup, type InfoItem } from '@/components/ui/collapsible-info'
+import { BestellungenChart, VorlaufzeitChart } from '@/components/ui/table-charts'
 import { formatNumber, addDays, toLocalISODateString } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
 import ExcelTable from '@/components/excel-table'
@@ -569,6 +570,16 @@ export default function InboundPage() {
         </Card>
       </div>
 
+      {/* ✅ VISUALISIERUNG: Vorlaufzeit-Zusammensetzung */}
+      <VorlaufzeitChart
+        produktion={lieferant.vorlaufzeitArbeitstage}
+        lkwChina={lieferant.lkwTransportChinaArbeitstage}
+        seefracht={lieferant.vorlaufzeitKalendertage + vorlaufzeitDelta}
+        lkwDeutschland={lieferant.lkwTransportDeutschlandArbeitstage}
+        gesamt={gesamtVorlaufzeit}
+        height={200}
+      />
+
       {/* ✅ HAUPTSEKTION: Bestellansichten mit Tabs (Tägliche + Monatliche Ansicht) */}
       <Card className="border-orange-200 bg-orange-50">
         <CardHeader>
@@ -827,6 +838,20 @@ export default function InboundPage() {
                   }}
                 />
 
+                {/* ✅ VISUALISIERUNG: Bestellungen über Zeit */}
+                <div className="mt-6">
+                  <BestellungenChart
+                    daten={taeglicheBestellungen.map(b => ({
+                      bestelldatum: b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum),
+                      menge: Object.values(b.komponenten).reduce((sum, m) => sum + m, 0),
+                      komponenten: b.komponenten,
+                      status: b.status
+                    }))}
+                    aggregation="monat"
+                    height={300}
+                  />
+                </div>
+
               {/* Info-Box unter der Tabelle */}
               <CollapsibleInfo
                 title="Wichtige Konzepte der täglichen Bestelllogik"
@@ -872,88 +897,95 @@ export default function InboundPage() {
         </CardContent>
       </Card>
 
-      {/* Lieferanten-Details - Informationen (ausklappbar) */}
-      <CollapsibleInfo
-        title={`${lieferant.land === 'China' ? '🇨🇳' : '🏭'} ${lieferant.name} - Lieferanten-Details`}
-        variant="info"
-        icon={<Ship className="h-5 w-5" />}
-        defaultOpen={false}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Einziger Lieferant für alle {konfiguration.bauteile.length} Komponenten
-          </p>
-          
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <h4 className="font-semibold mb-2">Transport-Sequenz (Reihenfolge wichtig für Feiertage!):</h4>
-              <ul className="space-y-1 text-sm">
-                {lieferant.transportSequenz && lieferant.transportSequenz.map((step, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="font-bold text-blue-600">{step.schritt}.</span>
-                    <span>
-                      <strong>{step.typ}:</strong> {step.dauer} {step.einheit} 
-                      {step.von !== step.nach && ` (${step.von} → ${step.nach})`}
-                      <span className="text-muted-foreground text-xs ml-1">- {step.beschreibung}</span>
-                    </span>
-                  </li>
-                ))}
-                <li className="pt-2 border-t">
-                  <strong>Gesamt: {gesamtVorlaufzeit} Tage ({Math.ceil(gesamtVorlaufzeit / 7)} Wochen)</strong>
+      {/* ✅ KONSOLIDIERTE INFO-BOXEN: Lieferanten-Details + Bestelllogik */}
+      <CollapsibleInfoGroup
+        groupTitle="Detaillierte Informationen"
+        items={[
+          {
+            id: 'lieferant-details',
+            title: `${lieferant.land === 'China' ? '🇨🇳' : '🏭'} ${lieferant.name} - Lieferanten-Details`,
+            icon: <Ship className="h-4 w-4" />,
+            variant: 'info',
+            content: (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Einziger Lieferant für alle {konfiguration.bauteile.length} Komponenten
+                </p>
+                
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <h4 className="font-semibold mb-2">Transport-Sequenz (Reihenfolge wichtig für Feiertage!):</h4>
+                    <ul className="space-y-1 text-sm">
+                      {lieferant.transportSequenz && lieferant.transportSequenz.map((step, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="font-bold text-blue-600">{step.schritt}.</span>
+                          <span>
+                            <strong>{step.typ}:</strong> {step.dauer} {step.einheit} 
+                            {step.von !== step.nach && ` (${step.von} → ${step.nach})`}
+                            <span className="text-muted-foreground text-xs ml-1">- {step.beschreibung}</span>
+                          </span>
+                        </li>
+                      ))}
+                      <li className="pt-2 border-t">
+                        <strong>Gesamt: {gesamtVorlaufzeit} Tage ({Math.ceil(gesamtVorlaufzeit / 7)} Wochen)</strong>
+                      </li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold mb-2">Besonderheiten:</h4>
+                    <ul className="space-y-1 text-sm">
+                      {lieferant.besonderheiten.map((b, idx) => (
+                        <li key={idx}>✓ {b}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )
+          },
+          {
+            id: 'bedarfsdatum-bestelldatum',
+            title: 'Bedarfsdatum → Bestelldatum (Rückwärtsrechnung)',
+            icon: <Calendar className="h-4 w-4" />,
+            variant: 'info',
+            content: (
+              <ol className="list-decimal list-inside space-y-1 text-sm">
+                <li>Vom Bedarfsdatum <strong>{gesamtVorlaufzeit} Tage</strong> (Gesamtvorlaufzeit) abziehen</li>
+                <li>Detailaufschlüsselung:
+                  <ul className="list-disc list-inside ml-4 mt-1">
+                    <li>2 AT LKW-Transport (Hamburg → Dortmund)</li>
+                    <li>{lieferant.vorlaufzeitKalendertage} KT Seefracht (Shanghai → Hamburg)</li>
+                    <li>2 AT LKW-Transport (China → Hafen Shanghai)</li>
+                    <li>{lieferant.vorlaufzeitArbeitstage} AT Produktion beim Zulieferer</li>
+                  </ul>
                 </li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold mb-2">Besonderheiten:</h4>
-              <ul className="space-y-1 text-sm">
-                {lieferant.besonderheiten.map((b, idx) => (
-                  <li key={idx}>✓ {b}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </CollapsibleInfo>
-
-      {/* Bestelllogik Info-Boxen - unter den Tabs */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Bestelllogik (Rückwärts-Berechnung)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <CollapsibleInfo
-            title="Bedarfsdatum → Bestelldatum (Rückwärtsrechnung)"
-            variant="info"
-          >
-            <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
-              <li>Vom Bedarfsdatum <strong>49 Tage</strong> (Gesamtvorlaufzeit) abziehen</li>
-              <li>Detailaufschlüsselung:
-                <ul className="list-disc list-inside ml-4 mt-1">
-                  <li>2 AT LKW-Transport (Hamburg → Dortmund)</li>
-                  <li>{lieferant.vorlaufzeitKalendertage} KT Seefracht (Shanghai → Hamburg)</li>
-                  <li>2 AT LKW-Transport (China → Hafen Shanghai)</li>
-                  <li>{lieferant.vorlaufzeitArbeitstage} AT Produktion beim Zulieferer</li>
-                </ul>
-              </li>
-              <li>1 Tag Puffer für Bestellverarbeitung abziehen</li>
-              <li>Sicherstellen dass Bestelldatum ein Arbeitstag ist</li>
-            </ol>
-          </CollapsibleInfo>
-
-          <CollapsibleInfo
-            title="Losgrößen-Aufrundung"
-            variant="success"
-          >
-            <p className="text-sm text-green-800">
-              Jede Bestellung wird auf Vielfache von <strong>{formatNumber(lieferant.losgroesse, 0)} Stück</strong> aufgerundet.
-            </p>
-            <p className="text-sm text-green-800 mt-2">
-              Beispiel: Bedarf 3.500 Stück → Bestellung <strong>{formatNumber(Math.ceil(3500 / lieferant.losgroesse) * lieferant.losgroesse, 0)} Stück</strong> ({Math.ceil(3500 / lieferant.losgroesse)}x Losgröße)
-            </p>
-          </CollapsibleInfo>
-        </CardContent>
-      </Card>
+                <li>1 Tag Puffer für Bestellverarbeitung abziehen</li>
+                <li>Sicherstellen dass Bestelldatum ein Arbeitstag ist</li>
+              </ol>
+            )
+          },
+          {
+            id: 'losgroessen-aufrundung',
+            title: 'Losgrößen-Aufrundung',
+            icon: <Package className="h-4 w-4" />,
+            variant: 'success',
+            content: (
+              <div className="space-y-2">
+                <p className="text-sm">
+                  Jede Bestellung wird auf Vielfache von <strong>{formatNumber(lieferant.losgroesse, 0)} Stück</strong> aufgerundet.
+                </p>
+                <p className="text-sm">
+                  Beispiel: Bedarf 3.500 Stück → Bestellung <strong>{formatNumber(Math.ceil(3500 / lieferant.losgroesse) * lieferant.losgroesse, 0)} Stück</strong> ({Math.ceil(3500 / lieferant.losgroesse)}x Losgröße)
+                </p>
+              </div>
+            )
+          }
+        ]}
+        variant="info"
+        icon={<Info className="h-5 w-5" />}
+        defaultOpen={false}
+      />
 
     </div>
   )

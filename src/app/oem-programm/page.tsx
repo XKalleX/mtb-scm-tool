@@ -22,8 +22,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { CollapsibleInfo } from '@/components/ui/collapsible-info'
-import { TrendingUp, AlertCircle, Download, Zap } from 'lucide-react'
+import { CollapsibleInfo, CollapsibleInfoGroup, InfoItem } from '@/components/ui/collapsible-info'
+import { SaisonalitaetChart, VariantenPieChart, TagesproduktionChart, KomponentenBarChart } from '@/components/ui/table-charts'
+import { TrendingUp, AlertCircle, Download, Zap, Info } from 'lucide-react'
 import { formatNumber, formatDate, toLocalISODateString } from '@/lib/utils'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { exportToCSV, exportToJSON } from '@/lib/export'
@@ -358,6 +359,20 @@ export default function OEMProgrammPage() {
                 </div>
               </div>
 
+              {/* 📊 VISUALISIERUNG: Saisonalitäts-Chart */}
+              <div className="mt-6">
+                <SaisonalitaetChart
+                  daten={konfiguration.saisonalitaet.map(s => ({
+                    monat: s.monat.toString(),
+                    name: s.name,
+                    anteil: s.anteil,
+                    bikes: Math.round(konfiguration.jahresproduktion * (s.anteil / 100))
+                  }))}
+                  jahresproduktion={konfiguration.jahresproduktion}
+                  height={300}
+                />
+              </div>
+
               {/* Erklärung: Saisonalität → Tagesplanung */}
               <CollapsibleInfo
                 title="Wie wird die Saisonalität auf die Tagesplanung übertragen?"
@@ -441,6 +456,22 @@ export default function OEMProgrammPage() {
                   </TableRow>
                 </TableBody>
               </Table>
+
+              {/* 📊 VISUALISIERUNG: Varianten-Pie-Chart */}
+              <div className="mt-6">
+                <VariantenPieChart
+                  daten={konfiguration.varianten.map(v => {
+                    const jahresprod = jahresproduktionProVariante[v.id] || Math.round(konfiguration.jahresproduktion * v.anteilPrognose)
+                    return {
+                      id: v.id,
+                      name: v.name.replace('MTB ', ''),
+                      anteil: v.anteilPrognose,
+                      menge: jahresprod
+                    }
+                  })}
+                  height={350}
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -525,6 +556,28 @@ export default function OEMProgrammPage() {
                     )
                   })}
                 </div>
+              </div>
+
+              {/* 📊 VISUALISIERUNG: Komponenten-Bar-Chart */}
+              <div className="mt-6">
+                <KomponentenBarChart
+                  daten={konfiguration.bauteile.map(bauteil => {
+                    const bedarf = konfiguration.stueckliste
+                      .filter(s => s.bauteilId === bauteil.id)
+                      .reduce((sum, s) => {
+                        const variante = konfiguration.varianten.find(v => v.id === s.mtbVariante)
+                        if (!variante) return sum
+                        return sum + Math.round(konfiguration.jahresproduktion * variante.anteilPrognose) * s.menge
+                      }, 0)
+                    
+                    return {
+                      id: bauteil.id,
+                      name: bauteil.name,
+                      bedarf: bedarf
+                    }
+                  })}
+                  height={200}
+                />
               </div>
             </CardContent>
           </Card>
@@ -792,6 +845,27 @@ export default function OEMProgrammPage() {
                   />
                 )
               })()}
+              
+              {/* 📊 VISUALISIERUNG: Tagesproduktions-Chart */}
+              {produktionsplaene && selectedVariante && (() => {
+                const plan = produktionsplaene[selectedVariante]
+                return (
+                  <div className="mt-6">
+                    <TagesproduktionChart
+                      daten={plan.tage.map((tag, idx) => ({
+                        tag: idx + 1,
+                        datum: tag.datum,
+                        planMenge: tag.planMenge,
+                        istMenge: tag.istMenge,
+                        monat: tag.datum.getMonth() + 1
+                      }))}
+                      aggregation="monat"
+                      height={300}
+                      showDelta={false}
+                    />
+                  </div>
+                )
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1024,45 +1098,93 @@ export default function OEMProgrammPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <CollapsibleInfo
-                title="Problem: Dezimalzahlen vs. Ganzzahlige Produktion"
+              {/* 📦 KONSOLIDIERT: Gruppierte InfoBoxen */}
+              <CollapsibleInfoGroup
+                groupTitle="Error-Management Konzept"
+                icon={<Info className="h-5 w-5" />}
                 variant="info"
-              >
-                <p className="text-sm text-blue-800">
-                  Die tägliche Planung arbeitet mit Dezimalzahlen (z.B. 71,61 Bikes/Tag), 
-                  aber die Produktion muss in ganzen Einheiten erfolgen (71 oder 72).
-                </p>
-              </CollapsibleInfo>
-
-              <CollapsibleInfo
-                title="Lösung: Kumuliertes Error-Management"
-                variant="success"
-              >
-                <div className="text-sm text-green-800 space-y-2">
-                  <p>
-                    <strong>Tag 1:</strong> Soll 71,61 → Ist 71, Error = +0,61
-                  </p>
-                  <p>
-                    <strong>Tag 2:</strong> Soll 71,61 → Error = 1,22 → <span className="font-bold">Ist 72 ✓</span>, Error = 0,22
-                  </p>
-                  <p>
-                    <strong>Tag 3:</strong> Soll 71,61 → Error = 0,83 → Ist 71, Error = 0,83
-                  </p>
-                  <p>
-                    <strong>Tag 4:</strong> Soll 71,61 → Error = 1,44 → <span className="font-bold">Ist 72 ✓</span>, Error = 0,44
-                  </p>
-                </div>
-              </CollapsibleInfo>
-
-              <CollapsibleInfo
-                title="Resultat: Präzise Jahressumme"
-                variant="purple"
-              >
-                <p className="text-sm text-purple-800">
-                  Die Jahressumme stimmt auf <strong>±1 Bike genau</strong>! 
-                  Ohne Error-Management würden sich die Rundungsfehler auf über 200 Bikes summieren.
-                </p>
-              </CollapsibleInfo>
+                defaultOpen={false}
+                items={[
+                  {
+                    id: 'problem',
+                    title: 'Problem: Dezimalzahlen vs. Ganzzahlige Produktion',
+                    variant: 'info',
+                    icon: <AlertCircle className="h-4 w-4" />,
+                    content: (
+                      <p className="text-sm text-blue-800">
+                        Die tägliche Planung arbeitet mit Dezimalzahlen (z.B. 71,61 Bikes/Tag), 
+                        aber die Produktion muss in ganzen Einheiten erfolgen (71 oder 72).
+                        Ohne Korrektur würden sich diese Rundungsfehler über das Jahr zu ±100-200 Bikes summieren!
+                      </p>
+                    )
+                  },
+                  {
+                    id: 'loesung',
+                    title: 'Lösung: Kumuliertes Error-Management',
+                    variant: 'success',
+                    icon: <TrendingUp className="h-4 w-4" />,
+                    content: (
+                      <div className="text-sm text-green-800 space-y-2">
+                        <p>
+                          <strong>Tag 1:</strong> Soll 71,61 → Ist 71, Error = +0,61
+                        </p>
+                        <p>
+                          <strong>Tag 2:</strong> Soll 71,61 → Error = 1,22 → <span className="font-bold">Ist 72 ✓</span>, Error = 0,22
+                        </p>
+                        <p>
+                          <strong>Tag 3:</strong> Soll 71,61 → Error = 0,83 → Ist 71, Error = 0,83
+                        </p>
+                        <p>
+                          <strong>Tag 4:</strong> Soll 71,61 → Error = 1,44 → <span className="font-bold">Ist 72 ✓</span>, Error = 0,44
+                        </p>
+                        <div className="mt-3 pt-2 border-t border-green-300">
+                          <strong>Algorithmus:</strong> Der Error wird mitgeführt und bei Überschreiten von ±0,5 
+                          durch Auf-/Abrunden korrigiert.
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    id: 'resultat',
+                    title: 'Resultat: Präzise Jahressumme',
+                    variant: 'purple',
+                    icon: <Zap className="h-4 w-4" />,
+                    content: (
+                      <div className="text-sm text-purple-800 space-y-2">
+                        <p>
+                          Die Jahressumme stimmt auf <strong>±1 Bike genau</strong>! 
+                          Ohne Error-Management würden sich die Rundungsfehler auf über 200 Bikes summieren.
+                        </p>
+                        <div className="bg-purple-100 p-2 rounded mt-2">
+                          <strong>Validierung:</strong> Σ(Tagesproduktion[1..365]) = 370.000 Bikes (exakt)
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    id: 'monatlich',
+                    title: 'Monatliches Error-Management',
+                    variant: 'info',
+                    icon: <AlertCircle className="h-4 w-4" />,
+                    content: (
+                      <div className="text-sm text-blue-800 space-y-2">
+                        <p>
+                          Der Error-Tracker wird <strong>monatlich zurückgesetzt</strong> auf 0, 
+                          damit Fehler nicht über Monate hinweg kumulieren.
+                        </p>
+                        <p>
+                          <strong>Vorteil:</strong> Jeder Monat ist unabhängig und erreicht seine Sollproduktion präzise.
+                          Der Error am Monatsende sollte immer ≤ ±0,5 sein.
+                        </p>
+                        <div className="bg-blue-100 p-2 rounded mt-2">
+                          <strong>Prüfpunkt:</strong> In der Tabelle &quot;Tagesplanung&quot; sehen Sie die Spalte 
+                          &quot;Monats-Error&quot;, die diesen Tracker visualisiert.
+                        </div>
+                      </div>
+                    )
+                  }
+                ]}
+              />
             </CardContent>
           </Card>
         </TabsContent>
