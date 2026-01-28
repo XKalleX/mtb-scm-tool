@@ -172,9 +172,10 @@ export default function InboundPage() {
     return generiereTaeglicheBestellungen(
       produktionsplaeneFormatiert, 
       konfiguration.planungsjahr,
-      lieferant.gesamtVorlaufzeitTage // Fixe Vorlaufzeit aus Konfiguration (49 Tage)
+      lieferant.gesamtVorlaufzeitTage, // Fixe Vorlaufzeit aus Konfiguration
+      konfiguration.feiertage // Feiertage aus Konfiguration
     )
-  }, [produktionsplaeneFormatiert, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage])
+  }, [produktionsplaeneFormatiert, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage, konfiguration.feiertage])
   
   // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung mit dem neuen System
   // Zeigt für jeden Tag: Bedarf, Backlog, Bestellung, Materialverfügbarkeit
