@@ -5,16 +5,10 @@
  * 
  * Bestellungen beim einzigen Lieferanten (China) - nur Sättel!
  * 
- * SSOT: Alle Parameter aus JSON-Dateien (src/data/) und KonfigurationContext
- * - lieferant-china.json: Vorlaufzeiten, Losgröße, Lieferintervall
- * - feiertage-china.json: Chinesische Feiertage (inkl. Spring Festival)
- * - stueckliste.json: Sattel-Komponenten (4 Varianten)
- * 
- * BERECHNUNGSLOGIK:
- * 1. Sattel-Bedarf aus Produktionsplan ermitteln (1 Sattel = 1 Bike)
- * 2. Bestelldatum rückwärts berechnen (Vorlaufzeit aus Konfiguration)
- * 3. Losgrößen aufrunden (aus Konfiguration)
- * 4. Feiertage berücksichtigen (generische Prüfung, keine spezielle Funktion)
+ * REFACTORED: Alle Parameter aus KonfigurationContext statt JSON-Imports
+ * - Losgröße, Lieferintervall aus Config
+ * - Stückliste aus Config
+ * - Feiertage über Parameter
  */
 
 import { Bestellung, TagesProduktionsplan, Stueckliste, Maschinenausfall } from '@/types'
@@ -27,8 +21,10 @@ import {
   naechsterArbeitstag_Deutschland,
   FeiertagsKonfiguration 
 } from '@/lib/kalender'
-import lieferantData from '@/data/lieferant-china.json'
-import stuecklistenData from '@/data/stueckliste.json'
+
+// Standard-Werte als Fallback (sollten aus KonfigurationContext kommen)
+const DEFAULT_LOSGROESSE = 500
+const DEFAULT_LIEFERINTERVALL = 7
 
 // Type für Komponente
 type Komponente = {
@@ -83,7 +79,7 @@ export function berechneGesamtbedarfKomponente(
   let gesamtbedarf = 0
   
   Object.entries(alleProduktionsplaene).forEach(([varianteId, plan]) => {
-    const stueckliste = stuecklisten[varianteId as keyof typeof stuecklisten]
+    const stueckliste = stklst[varianteId as keyof typeof stuecklisten]
     if (!stueckliste) return
     
     // TypeScript-sicherer Zugriff auf Komponenten
@@ -99,18 +95,17 @@ export function berechneGesamtbedarfKomponente(
 }
 
 /**
- * Rundet Bestellmenge auf Losgröße auf (aus Konfiguration)
+ * Rundet Bestellmenge auf Losgröße auf
  * 
  * @param menge - Benötigte Menge
+ * @param losgroesse - Losgröße (default: 500)
  * @returns Aufgerundete Bestellmenge
  */
-export function rundeAufLosgroesse(menge: number): number {
-  const LOSGROESSE = lieferantData.lieferant.losgroesse
-  
+export function rundeAufLosgroesse(menge: number, losgroesse: number = DEFAULT_LOSGROESSE): number {
   if (menge === 0) return 0
   
   // Aufrunden auf nächstes Vielfaches der Losgröße
-  return Math.ceil(menge / LOSGROESSE) * LOSGROESSE
+  return Math.ceil(menge / losgroesse) * losgroesse
 }
 
 /**
@@ -166,7 +161,7 @@ export function generiereJahresbestellungen(
     
     // Initialisiere alle Komponenten mit 0
     const alleKomponenten = new Set<string>()
-    Object.values(stuecklisten).forEach(sl => {
+    Object.values(stklst).forEach(sl => {
       const komponenten = sl.komponenten as Record<string, Komponente>
       Object.keys(komponenten).forEach(k => alleKomponenten.add(k))
     })
@@ -174,7 +169,7 @@ export function generiereJahresbestellungen(
     
     // Summiere Bedarf dieses Monats über alle Varianten
     Object.entries(alleProduktionsplaene).forEach(([varianteId, plan]) => {
-      const stueckliste = stuecklisten[varianteId as keyof typeof stuecklisten]
+      const stueckliste = stklst[varianteId as keyof typeof stuecklisten]
       if (!stueckliste) return
       
       const monatsTage = plan.filter(t => new Date(t.datum).getMonth() + 1 === monat)
@@ -351,20 +346,25 @@ export function generiereTaeglicheBestellungen(
   alleProduktionsplaene: Record<string, TagesProduktionsplan[]>,
   planungsjahr: number,
   vorlaufzeitTage: number,
-  customFeiertage?: FeiertagsKonfiguration[]
+  customFeiertage?: FeiertagsKonfiguration[],
+  stuecklisten?: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }>,
+  losgroesse: number = DEFAULT_LOSGROESSE,
+  lieferintervall: number = DEFAULT_LIEFERINTERVALL
 ): TaeglicheBestellung[] {
   const bestellungen: TaeglicheBestellung[] = []
-  const stuecklisten = stuecklistenData.stuecklisten
-  const LOSGROESSE = lieferantData.lieferant.losgroesse
+  
+  // Verwende übergebene Stücklisten oder leeres Objekt als Fallback
+  const stklst = stuecklisten || {}
+  const LOSGROESSE = losgroesse
   const VORLAUFZEIT_TAGE = vorlaufzeitTage
-  const LOSGROESSE_SAMMEL_PUFFER_TAGE = lieferantData.lieferant.lieferintervall
+  const LOSGROESSE_SAMMEL_PUFFER_TAGE = lieferintervall
   
   // Berechne täglichen Bedarf pro Komponente für das ganze Jahr
   const taeglicheBedarf: Record<string, number[]> = {} // komponente -> array[365]
   
   // Initialisiere alle Sattel-Komponenten
   const alleKomponenten = new Set<string>()
-  Object.values(stuecklisten).forEach(sl => {
+  Object.values(stklst).forEach(sl => {
     const komponenten = sl.komponenten as Record<string, Komponente>
     Object.keys(komponenten).forEach(k => alleKomponenten.add(k))
   })
@@ -375,7 +375,7 @@ export function generiereTaeglicheBestellungen(
   
   // Fülle täglichen Bedarf aus Produktionsplänen
   Object.entries(alleProduktionsplaene).forEach(([varianteId, plan]) => {
-    const stueckliste = stuecklisten[varianteId as keyof typeof stuecklisten]
+    const stueckliste = stklst[varianteId as keyof typeof stklst]
     if (!stueckliste) return
     
     const komponenten = stueckliste.komponenten as Record<string, Komponente>
@@ -602,15 +602,16 @@ export function erstelleZusatzbestellung(
   komponenten: Record<string, number>,
   vorlaufzeitTage: number,
   skipLosgroessenRundung: boolean = false,
-  customFeiertage?: FeiertagsKonfiguration[]
+  customFeiertage?: FeiertagsKonfiguration[],
+  losgroesse: number = DEFAULT_LOSGROESSE
 ): TaeglicheBestellung {
-  const LOSGROESSE = lieferantData.lieferant.losgroesse
+  const LOSGROESSE = losgroesse
   const finalKomponenten: Record<string, number> = skipLosgroessenRundung
     ? { ...komponenten }
     : Object.fromEntries(
         Object.entries(komponenten).map(([kompId, menge]) => [
           kompId,
-          rundeAufLosgroesse(menge)
+          rundeAufLosgroesse(menge, LOSGROESSE)
         ])
       )
   

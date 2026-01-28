@@ -36,8 +36,7 @@ const DEFAULT_VORLAUFZEIT_TAGE = 49
  * @returns SCOR-Metriken
  */
 export function berechneSCORMetriken(
-  produktionsauftraege: Produktionsauftrag[],,
-  vorlaufzeitTage: number = DEFAULT_VORLAUFZEIT_TAGE
+  produktionsauftraege: Produktionsauftrag[],
   lagerbestaende: Record<string, Lagerbestand>,
   bestellungen: Bestellung[],
   vorlaufzeitTage: number = DEFAULT_VORLAUFZEIT_TAGE

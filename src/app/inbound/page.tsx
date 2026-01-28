@@ -118,7 +118,9 @@ export default function InboundPage() {
       datum,
       komponenten,
       konfiguration.lieferant.gesamtVorlaufzeitTage,
-      false
+      false,
+      konfiguration.feiertage,
+      lieferant.losgroesse
     )
     
     setZusatzBestellungen(prev => [...prev, neueBestellung])
@@ -128,6 +130,22 @@ export default function InboundPage() {
   
   // Lieferant aus Konfiguration
   const lieferant = konfiguration.lieferant
+  
+  // Bereite Stücklisten-Map vor (für inbound-china Funktion)
+  const stuecklistenMap = useMemo(() => {
+    const map: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }> = {}
+    konfiguration.stueckliste.forEach(s => {
+      if (!map[s.mtbVariante]) {
+        map[s.mtbVariante] = { komponenten: {} }
+      }
+      map[s.mtbVariante].komponenten[s.bauteilId] = {
+        name: s.bauteilName,
+        menge: s.menge,
+        einheit: s.einheit
+      }
+    })
+    return map
+  }, [konfiguration.stueckliste])
   
   // Gesamtvorlaufzeit aus Konfiguration + Szenario-Modifikation
   // Bei Schiffsverspätung erhöht sich die Vorlaufzeit
@@ -173,9 +191,12 @@ export default function InboundPage() {
       produktionsplaeneFormatiert, 
       konfiguration.planungsjahr,
       lieferant.gesamtVorlaufzeitTage, // Fixe Vorlaufzeit aus Konfiguration
-      konfiguration.feiertage // Feiertage aus Konfiguration
+      konfiguration.feiertage, // Feiertage aus Konfiguration
+      stuecklistenMap, // Stücklisten aus Konfiguration
+      lieferant.losgroesse, // Losgröße aus Konfiguration
+      lieferant.lieferintervall // Lieferintervall aus Konfiguration
     )
-  }, [produktionsplaeneFormatiert, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage, konfiguration.feiertage])
+  }, [produktionsplaeneFormatiert, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage, konfiguration.feiertage, stuecklistenMap, lieferant.losgroesse, lieferant.lieferintervall])
   
   // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung mit dem neuen System
   // Zeigt für jeden Tag: Bedarf, Backlog, Bestellung, Materialverfügbarkeit
