@@ -159,7 +159,7 @@
     }
   },
   "meta": {
-    "quelle": "kontext/Spezifikation_SSOT_MR.ts",
+    "beschreibung": "Szenario-Standardwerte für Supply Chain Management",
     "anforderungen": ["A2", "A4", "A8", "A9"],
     "team": "Pascal Wagner, Da Yeon Kang, Shauna Ré Erfurth, Taha Wischmann",
     "projekt": "HAW Hamburg WI3 - MTB Supply Chain Management"

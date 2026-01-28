@@ -8,7 +8,7 @@
  * - Aktive Szenarien (Marketing, Maschinenausfall, etc.)
  * * Alle Seiten (Dashboard, Reporting, etc.) MÜSSEN diese
  * Berechnungen nutzen für konsistente Daten!
- * * Quelle: kontext/Spezifikation_SSOT_MR.ts
+ * * Datenquellen: JSON-Dateien in src/data/ via KonfigurationContext
  * * NEU: Unterstützt dynamische Konfiguration aus KonfigurationContext
  */
 
