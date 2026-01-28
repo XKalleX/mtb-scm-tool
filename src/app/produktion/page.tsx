@@ -138,28 +138,62 @@ export default function ProduktionPage() {
     )
   }, [konfiguration, variantenProduktionsplaeneForWarehouse])
   
-  // ✅ NEU: Transformiere tagesProduktion mit Backlog-Daten für Anzeige
+  // ✅ NEU: Transformiere tagesProduktion mit ECHTEN Warehouse-Backlog-Daten
+  // Nutzt die korrekten Backlog-Werte aus warehouse-management (basierend auf Material-Verfügbarkeit)
   const tagesProduktionFormatiert = useMemo(() => {
-    // Aggregiere Backlog über alle Sattel-Komponenten
+    // Aggregiere Produktions-Backlog aus Warehouse pro Tag (über alle Komponenten)
     const backlogProTag: Record<number, number> = {}
+    const tatsaechlichVerbrauchtProTag: Record<number, number> = {}
+    const nichtProduziertProTag: Record<number, number> = {}
+    const nachgeholtProTag: Record<number, number> = {}
     
-    Object.values(backlogErgebnis.komponenten).forEach(komponente => {
-      komponente.tagesDetails.forEach(detail => {
-        if (!backlogProTag[detail.tag]) {
-          backlogProTag[detail.tag] = 0
-        }
-        backlogProTag[detail.tag] += detail.backlogNachher
+    // Nur 2027 Tage verwenden
+    const jahr2027Tage = warehouseResult.tage.filter(t => t.tag >= 1 && t.tag <= 365)
+    
+    jahr2027Tage.forEach(warehouseTag => {
+      if (!backlogProTag[warehouseTag.tag]) {
+        backlogProTag[warehouseTag.tag] = 0
+        tatsaechlichVerbrauchtProTag[warehouseTag.tag] = 0
+        nichtProduziertProTag[warehouseTag.tag] = 0
+        nachgeholtProTag[warehouseTag.tag] = 0
+      }
+      
+      warehouseTag.bauteile.forEach(bauteil => {
+        backlogProTag[warehouseTag.tag] += bauteil.produktionsBacklog.backlogNachher
+        tatsaechlichVerbrauchtProTag[warehouseTag.tag] += bauteil.verbrauch
+        nichtProduziertProTag[warehouseTag.tag] += bauteil.produktionsBacklog.nichtProduziertHeute
+        nachgeholtProTag[warehouseTag.tag] += bauteil.produktionsBacklog.nachgeholt
       })
     })
     
-    return tagesProduktion.map(tag => ({
-      ...tag,
-      materialVerfuegbar: !tag.istArbeitstag 
-        ? '-'  // An Wochenenden/Feiertagen: Kein Material-Check
-        : tag.materialVerfuegbar ? '✓ Ja' : '✗ Nein',  // An Arbeitstagen: ATP-Status
-      backlog: backlogProTag[tag.tag] || 0  // Akkumulierter Backlog über alle Komponenten
-    }))
-  }, [tagesProduktion, backlogErgebnis])
+    return tagesProduktion.map(tag => {
+      const warehouseTag = jahr2027Tage.find(wt => wt.tag === tag.tag)
+      const hatMaterialEngpass = warehouseTag?.bauteile.some(b => !b.atpCheck.erfuellt) ?? false
+      const tatsaechlicheProduktion = tatsaechlichVerbrauchtProTag[tag.tag] || 0
+      const backlog = backlogProTag[tag.tag] || 0
+      const nichtProduziert = nichtProduziertProTag[tag.tag] || 0
+      
+      // Berechne tatsächliche Abweichung (negativ wenn nicht genug Material)
+      // Abweichung = tatsächlich produziert - geplant
+      const tatsaechlicheAbweichung = tag.istArbeitstag 
+        ? tatsaechlicheProduktion - tag.planMenge 
+        : 0
+      
+      return {
+        ...tag,
+        // Zeige tatsächliche Ist-Menge basierend auf Material-Verfügbarkeit
+        istMenge: tag.istArbeitstag ? tatsaechlicheProduktion : 0,
+        // Zeige Abweichung: negativ wenn weniger produziert als geplant
+        abweichung: tatsaechlicheAbweichung,
+        // Material-Status basierend auf ATP-Check
+        materialVerfuegbar: !tag.istArbeitstag 
+          ? '-'  // An Wochenenden/Feiertagen: Kein Material-Check
+          : hatMaterialEngpass ? '✗ Nein' : '✓ Ja',
+        // Akkumulierter Produktions-Backlog (nicht-produzierte Mengen die nachgeholt werden müssen)
+        backlog: backlog
+      }
+    })
+  }, [tagesProduktion, warehouseResult])
   
   // Konvertiere für Darstellung (nur 2027 Tage)
   const tagesLagerbestaende = useMemo(() => {
@@ -191,7 +225,12 @@ export default function ProduktionPage() {
         verbrauch: b.verbrauch,
         endBestand: b.endBestand,
         reichweite: b.reichweiteTage,
-        status: mapStatus(b.status)
+        status: mapStatus(b.status),
+        // NEU: Backlog-Informationen
+        backlogVorher: b.produktionsBacklog.backlogVorher,
+        backlogNachher: b.produktionsBacklog.backlogNachher,
+        nichtProduziert: b.produktionsBacklog.nichtProduziertHeute,
+        nachgeholt: b.produktionsBacklog.nachgeholt
       }))
     }))
   }, [warehouseResult])
@@ -200,18 +239,14 @@ export default function ProduktionPage() {
   const warehouseStats = warehouseResult.jahresstatistik
   
   // Berechne Produktionsstatistiken dynamisch (szenario-aware)
-  // Nutze tagesProduktion (istMenge) als korrekte Produktionszahl
+  // Nutze warehouseResult für echte Produktionszahlen (mit Material-Check)
   const produktionsStats = useMemo(() => {
-    // ✅ KORREKT: Berechne echte Ist-Produktion aus tagesProduktion (NICHT aus backlogErgebnis!)
-    // Die tagesProduktion hat bereits Error Management eingebaut und zeigt exakt 370.000
-    const summeIstProduktion = tagesProduktion.reduce((sum, tag) => sum + tag.istMenge, 0)
+    // ✅ KORREKT: Nutze tatsächliche Produktion aus Warehouse (mit ATP-Check!)
+    const summeIstProduktion = warehouseResult.jahresstatistik.gesamtProduziertTatsaechlich
     const geplantMenge = konfiguration.jahresproduktion // 370.000 Bikes
     
     // Materialengpass-Tage aus Warehouse (dort ist es korrekt berechnet)
-    const tageOhneMaterial = warehouseResult.tage.filter(t => 
-      t.tag >= 1 && t.tag <= 365 && 
-      t.bauteile.some(b => b.status === 'kritisch' || b.status === 'negativ')
-    ).length
+    const tageOhneMaterial = warehouseResult.jahresstatistik.tageMitBacklog
     
     // Liefertreue aus Warehouse
     const liefertreue = warehouseResult.jahresstatistik.liefertreue
