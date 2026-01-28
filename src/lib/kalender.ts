@@ -291,12 +291,17 @@ export function istArbeitstag(
 
 /**
  * Prüft ob Datum im Spring Festival liegt (28.01.-04.02.2027)
- * Gemäß SSOT: 8 Tage kompletter Produktionsstopp in China!
+ * Gemäß lieferant-china.json: 8 Tage kompletter Produktionsstopp in China!
+ * 
+ * Hinweis: Die einzelnen Feiertags-Einträge in feiertage-china.json (05.-11.02.)
+ * repräsentieren die gesetzlichen Feiertage, während diese Funktion die 
+ * Produktionsstop-Periode aus lieferant-china.json nutzt.
+ * 
  * @param datum - Zu prüfendes Datum
- * @returns True wenn Spring Festival
+ * @returns True wenn Spring Festival Produktionsstopp
  */
 export function istSpringFestival(datum: Date): boolean {
-  // Spring Festival 2027 gemäß feiertage-china.json: 28.01. - 04.02.2027
+  // Spring Festival 2027 Produktionsstopp gemäß lieferant-china.json: 28.01. - 04.02.2027
   const springStart = new Date(2027, 0, 28) // 28. Januar
   const springEnd = new Date(2027, 1, 4)    // 4. Februar
   
