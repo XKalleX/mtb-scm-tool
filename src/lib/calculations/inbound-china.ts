@@ -331,7 +331,6 @@ const LOSGROESSE_SAMMEL_PUFFER_TAGE = 14
 /**
  * Generiert tägliche Bestellungen über das ganze Jahr (+ Vorlauf aus 2026)
  * 
- * KORRIGIERT:
  * - Keine Initial-Bestellung
  * - Exakt nur benötigte Mengen bestellen
  * - Zeitraum: Beginn ~Mitte Oktober 2026, Ende ~Mitte November 2027
@@ -406,16 +405,10 @@ export function generiereTaeglicheBestellungen(
   
   while (aktuellerTag <= bestellEnde) {
     /**
-     * 🎯 FIX #2: BEDARFSERFASSUNG VOR WOCHENEND-PRÜFUNG
-     * 
-     * Problem: Wenn Wochenenden/Feiertage übersprungen werden, geht der Bedarf 
-     * für diese Tage verloren → 36.723 Sättel fehlen
-     * 
-     * Lösung:
+     * Bedarfserfassung vor Wochenend-Prüfung:
      * 1. ZUERST den Bedarf für diesen Tag erfassen (auch an Wochenenden!)
      * 2. DANN prüfen ob BESTELLT werden kann (nur an Arbeitstagen)
-     * 
-     * Konzept: An Wochenenden/Feiertagen sammelt sich der Bedarf an,
+     * An Wochenenden/Feiertagen sammelt sich der Bedarf an,
      * wird aber erst am nächsten Arbeitstag bestellt.
      */
     
@@ -496,10 +489,7 @@ export function generiereTaeglicheBestellungen(
       const bestelldatum = new Date(aktuellerTag)
       let bedarfsdatum = addDays(bestelldatum, VORLAUFZEIT_TAGE)
       
-      // ✅ KORRIGIERT: Bedarfsdatum muss ein deutscher Arbeitstag sein!
-      // Falls das berechnete Datum auf Wochenende/Feiertag fällt, 
-      // verschiebe auf den NÄCHSTEN deutschen Arbeitstag
-      // (Produktion findet in Deutschland statt)
+      // Bedarfsdatum muss ein deutscher Arbeitstag sein (Produktion findet in Deutschland statt)
       if (!istArbeitstag_Deutschland(bedarfsdatum, customFeiertage)) {
         bedarfsdatum = naechsterArbeitstag_Deutschland(bedarfsdatum, customFeiertage)
       }
@@ -522,8 +512,7 @@ export function generiereTaeglicheBestellungen(
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // FINALE BESTELLUNG: Restliche Mengen bestellen (auch wenn < Losgröße)
-  // ⚠️ FIX: KEIN Aufrunden auf Losgröße für finale Bestellung!
-  // Dies führt zu Überbestellung (370.500 statt 370.000)
+  // Keine Aufrundung für finale Bestellung (verhindert Überbestellung)
   // ═══════════════════════════════════════════════════════════════════════════════
   const restKomponenten: Record<string, number> = {}
   let hatRest = false
@@ -531,9 +520,7 @@ export function generiereTaeglicheBestellungen(
   alleKomponenten.forEach(kompId => {
     if (offeneMengen[kompId] > 0) {
       hatRest = true
-      // ⚠️ FIX: KEINE Aufrundung mehr! Nur exakte Restmenge bestellen
-      // Alte Logik: restKomponenten[kompId] = rundeAufLosgroesse(offeneMengen[kompId])
-      // Neue Logik: Exakte Menge (verhindert Überbestellung)
+      // Exakte Restmenge bestellen (keine Aufrundung)
       restKomponenten[kompId] = offeneMengen[kompId]
       offeneMengen[kompId] = 0
     }
@@ -543,7 +530,7 @@ export function generiereTaeglicheBestellungen(
     const finalesBestelldatum = new Date(bestellEnde)
     let finalesBedarfsdatum = addDays(finalesBestelldatum, VORLAUFZEIT_TAGE)
     
-    // ✅ KORRIGIERT: Bedarfsdatum muss ein deutscher Arbeitstag sein!
+    // Bedarfsdatum muss ein deutscher Arbeitstag sein
     if (!istArbeitstag_Deutschland(finalesBedarfsdatum, customFeiertage)) {
       finalesBedarfsdatum = naechsterArbeitstag_Deutschland(finalesBedarfsdatum, customFeiertage)
     }
@@ -615,15 +602,9 @@ export function erstelleZusatzbestellung(
   const LOSGROESSE = lieferantData.lieferant.losgroesse
   
   /**
-   * 🎯 KORRIGIERT: Optionale Losgrößen-Rundung
-   * 
-   * Wenn skipLosgroessenRundung = true:
-   *   - Mengen werden EXAKT übernommen (bereits im Handler verteilt)
-   *   - Keine weitere Aufrundung pro Variante
-   *   - Verhindert das "5000 → 6000" Problem
-   * 
-   * Wenn skipLosgroessenRundung = false:
-   *   - Alte Logik: Jede Variante wird auf Losgröße aufgerundet
+   * Optionale Losgrößen-Rundung:
+   * skipLosgroessenRundung = true: Mengen exakt übernommen (keine Aufrundung)
+   * skipLosgroessenRundung = false: Jede Variante wird auf Losgröße aufgerundet
    */
   let finalKomponenten: Record<string, number>
   
@@ -640,7 +621,7 @@ export function erstelleZusatzbestellung(
   
   let bedarfsdatum = addDays(bestelldatum, vorlaufzeitTage)
   
-  // ✅ KORRIGIERT: Bedarfsdatum muss ein deutscher Arbeitstag sein!
+  // Bedarfsdatum muss ein deutscher Arbeitstag sein
   if (!istArbeitstag_Deutschland(bedarfsdatum, customFeiertage)) {
     bedarfsdatum = naechsterArbeitstag_Deutschland(bedarfsdatum, customFeiertage)
   }

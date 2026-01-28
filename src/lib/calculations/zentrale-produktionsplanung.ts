@@ -9,9 +9,22 @@
  * ✅ KONSISTENZ: Gleiche Logik in allen Modulen
  */
 
-import type { KonfigurationData } from '@/contexts/KonfigurationContext'
+import type { KonfigurationData, FeiertagConfig } from '@/contexts/KonfigurationContext'
 import { daysBetween, toLocalISODateString } from '@/lib/utils'
+import { istArbeitstag_Deutschland, istDeutschlandFeiertag, FeiertagsKonfiguration } from '@/lib/kalender'
 import type { Bestellung, Produktionsauftrag, Lagerbestand, MarketingAuftrag } from '@/types' // Assumed types
+
+/**
+ * Konvertiert FeiertagConfig[] zu FeiertagsKonfiguration[] für kalender.ts Funktionen
+ */
+function konvertiereFeiertage(feiertage: FeiertagConfig[]): FeiertagsKonfiguration[] {
+  return feiertage.map(f => ({
+    datum: f.datum,
+    name: f.name,
+    typ: f.typ,
+    land: f.land
+  }))
+}
 
 /**
  * Typ für wöchentliche Überschreibungen (OEM Programplanung)
@@ -262,15 +275,13 @@ export function generiereTagesproduktion(
 ): TagesProduktionEntry[] {
   const saisonalitaet = berechneSaisonaleVerteilung(konfiguration)
   
+  // Konvertiere Feiertage für kalender.ts Funktionen
+  const customFeiertage = konvertiereFeiertage(konfiguration.feiertage)
+  
+  // Extrahiere deutsche Feiertage als String-Array für countArbeitstageInWoche
   const deutscheFeiertage = konfiguration.feiertage
     .filter(f => f.land === 'Deutschland')
     .map(f => f.datum)
-  
-  const feiertagMap = new Map(
-    konfiguration.feiertage
-      .filter(f => f.land === 'Deutschland')
-      .map(f => [f.datum, f.name])
-  )
   
   const monatlicheFehlerTracker: Record<number, number> = {}
   const result: TagesProduktionEntry[] = []
@@ -282,10 +293,11 @@ export function generiereTagesproduktion(
     const datumStr = toLocalISODateString(datum)
     const kw = getKalenderWoche(datum)
     
-    const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
-    const istFeiertag = deutscheFeiertage.includes(datumStr)
-    const istArbeitstag = !istWochenende && !istFeiertag
-    const feiertagsName = feiertagMap.get(datumStr)
+    // Nutze kalender.ts Funktionen für konsistente Feiertagsprüfung
+    const feiertagResult = istDeutschlandFeiertag(datum, customFeiertage)
+    const istFeiertag = feiertagResult.length > 0
+    const feiertagsName = feiertagResult.length > 0 ? feiertagResult[0].name : undefined
+    const istArbeitstag = istArbeitstag_Deutschland(datum, customFeiertage)
     
     const monat = datum.getMonth() + 1
     const saisonInfo = saisonalitaet.find(s => s.monat === monat)!

@@ -3,21 +3,23 @@
  * DATUM-KLASSIFIZIERUNG
  * ========================================
  * 
- * Utility-Funktionen zur Klassifizierung von Daten:
+ * Utility-Funktionen zur Klassifizierung von Daten für UI-Zwecke:
  * - Wochenenden (Samstag/Sonntag)
- * - Deutsche Feiertage (NRW) - aus JSON geladen
- * - Chinesische Feiertage - aus JSON geladen
+ * - Deutsche Feiertage (NRW)
+ * - Chinesische Feiertage
  * 
  * Wird verwendet für farbliche Markierung in Tabellen
  * 
- * WICHTIG: Feiertage werden aus den JSON-Dateien geladen:
- * - feiertage-deutschland.json
- * - feiertage-china.json
+ * WICHTIG: Nutzt die zentrale kalender.ts für alle Feiertags-Logik (SINGLE SOURCE OF TRUTH)
  */
 
 import { Feiertag } from '@/types'
-import feiertageDeutschlandData from '@/data/feiertage-deutschland.json'
-import feiertageChinaData from '@/data/feiertage-china.json'
+import { isWeekend } from '@/lib/utils'
+import { 
+  ladeDeutschlandFeiertage, 
+  ladeChinaFeiertage,
+  FeiertagsKonfiguration
+} from '@/lib/kalender'
 
 /**
  * Klassifizierung eines Datums
@@ -31,95 +33,90 @@ export type DateClassification = {
 }
 
 /**
- * Lädt deutsche Feiertage aus JSON (2026, 2027, 2028)
- */
-function ladeDeutscheFeiertage(): Feiertag[] {
-  const feiertage2028 = (feiertageDeutschlandData as any).feiertage2028 || []
-  return [
-    ...feiertageDeutschlandData.feiertage2026.map(f => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich'
-    })),
-    ...feiertageDeutschlandData.feiertage2027.map(f => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich'
-    })),
-    ...feiertage2028.map((f: any) => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich'
-    }))
-  ]
-}
-
-/**
- * Lädt chinesische Feiertage aus JSON (2026, 2027, 2028)
- */
-function ladeChinaFeiertage(): Feiertag[] {
-  const feiertage2028 = (feiertageChinaData as any).feiertage2028 || []
-  return [
-    ...feiertageChinaData.feiertage2026.map(f => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich'
-    })),
-    ...feiertageChinaData.feiertage2027.map(f => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich'
-    })),
-    ...feiertage2028.map((f: any) => ({
-      ...f,
-      datum: new Date(f.datum),
-      typ: f.typ as 'gesetzlich'
-    }))
-  ]
-}
-
-/**
  * Prüft ob ein Datum ein Wochenende ist (Samstag oder Sonntag)
  * @param date - Zu prüfendes Datum
  * @returns True wenn Wochenende
  */
 export function istWochenende(date: Date): boolean {
-  const day = date.getDay()
-  return day === 0 || day === 6 // 0 = Sonntag, 6 = Samstag
+  return isWeekend(date)
 }
 
 /**
  * Prüft ob ein Datum ein deutscher Feiertag ist
  * @param date - Zu prüfendes Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns Feiertag-Objekt oder undefined
  */
-export function istDeutscherFeiertag(date: Date): Feiertag | undefined {
-  const feiertage = ladeDeutscheFeiertage()
-  return feiertage.find(f => 
-    f.datum.toDateString() === date.toDateString()
-  )
+export function istDeutscherFeiertag(
+  date: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Feiertag | undefined {
+  // Wenn custom Feiertage übergeben, diese verwenden
+  if (customFeiertage) {
+    const deutscheFeiertage = customFeiertage.filter(f => f.land === 'Deutschland')
+    const gefunden = deutscheFeiertage.find(f => {
+      const fDatum = new Date(f.datum)
+      return fDatum.toDateString() === date.toDateString()
+    })
+    if (gefunden) {
+      return {
+        datum: new Date(gefunden.datum),
+        name: gefunden.name,
+        typ: gefunden.typ
+      }
+    }
+    return undefined
+  }
+  
+  // Fallback: Lade aus kalender.ts (JSON-Dateien)
+  const feiertage = ladeDeutschlandFeiertage()
+  return feiertage.find(f => f.datum.toDateString() === date.toDateString())
 }
 
 /**
  * Prüft ob ein Datum ein chinesischer Feiertag ist
  * @param date - Zu prüfendes Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns Feiertag-Objekt oder undefined
  */
-export function istChinesischerFeiertag(date: Date): Feiertag | undefined {
+export function istChinesischerFeiertag(
+  date: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): Feiertag | undefined {
+  // Wenn custom Feiertage übergeben, diese verwenden
+  if (customFeiertage) {
+    const chinaFeiertage = customFeiertage.filter(f => f.land === 'China')
+    const gefunden = chinaFeiertage.find(f => {
+      const fDatum = new Date(f.datum)
+      return fDatum.toDateString() === date.toDateString()
+    })
+    if (gefunden) {
+      return {
+        datum: new Date(gefunden.datum),
+        name: gefunden.name,
+        typ: gefunden.typ
+      }
+    }
+    return undefined
+  }
+  
+  // Fallback: Lade aus kalender.ts (JSON-Dateien)
   const feiertage = ladeChinaFeiertage()
-  return feiertage.find(f => 
-    f.datum.toDateString() === date.toDateString()
-  )
+  return feiertage.find(f => f.datum.toDateString() === date.toDateString())
 }
 
 /**
  * Klassifiziert ein Datum vollständig
  * @param date - Zu klassifizierendes Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns Vollständige Klassifizierung
  */
-export function klassifiziereDatum(date: Date): DateClassification {
-  const germanHoliday = istDeutscherFeiertag(date)
-  const chineseHoliday = istChinesischerFeiertag(date)
+export function klassifiziereDatum(
+  date: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): DateClassification {
+  const germanHoliday = istDeutscherFeiertag(date, customFeiertage)
+  const chineseHoliday = istChinesischerFeiertag(date, customFeiertage)
   
   return {
     isWeekend: istWochenende(date),
@@ -133,10 +130,14 @@ export function klassifiziereDatum(date: Date): DateClassification {
 /**
  * Gibt CSS-Klassen für die Hintergrundfarbe basierend auf Datum zurück
  * @param date - Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns Tailwind CSS Klassen für Hintergrund
  */
-export function getDateRowBackgroundClasses(date: Date): string {
-  const classification = klassifiziereDatum(date)
+export function getDateRowBackgroundClasses(
+  date: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): string {
+  const classification = klassifiziereDatum(date, customFeiertage)
   
   // Priorität: Deutsche Feiertage > Chinesische Feiertage > Wochenende
   if (classification.isGermanHoliday) {
@@ -157,10 +158,14 @@ export function getDateRowBackgroundClasses(date: Date): string {
 /**
  * Gibt eine Tooltip-Beschreibung für ein Datum zurück
  * @param date - Datum
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
  * @returns Tooltip-Text
  */
-export function getDateTooltip(date: Date): string | undefined {
-  const classification = klassifiziereDatum(date)
+export function getDateTooltip(
+  date: Date,
+  customFeiertage?: FeiertagsKonfiguration[]
+): string | undefined {
+  const classification = klassifiziereDatum(date, customFeiertage)
   
   if (classification.isGermanHoliday) {
     return `Deutscher Feiertag: ${classification.germanHolidayName}`
@@ -180,15 +185,17 @@ export function getDateTooltip(date: Date): string | undefined {
 
 /**
  * Exportiert alle deutschen Feiertage für externe Verwendung
- * @returns Array von deutschen Feiertagen (beide Jahre)
+ * Nutzt die zentrale Funktion aus kalender.ts
+ * @returns Array von deutschen Feiertagen
  */
 export function getDeutscheFeiertage(): Feiertag[] {
-  return ladeDeutscheFeiertage()
+  return ladeDeutschlandFeiertage()
 }
 
 /**
  * Exportiert alle chinesischen Feiertage für externe Verwendung
- * @returns Array von chinesischen Feiertagen (beide Jahre)
+ * Nutzt die zentrale Funktion aus kalender.ts
+ * @returns Array von chinesischen Feiertagen
  */
 export function getChinesischeFeiertage(): Feiertag[] {
   return ladeChinaFeiertage()
