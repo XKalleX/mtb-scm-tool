@@ -70,29 +70,36 @@ Die Markdown-Dateien können auch direkt im Repository-Browser oder mit Tools wi
 
 ### Für Prüfung/Präsentation
 1. [Home.md](Home.md) - Gesamtübersicht
-2. [Error-Management.md](Error-Management.md) - Zeigt Verständnis mathematischer Konzepte
-3. [ATP-Check.md](ATP-Check.md) - Zeigt Supply Chain Expertise
-4. [Frozen-Zone.md](Frozen-Zone.md) - Zeigt realistische Planung
+2. [Produktion-Warehouse.md](Produktion-Warehouse.md) - **NEU:** Vollständige Dokumentation für 10-Min-Präsentation
+3. [Produktion-Warehouse-Praesentationshilfe.md](Produktion-Warehouse-Praesentationshilfe.md) - **NEU:** Schnellstart-Guide
+4. [Error-Management.md](Error-Management.md) - Zeigt Verständnis mathematischer Konzepte
+5. [ATP-Check.md](ATP-Check.md) - Zeigt Supply Chain Expertise
+6. [Frozen-Zone.md](Frozen-Zone.md) - Zeigt realistische Planung
 
 ## 📝 Wiki Struktur (komplett)
 
 ```
 docs/wiki/
-├── Home.md                      # Einstiegsseite, Navigation
-├── Error-Management.md          # Rundungsfehler-Korrektur
-├── Frozen-Zone.md               # 'Heute'-Datum Konzept
-├── ATP-Check.md                 # Available-To-Promise
-├── SSOT.md                      # Single Source of Truth
-├── OEM-Planung.md               # Zentrale Produktionsplanung
-├── Installation-Setup.md        # Installation & Setup
-├── FAQ.md                       # Häufige Fragen
-├── Glossar.md                   # Fachbegriffe A-Z
-└── README.md                    # Diese Datei
+├── Home.md                                         # Einstiegsseite, Navigation
+├── Error-Management.md                             # Rundungsfehler-Korrektur
+├── Frozen-Zone.md                                  # 'Heute'-Datum Konzept
+├── ATP-Check.md                                    # Available-To-Promise
+├── SSOT.md                                         # Single Source of Truth
+├── OEM-Planung.md                                  # Zentrale Produktionsplanung
+├── Produktion-Warehouse.md                         # Vollständige Dokumentation (77KB, 2.413 Zeilen)
+├── Produktion-Warehouse-Praesentationshilfe.md    # Schnellstart-Guide für Präsentation
+├── Installation-Setup.md                           # Installation & Setup
+├── FAQ.md                                          # Häufige Fragen
+├── Glossar.md                                      # Fachbegriffe A-Z
+├── UPLOAD-ANLEITUNG.md                            # Wiki Upload Anleitung
+└── README.md                                       # Diese Datei
 ```
 
-## 🚀 Erweiterungen (TODO)
+## 🚀 Erweiterungen
 
-Weitere Wiki-Seiten könnten folgen:
+Weitere Wiki-Seiten sind bereits vorhanden oder in Planung:
+- ✅ **Produktion-Warehouse.md** - Vollständige Dokumentation (77KB, 11 Kapitel)
+- ✅ **Produktion-Warehouse-Praesentationshilfe.md** - Präsentations-Guide
 - **Benutzerhandbuch.md** - Schritt-für-Schritt Anleitung
 - **Code-Struktur.md** - Architektur-Details
 - **Datenmodell.md** - JSON-Schema Dokumentation
@@ -100,8 +107,8 @@ Weitere Wiki-Seiten könnten folgen:
 - **Szenarien-System.md** - 4 Szenarien erklärt
 - **SCOR-Metriken.md** - KPI-Berechnungen
 - **Inbound-Logistik.md** - China-Beschaffung
-- **Warehouse-Management.md** - Lagerbestandsführung
-- **Produktionssteuerung.md** - Montageplanung
+- **Warehouse-Management.md** - Lagerbestandsführung (kurz)
+- **Produktionssteuerung.md** - Montageplanung (kurz)
 - **Feiertage.md** - Deutschland & China
 - **Troubleshooting.md** - Problemlösungen
 

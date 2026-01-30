@@ -61,6 +61,8 @@ Zentrale Produktionsplanung ist die EINZIGE Berechnungsbasis. Alle anderen Modul
 - [Inbound Logistik](Inbound-Logistik.md) - China-Beschaffung (49 Tage Vorlaufzeit)
 - [Warehouse Management](Warehouse-Management.md) - Lagerbestandsführung mit ATP-Check
 - [Produktionssteuerung](Produktionssteuerung.md) - Montageplanung mit Material-Check
+- **[Produktion & Warehouse - Vollständige Dokumentation](Produktion-Warehouse.md)** - Detaillierte Erklärung für Präsentation (77KB, 2.413 Zeilen)
+  - [Präsentationshilfe](Produktion-Warehouse-Praesentationshilfe.md) - Schnellstart-Guide für 10-Min-Präsentation
 
 ### Planung & Simulation
 - [Saisonalität](Saisonalitaet.md) - Monatliche Verteilung (April = 16% Peak)
