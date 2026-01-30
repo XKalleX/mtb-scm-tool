@@ -34,6 +34,25 @@ Comprehensive Supply Chain Management System für Adventure Works AG - entwickel
 
 ---
 
+## 📚 Dokumentation
+
+**Umfassende Wiki-Dokumentation verfügbar!**
+
+* **[Wiki Home](docs/wiki/Home.md)** - Hauptübersicht über alle Themen
+* **[Produktion & Warehouse - Vollständige Dokumentation](docs/wiki/Produktion-Warehouse.md)** - 77KB, 2.413 Zeilen, 11 Kapitel
+  * Detaillierte Erklärung aller Module und Tabellen
+  * Konkretes Beispiel Tag 5 vollständig durchgerechnet
+  * 10 Professorenfragen mit Antworten
+* **[Präsentationshilfe](docs/wiki/Produktion-Warehouse-Praesentationshilfe.md)** - Schnellstart-Guide für 10-Min-Präsentation
+* **[Error Management](docs/wiki/Error-Management.md)** - Rundungsfehler-Korrektur
+* **[ATP-Check System](docs/wiki/ATP-Check.md)** - Available-To-Promise
+* **[Frozen Zone](docs/wiki/Frozen-Zone.md)** - Vergangenheit vs. Zukunft
+* **[SSOT Konzept](docs/wiki/SSOT.md)** - Single Source of Truth
+* **[FAQ](docs/wiki/FAQ.md)** - Häufige Fragen
+* **[Glossar](docs/wiki/Glossar.md)** - Fachbegriffe A-Z
+
+---
+
 ## 🏗️ Technologie-Stack
 
 ### Frontend
