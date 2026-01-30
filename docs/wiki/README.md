@@ -14,6 +14,9 @@ Dieses Verzeichnis enthält die vollständige Wiki-Dokumentation für das Mounta
 4. **[SSOT.md](SSOT.md)** - Single Source of Truth (JSON als Datenquelle)
 5. **[OEM-Planung.md](OEM-Planung.md)** - Zentrale Produktionsplanung als Berechnungsbasis
 
+### Module-Dokumentation
+- **[Produktion-und-Warehouse.md](Produktion-und-Warehouse.md)** - Ausführliche Dokumentation der Produktionssteuerung und Warehouse Management (Fließtext)
+
 ### Schnellstart & Hilfe
 - **[Installation-Setup.md](Installation-Setup.md)** - Installation, Konfiguration, Troubleshooting
 - **[FAQ.md](FAQ.md)** - Häufig gestellte Fragen
@@ -84,6 +87,7 @@ docs/wiki/
 ├── ATP-Check.md                 # Available-To-Promise
 ├── SSOT.md                      # Single Source of Truth
 ├── OEM-Planung.md               # Zentrale Produktionsplanung
+├── Produktion-und-Warehouse.md  # Produktion & Warehouse (Fließtext)
 ├── Installation-Setup.md        # Installation & Setup
 ├── FAQ.md                       # Häufige Fragen
 ├── Glossar.md                   # Fachbegriffe A-Z
@@ -100,8 +104,6 @@ Weitere Wiki-Seiten könnten folgen:
 - **Szenarien-System.md** - 4 Szenarien erklärt
 - **SCOR-Metriken.md** - KPI-Berechnungen
 - **Inbound-Logistik.md** - China-Beschaffung
-- **Warehouse-Management.md** - Lagerbestandsführung
-- **Produktionssteuerung.md** - Montageplanung
 - **Feiertage.md** - Deutschland & China
 - **Troubleshooting.md** - Problemlösungen
 
