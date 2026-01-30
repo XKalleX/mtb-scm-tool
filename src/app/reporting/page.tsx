@@ -1,50 +1,91 @@
 'use client'
 
 /**
- * ========================================
- * REPORTING & VISUALISIERUNGEN
- * ========================================
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * GRANULARES REPORTING & ZEITREIHEN-VISUALISIERUNGEN
+ * ═══════════════════════════════════════════════════════════════════════════════
  * 
- * Zentrale Seite für:
- * - SCOR Metriken und KPIs
- * - Interaktive Visualisierungen
- * - Performance-Dashboards
- * - Grafische Auswertungen
+ * Ziel: Detaillierte Zeitreihen-Analysen statt einfacher Endergebnis-Charts
  * 
- * WICHTIG: Alle Daten werden dynamisch aus dem zentralen
- * Supply Chain Metrics Rechner bezogen und reflektieren
- * ALLE aktiven Szenarien für konsistente Werte!
+ * User-Feedback: "Die Grafiken sind mir zu einfach und nichts aussagend. 
+ * Ich will auf granularer Basis sehen wie sich die Werte zusammensetzen."
  * 
- * NEU: Nutzt dynamische Konfiguration aus KonfigurationContext
+ * HAUPTFEATURES:
+ * - TAB 1: KPIs Übersicht (kompakt, schneller Überblick)
+ * - TAB 2: Zeitreihen Detailansicht (7 Sub-Tabs mit granularen Analysen)
+ * 
+ * DATENQUELLEN (ALLE ECHT, NICHT SIMULIERT!):
+ * 1. generiereAlleVariantenProduktionsplaene() - OEM Planung (365 Tage)
+ * 2. generiereTaeglicheBestellungen() - Inbound Logistik
+ * 3. berechneIntegriertesWarehouse() - Warehouse Management
+ * 4. reporting-aggregation.ts - Aggregationsfunktionen
+ * 
+ * ZEITREIHEN-ANALYSEN:
+ * 1. Planerfüllungsgrad - Monatlich, wöchentlich, Stacked Bars
+ * 2. Liefertreue China - Timeline Scatter, monatliche Performance
+ * 3. Durchlaufzeit - Waterfall Breakdown, Min/Avg/Max
+ * 4. Lagerumschlag - Composed Chart (Area + Line), Heatmap
+ * 5. Planungsgenauigkeit - Dual Axis (Plan vs. Ist), Box Plot Simulation
+ * 6. Materialverfügbarkeit - Stacked Area, ATP-Checks über Zeit
+ * 7. Lagerreichweite - Multi-Line pro Variante, Heatmap Woche x Variante
+ * 
+ * KONZEPTE:
+ * - Responsive Charts mit ResponsiveContainer
+ * - Deutsche Beschriftungen
+ * - Export-Funktionen (CSV/JSON) pro Chart
+ * - CustomTooltips mit detaillierten Infos
+ * - Performance-Optimierung mit useMemo
+ * 
+ * @author WI3 Team - Adventure Works AG
+ * @version 2.0 - Granulare Zeitreihen-Analyse
  */
 
 import { useState, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { TrendingUp, TrendingDown, Minus, BarChart3, Download, Filter, Maximize2 } from 'lucide-react'
-import { formatNumber, formatPercent } from '@/lib/utils'
-import { exportToCSV, exportToJSON } from '@/lib/export'
-import ExcelTable, { FormulaCard } from '@/components/excel-table'
-import { useSzenarien } from '@/contexts/SzenarienContext'
-import { useKonfiguration } from '@/contexts/KonfigurationContext'
-import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
-import { CollapsibleInfo } from '@/components/ui/collapsible-info'
 import { 
-  berechneGesamtMetriken,
-  berechneGesamtMetrikenMitKonfig,
-  berechneProduktionsDatenFuerVisualisierung,
-  berechneMonatlicheProduktionMitKonfig,
-  berechneLagerDaten,
-  berechneWoechentlicheAuslastung,
-  berechneTaeglicherDaten,
-  berechneVariantenProduktion,
-  berechneVariantenProduktionMitKonfig,
-  berechneSzenarioAuswirkungen,
-  BASELINE,
-  DynamicConfig
-} from '@/lib/calculations/supply-chain-metrics'
+  Download, 
+  TrendingUp, 
+  TrendingDown, 
+  Clock,
+  Package,
+  BarChart3,
+  AlertTriangle,
+  CheckCircle,
+  Truck,
+  Activity
+} from 'lucide-react'
+import { formatNumber, formatPercent } from '@/lib/utils'
+import { useKonfiguration } from '@/contexts/KonfigurationContext'
+import { useSzenarien } from '@/contexts/SzenarienContext'
+import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
+
+// Berechnungsmodule (ECHTE DATEN!)
+import { generiereAlleVariantenProduktionsplaene } from '@/lib/calculations/zentrale-produktionsplanung'
+import { generiereTaeglicheBestellungen } from '@/lib/calculations/inbound-china'
+import { berechneIntegriertesWarehouse } from '@/lib/calculations/warehouse-management'
+
+// Aggregations-Helper für Visualisierungen
+import {
+  MONATSNAMEN,
+  MONATSNAMEN_KURZ,
+  aggregierePlanerfuellungNachMonat,
+  aggregierePlanerfuellungNachWoche,
+  analysiereLieferungenTimeline,
+  aggregiereLieferperformanceNachMonat,
+  getDurchlaufzeitBreakdown,
+  aggregiereDurchlaufzeitNachMonat,
+  aggregiereLagerumschlagNachMonat,
+  aggregiereLagerbestandHeatmap,
+  aggregierePlanungsgenauigkeitNachMonat,
+  aggregiereMaterialverfuegbarkeit,
+  aggregiereTaeglicheMaterialverfuegbarkeit,
+  aggregiereLagerreichweiteNachMonat,
+  aggregiereLagerreichweiteHeatmap
+} from '@/lib/helpers/reporting-aggregation'
+
+// Recharts Visualisierungen
 import {
   LineChart,
   Line,
@@ -52,150 +93,555 @@ import {
   Bar,
   AreaChart,
   Area,
-  PieChart,
-  Pie,
-  Cell,
+  ComposedChart,
+  ScatterChart,
+  Scatter,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ComposedChart,
+  ReferenceLine,
+  ReferenceArea,
+  Cell,
+  Brush
 } from 'recharts'
 
-// Farben für Visualisierungen
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * FARB-SCHEMA FÜR VISUALISIERUNGEN
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
 const COLORS = {
-  primary: '#10b981',
-  secondary: '#3b82f6',
-  warning: '#f59e0b',
-  danger: '#ef4444',
-  info: '#8b5cf6',
-  success: '#22c55e'
+  primary: '#10b981',      // Grün - Erfolg, Plan erfüllt
+  secondary: '#3b82f6',    // Blau - Ist-Werte, Sekundäre Info
+  warning: '#f59e0b',      // Orange - Warnung, Mittel
+  danger: '#ef4444',       // Rot - Kritisch, Fehler
+  info: '#8b5cf6',         // Violett - Information
+  success: '#22c55e',      // Hellgrün - Sehr gut
+  neutral: '#64748b',      // Grau - Neutral
+  highlight: '#ec4899'     // Pink - Highlight
 }
 
-const VARIANTEN_FARBEN = [
-  '#10b981', '#3b82f6', '#f59e0b', '#ef4444',
-  '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'
+// Heatmap Gradient (Niedrig → Hoch)
+const HEATMAP_COLORS = [
+  '#ef4444',  // Rot - Kritisch niedrig
+  '#f59e0b',  // Orange - Niedrig
+  '#fbbf24',  // Gelb - Mittel
+  '#10b981',  // Grün - Gut
+  '#3b82f6'   // Blau - Sehr gut
 ]
 
-/**
- * Fallback-Wert für Arbeitstage wenn Konfiguration noch nicht geladen ist
- */
-const DEFAULT_ARBEITSTAGE_FALLBACK = 252
+// Sattel-Varianten Farben (4 Varianten)
+const SATTEL_COLORS = {
+  'SAT_FT': '#10b981',  // Freeride Team - Grün
+  'SAT_FR': '#3b82f6',  // Freeride - Blau
+  'SAT_TC': '#f59e0b',  // Team Carbon - Orange
+  'SAT_XC': '#8b5cf6'   // XC Carbon - Violett
+}
 
 /**
- * Reporting Hauptseite
- * Kombiniert SCOR Metriken und Visualisierungen
- * 
- * WICHTIG: Alle Daten werden dynamisch berechnet basierend auf aktiven Szenarien!
- * NEU: Nutzt auch dynamische Konfiguration aus KonfigurationContext
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * HILFSFUNKTIONEN
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Berechnet Heatmap-Farbe basierend auf Wert und Skala
+ */
+function getHeatmapColor(value: number, min: number, max: number): string {
+  if (max === min) return HEATMAP_COLORS[2] // Mittel
+  
+  const normalized = (value - min) / (max - min)
+  const index = Math.floor(normalized * (HEATMAP_COLORS.length - 1))
+  return HEATMAP_COLORS[Math.max(0, Math.min(HEATMAP_COLORS.length - 1, index))]
+}
+
+/**
+ * Berechnet Lagerreichweite-Farbe (Ziel: 7-14 Tage)
+ */
+function getLagerreichweiteColor(tage: number): string {
+  if (tage < 3) return COLORS.danger      // Kritisch
+  if (tage < 7) return COLORS.warning     // Niedrig
+  if (tage <= 14) return COLORS.success   // Optimal
+  if (tage <= 21) return COLORS.info      // Hoch
+  return COLORS.neutral                    // Sehr hoch
+}
+
+/**
+ * Berechnet Status-Badge-Farbe
+ */
+function getStatusColor(prozent: number): string {
+  if (prozent >= 98) return COLORS.success
+  if (prozent >= 95) return COLORS.primary
+  if (prozent >= 90) return COLORS.warning
+  return COLORS.danger
+}
+
+/**
+ * Formatiert Datum für Tooltip
+ */
+function formatDateTooltip(datum: Date | string): string {
+  const d = typeof datum === 'string' ? new Date(datum) : datum
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+/**
+ * Export-Funktionen
+ */
+function exportToCSV(data: any[], filename: string) {
+  if (!data || data.length === 0) return
+  
+  const headers = Object.keys(data[0]).join(',')
+  const rows = data.map(row => 
+    Object.values(row).map(v => 
+      typeof v === 'number' ? v : `"${v}"`
+    ).join(',')
+  ).join('\n')
+  
+  const csv = `${headers}\n${rows}`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`
+  link.click()
+}
+
+function exportToJSON(data: any, filename: string) {
+  const json = JSON.stringify(data, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `${filename}_${new Date().toISOString().split('T')[0]}.json`
+  link.click()
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * CUSTOM TOOLTIPS FÜR CHARTS
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+const CustomTooltipPlanerfuellung = ({ active, payload }: any) => {
+  if (!active || !payload || !payload.length) return null
+  
+  const data = payload[0].payload
+  
+  return (
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+      <p className="font-semibold text-sm mb-2">{data.monatName || `KW ${data.kalenderwoche}`}</p>
+      <div className="space-y-1 text-xs">
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-600">Plan:</span>
+          <span className="font-semibold">{formatNumber(data.planMenge)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-600">Ist:</span>
+          <span className="font-semibold">{formatNumber(data.istMenge)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-600">Erfüllungsgrad:</span>
+          <span className="font-semibold" style={{ color: getStatusColor(data.planerfuellungsgrad) }}>
+            {formatPercent(data.planerfuellungsgrad)}
+          </span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-600">Tage erfüllt:</span>
+          <span className="font-semibold">{data.auftragErfuellt} / {data.auftragGesamt}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const CustomTooltipLieferung = ({ active, payload }: any) => {
+  if (!active || !payload || !payload.length) return null
+  
+  const data = payload[0].payload
+  
+  return (
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+      <p className="font-semibold text-sm mb-2">Bestellung {data.bestellungId?.substring(0, 8)}</p>
+      <div className="space-y-1 text-xs">
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-600">Bestellt:</span>
+          <span className="font-semibold">{formatDateTooltip(data.bestelldatum)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-600">Ankunft:</span>
+          <span className="font-semibold">{formatDateTooltip(data.erwarteteAnkunft)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-600">Vorlaufzeit:</span>
+          <span className="font-semibold">{data.vorlaufzeitTage} Tage</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-600">Menge:</span>
+          <span className="font-semibold">{formatNumber(data.menge)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-600">Status:</span>
+          <span className={`font-semibold ${data.puenktlich ? 'text-green-600' : 'text-red-600'}`}>
+            {data.puenktlich ? 'Pünktlich' : 'Verspätet'}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const CustomTooltipDurchlaufzeit = ({ active, payload }: any) => {
+  if (!active || !payload || !payload.length) return null
+  
+  const data = payload[0].payload
+  
+  return (
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+      <p className="font-semibold text-sm mb-2">{data.komponente}</p>
+      <div className="space-y-1 text-xs">
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-600">Dauer:</span>
+          <span className="font-semibold">{data.tage} Tage</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-600">Typ:</span>
+          <span className="font-semibold">
+            {data.typ === 'arbeitstage' ? 'Arbeitstage' : 'Kalendertage'}
+          </span>
+        </div>
+        <div className="text-gray-600 mt-2 text-xs italic">
+          {data.beschreibung}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * HAUPTKOMPONENTE: REPORTING DASHBOARD
+ * ═══════════════════════════════════════════════════════════════════════════════
  */
 export default function ReportingPage() {
-  const [selectedView, setSelectedView] = useState<'metrics' | 'charts'>('metrics')
-  const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month' | 'quarter' | 'year'>('month')
+  // State
+  const [hauptTab, setHauptTab] = useState<'overview' | 'timeseries'>('timeseries')
+  const [detailTab, setDetailTab] = useState<'planerfuellung' | 'liefertreue' | 'durchlaufzeit' | 'lagerumschlag' | 'planungsgenauigkeit' | 'materialverfuegbarkeit' | 'lagerreichweite'>('planerfuellung')
   
-  // Hole aktive Szenarien aus dem globalen Context
+  // Contexts
+  const { konfiguration, isInitialized } = useKonfiguration()
   const { getAktiveSzenarien } = useSzenarien()
   const aktiveSzenarien = getAktiveSzenarien()
   
-  // Hole Konfiguration aus dem globalen Context
-  const { konfiguration, isInitialized, getArbeitstageProJahr } = useKonfiguration()
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════
+   * DATEN-BERECHNUNG (ALLE ECHT!)
+   * ═══════════════════════════════════════════════════════════════════════════════
+   */
   
-  // Erstelle dynamische Konfiguration für Berechnungen
-  const dynamicConfig: DynamicConfig = useMemo(() => ({
-    jahresproduktion: konfiguration.jahresproduktion,
-    arbeitstage: isInitialized ? getArbeitstageProJahr() : DEFAULT_ARBEITSTAGE_FALLBACK,
-    saisonalitaet: konfiguration.saisonalitaet.map(s => ({ monat: s.monat, anteil: s.anteil })),
-    varianten: konfiguration.varianten.map(v => ({
-      id: v.id,
-      name: v.name,
-      anteilPrognose: v.anteilPrognose
-    }))
-  }), [konfiguration, isInitialized, getArbeitstageProJahr])
+  // 1. OEM Produktionsplanung (365 Tage, alle Varianten)
+  const alleProduktionsplaene = useMemo(() => {
+    console.log('🔄 Berechne OEM Produktionsplanung...')
+    return generiereAlleVariantenProduktionsplaene(konfiguration)
+  }, [konfiguration])
   
-  // Berechne alle Metriken dynamisch basierend auf Szenarien UND Konfiguration
-  const gesamtMetriken = useMemo(() => {
-    if (isInitialized) {
-      return berechneGesamtMetrikenMitKonfig(aktiveSzenarien, dynamicConfig)
-    }
-    return berechneGesamtMetriken(aktiveSzenarien)
-  }, [aktiveSzenarien, dynamicConfig, isInitialized])
+  // 2. Inbound Logistik (Bestellungen von China)
+  const bestellungen = useMemo(() => {
+    console.log('🔄 Berechne Inbound Bestellungen...')
+    
+    // Konvertiere VariantenProduktionsplan zu TagesProduktionsplan[]
+    const tagesplaene: Record<string, any[]> = {}
+    Object.entries(alleProduktionsplaene).forEach(([varianteId, plan]) => {
+      tagesplaene[varianteId] = plan.tage
+    })
+    
+    // Konvertiere Stückliste zu Map-Format
+    const stuecklistenMap: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }> = {}
+    konfiguration.stueckliste.forEach(s => {
+      if (!stuecklistenMap[s.mtbVariante]) {
+        stuecklistenMap[s.mtbVariante] = { komponenten: {} }
+      }
+      stuecklistenMap[s.mtbVariante].komponenten[s.bauteilId] = {
+        name: s.bauteilName,
+        menge: s.menge,
+        einheit: s.einheit
+      }
+    })
+    
+    return generiereTaeglicheBestellungen(
+      tagesplaene,
+      2027,
+      konfiguration.lieferant.gesamtVorlaufzeitTage,
+      konfiguration.feiertage,
+      stuecklistenMap,
+      konfiguration.lieferant.losgroesse,
+      konfiguration.lieferant.lieferintervall
+    )
+  }, [alleProduktionsplaene, konfiguration])
   
-  // SCOR-Metriken aus dem zentralen Rechner
-  const scorMetriken = gesamtMetriken.scor
+  // 3. Warehouse Management (Lagerbestand, ATP-Checks)
+  const warehouse = useMemo(() => {
+    console.log('🔄 Berechne Warehouse Management...')
+    return berechneIntegriertesWarehouse(
+      konfiguration,
+      alleProduktionsplaene,
+      bestellungen
+    )
+  }, [konfiguration, alleProduktionsplaene, bestellungen])
   
   /**
-   * Exportiert SCOR-Metriken als CSV
-   * HINWEIS: "Kapitalbindung" wurde entfernt, da sie redundant zu "Lagerreichweite" ist
-   * und auf Benutzerwunsch aus der Anzeige entfernt wurde.
+   * ═══════════════════════════════════════════════════════════════════════════════
+   * AGGREGIERTE DATEN FÜR VISUALISIERUNGEN
+   * ═══════════════════════════════════════════════════════════════════════════════
    */
-  const handleExportMetrics = () => {
-    const metricsData = [
-      { Kategorie: 'Reliability', Metrik: 'Planerfüllungsgrad', Wert: scorMetriken.planerfuellungsgrad, Einheit: '%' },
-      { Kategorie: 'Reliability', Metrik: 'Liefertreue China', Wert: scorMetriken.liefertreueChina, Einheit: '%' },
-      { Kategorie: 'Reliability', Metrik: 'Lieferperformance', Wert: scorMetriken.deliveryPerformance, Einheit: '%' },
-      { Kategorie: 'Responsiveness', Metrik: 'Durchlaufzeit Produktion', Wert: scorMetriken.durchlaufzeitProduktion, Einheit: 'Tage' },
-      { Kategorie: 'Responsiveness', Metrik: 'Lagerumschlag', Wert: scorMetriken.lagerumschlag, Einheit: 'x/Jahr' },
-      { Kategorie: 'Responsiveness', Metrik: 'Planungsgenauigkeit', Wert: scorMetriken.forecastAccuracy, Einheit: '%' },
-      { Kategorie: 'Agility', Metrik: 'Produktionsflexibilität', Wert: scorMetriken.produktionsflexibilitaet, Einheit: '%' },
-      { Kategorie: 'Agility', Metrik: 'Materialverfügbarkeit', Wert: scorMetriken.materialverfuegbarkeit, Einheit: '%' },
-      { Kategorie: 'Assets', Metrik: 'Lagerreichweite', Wert: scorMetriken.lagerreichweite, Einheit: 'Tage' }
-    ]
+  
+  // 1. PLANERFÜLLUNGSGRAD
+  const planerfuellungMonatlich = useMemo(() => 
+    aggregierePlanerfuellungNachMonat(alleProduktionsplaene),
+    [alleProduktionsplaene]
+  )
+  
+  const planerfuellungWoechentlich = useMemo(() => 
+    aggregierePlanerfuellungNachWoche(alleProduktionsplaene),
+    [alleProduktionsplaene]
+  )
+  
+  // 2. LIEFERTREUE CHINA
+  const lieferTimeline = useMemo(() => 
+    analysiereLieferungenTimeline(bestellungen),
+    [bestellungen]
+  )
+  
+  const lieferperformanceMonatlich = useMemo(() => 
+    aggregiereLieferperformanceNachMonat(lieferTimeline),
+    [lieferTimeline]
+  )
+  
+  // 3. DURCHLAUFZEIT
+  const durchlaufzeitBreakdown = useMemo(() => 
+    getDurchlaufzeitBreakdown(),
+    []
+  )
+  
+  const durchlaufzeitMonatlich = useMemo(() => 
+    aggregiereDurchlaufzeitNachMonat(lieferTimeline),
+    [lieferTimeline]
+  )
+  
+  // 4. LAGERUMSCHLAG
+  const lagerumschlagMonatlich = useMemo(() => 
+    aggregiereLagerumschlagNachMonat(warehouse.tage, alleProduktionsplaene),
+    [warehouse, alleProduktionsplaene]
+  )
+  
+  const lagerbestandHeatmap = useMemo(() => 
+    aggregiereLagerbestandHeatmap(warehouse.tage),
+    [warehouse]
+  )
+  
+  // 5. PLANUNGSGENAUIGKEIT
+  const planungsgenauigkeitMonatlich = useMemo(() => 
+    aggregierePlanungsgenauigkeitNachMonat(alleProduktionsplaene),
+    [alleProduktionsplaene]
+  )
+  
+  // 6. MATERIALVERFÜGBARKEIT
+  const materialverfuegbarkeit = useMemo(() => 
+    aggregiereMaterialverfuegbarkeit(warehouse.tage),
+    [warehouse]
+  )
+  
+  const materialverfuegbarheitTaeglich = useMemo(() => 
+    aggregiereTaeglicheMaterialverfuegbarkeit(warehouse.tage),
+    [warehouse]
+  )
+  
+  // 7. LAGERREICHWEITE
+  const lagerreichweiteMonatlich = useMemo(() => 
+    aggregiereLagerreichweiteNachMonat(warehouse.tage),
+    [warehouse]
+  )
+  
+  const lagerreichweiteHeatmap = useMemo(() => 
+    aggregiereLagerreichweiteHeatmap(warehouse.tage),
+    [warehouse]
+  )
+  
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════
+   * KPI SUMMARY (für Overview Tab)
+   * ═══════════════════════════════════════════════════════════════════════════════
+   */
+  const kpiSummary = useMemo(() => {
+    // Durchschnitte berechnen
+    const durchschnittPlanerfuellung = planerfuellungMonatlich.reduce((sum, m) => sum + m.planerfuellungsgrad, 0) / 12
+    const durchschnittLiefertreue = lieferperformanceMonatlich.reduce((sum, m) => sum + m.liefertreue, 0) / 12
+    const durchschnittVerfuegbarkeit = materialverfuegbarkeit.reduce((sum, m) => sum + m.verfuegbarkeitsrate, 0) / 12
+    const durchschnittGenauigkeit = planungsgenauigkeitMonatlich.reduce((sum, m) => sum + m.genauigkeit, 0) / 12
     
-    exportToCSV(metricsData, 'scor_metriken_2027')
-  }
-
+    // Gesamtproduktion
+    const gesamtPlan = planerfuellungMonatlich.reduce((sum, m) => sum + m.planMenge, 0)
+    const gesamtIst = planerfuellungMonatlich.reduce((sum, m) => sum + m.istMenge, 0)
+    
+    // Lieferungen
+    const gesamtLieferungen = lieferperformanceMonatlich.reduce((sum, m) => sum + m.gesamtLieferungen, 0)
+    const puenktlicheLieferungen = lieferperformanceMonatlich.reduce((sum, m) => sum + m.puenktlicheLieferungen, 0)
+    
+    return {
+      planerfuellung: durchschnittPlanerfuellung,
+      liefertreue: durchschnittLiefertreue,
+      materialverfuegbarkeit: durchschnittVerfuegbarkeit,
+      planungsgenauigkeit: durchschnittGenauigkeit,
+      gesamtPlan,
+      gesamtIst,
+      abweichung: gesamtIst - gesamtPlan,
+      gesamtLieferungen,
+      puenktlicheLieferungen,
+      durchschnittVorlaufzeit: 49 // Konstant aus Konfiguration
+    }
+  }, [planerfuellungMonatlich, lieferperformanceMonatlich, materialverfuegbarkeit, planungsgenauigkeitMonatlich])
+  
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════
+   * RENDER: HAUPTSTRUKTUR
+   * ═══════════════════════════════════════════════════════════════════════════════
+   */
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto py-6 space-y-6">
+      {/* Header mit Export-Buttons */}
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Reporting & Visualisierungen</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Reporting & Visualisierungen</h1>
           <p className="text-muted-foreground mt-1">
-            SCOR-Metriken, KPIs und interaktive Dashboards
-            {aktiveSzenarien.length > 0 && ' - Live-Berechnung mit aktiven Szenarien'}
+            Granulare Zeitreihen-Analysen der Supply Chain Performance
           </p>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleExportMetrics}>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              exportToJSON({
+                planerfuellung: planerfuellungMonatlich,
+                liefertreue: lieferperformanceMonatlich,
+                lagerumschlag: lagerumschlagMonatlich,
+                planungsgenauigkeit: planungsgenauigkeitMonatlich,
+                materialverfuegbarkeit: materialverfuegbarkeit
+              }, 'reporting_komplett')
+            }}
+          >
             <Download className="h-4 w-4 mr-2" />
-            Export Metriken
-          </Button>
-          <Button variant="outline">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export
+            Alle Daten (JSON)
           </Button>
         </div>
       </div>
-
+      
       {/* Aktive Szenarien Banner */}
-      <ActiveScenarioBanner showDetails={true} />
-
-      {/* Tabs für Metriken und Charts */}
-      <Tabs value={selectedView} onValueChange={(v: any) => setSelectedView(v)}>
-        <TabsList>
-          <TabsTrigger value="metrics">SCOR Metriken</TabsTrigger>
-          <TabsTrigger value="charts">Visualisierungen</TabsTrigger>
+      {aktiveSzenarien.length > 0 && <ActiveScenarioBanner />}
+      
+      {/* Haupt-Tabs */}
+      <Tabs value={hauptTab} onValueChange={(v) => setHauptTab(v as any)}>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="overview">KPIs Übersicht</TabsTrigger>
+          <TabsTrigger value="timeseries">Zeitreihen Detailansicht</TabsTrigger>
         </TabsList>
-
-        {/* SCOR Metriken Tab */}
-        <TabsContent value="metrics" className="space-y-6">
-          <SCORMetrikenView metriken={scorMetriken} istBaseline={gesamtMetriken.istBaseline} />
+        
+        {/* TAB 1: KPIs ÜBERSICHT (kompakt) */}
+        <TabsContent value="overview" className="space-y-6">
+          <KPIsOverview kpiSummary={kpiSummary} />
         </TabsContent>
-
-        {/* Visualisierungen Tab */}
-        <TabsContent value="charts" className="space-y-6">
-          <VisualisierungenView 
-            timeRange={timeRange} 
-            setTimeRange={setTimeRange} 
-            aktiveSzenarien={aktiveSzenarien}
-          />
+        
+        {/* TAB 2: ZEITREIHEN DETAILANSICHT */}
+        <TabsContent value="timeseries" className="space-y-6">
+          <Tabs value={detailTab} onValueChange={(v) => setDetailTab(v as any)}>
+            <TabsList className="grid w-full grid-cols-7 h-auto">
+              <TabsTrigger value="planerfuellung" className="text-xs">
+                <Activity className="h-3 w-3 mr-1" />
+                Planerfüllung
+              </TabsTrigger>
+              <TabsTrigger value="liefertreue" className="text-xs">
+                <Truck className="h-3 w-3 mr-1" />
+                Liefertreue
+              </TabsTrigger>
+              <TabsTrigger value="durchlaufzeit" className="text-xs">
+                <Clock className="h-3 w-3 mr-1" />
+                Durchlaufzeit
+              </TabsTrigger>
+              <TabsTrigger value="lagerumschlag" className="text-xs">
+                <Package className="h-3 w-3 mr-1" />
+                Lagerumschlag
+              </TabsTrigger>
+              <TabsTrigger value="planungsgenauigkeit" className="text-xs">
+                <BarChart3 className="h-3 w-3 mr-1" />
+                Genauigkeit
+              </TabsTrigger>
+              <TabsTrigger value="materialverfuegbarkeit" className="text-xs">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Material
+              </TabsTrigger>
+              <TabsTrigger value="lagerreichweite" className="text-xs">
+                <TrendingUp className="h-3 w-3 mr-1" />
+                Reichweite
+              </TabsTrigger>
+            </TabsList>
+            
+            {/* Sub-Tab 1: PLANERFÜLLUNGSGRAD */}
+            <TabsContent value="planerfuellung" className="space-y-6">
+              <PlanerfuellungDetailView 
+                monatlich={planerfuellungMonatlich}
+                woechentlich={planerfuellungWoechentlich}
+              />
+            </TabsContent>
+            
+            {/* Sub-Tab 2: LIEFERTREUE CHINA */}
+            <TabsContent value="liefertreue" className="space-y-6">
+              <LiefertreuDetailView 
+                timeline={lieferTimeline}
+                monatlich={lieferperformanceMonatlich}
+              />
+            </TabsContent>
+            
+            {/* Sub-Tab 3: DURCHLAUFZEIT */}
+            <TabsContent value="durchlaufzeit" className="space-y-6">
+              <DurchlaufzeitDetailView 
+                breakdown={durchlaufzeitBreakdown}
+                monatlich={durchlaufzeitMonatlich}
+              />
+            </TabsContent>
+            
+            {/* Sub-Tab 4: LAGERUMSCHLAG */}
+            <TabsContent value="lagerumschlag" className="space-y-6">
+              <LagerumschlagDetailView 
+                monatlich={lagerumschlagMonatlich}
+                heatmap={lagerbestandHeatmap}
+                warehouseTage={warehouse.tage}
+              />
+            </TabsContent>
+            
+            {/* Sub-Tab 5: PLANUNGSGENAUIGKEIT */}
+            <TabsContent value="planungsgenauigkeit" className="space-y-6">
+              <PlanungsgenauigkeitDetailView 
+                monatlich={planungsgenauigkeitMonatlich}
+              />
+            </TabsContent>
+            
+            {/* Sub-Tab 6: MATERIALVERFÜGBARKEIT */}
+            <TabsContent value="materialverfuegbarkeit" className="space-y-6">
+              <MaterialverfuegbarkeitDetailView 
+                monatlich={materialverfuegbarkeit}
+                taeglich={materialverfuegbarheitTaeglich}
+              />
+            </TabsContent>
+            
+            {/* Sub-Tab 7: LAGERREICHWEITE */}
+            <TabsContent value="lagerreichweite" className="space-y-6">
+              <LagerreichweiteDetailView 
+                monatlich={lagerreichweiteMonatlich}
+                heatmap={lagerreichweiteHeatmap}
+              />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>
@@ -203,1024 +649,1251 @@ export default function ReportingPage() {
 }
 
 /**
- * SCOR Metriken Ansicht
- * Zeigt alle Performance-Kennzahlen nach SCOR-Modell
- * 
- * DYNAMISCH: Alle Werte werden aus dem zentralen Metrics Rechner bezogen!
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SUB-KOMPONENTE 1: KPIs ÜBERSICHT (kompakt)
+ * ═══════════════════════════════════════════════════════════════════════════════
  */
-function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaseline: boolean }) {
+function KPIsOverview({ kpiSummary }: { kpiSummary: any }) {
   return (
-    <>
-      {/* SCOR Übersicht - COLLAPSIBLE */}
-      <CollapsibleInfo
-        title={`SCOR-Framework ${istBaseline ? '(Baseline)' : '(Mit Szenarien)'}`}
-        variant={istBaseline ? "info" : "success"}
-        icon={<BarChart3 className="h-5 w-5" />}
-        defaultOpen={false}
-      >
-        <p className={`text-sm ${istBaseline ? "text-blue-800" : "text-green-800"}`}>
-          {istBaseline 
-            ? 'Baseline-Werte ohne aktive Szenarien. Aktivieren Sie Szenarien um die Auswirkungen auf die Supply Chain zu sehen.'
-            : 'Alle Werte werden in Echtzeit basierend auf den aktiven Szenarien berechnet.'}
-        </p>
-        <p className={`text-sm ${istBaseline ? "text-blue-800" : "text-green-800"} mt-2`}>
-          Fokus auf <strong>Reliability, Responsiveness, Agility und Assets</strong>
-        </p>
-      </CollapsibleInfo>
-
-      {/* RELIABILITY (Zuverlässigkeit) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>1. RELIABILITY (Zuverlässigkeit)</CardTitle>
-          <CardDescription>
-            Wie zuverlässig werden Pläne erfüllt?
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <MetricCardWithDetails
-              label="Planerfüllungsgrad"
-              value={formatPercent(metriken.planerfuellungsgrad, 2)}
-              description="% der geplanten Produktion erreicht"
-              status={getStatus(metriken.planerfuellungsgrad, 95, 85)}
-              zielwert="≥ 95,0 %"
-              formel="(Vollständig produzierte Aufträge / Gesamt Aufträge) × 100%"
-              herleitung="Misst, wie viele Produktionsaufträge die geplante Menge vollständig erreicht haben. Ein hoher Wert zeigt zuverlässige Planung und Ausführung."
-              beispiel="Wenn 355 von 365 Tagesaufträgen vollständig erfüllt wurden: (355 / 365) × 100% = 97,3%"
-            />
-            <MetricCardWithDetails
-              label="Liefertreue China"
-              value={formatPercent(metriken.liefertreueChina, 1)}
-              description="% pünktliche Lieferungen vom Lieferanten"
-              status={getStatus(metriken.liefertreueChina, 95, 85)}
-              zielwert="≥ 95,0 %"
-              formel="(Pünktliche Bestellungen / Gesamt Bestellungen) × 100%"
-              herleitung="Gibt an, wie viele Bestellungen vom China-Lieferanten termingerecht ankommen. Wichtig für Just-in-Time Produktion."
-              beispiel="Bei 48 von 50 pünktlichen Lieferungen: (48 / 50) × 100% = 96,0%"
-            />
-            <MetricCardWithDetails
-              label="Lieferperformance"
-              value={formatPercent(metriken.deliveryPerformance, 1)}
-              description="% Lieferungen innerhalb der Vorlaufzeit (49 Tage)"
-              status={getStatus(metriken.deliveryPerformance, 90, 80)}
-              zielwert="≥ 90,0 %"
-              formel="Liefertreue × (1 - (Ist-Durchlaufzeit - Soll-Durchlaufzeit) / 100)"
-              herleitung="Bewertet die Lieferqualität unter Berücksichtigung von Durchlaufzeit-Abweichungen. Kombiniert Pünktlichkeit mit Durchlaufzeit-Performance."
-              beispiel="Bei 95% Liefertreue und +4 Tage Verzögerung: 95 × (1 - 4/100) = 91,2%"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* RESPONSIVENESS (Reaktionsfähigkeit) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>2. RESPONSIVENESS (Reaktionsfähigkeit)</CardTitle>
-          <CardDescription>
-            Wie schnell reagiert die Supply Chain?
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <MetricCardWithDetails
-              label="Durchlaufzeit Produktion"
-              value={`${metriken.durchlaufzeitProduktion} Tage`}
-              description="Bestellung China → Fertige Produktion"
-              status="neutral"
-              zielwert="≤ 60 Tage"
-              formel="Ø (Ankunftsdatum Komponenten - Bestelldatum)"
-              herleitung="Durchschnittliche Zeit von der Bestellung in China bis zur Ankunft im Werk. Beinhaltet Produktion (5 AT) und Transport (2 AT + 30 KT + 2 AT)."
-              beispiel="Bei 49 Tage Vorlaufzeit: Bestellung 01.01. → Ankunft ~19.02. (49 Tage später)"
-            />
-            <MetricCardWithDetails
-              label="Lagerumschlag"
-              value={`${formatNumber(metriken.lagerumschlag, 1)}x pro Jahr`}
-              description="Wie oft wird Lager umgeschlagen"
-              status={getStatus(metriken.lagerumschlag, 4, 2)}
-              zielwert="≥ 4,0x pro Jahr"
-              formel="Jahresproduktion (Bikes) / Durchschnittlicher Lagerbestand (Komponenten)"
-              herleitung="Zeigt, wie oft der Lagerbestand pro Jahr umgeschlagen wird. Hoher Wert = effiziente Lagerhaltung, wenig gebundenes Kapital."
-              beispiel="Bei 370.000 Bikes und Ø 92.500 Sätteln im Lager: 370.000 / 92.500 = 4,0x pro Jahr"
-            />
-            <MetricCardWithDetails
-              label="Planungsgenauigkeit"
-              value={formatPercent(metriken.forecastAccuracy, 1)}
-              description="Genauigkeit zwischen Plan und Ist"
-              status={getStatus(metriken.forecastAccuracy, 95, 90)}
-              zielwert="≥ 95,0 %"
-              formel="100% - (Σ |Abweichung Plan-Ist| / Σ Plan) × 100%"
-              herleitung="Misst die Genauigkeit der Produktionsplanung über alle Monate. Je höher, desto besser stimmen Plan und Ist überein."
-              beispiel="Bei 5.000 Bikes Gesamtabweichung und 370.000 Plan: 100 - (5.000 / 370.000) × 100 = 98,6%"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* AGILITY (Flexibilität) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>3. AGILITY (Flexibilität)</CardTitle>
-          <CardDescription>
-            Wie flexibel kann die Supply Chain reagieren?
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <MetricCardWithDetails
-              label="Produktionsflexibilität"
-              value={formatPercent(metriken.produktionsflexibilitaet, 2)}
-              description="% Aufträge vollständig produziert"
-              status={getStatus(metriken.produktionsflexibilitaet, 95, 85)}
-              zielwert="≥ 95,0 %"
-              formel="(Tage mit vollständiger Produktion / Gesamt Produktionstage) × 100%"
-              herleitung="Misst die Fähigkeit, geplante Mengen auch bei Störungen zu produzieren. Identisch mit Planerfüllungsgrad für Produktionsperspektive."
-              beispiel="Bei 340 von 365 Tagen ohne Materialmangel: (340 / 365) × 100% = 93,2%"
-            />
-            <MetricCardWithDetails
-              label="Materialverfügbarkeit"
-              value={formatPercent(metriken.materialverfuegbarkeit, 1)}
-              description="% der Zeit genug Material vorhanden"
-              status={getStatus(metriken.materialverfuegbarkeit, 95, 85)}
-              zielwert="≥ 95,0 %"
-              formel="(Produktionstage ohne Materialmangel / Gesamt Produktionstage) × 100%"
-              herleitung="Prozentsatz der Tage, an denen alle benötigten Komponenten verfügbar waren. Schlüssel-KPI für Beschaffungsplanung."
-              beispiel="Wenn an 350 von 365 Tagen Material verfügbar war: (350 / 365) × 100% = 95,9%"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ASSETS (Anlagenverwaltung) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>4. ASSETS (Anlagenverwaltung)</CardTitle>
-          <CardDescription>
-            Lagerreichweite (keine Kosten)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <MetricCardWithDetails
-              label="Lagerreichweite"
-              value={`${formatNumber(metriken.lagerreichweite, 1)} Tage`}
-              description="Wie lange reicht der aktuelle Lagerbestand"
-              status={getStatusRange(metriken.lagerreichweite, 7, 14, 20)}
-              zielwert="7-14 Tage"
-              formel="Durchschnittlicher Lagerbestand / Täglicher Verbrauch"
-              herleitung="Anzahl Tage, die der aktuelle Lagerbestand reicht. Optimal: 7-14 Tage für Balance zwischen Sicherheit und Kapitalbindung."
-              beispiel="Bei 14.200 Sätteln im Lager und 1.000 Verbrauch/Tag: 14.200 / 1.000 = 14,2 Tage"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Produktions-KPIs */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Produktions-KPIs</CardTitle>
-          <CardDescription>
-            Zusätzliche Kennzahlen zur Produktion
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="bg-slate-50 rounded-lg p-4">
-              <div className="text-sm text-muted-foreground">Gesamtproduktion</div>
-              <div className="text-2xl font-bold mt-1">
-                {formatNumber(metriken.gesamtproduktion, 0)}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">MTBs</div>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* KPI Card: Planerfüllungsgrad */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Planerfüllungsgrad
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" style={{ color: getStatusColor(kpiSummary.planerfuellung) }}>
+              {formatPercent(kpiSummary.planerfuellung)}
             </div>
-
-            <div className="bg-slate-50 rounded-lg p-4">
-              <div className="text-sm text-muted-foreground">Produktionstage</div>
-              <div className="text-2xl font-bold mt-1">
-                {metriken.produktionstage}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">von 365 Tagen</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Durchschnitt über 12 Monate
+            </p>
+          </CardContent>
+        </Card>
+        
+        {/* KPI Card: Liefertreue China */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Liefertreue China
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" style={{ color: getStatusColor(kpiSummary.liefertreue) }}>
+              {formatPercent(kpiSummary.liefertreue)}
             </div>
-
-            <div className="bg-slate-50 rounded-lg p-4">
-              <div className="text-sm text-muted-foreground">Durchschnitt pro Tag</div>
-              <div className="text-2xl font-bold mt-1">
-                {formatNumber(metriken.durchschnittProTag, 0)}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">Bikes/Tag</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {kpiSummary.puenktlicheLieferungen} / {kpiSummary.gesamtLieferungen} pünktlich
+            </p>
+          </CardContent>
+        </Card>
+        
+        {/* KPI Card: Materialverfügbarkeit */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Materialverfügbarkeit
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" style={{ color: getStatusColor(kpiSummary.materialverfuegbarkeit) }}>
+              {formatPercent(kpiSummary.materialverfuegbarkeit)}
             </div>
-
-            <div className="bg-slate-50 rounded-lg p-4">
-              <div className="text-sm text-muted-foreground">Auslastung</div>
-              <div className="text-2xl font-bold mt-1">
-                {formatPercent(metriken.auslastung, 2)}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">Kapazität genutzt</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              ATP-Checks erfüllt
+            </p>
+          </CardContent>
+        </Card>
+        
+        {/* KPI Card: Planungsgenauigkeit */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Planungsgenauigkeit
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" style={{ color: getStatusColor(kpiSummary.planungsgenauigkeit) }}>
+              {formatPercent(kpiSummary.planungsgenauigkeit)}
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    </>
-  )
-}
-
-function MetricRow({
-  label,
-  value,
-  description,
-  status
-}: {
-  label: string
-  value: string
-  description: string
-  status: 'good' | 'medium' | 'bad' | 'neutral'
-}) {
-  const statusConfig = {
-    good: { icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
-    medium: { icon: Minus, color: 'text-orange-600', bg: 'bg-orange-50' },
-    bad: { icon: TrendingDown, color: 'text-red-600', bg: 'bg-red-50' },
-    neutral: { icon: Minus, color: 'text-slate-600', bg: 'bg-slate-50' }
-  }
-
-  const config = statusConfig[status]
-  const Icon = config.icon
-
-  return (
-    <div className={`flex items-center justify-between p-3 rounded-lg ${config.bg}`}>
-      <div className="flex-1">
-        <div className="font-medium">{label}</div>
-        <div className="text-xs text-muted-foreground">{description}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Plan vs. Ist Übereinstimmung
+            </p>
+          </CardContent>
+        </Card>
       </div>
-      <div className="flex items-center space-x-3">
-        <div className="text-xl font-bold">{value}</div>
-        <Icon className={`h-5 w-5 ${config.color}`} />
-      </div>
+      
+      {/* Produktions-Übersicht */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Jahresproduktion 2027</CardTitle>
+          <CardDescription>Soll vs. Ist Vergleich</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-8">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Plan</p>
+              <p className="text-2xl font-bold text-green-600">{formatNumber(kpiSummary.gesamtPlan)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Ist</p>
+              <p className="text-2xl font-bold text-blue-600">{formatNumber(kpiSummary.gesamtIst)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Abweichung</p>
+              <p className={`text-2xl font-bold ${kpiSummary.abweichung >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {kpiSummary.abweichung >= 0 ? '+' : ''}{formatNumber(kpiSummary.abweichung)}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
 
 /**
- * Erweiterte Metrik-Karte mit ausklappbaren Details
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SUB-KOMPONENTE 2: PLANERFÜLLUNGSGRAD DETAILANSICHT
+ * ═══════════════════════════════════════════════════════════════════════════════
  */
-function MetricCardWithDetails({
-  label,
-  value,
-  description,
-  status,
-  zielwert,
-  formel,
-  herleitung,
-  beispiel
-}: {
-  label: string
-  value: string
-  description: string
-  status: 'good' | 'medium' | 'bad' | 'neutral'
-  zielwert: string
-  formel: string
-  herleitung: string
-  beispiel: string
+function PlanerfuellungDetailView({ 
+  monatlich, 
+  woechentlich 
+}: { 
+  monatlich: any[]
+  woechentlich: any[]
 }) {
-  const statusConfig = {
-    good: { icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50', badgeColor: 'bg-green-100 text-green-800' },
-    medium: { icon: Minus, color: 'text-orange-600', bg: 'bg-orange-50', badgeColor: 'bg-orange-100 text-orange-800' },
-    bad: { icon: TrendingDown, color: 'text-red-600', bg: 'bg-red-50', badgeColor: 'bg-red-100 text-red-800' },
-    neutral: { icon: Minus, color: 'text-slate-600', bg: 'bg-slate-50', badgeColor: 'bg-slate-100 text-slate-800' }
-  }
-
-  const config = statusConfig[status]
-  const Icon = config.icon
-
   return (
-    <CollapsibleInfo
-      title={
-        <div className="flex items-center justify-between w-full">
-          <div className="flex-1">
-            <div className="font-medium text-base">{label}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">{description}</div>
-          </div>
-          <div className="flex items-center space-x-3 ml-4">
-            <div className="text-right">
-              <div className="text-xl font-bold">{value}</div>
-              <div className="text-xs text-muted-foreground">Ziel: {zielwert}</div>
+    <div className="space-y-6">
+      {/* Chart 1: Monatlicher Planerfüllungsgrad (Line Chart) */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Monatlicher Planerfüllungsgrad</CardTitle>
+              <CardDescription>Entwicklung der Planerfüllung über 12 Monate</CardDescription>
             </div>
-            <Icon className={`h-5 w-5 ${config.color} flex-shrink-0`} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCSV(monatlich, 'planerfuellung_monatlich')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
           </div>
-        </div>
-      }
-      variant={status === 'good' ? 'success' : status === 'bad' ? 'destructive' : 'default'}
-      defaultOpen={false}
-      className={config.bg}
-    >
-      <div className="space-y-3 pt-2">
-        <div>
-          <div className="text-xs font-semibold text-muted-foreground mb-1">FORMEL:</div>
-          <code className="text-sm bg-slate-100 px-2 py-1 rounded block">{formel}</code>
-        </div>
-        <div>
-          <div className="text-xs font-semibold text-muted-foreground mb-1">HERLEITUNG:</div>
-          <p className="text-sm text-slate-700">{herleitung}</p>
-        </div>
-        <div>
-          <div className="text-xs font-semibold text-muted-foreground mb-1">BEISPIEL:</div>
-          <p className="text-sm text-slate-700 italic">{beispiel}</p>
-        </div>
-      </div>
-    </CollapsibleInfo>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={monatlich}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monatKurz" />
+              <YAxis 
+                yAxisId="left"
+                label={{ value: 'Planerfüllungsgrad %', angle: -90, position: 'insideLeft' }}
+                domain={[0, 100]}
+              />
+              <YAxis 
+                yAxisId="right"
+                orientation="right"
+                label={{ value: 'Menge (Bikes)', angle: 90, position: 'insideRight' }}
+              />
+              <Tooltip content={<CustomTooltipPlanerfuellung />} />
+              <Legend />
+              <ReferenceLine yAxisId="left" y={95} stroke={COLORS.warning} strokeDasharray="3 3" label="Ziel 95%" />
+              <ReferenceLine yAxisId="left" y={100} stroke={COLORS.success} strokeDasharray="3 3" label="Ideal 100%" />
+              <Line 
+                yAxisId="left"
+                type="monotone" 
+                dataKey="planerfuellungsgrad" 
+                stroke={COLORS.primary} 
+                strokeWidth={3}
+                name="Planerfüllungsgrad %"
+                dot={{ r: 6 }}
+              />
+              <Line 
+                yAxisId="right"
+                type="monotone" 
+                dataKey="istMenge" 
+                stroke={COLORS.secondary} 
+                strokeWidth={2}
+                name="Ist-Produktion"
+                dot={{ r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 2: Wöchentliche Erfüllung (Bar Chart mit Scrollbar) */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Wöchentliche Planerfüllung</CardTitle>
+              <CardDescription>Detaillierte Erfüllung pro Kalenderwoche (52 Wochen)</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCSV(woechentlich, 'planerfuellung_woechentlich')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={woechentlich}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="kalenderwoche" label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5 }} />
+              <YAxis label={{ value: 'Planerfüllungsgrad %', angle: -90, position: 'insideLeft' }} domain={[0, 100]} />
+              <Tooltip content={<CustomTooltipPlanerfuellung />} />
+              <Legend />
+              <ReferenceLine y={95} stroke={COLORS.warning} strokeDasharray="3 3" label="Ziel 95%" />
+              <Bar dataKey="planerfuellungsgrad" name="Planerfüllungsgrad %">
+                {woechentlich.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={getStatusColor(entry.planerfuellungsgrad)} />
+                ))}
+              </Bar>
+              <Brush dataKey="kalenderwoche" height={30} stroke={COLORS.primary} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 3: Stacked Bar - Erfüllt vs. Nicht erfüllt */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Monatliche Erfüllung - Tage erfüllt vs. nicht erfüllt</CardTitle>
+          <CardDescription>Anzahl Arbeitstage mit vollständiger Planerfüllung</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={monatlich}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monatKurz" />
+              <YAxis label={{ value: 'Anzahl Tage', angle: -90, position: 'insideLeft' }} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="auftragErfuellt" stackId="a" fill={COLORS.success} name="Tage erfüllt" />
+              <Bar 
+                dataKey={(entry) => entry.auftragGesamt - entry.auftragErfuellt} 
+                stackId="a" 
+                fill={COLORS.danger} 
+                name="Tage nicht erfüllt" 
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
-function getStatus(value: number, goodThreshold: number, mediumThreshold: number): 'good' | 'medium' | 'bad' {
-  if (value >= goodThreshold) return 'good'
-  if (value >= mediumThreshold) return 'medium'
-  return 'bad'
-}
-
-function getStatusInverted(value: number, goodThreshold: number, mediumThreshold: number): 'good' | 'medium' | 'bad' {
-  if (value <= goodThreshold) return 'good'
-  if (value <= mediumThreshold) return 'medium'
-  return 'bad'
-}
-
-function getStatusRange(value: number, minGood: number, maxGood: number, maxMedium: number): 'good' | 'medium' | 'bad' {
-  if (value >= minGood && value <= maxGood) return 'good'
-  if (value <= maxMedium) return 'medium'
-  return 'bad'
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SUB-KOMPONENTE 3: LIEFERTREUE CHINA DETAILANSICHT
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+function LiefertreuDetailView({ 
+  timeline, 
+  monatlich 
+}: { 
+  timeline: any[]
+  monatlich: any[]
+}) {
+  // Prepare Scatter Data: Sample every 5th delivery for performance
+  const scatterData = timeline.filter((_, idx) => idx % 5 === 0).map(l => ({
+    bestelldatum: l.bestelldatum.getTime(),
+    bestelldatumStr: l.bestelldatumStr,
+    ankunft: l.erwarteteAnkunft.getTime(),
+    vorlaufzeit: l.vorlaufzeitTage,
+    puenktlich: l.puenktlich ? 1 : 0,
+    status: l.puenktlich ? 'Pünktlich' : 'Verspätet',
+    ...l
+  }))
+  
+  return (
+    <div className="space-y-6">
+      {/* Chart 1: Timeline Scatter - Jede Lieferung */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Lieferungs-Timeline</CardTitle>
+              <CardDescription>
+                Jede Bestellung auf Zeitachse (Grün = pünktlich, Rot = verspätet) - Sample von {scatterData.length} Lieferungen
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCSV(timeline, 'lieferungen_timeline')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <ScatterChart>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="ankunft" 
+                type="number"
+                domain={['dataMin', 'dataMax']}
+                tickFormatter={(timestamp) => {
+                  const d = new Date(timestamp)
+                  return d.toLocaleDateString('de-DE', { month: 'short' })
+                }}
+                label={{ value: 'Ankunftsdatum', position: 'insideBottom', offset: -5 }}
+              />
+              <YAxis 
+                dataKey="vorlaufzeit" 
+                type="number"
+                label={{ value: 'Vorlaufzeit (Tage)', angle: -90, position: 'insideLeft' }}
+              />
+              <Tooltip content={<CustomTooltipLieferung />} />
+              <Legend />
+              <ReferenceLine y={49} stroke={COLORS.info} strokeDasharray="3 3" label="Standard: 49 Tage" />
+              <Scatter name="Pünktliche Lieferungen" data={scatterData.filter(d => d.puenktlich === 1)} fill={COLORS.success} />
+              <Scatter name="Verspätete Lieferungen" data={scatterData.filter(d => d.puenktlich === 0)} fill={COLORS.danger} />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 2: Monatliche Lieferungen - Stacked Bar */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Monatliche Lieferperformance</CardTitle>
+              <CardDescription>Pünktliche vs. verspätete Lieferungen pro Monat</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCSV(monatlich, 'lieferperformance_monatlich')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={monatlich}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monatKurz" />
+              <YAxis label={{ value: 'Anzahl Lieferungen', angle: -90, position: 'insideLeft' }} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="puenktlicheLieferungen" stackId="a" fill={COLORS.success} name="Pünktlich" />
+              <Bar dataKey="verspaeteteLieferungen" stackId="a" fill={COLORS.danger} name="Verspätet" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 3: Liefertreue-Entwicklung (Line Chart) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Liefertreue-Entwicklung über Zeit</CardTitle>
+          <CardDescription>Monatliche Liefertreue in Prozent</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={monatlich}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monatKurz" />
+              <YAxis domain={[0, 100]} label={{ value: 'Liefertreue %', angle: -90, position: 'insideLeft' }} />
+              <Tooltip />
+              <Legend />
+              <ReferenceLine y={95} stroke={COLORS.warning} strokeDasharray="3 3" label="Ziel 95%" />
+              <ReferenceLine y={100} stroke={COLORS.success} strokeDasharray="3 3" label="Perfekt 100%" />
+              <Line 
+                type="monotone" 
+                dataKey="liefertreue" 
+                stroke={COLORS.primary} 
+                strokeWidth={3}
+                name="Liefertreue %"
+                dot={{ r: 6 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 /**
- * Visualisierungen Ansicht
- * Interaktive Charts und Diagramme zur Datenanalyse
- * 
- * DYNAMISCH: Alle Daten werden aus dem zentralen Metrics Rechner bezogen
- * und reflektieren aktive Szenarien!
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SUB-KOMPONENTE 4: DURCHLAUFZEIT DETAILANSICHT
+ * ═══════════════════════════════════════════════════════════════════════════════
  */
-function VisualisierungenView({ 
-  timeRange, 
-  setTimeRange,
-  aktiveSzenarien
+function DurchlaufzeitDetailView({ 
+  breakdown, 
+  monatlich 
 }: { 
-  timeRange: string
-  setTimeRange: (range: any) => void 
-  aktiveSzenarien: any[]
+  breakdown: any[]
+  monatlich: any[]
 }) {
-  // DYNAMISCH: Monatliche Produktionsdaten aus dem zentralen Rechner
-  const dynamischeProduktionsDaten = useMemo(() => {
-    const daten = berechneProduktionsDatenFuerVisualisierung(aktiveSzenarien)
-    return daten.map(d => ({
-      monat: d.monat,
-      plan: d.plan,
-      ist: d.ist,
-      abweichung: d.abweichung
-    }))
-  }, [aktiveSzenarien])
-
-  // DYNAMISCH: Tägliche Produktionsdaten
-  const dynamischeTaeglicherDaten = useMemo(() => {
-    return berechneTaeglicherDaten(aktiveSzenarien)
-  }, [aktiveSzenarien])
-
-  // DYNAMISCH: Variantenverteilung
-  const dynamischeVariantenDaten = useMemo(() => {
-    const auswirkungen = berechneSzenarioAuswirkungen(aktiveSzenarien)
-    return berechneVariantenProduktion(auswirkungen.produktionsmenge).map(v => ({
-      name: v.name,
-      wert: v.wert,
-      prozent: v.prozent
-    }))
-  }, [aktiveSzenarien])
-
-  // DYNAMISCH: Lagerbestandsdaten
-  const dynamischeLagerDaten = useMemo(() => {
-    return berechneLagerDaten(aktiveSzenarien)
-  }, [aktiveSzenarien])
-
-  // DYNAMISCH: Wöchentliche Auslastungsdaten
-  const dynamischeWoechentlicheDaten = useMemo(() => {
-    return berechneWoechentlicheAuslastung(aktiveSzenarien)
-  }, [aktiveSzenarien])
-
-  // Basis-Referenzen für Kompatibilität
-  const basisProduktionsDaten = dynamischeProduktionsDaten
-  const basisTaeglicherDaten = dynamischeTaeglicherDaten
-  const variantenDaten = dynamischeVariantenDaten
-  const basisLagerDaten = dynamischeLagerDaten
-  const basisWoechentlicheDaten = dynamischeWoechentlicheDaten
+  // Prepare Waterfall Data (kumulative Werte)
+  const waterfallData = breakdown.slice(0, -1).map((item, idx) => {
+    const kumulative = breakdown.slice(0, idx + 1).reduce((sum, b) => sum + b.tage, 0)
+    return {
+      ...item,
+      kumulative
+    }
+  })
   
-  // Konstanten für Berechnungen
-  const KALENDERTAGE_PRO_JAHR = 365
-  const DURCHSCHNITT_TAGE_PRO_MONAT = 30.4
-  const TAGE_PRO_WOCHE = 7
-  const WOCHEN_PRO_JAHR = 52
-
-  // Tägliche Lagerdaten (basierend auf monatlichen Daten interpoliert)
-  const basisTaeglicherLagerDaten = useMemo(() => {
-    const monatsDaten = dynamischeLagerDaten
-    return Array.from({ length: KALENDERTAGE_PRO_JAHR }, (_, i) => {
-      const monatIndex = Math.floor(i / DURCHSCHNITT_TAGE_PRO_MONAT)
-      const monat = monatsDaten[Math.min(monatIndex, 11)]
-      // Tägliche Schwankung innerhalb des Monats
-      const schwankung = Math.sin(i * 0.1) * 100
-      return {
-        tag: i + 1,
-        saettel: Math.round(monat.saettel + schwankung)
-      }
-    })
-  }, [dynamischeLagerDaten])
-
-  // Tägliche Auslastung
-  const basisTaeglicherAuslastung = useMemo(() => {
-    const wochenDaten = dynamischeWoechentlicheDaten
-    return Array.from({ length: KALENDERTAGE_PRO_JAHR }, (_, i) => {
-      const wochenIndex = Math.floor(i / TAGE_PRO_WOCHE)
-      const woche = wochenDaten[Math.min(wochenIndex, WOCHEN_PRO_JAHR - 1)]
-      return {
-        tag: i + 1,
-        auslastung: woche.auslastung,
-        produktion: Math.round(woche.produktion / TAGE_PRO_WOCHE) // Tägliche Produktion
-      }
-    })
-  }, [dynamischeWoechentlicheDaten])
-
-  // Filter/Aggregiere Produktionsdaten basierend auf timeRange
-  const produktionsDaten = (() => {
-    if (timeRange === 'day') {
-      // Zeige ALLE 365 Tage für vollständige Transparenz
-      return basisTaeglicherDaten.map(t => ({
-        monat: `Tag ${t.tag}`,
-        plan: t.plan,
-        ist: t.ist,
-        abweichung: t.abweichung
-      }))
-    } else if (timeRange === 'week') {
-      // Zeige die letzten 8 Wochen basierend auf wöchentlichen Daten
-      return basisWoechentlicheDaten.slice(-8).map(w => ({
-        monat: `KW ${w.woche}`,
-        plan: Math.round(w.produktion * 1.05),
-        ist: Math.round(w.produktion),
-        abweichung: Math.round(w.produktion * -0.05)
-      }))
-    } else if (timeRange === 'quarter') {
-      // Aggregiere nach Quartalen
-      return [
-        {
-          monat: 'Q1',
-          plan: basisProduktionsDaten.slice(0, 3).reduce((sum, m) => sum + m.plan, 0),
-          ist: basisProduktionsDaten.slice(0, 3).reduce((sum, m) => sum + m.ist, 0),
-          abweichung: basisProduktionsDaten.slice(0, 3).reduce((sum, m) => sum + m.abweichung, 0)
-        },
-        {
-          monat: 'Q2',
-          plan: basisProduktionsDaten.slice(3, 6).reduce((sum, m) => sum + m.plan, 0),
-          ist: basisProduktionsDaten.slice(3, 6).reduce((sum, m) => sum + m.ist, 0),
-          abweichung: basisProduktionsDaten.slice(3, 6).reduce((sum, m) => sum + m.abweichung, 0)
-        },
-        {
-          monat: 'Q3',
-          plan: basisProduktionsDaten.slice(6, 9).reduce((sum, m) => sum + m.plan, 0),
-          ist: basisProduktionsDaten.slice(6, 9).reduce((sum, m) => sum + m.ist, 0),
-          abweichung: basisProduktionsDaten.slice(6, 9).reduce((sum, m) => sum + m.abweichung, 0)
-        },
-        {
-          monat: 'Q4',
-          plan: basisProduktionsDaten.slice(9, 12).reduce((sum, m) => sum + m.plan, 0),
-          ist: basisProduktionsDaten.slice(9, 12).reduce((sum, m) => sum + m.ist, 0),
-          abweichung: basisProduktionsDaten.slice(9, 12).reduce((sum, m) => sum + m.abweichung, 0)
-        }
-      ]
-    } else if (timeRange === 'year') {
-      // Zeige Jahressumme
-      return [{
-        monat: '2027',
-        plan: basisProduktionsDaten.reduce((sum, m) => sum + m.plan, 0),
-        ist: basisProduktionsDaten.reduce((sum, m) => sum + m.ist, 0),
-        abweichung: basisProduktionsDaten.reduce((sum, m) => sum + m.abweichung, 0)
-      }]
-    }
-    // Standard: Monat - zeige alle 12 Monate
-    return basisProduktionsDaten
-  })()
-
-  // Filter/Aggregiere Lagerdaten basierend auf timeRange
-  const lagerDaten = (() => {
-    if (timeRange === 'day') {
-      // Zeige ALLE 365 Tage für vollständige Transparenz
-      return basisTaeglicherLagerDaten.map(t => ({
-        monat: `Tag ${t.tag}`,
-        saettel: t.saettel
-      }))
-    } else if (timeRange === 'week') {
-      // Zeige die letzten 8 Wochen (berechnet aus Monatsdaten, deterministisch)
-      return basisLagerDaten.slice(-2).flatMap((monat, idx) => {
-        return Array.from({ length: 4 }, (_, w) => ({
-          monat: `KW ${44 + idx * 4 + w}`,
-          saettel: monat.saettel + Math.sin((idx * 4 + w) * 0.5) * 100
-        }))
-      })
-    } else if (timeRange === 'quarter') {
-      // Aggregiere nach Quartalen (Durchschnitt)
-      return [
-        {
-          monat: 'Q1',
-          saettel: basisLagerDaten.slice(0, 3).reduce((sum, m) => sum + m.saettel, 0) / 3
-        },
-        {
-          monat: 'Q2',
-          saettel: basisLagerDaten.slice(3, 6).reduce((sum, m) => sum + m.saettel, 0) / 3
-        },
-        {
-          monat: 'Q3',
-          saettel: basisLagerDaten.slice(6, 9).reduce((sum, m) => sum + m.saettel, 0) / 3
-        },
-        {
-          monat: 'Q4',
-          saettel: basisLagerDaten.slice(9, 12).reduce((sum, m) => sum + m.saettel, 0) / 3
-        }
-      ]
-    } else if (timeRange === 'year') {
-      // Zeige Jahresdurchschnitt
-      return [{
-        monat: '2027',
-        saettel: basisLagerDaten.reduce((sum, m) => sum + m.saettel, 0) / 12
-      }]
-    }
-    // Standard: Monat
-    return basisLagerDaten
-  })()
-
-  // Filter wöchentliche Daten basierend auf timeRange
-  const woechentlicheDaten = (() => {
-    if (timeRange === 'day') {
-      // Zeige ALLE 365 Tage für vollständige Transparenz
-      return basisTaeglicherAuslastung.map(t => ({
-        woche: `Tag ${t.tag}`,
-        auslastung: t.auslastung,
-        produktion: t.produktion
-      }))
-    } else if (timeRange === 'week') {
-      // Zeige die letzten 8 Wochen
-      return basisWoechentlicheDaten.slice(-8)
-    } else if (timeRange === 'quarter') {
-      // Zeige 4 Quartale (aggregiere je 13 Wochen)
-      return [1, 2, 3, 4].map(q => {
-        const startWeek = (q - 1) * 13
-        const quarterData = basisWoechentlicheDaten.slice(startWeek, startWeek + 13)
-        return {
-          woche: `Q${q}`,
-          auslastung: quarterData.reduce((sum, w) => sum + w.auslastung, 0) / quarterData.length,
-          produktion: quarterData.reduce((sum, w) => sum + w.produktion, 0)
-        }
-      })
-    } else if (timeRange === 'year') {
-      // Zeige Jahressumme
-      return [{
-        woche: '2027',
-        auslastung: basisWoechentlicheDaten.reduce((sum, w) => sum + w.auslastung, 0) / 52,
-        produktion: basisWoechentlicheDaten.reduce((sum, w) => sum + w.produktion, 0)
-      }]
-    }
-    // Standard: Monat - aggregiere zu 12 Monaten
-    return Array.from({ length: 12 }, (_, m) => {
-      const monthName = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][m]
-      const startWeek = Math.floor(m * 52 / 12)
-      const endWeek = Math.floor((m + 1) * 52 / 12)
-      const monthData = basisWoechentlicheDaten.slice(startWeek, endWeek)
-      return {
-        woche: monthName,
-        auslastung: monthData.reduce((sum, w) => sum + w.auslastung, 0) / monthData.length,
-        produktion: monthData.reduce((sum, w) => sum + w.produktion, 0)
-      }
-    })
-  })()
-
-  // Helper für Zeitbereichs-Beschriftungen
-  const getTimeRangeLabel = () => {
-    switch (timeRange) {
-      case 'day': return 'Täglich'
-      case 'week': return 'Wöchentlich'
-      case 'quarter': return 'Quartalsweise'
-      case 'year': return 'Jährlich'
-      default: return 'Monatlich'
-    }
-  }
-
-  const getXAxisLabel = () => {
-    switch (timeRange) {
-      case 'day': return 'Tag'
-      case 'week': return 'Kalenderwoche'
-      case 'quarter': return 'Quartal'
-      case 'year': return 'Jahr'
-      default: return 'Monat'
-    }
-  }
-
   return (
     <div className="space-y-6">
-      {/* Zeitbereichs-Auswahl */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Interaktive Visualisierungen</h3>
-        <div className="flex items-center gap-1 bg-white border rounded-lg p-1">
-          {(['day', 'week', 'month', 'quarter', 'year'] as const).map((range) => (
-            <button
-              key={range}
-              onClick={() => setTimeRange(range)}
-              className={`px-3 py-1.5 text-sm rounded ${
-                timeRange === range 
-                  ? 'bg-green-600 text-white' 
-                  : 'hover:bg-gray-100'
-              }`}
+      {/* Chart 1: Waterfall Chart - Breakdown der 49 Tage */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Durchlaufzeit-Breakdown</CardTitle>
+              <CardDescription>Detaillierte Aufschlüsselung der 49 Tage Vorlaufzeit</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCSV(breakdown, 'durchlaufzeit_breakdown')}
             >
-              {range === 'day' && 'Tag'}
-              {range === 'week' && 'Woche'}
-              {range === 'month' && 'Monat'}
-              {range === 'quarter' && 'Quartal'}
-              {range === 'year' && 'Jahr'}
-            </button>
-          ))}
-        </div>
-      </div>
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <ComposedChart data={waterfallData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="komponente" angle={-15} textAnchor="end" height={80} />
+              <YAxis label={{ value: 'Tage', angle: -90, position: 'insideLeft' }} />
+              <Tooltip content={<CustomTooltipDurchlaufzeit />} />
+              <Legend />
+              <Bar dataKey="tage" name="Teilschritte (Tage)" stackId="a">
+                {waterfallData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS.primary} />
+                ))}
+              </Bar>
+              <Line 
+                type="stepAfter" 
+                dataKey="kumulative" 
+                stroke={COLORS.danger} 
+                strokeWidth={3}
+                name="Kumulative Dauer"
+                dot={{ r: 6 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+          
+          {/* Breakdown-Tabelle */}
+          <div className="mt-6 border rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="px-4 py-2 text-left text-sm font-semibold">Komponente</th>
+                  <th className="px-4 py-2 text-right text-sm font-semibold">Tage</th>
+                  <th className="px-4 py-2 text-left text-sm font-semibold">Typ</th>
+                  <th className="px-4 py-2 text-left text-sm font-semibold">Beschreibung</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {breakdown.map((item, idx) => (
+                  <tr key={idx} className={idx === breakdown.length - 1 ? 'bg-muted/50 font-semibold' : ''}>
+                    <td className="px-4 py-2 text-sm">{item.komponente}</td>
+                    <td className="px-4 py-2 text-sm text-right">{item.tage}</td>
+                    <td className="px-4 py-2 text-sm">
+                      {item.typ === 'arbeitstage' ? 'Arbeitstage' : 'Kalendertage'}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-muted-foreground">{item.beschreibung}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 2: Monatliche Durchlaufzeit - Line Chart mit Min/Max */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Durchlaufzeit-Entwicklung</CardTitle>
+              <CardDescription>Min / Durchschnitt / Max Vorlaufzeit pro Monat</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCSV(monatlich, 'durchlaufzeit_monatlich')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <ComposedChart data={monatlich}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monatName" />
+              <YAxis label={{ value: 'Vorlaufzeit (Tage)', angle: -90, position: 'insideLeft' }} />
+              <Tooltip />
+              <Legend />
+              <ReferenceLine y={49} stroke={COLORS.info} strokeDasharray="3 3" label="Standard: 49 Tage" />
+              <Area 
+                dataKey="maxVorlaufzeit" 
+                fill={COLORS.neutral} 
+                fillOpacity={0.2}
+                stroke="none"
+                name="Max-Bereich"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="durchschnittVorlaufzeit" 
+                stroke={COLORS.primary} 
+                strokeWidth={3}
+                name="Durchschnitt"
+                dot={{ r: 6 }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="minVorlaufzeit" 
+                stroke={COLORS.secondary} 
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                name="Minimum"
+                dot={{ r: 4 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
-      {/* Charts Grid - Volle Breite für Tagesansicht, sonst 2-spaltig */}
-      <div className={timeRange === 'day' ? 'space-y-6' : 'grid grid-cols-2 gap-6'}>
-        {/* Produktionsverlauf */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Produktionsverlauf 2027</CardTitle>
-            <CardDescription>
-              Plan vs. Ist mit Abweichungen ({getTimeRangeLabel()})
-              {timeRange === 'day' && ' - Horizontal scrollbar für alle 365 Tage'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {timeRange === 'day' ? (
-              // Tagesansicht mit horizontaler Scrollfunktion
-              <div className="w-full overflow-x-auto">
-                <div style={{ width: `${produktionsDaten.length * 20}px`, minWidth: '100%' }}>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <ComposedChart data={produktionsDaten}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="monat" 
-                        stroke="#666"
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                        interval={Math.floor(produktionsDaten.length / 50)}
-                        label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -10, style: { fontWeight: 'bold' } }}
-                      />
-                      <YAxis 
-                        stroke="#666"
-                        label={{ value: 'Produktion (Bikes)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'white',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '6px'
-                        }}
-                        formatter={(value) => {
-                          if (value === undefined || value === null) return 'N/A'
-                          if (typeof value !== 'number') return String(value)
-                          return value.toLocaleString('de-DE') + ' Bikes'
-                        }}
-                      />
-                      <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                      <Bar dataKey="plan" fill={COLORS.secondary} name="Plan" opacity={0.8} />
-                      <Bar dataKey="ist" fill={COLORS.primary} name="Ist" />
-                      <Line
-                        type="monotone"
-                        dataKey="abweichung"
-                        stroke={COLORS.danger}
-                        strokeWidth={2}
-                        name="Abweichung"
-                        dot={false}
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            ) : (
-              // Normale Ansicht ohne Scrolling
-              <ResponsiveContainer width="100%" height={350}>
-                <ComposedChart data={produktionsDaten}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="monat" 
-                    stroke="#666"
-                    label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SUB-KOMPONENTE 5: LAGERUMSCHLAG DETAILANSICHT
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+function LagerumschlagDetailView({ 
+  monatlich, 
+  heatmap,
+  warehouseTage
+}: { 
+  monatlich: any[]
+  heatmap: any[]
+  warehouseTage: any[]
+}) {
+  // Prepare Composed Chart Data (Lagerbestand + Produktion)
+  const composedData = monatlich.map(m => ({
+    ...m,
+    lagerbestandArea: m.durchschnittLagerbestand // For Area Chart
+  }))
+  
+  // Calculate Heatmap Color Scale
+  const allBestaende = heatmap.flatMap(h => h.monatlicheBestaende.map((m: any) => m.durchschnittBestand))
+  const minBestand = Math.min(...allBestaende)
+  const maxBestand = Math.max(...allBestaende)
+  
+  return (
+    <div className="space-y-6">
+      {/* Chart 1: Composed Chart - Lagerbestand (Area) + Produktion (Line) */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Lagerbestand & Produktionsmenge</CardTitle>
+              <CardDescription>Durchschnittlicher Lagerbestand (Area) vs. Produktionsmenge (Linie)</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCSV(monatlich, 'lagerumschlag_monatlich')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <ComposedChart data={composedData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monatKurz" />
+              <YAxis 
+                yAxisId="left"
+                label={{ value: 'Lagerbestand (Stück)', angle: -90, position: 'insideLeft' }}
+              />
+              <YAxis 
+                yAxisId="right"
+                orientation="right"
+                label={{ value: 'Produktion (Bikes)', angle: 90, position: 'insideRight' }}
+              />
+              <Tooltip />
+              <Legend />
+              <Area 
+                yAxisId="left"
+                type="monotone" 
+                dataKey="lagerbestandArea" 
+                fill={COLORS.info} 
+                fillOpacity={0.3}
+                stroke={COLORS.info}
+                strokeWidth={2}
+                name="Ø Lagerbestand"
+              />
+              <Line 
+                yAxisId="right"
+                type="monotone" 
+                dataKey="produktionsMenge" 
+                stroke={COLORS.primary} 
+                strokeWidth={3}
+                name="Produktion"
+                dot={{ r: 6 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 2: Monatlicher Lagerumschlag (Bar Chart) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Monatlicher Lagerumschlag</CardTitle>
+          <CardDescription>Lagerumschlag = Produktion / Durchschnittlicher Lagerbestand</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={monatlich}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monatKurz" />
+              <YAxis label={{ value: 'Lagerumschlag', angle: -90, position: 'insideLeft' }} />
+              <Tooltip />
+              <Legend />
+              <ReferenceLine y={1} stroke={COLORS.warning} strokeDasharray="3 3" label="Ziel: > 1" />
+              <Bar dataKey="lagerumschlag" name="Lagerumschlag">
+                {monatlich.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={entry.lagerumschlag >= 1 ? COLORS.success : COLORS.danger} 
                   />
-                  <YAxis 
-                    stroke="#666"
-                    label={{ value: 'Produktion (Bikes)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px'
-                    }}
-                    formatter={(value) => {
-                      if (value === undefined || value === null) return 'N/A'
-                      if (typeof value !== 'number') return String(value)
-                      return value.toLocaleString('de-DE') + ' Bikes'
-                    }}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Bar dataKey="plan" fill={COLORS.secondary} name="Plan" opacity={0.8} />
-                  <Bar dataKey="ist" fill={COLORS.primary} name="Ist" />
-                  <Line
-                    type="monotone"
-                    dataKey="abweichung"
-                    stroke={COLORS.danger}
-                    strokeWidth={2}
-                    name="Abweichung"
-                    dot={{ fill: COLORS.danger }}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Variantenverteilung - unverändert (keine Zeitbereichs-Abhängigkeit) */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Produktvariantenverteilung</CardTitle>
-            <CardDescription>Jahresproduktion nach Varianten</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={timeRange === 'day' ? 400 : 350}>
-              <PieChart>
-                <Pie
-                  data={variantenDaten}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={(entry) => `${entry.name.replace('MTB ', '')}: ${entry.prozent}%`}
-                  outerRadius={timeRange === 'day' ? 130 : 100}
-                  fill="#8884d8"
-                  dataKey="wert"
-                >
-                  {variantenDaten.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={VARIANTEN_FARBEN[index]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 3: Heatmap - Lagerbestand nach Variante x Monat */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Lagerbestand Heatmap</CardTitle>
+              <CardDescription>Durchschnittlicher Lagerbestand pro Sattel-Variante und Monat</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToJSON(heatmap, 'lagerbestand_heatmap')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              JSON
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <div className="inline-block min-w-full">
+              <div className="flex flex-col gap-2">
+                {/* Header */}
+                <div className="flex gap-2">
+                  <div className="w-32 text-xs font-semibold px-2 py-1">Variante</div>
+                  {MONATSNAMEN_KURZ.map((m, idx) => (
+                    <div key={idx} className="w-16 text-xs font-semibold text-center px-2 py-1">
+                      {m}
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value) => {
-                    if (value === undefined || value === null) return 'N/A'
-                    if (typeof value !== 'number') return String(value)
-                    return value.toLocaleString('de-DE') + ' Bikes'
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Lagerbestandsentwicklung */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Lagerbestandsentwicklung 2027 - Sättel</CardTitle>
-            <CardDescription>
-              Bestandsverlauf der Sättel aus China ({getTimeRangeLabel()})
-              {timeRange === 'day' && ' - Horizontal scrollbar für alle 365 Tage'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {timeRange === 'day' ? (
-              // Tagesansicht mit horizontaler Scrollfunktion
-              <div className="w-full overflow-x-auto">
-                <div style={{ width: `${lagerDaten.length * 20}px`, minWidth: '100%' }}>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <LineChart data={lagerDaten}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="monat" 
-                        stroke="#666"
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                        interval={Math.floor(lagerDaten.length / 50)}
-                        label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -10, style: { fontWeight: 'bold' } }}
-                      />
-                      <YAxis 
-                        stroke="#666"
-                        label={{ value: 'Bestand (Stück)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
-                      />
-                      <Tooltip 
-                        formatter={(value) => {
-                          if (value === undefined || value === null) return 'N/A'
-                          if (typeof value !== 'number') return String(value)
-                          return Math.round(value).toLocaleString('de-DE') + ' Stück'
-                        }}
-                      />
-                      <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                      <Line
-                        type="monotone"
-                        dataKey="saettel"
-                        stroke={COLORS.primary}
-                        strokeWidth={2}
-                        dot={false}
-                        name="Sättel"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
                 </div>
-              </div>
-            ) : (
-              // Normale Ansicht ohne Scrolling
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={lagerDaten}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="monat" 
-                    stroke="#666"
-                    label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
-                  />
-                  <YAxis 
-                    stroke="#666"
-                    label={{ value: 'Bestand (Stück)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
-                  />
-                  <Tooltip 
-                    formatter={(value) => {
-                      if (value === undefined || value === null) return 'N/A'
-                      if (typeof value !== 'number') return String(value)
-                      return Math.round(value).toLocaleString('de-DE') + ' Stück'
-                    }}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Line
-                    type="monotone"
-                    dataKey="saettel"
-                    stroke={COLORS.primary}
-                    strokeWidth={3}
-                    dot={{ r: 4 }}
-                    name="Sättel"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Produktionsauslastung */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Produktionsauslastung 2027</CardTitle>
-            <CardDescription>
-              Auslastung in % ({getTimeRangeLabel()})
-              {timeRange === 'day' && ' - Horizontal scrollbar für alle 365 Tage'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {timeRange === 'day' ? (
-              // Tagesansicht mit horizontaler Scrollfunktion
-              <div className="w-full overflow-x-auto">
-                <div style={{ width: `${woechentlicheDaten.length * 20}px`, minWidth: '100%' }}>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <AreaChart data={woechentlicheDaten}>
-                      <defs>
-                        <linearGradient id="colorAuslastung" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0.1}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="woche" 
-                        stroke="#666"
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                        interval={Math.floor(woechentlicheDaten.length / 50)}
-                        label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -10, style: { fontWeight: 'bold' } }}
-                      />
-                      <YAxis 
-                        stroke="#666" 
-                        domain={[0, 100]}
-                        label={{ value: 'Auslastung (%)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
-                      />
-                      <Tooltip 
-                        formatter={(value) => {
-                          if (value === undefined || value === null) return 'N/A'
-                          if (typeof value !== 'number') return String(value)
-                          return value.toFixed(1) + '%'
+                
+                {/* Heatmap Rows */}
+                {heatmap.map((bauteil, bIdx) => (
+                  <div key={bIdx} className="flex gap-2 items-center">
+                    <div className="w-32 text-xs font-medium px-2 py-1 truncate" title={bauteil.bauteilName}>
+                      {bauteil.bauteilName.split(' ').slice(-2).join(' ')}
+                    </div>
+                    {bauteil.monatlicheBestaende.map((monat: any, mIdx: number) => (
+                      <div
+                        key={mIdx}
+                        className="w-16 h-12 rounded flex items-center justify-center text-xs font-semibold text-white shadow-sm"
+                        style={{
+                          backgroundColor: getHeatmapColor(monat.durchschnittBestand, minBestand, maxBestand)
                         }}
-                      />
-                      <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                      <Area
-                        type="monotone"
-                        dataKey="auslastung"
-                        stroke={COLORS.primary}
-                        fillOpacity={1}
-                        fill="url(#colorAuslastung)"
-                        name="Auslastung %"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
+                        title={`${MONATSNAMEN[monat.monat - 1]}: ${formatNumber(monat.durchschnittBestand)}`}
+                      >
+                        {formatNumber(monat.durchschnittBestand)}
+                      </div>
+                    ))}
+                  </div>
+                ))}
               </div>
-            ) : (
-              // Normale Ansicht ohne Scrolling
-              <ResponsiveContainer width="100%" height={350}>
-                <AreaChart data={woechentlicheDaten}>
-                  <defs>
-                    <linearGradient id="colorAuslastung" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="woche" 
-                    stroke="#666"
-                    label={{ value: getXAxisLabel(), position: 'insideBottom', offset: -5, style: { fontWeight: 'bold' } }}
-                  />
-                  <YAxis 
-                    stroke="#666" 
-                    domain={[0, 100]}
-                    label={{ value: 'Auslastung (%)', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
-                  />
-                  <Tooltip 
-                    formatter={(value) => {
-                      if (value === undefined || value === null) return 'N/A'
-                      if (typeof value !== 'number') return String(value)
-                      return value.toFixed(1) + '%'
-                    }}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Area
-                    type="monotone"
-                    dataKey="auslastung"
-                    stroke={COLORS.primary}
-                    fillOpacity={1}
-                    fill="url(#colorAuslastung)"
-                    name="Auslastung %"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Zusätzliche Visualisierungen */}
-      <div className="grid grid-cols-1 gap-6">
-        {/* Wöchentlicher Durchsatz - UNABHÄNGIG von Zeitfiltern */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Wöchentlicher Produktionsdurchsatz</CardTitle>
-            <CardDescription>Alle 52 KWs in 2027 (unabhängig von Zeitfiltern) - Horizontal scrollbar</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Horizontale Scrollfunktion für alle 52 Wochen */}
-            <div className="w-full overflow-x-auto">
-              <div style={{ width: `${52 * 40}px`, minWidth: '100%' }}>
-                <ResponsiveContainer width="100%" height={350}>
-                  <BarChart 
-                    data={Array.from({ length: 52 }, (_, i) => {
-                      const basisDurchsatz = 7000
-                      const schwankung = Math.sin(i * 0.7) * 400
-                      
-                      return {
-                        woche: `KW ${i + 1}`,
-                        durchsatz: Math.round(basisDurchsatz + schwankung)
-                      }
-                    })}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="woche"
-                      stroke="#666"
-                      angle={-45}
-                      textAnchor="end"
-                      height={80}
-                      label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -10, style: { fontWeight: 'bold' } }}
+              
+              {/* Legend */}
+              <div className="mt-4 flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground">Legende:</span>
+                <div className="flex items-center gap-1">
+                  {HEATMAP_COLORS.map((color, idx) => (
+                    <div
+                      key={idx}
+                      className="w-8 h-4 rounded"
+                      style={{ backgroundColor: color }}
                     />
-                    <YAxis 
-                      stroke="#666"
-                      label={{ value: 'Bikes pro Woche', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
-                    />
-                    <Tooltip 
-                      formatter={(value: any) => {
-                        if (typeof value === 'number') {
-                          return formatNumber(value, 0) + ' Bikes'
-                        }
-                        return String(value)
-                      }}
-                    />
-                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                    <Bar
-                      dataKey="durchsatz"
-                      fill={COLORS.primary}
-                      name="Wöchentliche Produktion"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                  ))}
+                </div>
+                <span className="text-muted-foreground ml-2">
+                  {formatNumber(minBestand)} - {formatNumber(maxBestand)} Stück
+                </span>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SUB-KOMPONENTE 6: PLANUNGSGENAUIGKEIT DETAILANSICHT
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+function PlanungsgenauigkeitDetailView({ 
+  monatlich 
+}: { 
+  monatlich: any[]
+}) {
+  // Box Plot Data Simulation (Min, Q1, Median, Q3, Max)
+  const boxPlotData = monatlich.map(m => {
+    const abweichungProzent = m.abweichungProzent
+    return {
+      monat: m.monatKurz,
+      min: Math.min(-5, abweichungProzent - 2),
+      q1: abweichungProzent - 1,
+      median: abweichungProzent,
+      q3: abweichungProzent + 1,
+      max: Math.max(5, abweichungProzent + 2)
+    }
+  })
+  
+  return (
+    <div className="space-y-6">
+      {/* Chart 1: Dual Axis - Plan vs. Ist (Bars) + Abweichung % (Line) */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Plan vs. Ist mit Abweichung</CardTitle>
+              <CardDescription>Monatliche Soll-Produktion vs. Ist-Produktion mit prozentualer Abweichung</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCSV(monatlich, 'planungsgenauigkeit_monatlich')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <ComposedChart data={monatlich}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monatKurz" />
+              <YAxis 
+                yAxisId="left"
+                label={{ value: 'Menge (Bikes)', angle: -90, position: 'insideLeft' }}
+              />
+              <YAxis 
+                yAxisId="right"
+                orientation="right"
+                label={{ value: 'Abweichung %', angle: 90, position: 'insideRight' }}
+              />
+              <Tooltip />
+              <Legend />
+              <ReferenceLine yAxisId="right" y={0} stroke={COLORS.neutral} strokeDasharray="3 3" />
+              <Bar yAxisId="left" dataKey="planMenge" fill={COLORS.primary} name="Plan" />
+              <Bar yAxisId="left" dataKey="istMenge" fill={COLORS.secondary} name="Ist" />
+              <Line 
+                yAxisId="right"
+                type="monotone" 
+                dataKey="abweichungProzent" 
+                stroke={COLORS.danger} 
+                strokeWidth={3}
+                name="Abweichung %"
+                dot={{ r: 6 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 2: Genauigkeit über Zeit (Line Chart) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Planungsgenauigkeit-Entwicklung</CardTitle>
+          <CardDescription>Genauigkeit = 100% - |Abweichung%|</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={monatlich}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monatKurz" />
+              <YAxis domain={[0, 100]} label={{ value: 'Genauigkeit %', angle: -90, position: 'insideLeft' }} />
+              <Tooltip />
+              <Legend />
+              <ReferenceLine y={95} stroke={COLORS.warning} strokeDasharray="3 3" label="Ziel 95%" />
+              <ReferenceLine y={99} stroke={COLORS.success} strokeDasharray="3 3" label="Sehr gut 99%" />
+              <Line 
+                type="monotone" 
+                dataKey="genauigkeit" 
+                stroke={COLORS.primary} 
+                strokeWidth={3}
+                name="Genauigkeit %"
+                dot={{ r: 6 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 3: Abweichungs-Tabelle */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Detaillierte Abweichungs-Analyse</CardTitle>
+          <CardDescription>Monatliche Aufschlüsselung von Plan, Ist und Abweichung</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="px-4 py-2 text-left text-sm font-semibold">Monat</th>
+                  <th className="px-4 py-2 text-right text-sm font-semibold">Plan</th>
+                  <th className="px-4 py-2 text-right text-sm font-semibold">Ist</th>
+                  <th className="px-4 py-2 text-right text-sm font-semibold">Abweichung</th>
+                  <th className="px-4 py-2 text-right text-sm font-semibold">Abweichung %</th>
+                  <th className="px-4 py-2 text-right text-sm font-semibold">Genauigkeit</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {monatlich.map((m, idx) => (
+                  <tr key={idx}>
+                    <td className="px-4 py-2 text-sm font-medium">{m.monatName}</td>
+                    <td className="px-4 py-2 text-sm text-right">{formatNumber(m.planMenge)}</td>
+                    <td className="px-4 py-2 text-sm text-right">{formatNumber(m.istMenge)}</td>
+                    <td className={`px-4 py-2 text-sm text-right font-semibold ${m.abweichung >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {m.abweichung >= 0 ? '+' : ''}{formatNumber(m.abweichung)}
+                    </td>
+                    <td className={`px-4 py-2 text-sm text-right font-semibold ${m.abweichungProzent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {m.abweichungProzent >= 0 ? '+' : ''}{formatPercent(m.abweichungProzent)}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-right" style={{ color: getStatusColor(m.genauigkeit) }}>
+                      {formatPercent(m.genauigkeit)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SUB-KOMPONENTE 7: MATERIALVERFÜGBARKEIT DETAILANSICHT
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+function MaterialverfuegbarkeitDetailView({ 
+  monatlich, 
+  taeglich 
+}: { 
+  monatlich: any[]
+  taeglich: any[]
+}) {
+  // Prepare Stacked Area Data (nur Arbeitstage)
+  const stackedAreaData = taeglich
+    .filter(t => t.istArbeitstag)
+    .map(t => ({
+      tag: t.tag,
+      datumStr: t.datumStr,
+      verfuegbar: t.materialVerfuegbar ? 1 : 0,
+      mangel: t.materialVerfuegbar ? 0 : 1,
+      monat: t.monat
+    }))
+  
+  return (
+    <div className="space-y-6">
+      {/* Chart 1: Stacked Area - Tägliche Verfügbarkeit */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Tägliche Materialverfügbarkeit</CardTitle>
+              <CardDescription>
+                Grün = Material verfügbar, Rot = Materialmangel (nur Arbeitstage, Sample von {Math.min(stackedAreaData.length, 100)} Tagen)
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCSV(taeglich, 'materialverfuegbarkeit_taeglich')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <AreaChart data={stackedAreaData.slice(0, 100)}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="tag" 
+                label={{ value: 'Tag im Jahr', position: 'insideBottom', offset: -5 }}
+              />
+              <YAxis 
+                label={{ value: 'Status', angle: -90, position: 'insideLeft' }}
+                domain={[0, 1]}
+                ticks={[0, 1]}
+                tickFormatter={(v) => v === 1 ? 'Verfügbar' : 'Mangel'}
+              />
+              <Tooltip 
+                labelFormatter={(label) => `Tag ${label}`}
+                formatter={(value, name) => [value === 1 ? 'Ja' : 'Nein', name]}
+              />
+              <Legend />
+              <Area 
+                type="stepAfter"
+                dataKey="verfuegbar" 
+                stackId="1"
+                stroke={COLORS.success} 
+                fill={COLORS.success} 
+                fillOpacity={0.8}
+                name="Material verfügbar"
+              />
+              <Area 
+                type="stepAfter"
+                dataKey="mangel" 
+                stackId="1"
+                stroke={COLORS.danger} 
+                fill={COLORS.danger} 
+                fillOpacity={0.8}
+                name="Materialmangel"
+              />
+              <Brush dataKey="tag" height={30} stroke={COLORS.primary} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 2: Monatliche Häufigkeit Engpässe (Bar Chart) */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Monatliche Materialengpässe</CardTitle>
+              <CardDescription>Anzahl Tage mit Materialmangel pro Monat</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCSV(monatlich, 'materialverfuegbarkeit_monatlich')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={monatlich}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monatKurz" />
+              <YAxis label={{ value: 'Anzahl Tage', angle: -90, position: 'insideLeft' }} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="tageMaterialmangel" fill={COLORS.danger} name="Tage mit Mangel" />
+              <Bar dataKey="tageMaterialVerfuegbar" fill={COLORS.success} name="Tage verfügbar" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 3: Verfügbarkeitsrate über Zeit (Line Chart) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Verfügbarkeitsrate-Entwicklung</CardTitle>
+          <CardDescription>Monatliche Verfügbarkeitsrate in Prozent</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={monatlich}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monatKurz" />
+              <YAxis domain={[0, 100]} label={{ value: 'Verfügbarkeitsrate %', angle: -90, position: 'insideLeft' }} />
+              <Tooltip />
+              <Legend />
+              <ReferenceLine y={95} stroke={COLORS.warning} strokeDasharray="3 3" label="Ziel 95%" />
+              <ReferenceLine y={100} stroke={COLORS.success} strokeDasharray="3 3" label="Perfekt 100%" />
+              <Line 
+                type="monotone" 
+                dataKey="verfuegbarkeitsrate" 
+                stroke={COLORS.primary} 
+                strokeWidth={3}
+                name="Verfügbarkeit %"
+                dot={{ r: 6 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SUB-KOMPONENTE 8: LAGERREICHWEITE DETAILANSICHT
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+function LagerreichweiteDetailView({ 
+  monatlich, 
+  heatmap 
+}: { 
+  monatlich: any[]
+  heatmap: any[]
+}) {
+  // Prepare Multi-Line Data (pro Sattel-Variante)
+  // Transformiere monatlich nach Varianten
+  const sattelVarianten = monatlich[0]?.bauteile.map((b: any) => b.bauteilId) || []
+  
+  const multiLineData = MONATSNAMEN_KURZ.map((monatKurz, idx) => {
+    const monat = monatlich[idx]
+    const dataPoint: any = { monat: monatKurz, monatIdx: idx + 1 }
+    
+    monat?.bauteile.forEach((b: any) => {
+      dataPoint[b.bauteilId] = b.durchschnittReichweite
+    })
+    
+    return dataPoint
+  })
+  
+  // Heatmap Color Scale
+  const allReichweiten = heatmap.flatMap(w => w.bauteile.map((b: any) => b.durchschnittReichweite))
+  const minReichweite = Math.min(...allReichweiten, 0)
+  const maxReichweite = Math.max(...allReichweiten, 30)
+  
+  return (
+    <div className="space-y-6">
+      {/* Chart 1: Multi-Line - Reichweite pro Sattel-Variante */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Lagerreichweite pro Sattel-Variante</CardTitle>
+              <CardDescription>Durchschnittliche Reichweite in Tagen (Zielbereich: 7-14 Tage)</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToJSON(monatlich, 'lagerreichweite_monatlich')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              JSON
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={multiLineData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monat" />
+              <YAxis label={{ value: 'Reichweite (Tage)', angle: -90, position: 'insideLeft' }} />
+              <Tooltip />
+              <Legend />
+              
+              {/* Zielbereich 7-14 Tage */}
+              <ReferenceArea y1={7} y2={14} fill={COLORS.success} fillOpacity={0.1} label="Optimal" />
+              <ReferenceLine y={7} stroke={COLORS.warning} strokeDasharray="3 3" label="Min 7 Tage" />
+              <ReferenceLine y={14} stroke={COLORS.warning} strokeDasharray="3 3" label="Max 14 Tage" />
+              
+              {/* Linien pro Sattel-Variante */}
+              {sattelVarianten.map((sattelId: string, idx: number) => (
+                <Line
+                  key={sattelId}
+                  type="monotone"
+                  dataKey={sattelId}
+                  stroke={Object.values(SATTEL_COLORS)[idx] || COLORS.neutral}
+                  strokeWidth={2}
+                  name={sattelId}
+                  dot={{ r: 4 }}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 2: Heatmap - Woche x Variante */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Lagerreichweite Heatmap (Wöchentlich)</CardTitle>
+              <CardDescription>Durchschnittliche Reichweite pro Kalenderwoche und Sattel-Variante</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToJSON(heatmap, 'lagerreichweite_heatmap')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              JSON
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <div className="inline-block min-w-full">
+              <div className="space-y-4">
+                {/* Für jede Sattel-Variante eine Zeile */}
+                {sattelVarianten.map((sattelId: string, sIdx: number) => (
+                  <div key={sattelId} className="space-y-1">
+                    <h4 className="text-xs font-semibold">{sattelId}</h4>
+                    <div className="flex gap-1 flex-wrap">
+                      {heatmap.slice(0, 52).map((woche, wIdx) => {
+                        const bauteil = woche.bauteile.find((b: any) => b.bauteilId === sattelId)
+                        const reichweite = bauteil?.durchschnittReichweite || 0
+                        
+                        return (
+                          <div
+                            key={wIdx}
+                            className="w-12 h-12 rounded flex items-center justify-center text-xs font-semibold text-white shadow-sm"
+                            style={{
+                              backgroundColor: getLagerreichweiteColor(reichweite)
+                            }}
+                            title={`KW${woche.kalenderwoche}: ${reichweite.toFixed(1)} Tage`}
+                          >
+                            {woche.kalenderwoche}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Legend */}
+              <div className="mt-6 p-4 bg-muted rounded-lg">
+                <h5 className="text-sm font-semibold mb-2">Legende Reichweite (Tage):</h5>
+                <div className="flex flex-wrap gap-4 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded" style={{ backgroundColor: COLORS.danger }} />
+                    <span>&lt; 3: Kritisch</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded" style={{ backgroundColor: COLORS.warning }} />
+                    <span>3-6: Niedrig</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded" style={{ backgroundColor: COLORS.success }} />
+                    <span>7-14: Optimal</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded" style={{ backgroundColor: COLORS.info }} />
+                    <span>15-21: Hoch</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded" style={{ backgroundColor: COLORS.neutral }} />
+                    <span>&gt; 21: Sehr hoch</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Chart 3: Reichweiten-Statistik Tabelle */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Monatliche Reichweiten-Statistik</CardTitle>
+          <CardDescription>Min / Durchschnitt / Max pro Monat und Variante</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <div className="space-y-6">
+              {monatlich.map((monat, mIdx) => (
+                <div key={mIdx}>
+                  <h4 className="text-sm font-semibold mb-2">{monat.monatName}</h4>
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Variante</th>
+                        <th className="px-3 py-2 text-right">Min</th>
+                        <th className="px-3 py-2 text-right">Ø</th>
+                        <th className="px-3 py-2 text-right">Max</th>
+                        <th className="px-3 py-2 text-left">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {monat.bauteile.map((b: any, bIdx: number) => (
+                        <tr key={bIdx}>
+                          <td className="px-3 py-2">{b.bauteilId}</td>
+                          <td className="px-3 py-2 text-right">{b.minReichweite.toFixed(1)}</td>
+                          <td className="px-3 py-2 text-right font-semibold">{b.durchschnittReichweite.toFixed(1)}</td>
+                          <td className="px-3 py-2 text-right">{b.maxReichweite.toFixed(1)}</td>
+                          <td className="px-3 py-2">
+                            <span 
+                              className="px-2 py-1 rounded text-white text-xs font-semibold"
+                              style={{ backgroundColor: getLagerreichweiteColor(b.durchschnittReichweite) }}
+                            >
+                              {b.durchschnittReichweite < 3 ? 'Kritisch' :
+                               b.durchschnittReichweite < 7 ? 'Niedrig' :
+                               b.durchschnittReichweite <= 14 ? 'Optimal' :
+                               b.durchschnittReichweite <= 21 ? 'Hoch' : 'Sehr hoch'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
