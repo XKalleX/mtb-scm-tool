@@ -803,6 +803,129 @@ export function SCORBarChart({ metriken, height = 250 }: SCORChartProps) {
 }
 
 /**
+ * Fertigerzeugnisse Chart (Finished Goods)
+ * Zeigt kumulative Bike-Produktion über Zeit
+ * 
+ * WICHTIG: Zeigt fertige Bikes, nicht Rohstoffe (Sättel)!
+ * Sollte am Jahresende exakt 370.000 erreichen.
+ */
+export interface FertigerzeugnisseChartProps {
+  daten: Array<{
+    tag: number
+    datum?: Date
+    kumulativIst: number  // Kumulative Ist-Produktion
+    kumulativPlan: number // Kumulative Plan-Produktion
+    monat?: number
+  }>
+  jahresproduktion: number
+  aggregation?: 'tag' | 'woche' | 'monat'
+  height?: number
+}
+
+export function FertigerzeugnisseChart({ 
+  daten, 
+  jahresproduktion,
+  aggregation = 'woche', 
+  height = 300 
+}: FertigerzeugnisseChartProps) {
+  const chartData = useMemo(() => {
+    if (aggregation === 'tag') {
+      // Zeige jeden 5. Tag für bessere Lesbarkeit
+      return daten
+        .filter((_, i) => i % 5 === 0)
+        .map(d => ({
+          label: `Tag ${d.tag}`,
+          kumulativIst: d.kumulativIst,
+          kumulativPlan: d.kumulativPlan
+        }))
+    } else if (aggregation === 'woche') {
+      // Nimm letzten Wert jeder Woche
+      const wochen: Record<number, { kumulativIst: number; kumulativPlan: number }> = {}
+      daten.forEach(d => {
+        const woche = Math.ceil(d.tag / 7)
+        wochen[woche] = { kumulativIst: d.kumulativIst, kumulativPlan: d.kumulativPlan }
+      })
+      return Object.entries(wochen).map(([woche, values]) => ({
+        label: `KW ${woche}`,
+        ...values
+      }))
+    } else {
+      // Nimm letzten Wert jedes Monats
+      const monatNamen = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+      const monate: Record<number, { kumulativIst: number; kumulativPlan: number; name: string }> = {}
+      daten.forEach(d => {
+        const monat = d.monat ?? Math.ceil(d.tag / 30)
+        monate[monat] = { 
+          kumulativIst: d.kumulativIst, 
+          kumulativPlan: d.kumulativPlan,
+          name: monatNamen[(monat - 1) % 12]
+        }
+      })
+      return Object.values(monate).map(values => ({
+        label: values.name,
+        kumulativIst: values.kumulativIst,
+        kumulativPlan: values.kumulativPlan
+      }))
+    }
+  }, [daten, aggregation])
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium">
+          🚴 Fertigerzeugnisse (Kumulativ) - Ziel: {jahresproduktion.toLocaleString('de-DE')} Bikes
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={height}>
+          <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+            <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={aggregation === 'woche' ? 3 : 0} />
+            <YAxis 
+              tick={{ fontSize: 11 }} 
+              tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+              domain={[0, jahresproduktion * 1.05]}
+            />
+            <Tooltip 
+              formatter={(value: number, name: string) => {
+                const labelMap: Record<string, string> = {
+                  kumulativIst: 'Produziert (Ist)',
+                  kumulativPlan: 'Geplant (Plan)'
+                }
+                return [value.toLocaleString('de-DE') + ' Bikes', labelMap[name] || name]
+              }}
+            />
+            <Legend />
+            <Area 
+              type="monotone" 
+              dataKey="kumulativPlan" 
+              fill={COLORS.secondary}
+              fillOpacity={0.2}
+              stroke={COLORS.secondary}
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              name="Plan"
+            />
+            <Area 
+              type="monotone" 
+              dataKey="kumulativIst" 
+              fill={COLORS.success}
+              fillOpacity={0.4}
+              stroke={COLORS.success}
+              strokeWidth={3}
+              name="Ist"
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+        <p className="text-xs text-center text-muted-foreground mt-2">
+          ✅ Zeigt kumulative Produktion fertiger Bikes. Ziel: {jahresproduktion.toLocaleString('de-DE')} am Jahresende.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
  * Feiertage Chart
  * Zeigt Verteilung der Feiertage über das Jahr
  */

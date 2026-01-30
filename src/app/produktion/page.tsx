@@ -36,7 +36,7 @@ import {
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport } from '@/lib/calculations/warehouse-management'
 import { berechneBedarfsBacklog } from '@/lib/calculations/bedarfs-backlog-rechnung'
-import { TagesproduktionChart, LagerbestandChart } from '@/components/ui/table-charts'
+import { TagesproduktionChart, LagerbestandChart, FertigerzeugnisseChart } from '@/components/ui/table-charts'
 
 /**
  * Produktion Hauptseite
@@ -301,6 +301,27 @@ export default function ProduktionPage() {
       status: 'ok' as const
     }))
   }, [tagesLagerbestaende])
+  
+  // ✅ NEU: Fertigerzeugnisse-Daten (kumulative Bike-Produktion)
+  // Zeigt wie viele Bikes bereits produziert wurden (kumulativ)
+  // Muss am Jahresende exakt 370.000 erreichen!
+  const fertigerzeugnisseDaten = useMemo(() => {
+    let kumulativIst = 0
+    let kumulativPlan = 0
+    
+    return tagesProduktionFormatiert.map(tag => {
+      kumulativPlan += tag.planMenge
+      kumulativIst += tag.istMenge
+      
+      return {
+        tag: tag.tag,
+        datum: tag.datum,
+        kumulativIst,
+        kumulativPlan,
+        monat: tag.monat
+      }
+    })
+  }, [tagesProduktionFormatiert])
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
@@ -873,6 +894,17 @@ export default function ProduktionPage() {
             <div className="mt-6">
               <LagerbestandChart
                 daten={lagerbestandChartDaten}
+                aggregation="woche"
+                height={300}
+              />
+            </div>
+            
+            {/* ✅ NEU: FERTIGERZEUGNISSE-CHART (Kumulative Bike-Produktion) */}
+            {/* Zeigt wie Bikes über das Jahr akkumulieren - Ziel: 370.000 am Jahresende */}
+            <div className="mt-6">
+              <FertigerzeugnisseChart
+                daten={fertigerzeugnisseDaten}
+                jahresproduktion={konfiguration.jahresproduktion}
                 aggregation="woche"
                 height={300}
               />
