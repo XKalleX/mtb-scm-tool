@@ -816,17 +816,22 @@ export interface FertigerzeugnisseChartProps {
     kumulativIst: number  // Kumulative Ist-Produktion
     kumulativPlan: number // Kumulative Plan-Produktion
     monat?: number
+    varianten?: Record<string, { plan: number; ist: number }>  // NEU: Pro Variante
   }>
   jahresproduktion: number
   aggregation?: 'tag' | 'woche' | 'monat'
   height?: number
+  varianten?: Array<{ id: string; name: string; anteilPrognose: number }>  // NEU: Varianten-Info
+  showPerVariante?: boolean  // NEU: Zeige pro Variante
 }
 
 export function FertigerzeugnisseChart({ 
   daten, 
   jahresproduktion,
   aggregation = 'woche', 
-  height = 300 
+  height = 300,
+  varianten,
+  showPerVariante = false
 }: FertigerzeugnisseChartProps) {
   const chartData = useMemo(() => {
     if (aggregation === 'tag') {
@@ -836,36 +841,70 @@ export function FertigerzeugnisseChart({
         .map(d => ({
           label: `Tag ${d.tag}`,
           kumulativIst: d.kumulativIst,
-          kumulativPlan: d.kumulativPlan
+          kumulativPlan: d.kumulativPlan,
+          ...(d.varianten || {})
         }))
     } else if (aggregation === 'woche') {
       // Nimm letzten Wert jeder Woche
-      const wochen: Record<number, { kumulativIst: number; kumulativPlan: number }> = {}
+      const wochen: Record<number, { 
+        kumulativIst: number; 
+        kumulativPlan: number;
+        varianten?: Record<string, { plan: number; ist: number }>
+      }> = {}
       daten.forEach(d => {
         const woche = Math.ceil(d.tag / 7)
-        wochen[woche] = { kumulativIst: d.kumulativIst, kumulativPlan: d.kumulativPlan }
+        wochen[woche] = { 
+          kumulativIst: d.kumulativIst, 
+          kumulativPlan: d.kumulativPlan,
+          varianten: d.varianten
+        }
       })
-      return Object.entries(wochen).map(([woche, values]) => ({
-        label: `KW ${woche}`,
-        ...values
-      }))
+      return Object.entries(wochen).map(([woche, values]) => {
+        const variantenFlat: Record<string, number> = {}
+        if (values.varianten) {
+          Object.entries(values.varianten).forEach(([id, v]) => {
+            variantenFlat[`${id}_ist`] = v.ist
+          })
+        }
+        return {
+          label: `KW ${woche}`,
+          kumulativIst: values.kumulativIst,
+          kumulativPlan: values.kumulativPlan,
+          ...variantenFlat
+        }
+      })
     } else {
       // Nimm letzten Wert jedes Monats
       const monatNamen = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
-      const monate: Record<number, { kumulativIst: number; kumulativPlan: number; name: string }> = {}
+      const monate: Record<number, { 
+        kumulativIst: number; 
+        kumulativPlan: number; 
+        name: string;
+        varianten?: Record<string, { plan: number; ist: number }>
+      }> = {}
       daten.forEach(d => {
         const monat = d.monat ?? Math.ceil(d.tag / 30)
         monate[monat] = { 
           kumulativIst: d.kumulativIst, 
           kumulativPlan: d.kumulativPlan,
-          name: monatNamen[(monat - 1) % 12]
+          name: monatNamen[(monat - 1) % 12],
+          varianten: d.varianten
         }
       })
-      return Object.values(monate).map(values => ({
-        label: values.name,
-        kumulativIst: values.kumulativIst,
-        kumulativPlan: values.kumulativPlan
-      }))
+      return Object.values(monate).map(values => {
+        const variantenFlat: Record<string, number> = {}
+        if (values.varianten) {
+          Object.entries(values.varianten).forEach(([id, v]) => {
+            variantenFlat[`${id}_ist`] = v.ist
+          })
+        }
+        return {
+          label: values.name,
+          kumulativIst: values.kumulativIst,
+          kumulativPlan: values.kumulativPlan,
+          ...variantenFlat
+        }
+      })
     }
   }, [daten, aggregation])
 
@@ -889,36 +928,60 @@ export function FertigerzeugnisseChart({
             <Tooltip 
               formatter={(value: number, name: string) => {
                 const labelMap: Record<string, string> = {
-                  kumulativIst: 'Produziert (Ist)',
-                  kumulativPlan: 'Geplant (Plan)'
+                  kumulativIst: 'Produziert (Gesamt)',
+                  kumulativPlan: 'Geplant (Gesamt)'
+                }
+                // Handle Varianten-Keys
+                if (name.endsWith('_ist') && varianten) {
+                  const varId = name.replace('_ist', '')
+                  const variante = varianten.find(v => v.id === varId)
+                  return [value.toLocaleString('de-DE') + ' Bikes', variante?.name || varId]
                 }
                 return [value.toLocaleString('de-DE') + ' Bikes', labelMap[name] || name]
               }}
             />
             <Legend />
+            {/* Gesamt Plan (gestrichelt) */}
             <Area 
               type="monotone" 
               dataKey="kumulativPlan" 
               fill={COLORS.secondary}
-              fillOpacity={0.2}
+              fillOpacity={0.1}
               stroke={COLORS.secondary}
               strokeWidth={2}
               strokeDasharray="5 5"
-              name="Plan"
+              name="Plan (Gesamt)"
             />
-            <Area 
-              type="monotone" 
-              dataKey="kumulativIst" 
-              fill={COLORS.success}
-              fillOpacity={0.4}
-              stroke={COLORS.success}
-              strokeWidth={3}
-              name="Ist"
-            />
+            {/* Varianten-Linien wenn aktiviert */}
+            {showPerVariante && varianten ? (
+              varianten.map((v, idx) => (
+                <Line
+                  key={v.id}
+                  type="monotone"
+                  dataKey={`${v.id}_ist`}
+                  stroke={VARIANTEN_FARBEN[idx % VARIANTEN_FARBEN.length]}
+                  strokeWidth={2}
+                  dot={false}
+                  name={v.name}
+                />
+              ))
+            ) : (
+              /* Gesamt Ist (wenn keine Varianten) */
+              <Area 
+                type="monotone" 
+                dataKey="kumulativIst" 
+                fill={COLORS.success}
+                fillOpacity={0.4}
+                stroke={COLORS.success}
+                strokeWidth={3}
+                name="Ist (Gesamt)"
+              />
+            )}
           </ComposedChart>
         </ResponsiveContainer>
         <p className="text-xs text-center text-muted-foreground mt-2">
           ✅ Zeigt kumulative Produktion fertiger Bikes. Ziel: {jahresproduktion.toLocaleString('de-DE')} am Jahresende.
+          {showPerVariante && varianten && ` (${varianten.length} Varianten)`}
         </p>
       </CardContent>
     </Card>

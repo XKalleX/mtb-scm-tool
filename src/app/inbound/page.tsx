@@ -676,108 +676,58 @@ export default function InboundPage() {
                   )}
                 </div>
 
-                {/* Excel-Tabelle mit ALLEN BEDARFSDATEN des Jahres */}
+                {/* Excel-Tabelle: Fokus auf Bestellungen nach China */}
                 <div className="mb-2 text-xs text-muted-foreground">
-                  ✅ Zeigt alle BEDARFSDATEN {konfiguration.planungsjahr} (wann Sättel benötigt werden) | 🟢 = Bestellung | 🟡 = Wochenende | 🔴 = Feiertag | Bestelldatum = 49 Tage vor Bedarfsdatum
+                  ✅ Zeigt Bestellungen bei China-Zulieferer | 🟢 = Bestellung ausgelöst | 🟡 = Wochenende | 🔴 = Feiertag | Bestelldatum = {gesamtVorlaufzeit} Tage vor Bedarfsdatum
                 </div>
                 <ExcelTable
                   columns={[
                     {
                       key: 'bedarfsdatumFormatiert',
                       label: 'Bedarfsdatum',
-                      width: '100px',
+                      width: '120px',
                       align: 'center',
                       sumable: false
                     },
                     {
                       key: 'bestelldatumFormatiert',
-                      label: 'Bestelldatum',
-                      width: '110px',
+                      label: 'Bestelldatum (China)',
+                      width: '130px',
                       align: 'center',
                       sumable: false
                     },
                     {
                       key: 'menge',
                       label: 'Bestellmenge',
-                      width: '120px',
+                      width: '130px',
                       align: 'right',
                       sumable: true,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-'
-                    },
-                    // ✅ NEU: Komponenten-Details anzeigen
-                    {
-                      key: 'SAT_FT_bestellt',
-                      label: 'SAT_FT bestellt',
-                      width: '110px',
-                      align: 'right',
-                      sumable: true,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) : '-'
-                    },
-                    {
-                      key: 'SAT_RL_bestellt',
-                      label: 'SAT_RL bestellt',
-                      width: '110px',
-                      align: 'right',
-                      sumable: true,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) : '-'
-                    },
-                    {
-                      key: 'SAT_SP_bestellt',
-                      label: 'SAT_SP bestellt',
-                      width: '110px',
-                      align: 'right',
-                      sumable: true,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) : '-'
-                    },
-                    {
-                      key: 'SAT_SL_bestellt',
-                      label: 'SAT_SL bestellt',
-                      width: '110px',
-                      align: 'right',
-                      sumable: true,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) : '-'
+                      format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Sättel' : '-'
                     },
                     {
                       key: 'grundFormatiert',
-                      label: 'Status / Grund',
-                      width: '220px',
+                      label: 'Status',
+                      width: '250px',
                       align: 'left',
                       sumable: false
-                    },
-                    // NEU: Backlog-Spalten
-                    {
-                      key: 'tagesBedarf',
-                      label: 'Tagesbedarf',
-                      width: '100px',
-                      align: 'right',
-                      sumable: true,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) : '-'
-                    },
-                    {
-                      key: 'akkumulierterBacklog',
-                      label: 'Backlog',
-                      width: '100px',
-                      align: 'right',
-                      sumable: false,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) : '0'
                     },
                     {
                       key: 'vorlaufzeitFormatiert',
                       label: 'Vorlaufzeit',
-                      width: '90px',
+                      width: '100px',
                       align: 'center',
                       sumable: false
                     },
                     {
                       key: 'erwarteteAnkunftFormatiert',
-                      label: 'Tatsächliche Ankunft',
+                      label: 'Ankunft Dortmund',
                       width: '130px',
                       align: 'center',
                       sumable: false
                     }
                   ]}
                   data={alleTageMitBestellungen}
-                  maxHeight="600px"
+                  maxHeight="500px"
                   showFormulas={false}
                   showSums={true}
                   sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel`}
@@ -814,18 +764,159 @@ export default function InboundPage() {
                   }}
                 />
 
-                {/* ✅ VISUALISIERUNG: Bestellungen über Zeit */}
-                <div className="mt-6">
-                  <BestellungenChart
-                    daten={taeglicheBestellungen.map(b => ({
-                      bestelldatum: b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum),
-                      menge: Object.values(b.komponenten).reduce((sum, m) => sum + m, 0),
-                      komponenten: b.komponenten,
-                      status: b.status
-                    }))}
-                    aggregation="monat"
-                    height={300}
+                {/* ✅ NEU: HAFEN & VERSAND LOGISTIK */}
+                <div className="mt-8 bg-blue-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                    <Ship className="h-5 w-5 text-blue-600" />
+                    Versand & Hafen Logistik
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Übersicht der Verschiffungen: Losgrößen-Bündelung am Hafen Shanghai, Schiff nur mittwochs, Lieferverlauf nach Dortmund
+                  </p>
+                  
+                  {/* Versand-Statistik */}
+                  <div className="grid gap-4 md:grid-cols-4 mb-4">
+                    <div className="bg-white rounded-lg p-3 border">
+                      <div className="text-xs text-gray-500">Durchschn. Wartezeit Hafen</div>
+                      <div className="text-xl font-bold text-blue-600">
+                        {(() => {
+                          const bestellungenMitWartezeit = taeglicheBestellungen.filter(b => b.wartetageAmHafen !== undefined)
+                          const avg = bestellungenMitWartezeit.length > 0 
+                            ? bestellungenMitWartezeit.reduce((sum, b) => sum + (b.wartetageAmHafen || 0), 0) / bestellungenMitWartezeit.length
+                            : 0
+                          return formatNumber(avg, 1) + ' Tage'
+                        })()}
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border">
+                      <div className="text-xs text-gray-500">Schiffsabfahrten</div>
+                      <div className="text-xl font-bold text-blue-600">
+                        {(() => {
+                          const uniqueMittwoche = new Set(
+                            taeglicheBestellungen
+                              .filter(b => b.schiffAbfahrtMittwoch)
+                              .map(b => b.schiffAbfahrtMittwoch?.toISOString())
+                          )
+                          return uniqueMittwoche.size
+                        })()} Mittwochs
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border">
+                      <div className="text-xs text-gray-500">Gesamtmenge verschifft</div>
+                      <div className="text-xl font-bold text-blue-600">
+                        {formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border">
+                      <div className="text-xs text-gray-500">Durchschn. Losgröße/Schiff</div>
+                      <div className="text-xl font-bold text-blue-600">
+                        {(() => {
+                          const uniqueMittwoche = new Set(
+                            taeglicheBestellungen
+                              .filter(b => b.schiffAbfahrtMittwoch)
+                              .map(b => b.schiffAbfahrtMittwoch?.toISOString())
+                          )
+                          return uniqueMittwoche.size > 0 
+                            ? formatNumber(bestellStatistik.gesamtMenge / uniqueMittwoche.size, 0) + ' Stk'
+                            : '-'
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Shipment Tracking Table */}
+                  <ExcelTable
+                    columns={[
+                      {
+                        key: 'bestelldatumFormatiert',
+                        label: 'Bestelldatum',
+                        width: '110px',
+                        align: 'center',
+                        sumable: false
+                      },
+                      {
+                        key: 'menge',
+                        label: 'Losgröße',
+                        width: '100px',
+                        align: 'right',
+                        sumable: true,
+                        format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-'
+                      },
+                      {
+                        key: 'schiffAbfahrt',
+                        label: 'Schiff ab Shanghai',
+                        width: '130px',
+                        align: 'center',
+                        sumable: false
+                      },
+                      {
+                        key: 'wartetage',
+                        label: 'Wartezeit Hafen',
+                        width: '120px',
+                        align: 'center',
+                        sumable: false
+                      },
+                      {
+                        key: 'erwarteteAnkunftFormatiert',
+                        label: 'Ankunft Hamburg',
+                        width: '130px',
+                        align: 'center',
+                        sumable: false
+                      },
+                      {
+                        key: 'verfuegbarAb',
+                        label: 'Verfügbar ab',
+                        width: '130px',
+                        align: 'center',
+                        sumable: false
+                      }
+                    ]}
+                    data={taeglicheBestellungen
+                      .filter(b => Object.values(b.komponenten).reduce((sum, m) => sum + m, 0) > 0)
+                      .map(b => {
+                        const menge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
+                        return {
+                          bestelldatumFormatiert: b.bestelldatum instanceof Date 
+                            ? b.bestelldatum.toLocaleDateString('de-DE')
+                            : new Date(b.bestelldatum).toLocaleDateString('de-DE'),
+                          menge,
+                          schiffAbfahrt: b.schiffAbfahrtMittwoch 
+                            ? (b.schiffAbfahrtMittwoch instanceof Date 
+                                ? b.schiffAbfahrtMittwoch.toLocaleDateString('de-DE') + ' (Mi)' 
+                                : new Date(b.schiffAbfahrtMittwoch).toLocaleDateString('de-DE') + ' (Mi)')
+                            : '-',
+                          wartetage: b.wartetageAmHafen !== undefined 
+                            ? b.wartetageAmHafen + ' Tage' 
+                            : '-',
+                          erwarteteAnkunftFormatiert: b.erwarteteAnkunft instanceof Date 
+                            ? b.erwarteteAnkunft.toLocaleDateString('de-DE')
+                            : new Date(b.erwarteteAnkunft).toLocaleDateString('de-DE'),
+                          verfuegbarAb: b.verfuegbarAb 
+                            ? (b.verfuegbarAb instanceof Date 
+                                ? b.verfuegbarAb.toLocaleDateString('de-DE')
+                                : new Date(b.verfuegbarAb).toLocaleDateString('de-DE'))
+                            : '-'
+                        }
+                      })}
+                    maxHeight="400px"
+                    showFormulas={false}
+                    showSums={true}
+                    sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Lieferungen`}
                   />
+                  
+                  {/* Chart: Monatliche Liefermengen */}
+                  <div className="mt-4">
+                    <BestellungenChart
+                      daten={taeglicheBestellungen.map(b => ({
+                        bestelldatum: b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum),
+                        menge: Object.values(b.komponenten).reduce((sum, m) => sum + m, 0),
+                        komponenten: b.komponenten,
+                        status: b.status
+                      }))}
+                      aggregation="monat"
+                      height={250}
+                    />
+                  </div>
                 </div>
 
               {/* Info-Box unter der Tabelle */}
