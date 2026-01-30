@@ -14,6 +14,9 @@ Dieses Verzeichnis enthält die vollständige Wiki-Dokumentation für das Mounta
 4. **[SSOT.md](SSOT.md)** - Single Source of Truth (JSON als Datenquelle)
 5. **[OEM-Planung.md](OEM-Planung.md)** - Zentrale Produktionsplanung als Berechnungsbasis
 
+### Module-Dokumentation
+- **[Produktion-und-Warehouse.md](Produktion-und-Warehouse.md)** - Ausführliche Dokumentation der Produktionssteuerung und Warehouse Management (Fließtext)
+
 ### Schnellstart & Hilfe
 - **[Installation-Setup.md](Installation-Setup.md)** - Installation, Konfiguration, Troubleshooting
 - **[FAQ.md](FAQ.md)** - Häufig gestellte Fragen
