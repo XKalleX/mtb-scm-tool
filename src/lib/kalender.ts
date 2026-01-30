@@ -879,20 +879,24 @@ export function berechneMaterialflussDetails(
   const ankunftHafenShanghai = addLKWFahrtage(produktionsende, vorlaufzeiten.lkwTransportChinaArbeitstage, 'China', customFeiertage)
   
   // Schritt 3: Warten auf nächsten Mittwoch (Schiff fährt nur mittwochs!)
-  const schiffAbfahrt = naechsterMittwoch(addDays(ankunftHafenShanghai, 1)) // Nächster Mittwoch NACH Ankunft
+  // WICHTIG: Ware die am Hafen ankommt muss mindestens 1 Tag zur Verarbeitung warten,
+  // daher suchen wir den nächsten Mittwoch NACH dem Ankunftstag (nicht am selben Tag).
+  // Dies entspricht der Realität: Zoll, Entladung, Beladung des Schiffs brauchen Zeit.
+  const schiffAbfahrt = naechsterMittwoch(addDays(ankunftHafenShanghai, 1))
   const wartetageHafen = Math.max(0, daysBetween(ankunftHafenShanghai, schiffAbfahrt))
   
   // Schritt 4: Seefracht (+30 KT)
   const schiffAnkunftHamburg = addDays(schiffAbfahrt, vorlaufzeiten.vorlaufzeitKalendertage)
   
   // Schritt 5: LKW-Transport Deutschland (+2 AT, nur Mo-Fr)
-  // LKW fährt am nächsten Fahrtag nach Ankunft
+  // LKW fährt ab dem nächsten gültigen Fahrtag nach Schiff-Ankunft
+  const ankunftProduktion = addLKWFahrtage(schiffAnkunftHamburg, vorlaufzeiten.lkwTransportDeutschlandArbeitstage, 'Deutschland', customFeiertage)
+  
+  // Berechne LKW-Abfahrt für Tracking (erster Fahrtag nach Schiff-Ankunft)
   let lkwAbfahrtDeutschland = addDays(schiffAnkunftHamburg, 1)
   while (!istLKWFahrtag(lkwAbfahrtDeutschland, 'Deutschland', customFeiertage)) {
     lkwAbfahrtDeutschland = addDays(lkwAbfahrtDeutschland, 1)
   }
-  
-  const ankunftProduktion = addLKWFahrtage(schiffAnkunftHamburg, vorlaufzeiten.lkwTransportDeutschlandArbeitstage, 'Deutschland', customFeiertage)
   
   // Schritt 6: Material ist NÄCHSTEN TAG nach Ankunft verfügbar!
   const verfuegbarAb = addDays(ankunftProduktion, 1)

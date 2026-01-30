@@ -92,7 +92,7 @@
       "NEU: Proportionale Allokation statt FCFS bei Engpässen!",
       "Seefracht: 30 Kalendertage (24/7 unterwegs)",
       "Bearbeitung: 5 Arbeitstage (Mo-Fr ohne Feiertage)",
-      "Durchschnittl. Wartezeit am Hafen: ca. 4 Tage (warten auf Mittwoch)",
+      "Wartezeit am Hafen: 1-7 Tage (bis zum nächsten Mittwoch, mind. 1 Tag für Zoll/Beladung)",
       "Gesamte Vorlaufzeit: variabel (ca. 49-55 Tage inkl. Hafen-Wartezeit)",
       "Mindestbestellung: 500 Stück Sättel (Losgröße)",
       "Losgrößen-Teilbarkeit: 370.000 / 500 = 740 (ganzzahlig → volle Menge erreichbar)"

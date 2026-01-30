@@ -7,12 +7,13 @@
  * 
  * Produktionssteuerung mit:
  * - ATP-Check (Available-to-Promise)
- * - First-Come-First-Serve Regel
+ * - Proportionale Allokation (Gewichtungsprinzip) statt FCFS
  * - Lagerbestandsmanagement
  * - Materialfluss-Visualisierung
  * 
  * ✅ NEU: Szenarien-Integration global wirksam!
  * ✅ Zeigt Deltas (+X / -X) gegenüber Baseline
+ * ✅ NEU: Proportionale Verteilung bei Materialengpass
  */
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -350,7 +351,7 @@ export default function ProduktionPage() {
         <div>
           <h1 className="text-3xl font-bold">Produktion & Warehouse</h1>
           <p className="text-muted-foreground mt-1">
-            Produktionssteuerung mit FCFS-Regel (First-Come-First-Serve) • {formatNumber(konfiguration.jahresproduktion, 0)} Bikes/Jahr • Nur 4 Sattel-Varianten
+            Produktionssteuerung mit Proportionaler Allokation • {formatNumber(konfiguration.jahresproduktion, 0)} Bikes/Jahr • Nur 4 Sattel-Varianten
           </p>
         </div>
         <div className="flex gap-2">
@@ -408,14 +409,14 @@ export default function ProduktionPage() {
         groupTitle="Produktionslogik & Konzepte"
         items={[
           {
-            id: 'fcfs',
-            title: 'FCFS-Regel (First-Come-First-Serve)',
+            id: 'proportional',
+            title: 'Proportionale Allokation (Gewichtungsprinzip)',
             icon: <Factory className="h-4 w-4" />,
             variant: 'info',
             content: (
               <div className="space-y-3">
                 <p className="text-sm text-blue-700">
-                  Einfache First-Come-First-Serve Regel statt mathematischer Optimierung
+                  <strong>NEU:</strong> Faire prozentuale Verteilung bei Materialengpass statt FCFS
                 </p>
                 <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
                   <li>
@@ -423,15 +424,19 @@ export default function ProduktionPage() {
                     Ist genug Material im Lager?
                   </li>
                   <li>
-                    <strong>Schritt 2a: JA</strong> - Produziere die volle Menge & buche Material ab
+                    <strong>Schritt 2a: Genug Material</strong> - Alle Varianten erhalten 100%
                   </li>
                   <li>
-                    <strong>Schritt 2b: NEIN</strong> - Auftrag zurückstellen oder Teilproduktion
+                    <strong>Schritt 2b: Engpass</strong> - Proportionale Verteilung: 
+                    Jede Variante erhält gleichen % Anteil (z.B. 50% bei halber Verfügbarkeit)
                   </li>
                   <li>
-                    <strong>Keine Optimierung:</strong> Kein Solver, keine Prioritäten nach Deckungsbeitrag
+                    <strong>Fair:</strong> Keine Variante wird bevorzugt oder komplett ausgeschlossen
                   </li>
                 </ol>
+                <p className="text-xs text-blue-600 mt-2">
+                  Beispiel: 4 Varianten je 500 benötigt = 2000 gesamt, nur 1000 verfügbar → Jede bekommt 250 (50%)
+                </p>
               </div>
             )
           },

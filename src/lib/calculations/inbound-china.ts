@@ -93,14 +93,14 @@ export interface TaeglicheBestellung {
   komponenten: Record<string, number> // Sattel-ID → Menge
   erwarteteAnkunft: Date
   verfuegbarAb: Date                  // NEU: Material verfügbar am nächsten Tag nach Ankunft
-  status: 'bestellt' | 'unterwegs' | 'geliefert' | 'am_hafen'
+  status: 'bestellt' | 'unterwegs' | 'geliefert'
   istVorjahr: boolean // Bestellung aus 2026?
   grund: 'losgroesse' | 'zusatzbestellung'
   
   // NEU: Detaillierter Materialfluss
   materialfluss?: MaterialflussDetails
   schiffAbfahrtMittwoch?: Date        // Schiff fährt nur mittwochs!
-  wartetageAmHafen?: number           // Tage die Ware am Hafen wartet
+  wartetageAmHafen?: number           // Tage die Ware am Hafen wartet (1-7 Tage bis zum nächsten Mittwoch)
 }
 
 // Puffer-Tage werden aus lieferant-china.json geladen (lieferintervall: 14 Tage)

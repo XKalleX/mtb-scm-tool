@@ -6,9 +6,13 @@
  * ========================================
  * 
  * Verwaltung des China-Lieferanten mit:
- * - Vorlaufzeiten-Berechnung
+ * - Vorlaufzeiten-Berechnung mit detailliertem Materialfluss
+ * - Schiffe fahren NUR mittwochs ab Shanghai!
+ * - LKWs fahren NICHT am Wochenende (Sa/So)
+ * - Material verfügbar am NÄCHSTEN TAG nach Ankunft
  * - Spring Festival Berücksichtigung
  * - Losgrößen-Optimierung
+ * - Proportionale Allokation statt FCFS
  * - Bestellplanung
  * 
  * ✅ NEU: Szenarien-Integration global wirksam!
