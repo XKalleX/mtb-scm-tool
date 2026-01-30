@@ -143,7 +143,7 @@
       "Transport: Nur Schiff (China→Hamburg) + LKW (Hamburg→Dortmund), keine Bahn",
       "Kein Outbound zu 6 internationalen Märkten",
       "Proportionale Allokation statt Solver-Optimierung (faire Verteilung bei Engpässen)",
-      "Vorlaufzeit: variabel (49-55 Tage inkl. Hafen-Wartezeit), Losgröße: 500 Sättel"
+      "Planungs-Vorlaufzeit: 49 Tage (fix, konfigurierbar), Losgröße: 500 Sättel"
     ],
     "datenquellen": {
       "beschreibung": "SINGLE SOURCE OF TRUTH - Alle anderen Daten in separaten JSON-Dateien",
