@@ -203,76 +203,133 @@ export default function ReportingPage() {
 }
 
 /**
+ * Zielwerte und Schwellenwerte für SCOR-Metriken
+ * Diese Konstanten definieren die Benchmarks für die Visualisierungen
+ */
+const SCOR_TARGETS = {
+  // RELIABILITY
+  PLANERFUELLUNG_TARGET: 95,
+  LIEFERTREUE_TARGET: 95,
+  DELIVERY_PERFORMANCE_TARGET: 90,
+  
+  // RESPONSIVENESS  
+  DURCHLAUFZEIT_SOLL: 49,
+  DURCHLAUFZEIT_TARGET_MAX: 60,
+  LAGERUMSCHLAG_TARGET: 4.0,
+  FORECAST_ACCURACY_TARGET: 95,
+  
+  // AGILITY
+  FLEXIBILITAET_TARGET: 95,
+  MATERIALVERFUEGBARKEIT_TARGET: 95,
+  
+  // ASSETS
+  LAGERREICHWEITE_MIN: 7,
+  LAGERREICHWEITE_MAX: 14,
+  LAGERREICHWEITE_AKZEPTABEL: 20
+} as const
+
+/**
+ * Interface für SCOR Metriken
+ */
+interface SCORMetriken {
+  planerfuellungsgrad: number
+  liefertreueChina: number
+  deliveryPerformance: number
+  durchlaufzeitProduktion: number
+  lagerumschlag: number
+  forecastAccuracy: number
+  produktionsflexibilitaet: number
+  materialverfuegbarkeit: number
+  lagerreichweite: number
+  kapitalbindung: number
+  gesamtproduktion: number
+  produktionstage: number
+  durchschnittProTag: number
+  auslastung: number
+}
+
+/**
  * SCOR Metriken Ansicht
  * Zeigt alle Performance-Kennzahlen nach SCOR-Modell MIT VISUALISIERUNGEN
  * 
  * DYNAMISCH: Alle Werte werden aus dem zentralen Metrics Rechner bezogen!
  * NEU: Jede Metrik hat nun eine sinnvolle Visualisierung in der aufgeklappten Box
  */
-function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaseline: boolean }) {
+function SCORMetrikenView({ metriken, istBaseline }: { metriken: SCORMetriken; istBaseline: boolean }) {
   /**
    * ========================================
    * VISUALISIERUNGS-DATEN VORBEREITEN
    * ========================================
    * Berechne Daten für die Visualisierungen der einzelnen Metriken
+   * Alle Werte werden validiert und gegen definierte Targets geprüft
    */
   
+  // Hilfsfunktion: Klemme Prozent-Werte zwischen 0 und 100
+  const clampPercent = (value: number): number => Math.max(0, Math.min(100, value))
+  
   // 1. Planerfüllungsgrad: Zeige erfüllt vs. nicht erfüllt (Pie Chart)
+  const planerfuellungWert = clampPercent(metriken.planerfuellungsgrad)
   const planerfuellungDaten = [
-    { name: 'Vollständig erfüllt', wert: metriken.planerfuellungsgrad, fill: COLORS.success },
-    { name: 'Nicht vollständig', wert: 100 - metriken.planerfuellungsgrad, fill: COLORS.danger }
+    { name: 'Vollständig erfüllt', wert: planerfuellungWert, fill: COLORS.success },
+    { name: 'Nicht vollständig', wert: 100 - planerfuellungWert, fill: COLORS.danger }
   ]
   
   // 2. Liefertreue China: Zeige pünktlich vs. verspätet (Pie Chart)
+  const liefertreueWert = clampPercent(metriken.liefertreueChina)
   const liefertreueFromChinaDaten = [
-    { name: 'Pünktlich', wert: metriken.liefertreueChina, fill: COLORS.success },
-    { name: 'Verspätet', wert: 100 - metriken.liefertreueChina, fill: COLORS.danger }
+    { name: 'Pünktlich', wert: liefertreueWert, fill: COLORS.success },
+    { name: 'Verspätet', wert: 100 - liefertreueWert, fill: COLORS.danger }
   ]
   
   // 3. Lieferperformance: Vergleich mit Zielwert (Bar Chart)
+  const deliveryPerfWert = clampPercent(metriken.deliveryPerformance)
   const lieferperformanceDaten = [
-    { kategorie: 'Ist-Wert', wert: metriken.deliveryPerformance, fill: metriken.deliveryPerformance >= 90 ? COLORS.success : COLORS.warning },
-    { kategorie: 'Zielwert', wert: 90, fill: COLORS.info }
+    { kategorie: 'Ist-Wert', wert: deliveryPerfWert, fill: deliveryPerfWert >= SCOR_TARGETS.DELIVERY_PERFORMANCE_TARGET ? COLORS.success : COLORS.warning },
+    { kategorie: 'Zielwert', wert: SCOR_TARGETS.DELIVERY_PERFORMANCE_TARGET, fill: COLORS.info }
   ]
   
   // 4. Durchlaufzeit: Vergleich Ist vs. Soll (Bar Chart)
   const durchlaufzeitDaten = [
     { kategorie: 'Ist-Durchlaufzeit', tage: metriken.durchlaufzeitProduktion, fill: COLORS.primary },
-    { kategorie: 'Soll-Durchlaufzeit', tage: 49, fill: COLORS.info },
-    { kategorie: 'Zielwert (≤60)', tage: 60, fill: COLORS.warning }
+    { kategorie: 'Soll-Durchlaufzeit', tage: SCOR_TARGETS.DURCHLAUFZEIT_SOLL, fill: COLORS.info },
+    { kategorie: `Zielwert (≤${SCOR_TARGETS.DURCHLAUFZEIT_TARGET_MAX})`, tage: SCOR_TARGETS.DURCHLAUFZEIT_TARGET_MAX, fill: COLORS.warning }
   ]
   
   // 5. Lagerumschlag: Monatliche Entwicklung (Line Chart)
-  // Simuliere monatliche Werte basierend auf Jahresdurchschnitt
+  // Simuliere monatliche Werte basierend auf Jahresdurchschnitt mit Saisonalität
   const lagerumschlagDaten = Array.from({ length: 12 }, (_, i) => ({
     monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
-    umschlag: metriken.lagerumschlag + (Math.sin(i / 2) * 0.5) // Leichte Variation
+    // Leichte Variation um Durchschnitt, garantiert positiv
+    umschlag: Math.max(0, metriken.lagerumschlag + (Math.sin(i / 2) * 0.3))
   }))
   
   // 6. Planungsgenauigkeit: Vergleich mit Ziel (Gauge-artiger Bar)
+  const forecastAccWert = clampPercent(metriken.forecastAccuracy)
   const planungsgenauigkeitDaten = [
-    { kategorie: 'Ist-Genauigkeit', prozent: metriken.forecastAccuracy, fill: metriken.forecastAccuracy >= 95 ? COLORS.success : COLORS.warning },
-    { kategorie: 'Zielwert', prozent: 95, fill: COLORS.info }
+    { kategorie: 'Ist-Genauigkeit', prozent: forecastAccWert, fill: forecastAccWert >= SCOR_TARGETS.FORECAST_ACCURACY_TARGET ? COLORS.success : COLORS.warning },
+    { kategorie: 'Zielwert', prozent: SCOR_TARGETS.FORECAST_ACCURACY_TARGET, fill: COLORS.info }
   ]
   
   // 7. Produktionsflexibilität: Vergleich mit Ziel (Bar Chart)
+  const flexWert = clampPercent(metriken.produktionsflexibilitaet)
   const flexibilitaetDaten = [
-    { kategorie: 'Ist-Flexibilität', prozent: metriken.produktionsflexibilitaet, fill: metriken.produktionsflexibilitaet >= 95 ? COLORS.success : COLORS.warning },
-    { kategorie: 'Zielwert', prozent: 95, fill: COLORS.info }
+    { kategorie: 'Ist-Flexibilität', prozent: flexWert, fill: flexWert >= SCOR_TARGETS.FLEXIBILITAET_TARGET ? COLORS.success : COLORS.warning },
+    { kategorie: 'Zielwert', prozent: SCOR_TARGETS.FLEXIBILITAET_TARGET, fill: COLORS.info }
   ]
   
   // 8. Materialverfügbarkeit: Verfügbar vs. Mangel (Pie Chart)
+  const materialverfWert = clampPercent(metriken.materialverfuegbarkeit)
   const materialverfuegbarkeitDaten = [
-    { name: 'Verfügbar', wert: metriken.materialverfuegbarkeit, fill: COLORS.success },
-    { name: 'Mangel', wert: 100 - metriken.materialverfuegbarkeit, fill: COLORS.danger }
+    { name: 'Verfügbar', wert: materialverfWert, fill: COLORS.success },
+    { name: 'Mangel', wert: 100 - materialverfWert, fill: COLORS.danger }
   ]
   
   // 9. Lagerreichweite: Vergleich mit Zielbereich (Bar Chart mit Bereichen)
   const lagerreichweiteDaten = [
     { kategorie: 'Ist-Reichweite', tage: metriken.lagerreichweite, fill: COLORS.primary },
-    { kategorie: 'Min. Ziel (7)', tage: 7, fill: COLORS.success },
-    { kategorie: 'Max. Ziel (14)', tage: 14, fill: COLORS.success },
-    { kategorie: 'Max. Akzeptabel (20)', tage: 20, fill: COLORS.warning }
+    { kategorie: `Min. Ziel (${SCOR_TARGETS.LAGERREICHWEITE_MIN})`, tage: SCOR_TARGETS.LAGERREICHWEITE_MIN, fill: COLORS.success },
+    { kategorie: `Max. Ziel (${SCOR_TARGETS.LAGERREICHWEITE_MAX})`, tage: SCOR_TARGETS.LAGERREICHWEITE_MAX, fill: COLORS.success },
+    { kategorie: `Max. Akzeptabel (${SCOR_TARGETS.LAGERREICHWEITE_AKZEPTABEL})`, tage: SCOR_TARGETS.LAGERREICHWEITE_AKZEPTABEL, fill: COLORS.warning }
   ]
 
   return (
@@ -332,7 +389,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: any) => `${value.toFixed(2)}%`} />
+                      <Tooltip formatter={(value: number | string) => `${typeof value === "number" ? value.toFixed(2)}%`} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -366,7 +423,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: any) => `${value.toFixed(2)}%`} />
+                      <Tooltip formatter={(value: number | string) => `${typeof value === "number" ? value.toFixed(2)}%`} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -389,7 +446,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis type="number" domain={[0, 100]} label={{ value: 'Performance (%)', position: 'bottom' }} />
                       <YAxis type="category" dataKey="kategorie" width={120} />
-                      <Tooltip formatter={(value: any) => `${value.toFixed(1)}%`} />
+                      <Tooltip formatter={(value: number | string) => `${typeof value === "number" ? value.toFixed(1)}%`} />
                       <Bar dataKey="wert" radius={[0, 8, 8, 0]}>
                         {lieferperformanceDaten.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -431,7 +488,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis dataKey="kategorie" angle={-15} textAnchor="end" height={80} />
                       <YAxis label={{ value: 'Tage', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip formatter={(value: any) => `${value} Tage`} />
+                      <Tooltip formatter={(value: number | string) => `${value} Tage`} />
                       <Bar dataKey="tage" radius={[8, 8, 0, 0]}>
                         {durchlaufzeitDaten.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -459,7 +516,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis dataKey="monat" />
                       <YAxis label={{ value: 'Umschlag (x)', angle: -90, position: 'insideLeft' }} domain={[0, 'dataMax + 1']} />
-                      <Tooltip formatter={(value: any) => `${value.toFixed(2)}x`} />
+                      <Tooltip formatter={(value: number | string) => typeof value === 'number' ? `${typeof value === "number" ? value.toFixed(2)}x` : `${value}x`} />
                       <Line 
                         type="monotone" 
                         dataKey="umschlag" 
@@ -499,7 +556,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis type="number" domain={[0, 100]} label={{ value: 'Genauigkeit (%)', position: 'bottom' }} />
                       <YAxis type="category" dataKey="kategorie" width={140} />
-                      <Tooltip formatter={(value: any) => `${value.toFixed(1)}%`} />
+                      <Tooltip formatter={(value: number | string) => `${typeof value === "number" ? value.toFixed(1)}%`} />
                       <Bar dataKey="prozent" radius={[0, 8, 8, 0]}>
                         {planungsgenauigkeitDaten.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -541,7 +598,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis type="number" domain={[0, 100]} label={{ value: 'Flexibilität (%)', position: 'bottom' }} />
                       <YAxis type="category" dataKey="kategorie" width={140} />
-                      <Tooltip formatter={(value: any) => `${value.toFixed(1)}%`} />
+                      <Tooltip formatter={(value: number | string) => `${typeof value === "number" ? value.toFixed(1)}%`} />
                       <Bar dataKey="prozent" radius={[0, 8, 8, 0]}>
                         {flexibilitaetDaten.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -580,7 +637,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: any) => `${value.toFixed(2)}%`} />
+                      <Tooltip formatter={(value: number | string) => `${typeof value === "number" ? value.toFixed(2)}%`} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -617,7 +674,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis dataKey="kategorie" angle={-15} textAnchor="end" height={80} />
                       <YAxis label={{ value: 'Tage', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip formatter={(value: any) => `${value} Tage`} />
+                      <Tooltip formatter={(value: number | string) => `${value} Tage`} />
                       <Bar dataKey="tage" radius={[8, 8, 0, 0]}>
                         {lagerreichweiteDaten.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -1375,7 +1432,7 @@ function VisualisierungenView({
                         formatter={(value) => {
                           if (value === undefined || value === null) return 'N/A'
                           if (typeof value !== 'number') return String(value)
-                          return value.toFixed(1) + '%'
+                          return typeof value === "number" ? value.toFixed(1) + '%'
                         }}
                       />
                       <Legend wrapperStyle={{ paddingTop: '10px' }} />
@@ -1416,7 +1473,7 @@ function VisualisierungenView({
                     formatter={(value) => {
                       if (value === undefined || value === null) return 'N/A'
                       if (typeof value !== 'number') return String(value)
-                      return value.toFixed(1) + '%'
+                      return typeof value === "number" ? value.toFixed(1) + '%'
                     }}
                   />
                   <Legend wrapperStyle={{ paddingTop: '10px' }} />
@@ -1474,7 +1531,7 @@ function VisualisierungenView({
                       label={{ value: 'Bikes pro Woche', angle: -90, position: 'insideLeft', style: { fontWeight: 'bold', textAnchor: 'middle' } }}
                     />
                     <Tooltip 
-                      formatter={(value: any) => {
+                      formatter={(value: number | string) => {
                         if (typeof value === 'number') {
                           return formatNumber(value, 0) + ' Bikes'
                         }
