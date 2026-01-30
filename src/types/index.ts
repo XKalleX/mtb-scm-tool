@@ -158,7 +158,7 @@ export interface Lagerbestand {
 
 /**
  * Produktionsauftrag im Werk Deutschland
- * WICHTIG: Keine Solver-Optimierung, sondern First-Come-First-Serve!
+ * Nutzt proportionale Allokation bei Materialengpässen (faire Verteilung)
  */
 export interface Produktionsauftrag {
   id: string;

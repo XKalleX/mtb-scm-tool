@@ -21,10 +21,10 @@
  * 
  * ANFORDERUNGEN:
  * - A5: Auftragsverbuchung China (Losgrößen)
- * - A6: Vorlaufzeit 49 Tage korrekt
+ * - A6: Vorlaufzeit variabel (49-55 Tage inkl. Hafen-Wartezeit)
  * - A7: Losgröße 500 Sättel
  * - A10: Ende-zu-Ende Supply Chain (Material → Produktion)
- * - A13: FCFS-Priorisierung bei Engpass
+ * - A13: Proportionale Allokation bei Engpass (faire Verteilung)
  * 
  * SINGLE SOURCE OF TRUTH: 
  * - KonfigurationContext für alle Parameter
@@ -279,12 +279,12 @@ function konvertiereFeiertagsKonfiguration(konfiguration: KonfigurationData): Fe
  * - Bestellungen nur in Vielfachen von 500
  * - Backlog akkumuliert wenn Losgröße nicht erreicht
  * 
- * ANFORDERUNG A6: Vorlaufzeit 49 Tage
- * - Material trifft nach 49 Tagen ein
+ * ANFORDERUNG A6: Vorlaufzeit variabel (49-55 Tage)
+ * - Material trifft nach variabler Zeit ein (abhängig von Mittwochs-Schiff)
  * - Berücksichtigt Feiertage und Spring Festival
  * 
- * ANFORDERUNG A13: FCFS (First-Come-First-Serve)
- * - Älteste Bedarfe werden zuerst erfüllt
+ * ANFORDERUNG A13: Proportionale Allokation
+ * - Bei Engpass faire prozentuale Verteilung auf alle Varianten
  * - Keine Optimierung nach Deckungsbeitrag
  * 
  * @param produktionsplaene - Produktionspläne aller Varianten (aus zentrale-produktionsplanung)
