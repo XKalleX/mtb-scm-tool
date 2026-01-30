@@ -325,23 +325,42 @@ export default function ProduktionPage() {
   // ✅ NEU: Fertigerzeugnisse-Daten (kumulative Bike-Produktion)
   // Zeigt wie viele Bikes bereits produziert wurden (kumulativ)
   // Muss am Jahresende exakt 370.000 erreichen!
+  // NEU: Auch pro Variante für detailliertere Ansicht
   const fertigerzeugnisseDaten = useMemo(() => {
     let kumulativIst = 0
     let kumulativPlan = 0
     
+    // Kumulative Werte pro Variante
+    const variantenKumulativ: Record<string, { plan: number, ist: number }> = {}
+    konfiguration.varianten.forEach(v => {
+      variantenKumulativ[v.id] = { plan: 0, ist: 0 }
+    })
+    
     return tagesProduktionFormatiert.map(tag => {
       kumulativPlan += tag.planMenge
       kumulativIst += tag.istMenge
+      
+      // Berechne pro Variante (proportional zur Variantenverteilung)
+      konfiguration.varianten.forEach(v => {
+        const anteil = v.anteilPrognose
+        variantenKumulativ[v.id].plan += Math.round(tag.planMenge * anteil)
+        variantenKumulativ[v.id].ist += Math.round(tag.istMenge * anteil)
+      })
       
       return {
         tag: tag.tag,
         datum: tag.datum,
         kumulativIst,
         kumulativPlan,
-        monat: tag.monat
+        monat: tag.monat,
+        // NEU: Pro Variante
+        varianten: Object.entries(variantenKumulativ).reduce((acc, [id, values]) => {
+          acc[id] = { plan: values.plan, ist: values.ist }
+          return acc
+        }, {} as Record<string, { plan: number, ist: number }>)
       }
     })
-  }, [tagesProduktionFormatiert])
+  }, [tagesProduktionFormatiert, konfiguration.varianten])
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
@@ -696,20 +715,80 @@ export default function ProduktionPage() {
             dateColumnKey="datum"
           />
           
-          {/* ✅ VISUALISIERUNG: Produktionsverlauf */}
-          <div className="mt-6">
-            <TagesproduktionChart
-              daten={tagesProduktionFormatiert.map(t => ({
-                tag: t.tag,
-                datum: t.datum,
-                planMenge: t.planMenge,
-                istMenge: t.istMenge,
-                monat: t.monat
-              }))}
-              aggregation="woche"
-              height={300}
-              showDelta={false}
-            />
+          {/* ✅ VISUALISIERUNGEN: Plan vs Ist + Backlog-Entwicklung */}
+          <div className="mt-6 grid gap-6 md:grid-cols-2">
+            {/* Chart 1: Plan vs Ist Produktion (monatlich) */}
+            <div className="bg-white rounded-lg p-4 border">
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-green-600" />
+                Plan vs. Ist Produktion (monatlich)
+              </h4>
+              <TagesproduktionChart
+                daten={tagesProduktionFormatiert.map(t => ({
+                  tag: t.tag,
+                  datum: t.datum,
+                  planMenge: t.planMenge,
+                  istMenge: t.istMenge,
+                  monat: t.monat
+                }))}
+                aggregation="monat"
+                height={250}
+                showDelta={true}
+              />
+            </div>
+            
+            {/* Chart 2: Backlog-Entwicklung (monatlich) */}
+            <div className="bg-white rounded-lg p-4 border">
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                Backlog-Entwicklung (monatlich)
+              </h4>
+              <div className="h-[250px]">
+                {(() => {
+                  // Aggregiere Backlog pro Monat
+                  const backlogProMonat: Record<number, number> = {}
+                  tagesProduktionFormatiert.forEach(t => {
+                    const monat = t.monat
+                    if (!backlogProMonat[monat]) backlogProMonat[monat] = 0
+                    // Nehme den maximalen Backlog-Wert des Monats
+                    if (typeof t.backlog === 'number' && t.backlog > backlogProMonat[monat]) {
+                      backlogProMonat[monat] = t.backlog
+                    }
+                  })
+                  
+                  const monatsnamen = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+                  const chartData = monatsnamen.map((name, idx) => ({
+                    monat: name,
+                    backlog: backlogProMonat[idx + 1] || 0
+                  }))
+                  
+                  return (
+                    <div className="space-y-2 h-full flex flex-col justify-center">
+                      {chartData.map((d, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className="w-10 text-xs text-gray-500">{d.monat}</span>
+                          <div className="flex-1 bg-gray-100 rounded-full h-4 relative">
+                            <div 
+                              className={`h-4 rounded-full ${d.backlog > 1000 ? 'bg-red-400' : d.backlog > 500 ? 'bg-orange-400' : 'bg-green-400'}`}
+                              style={{ 
+                                width: `${Math.min(100, (d.backlog / 3000) * 100)}%`,
+                                minWidth: d.backlog > 0 ? '4px' : '0'
+                              }}
+                            />
+                          </div>
+                          <span className={`w-16 text-xs font-medium text-right ${d.backlog > 1000 ? 'text-red-600' : d.backlog > 500 ? 'text-orange-600' : 'text-green-600'}`}>
+                            {formatNumber(d.backlog, 0)} Stk
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Max. Produktions-Backlog pro Monat (nicht produzierte Mengen aufgrund von Materialengpässen)
+              </p>
+            </div>
           </div>
           
           {/* ✅ FORMEL-KARTEN NACH DER TABELLE UND CHART (User-Anforderung: Tabellen vor Erklärungen) */}
@@ -925,12 +1004,15 @@ export default function ProduktionPage() {
             
             {/* ✅ NEU: FERTIGERZEUGNISSE-CHART (Kumulative Bike-Produktion) */}
             {/* Zeigt wie Bikes über das Jahr akkumulieren - Ziel: 370.000 am Jahresende */}
+            {/* NEU: Mit separaten Linien pro MTB-Variante */}
             <div className="mt-6">
               <FertigerzeugnisseChart
                 daten={fertigerzeugnisseDaten}
                 jahresproduktion={konfiguration.jahresproduktion}
                 aggregation="woche"
-                height={300}
+                height={350}
+                varianten={konfiguration.varianten}
+                showPerVariante={true}
               />
             </div>
             
