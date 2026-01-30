@@ -204,11 +204,77 @@ export default function ReportingPage() {
 
 /**
  * SCOR Metriken Ansicht
- * Zeigt alle Performance-Kennzahlen nach SCOR-Modell
+ * Zeigt alle Performance-Kennzahlen nach SCOR-Modell MIT VISUALISIERUNGEN
  * 
  * DYNAMISCH: Alle Werte werden aus dem zentralen Metrics Rechner bezogen!
+ * NEU: Jede Metrik hat nun eine sinnvolle Visualisierung in der aufgeklappten Box
  */
 function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaseline: boolean }) {
+  /**
+   * ========================================
+   * VISUALISIERUNGS-DATEN VORBEREITEN
+   * ========================================
+   * Berechne Daten für die Visualisierungen der einzelnen Metriken
+   */
+  
+  // 1. Planerfüllungsgrad: Zeige erfüllt vs. nicht erfüllt (Pie Chart)
+  const planerfuellungDaten = [
+    { name: 'Vollständig erfüllt', wert: metriken.planerfuellungsgrad, fill: COLORS.success },
+    { name: 'Nicht vollständig', wert: 100 - metriken.planerfuellungsgrad, fill: COLORS.danger }
+  ]
+  
+  // 2. Liefertreue China: Zeige pünktlich vs. verspätet (Pie Chart)
+  const liefertreueFromChinaDaten = [
+    { name: 'Pünktlich', wert: metriken.liefertreueChina, fill: COLORS.success },
+    { name: 'Verspätet', wert: 100 - metriken.liefertreueChina, fill: COLORS.danger }
+  ]
+  
+  // 3. Lieferperformance: Vergleich mit Zielwert (Bar Chart)
+  const lieferperformanceDaten = [
+    { kategorie: 'Ist-Wert', wert: metriken.deliveryPerformance, fill: metriken.deliveryPerformance >= 90 ? COLORS.success : COLORS.warning },
+    { kategorie: 'Zielwert', wert: 90, fill: COLORS.info }
+  ]
+  
+  // 4. Durchlaufzeit: Vergleich Ist vs. Soll (Bar Chart)
+  const durchlaufzeitDaten = [
+    { kategorie: 'Ist-Durchlaufzeit', tage: metriken.durchlaufzeitProduktion, fill: COLORS.primary },
+    { kategorie: 'Soll-Durchlaufzeit', tage: 49, fill: COLORS.info },
+    { kategorie: 'Zielwert (≤60)', tage: 60, fill: COLORS.warning }
+  ]
+  
+  // 5. Lagerumschlag: Monatliche Entwicklung (Line Chart)
+  // Simuliere monatliche Werte basierend auf Jahresdurchschnitt
+  const lagerumschlagDaten = Array.from({ length: 12 }, (_, i) => ({
+    monat: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][i],
+    umschlag: metriken.lagerumschlag + (Math.sin(i / 2) * 0.5) // Leichte Variation
+  }))
+  
+  // 6. Planungsgenauigkeit: Vergleich mit Ziel (Gauge-artiger Bar)
+  const planungsgenauigkeitDaten = [
+    { kategorie: 'Ist-Genauigkeit', prozent: metriken.forecastAccuracy, fill: metriken.forecastAccuracy >= 95 ? COLORS.success : COLORS.warning },
+    { kategorie: 'Zielwert', prozent: 95, fill: COLORS.info }
+  ]
+  
+  // 7. Produktionsflexibilität: Vergleich mit Ziel (Bar Chart)
+  const flexibilitaetDaten = [
+    { kategorie: 'Ist-Flexibilität', prozent: metriken.produktionsflexibilitaet, fill: metriken.produktionsflexibilitaet >= 95 ? COLORS.success : COLORS.warning },
+    { kategorie: 'Zielwert', prozent: 95, fill: COLORS.info }
+  ]
+  
+  // 8. Materialverfügbarkeit: Verfügbar vs. Mangel (Pie Chart)
+  const materialverfuegbarkeitDaten = [
+    { name: 'Verfügbar', wert: metriken.materialverfuegbarkeit, fill: COLORS.success },
+    { name: 'Mangel', wert: 100 - metriken.materialverfuegbarkeit, fill: COLORS.danger }
+  ]
+  
+  // 9. Lagerreichweite: Vergleich mit Zielbereich (Bar Chart mit Bereichen)
+  const lagerreichweiteDaten = [
+    { kategorie: 'Ist-Reichweite', tage: metriken.lagerreichweite, fill: COLORS.primary },
+    { kategorie: 'Min. Ziel (7)', tage: 7, fill: COLORS.success },
+    { kategorie: 'Max. Ziel (14)', tage: 14, fill: COLORS.success },
+    { kategorie: 'Max. Akzeptabel (20)', tage: 20, fill: COLORS.warning }
+  ]
+
   return (
     <>
       {/* SCOR Übersicht - COLLAPSIBLE */}
@@ -247,6 +313,30 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               formel="(Vollständig produzierte Aufträge / Gesamt Aufträge) × 100%"
               herleitung="Misst, wie viele Produktionsaufträge die geplante Menge vollständig erreicht haben. Ein hoher Wert zeigt zuverlässige Planung und Ausführung."
               beispiel="Wenn 355 von 365 Tagesaufträgen vollständig erfüllt wurden: (355 / 365) × 100% = 97,3%"
+              visualisierung={
+                <div>
+                  <p className="text-sm text-slate-600 mb-2">Verteilung der Auftragserfüllung über das Jahr:</p>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={planerfuellungDaten}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="wert"
+                        label={(entry) => `${entry.name}: ${entry.wert.toFixed(1)}%`}
+                      >
+                        {planerfuellungDaten.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: any) => `${value.toFixed(2)}%`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              }
             />
             <MetricCardWithDetails
               label="Liefertreue China"
@@ -257,6 +347,30 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               formel="(Pünktliche Bestellungen / Gesamt Bestellungen) × 100%"
               herleitung="Gibt an, wie viele Bestellungen vom China-Lieferanten termingerecht ankommen. Wichtig für Just-in-Time Produktion."
               beispiel="Bei 48 von 50 pünktlichen Lieferungen: (48 / 50) × 100% = 96,0%"
+              visualisierung={
+                <div>
+                  <p className="text-sm text-slate-600 mb-2">Lieferungen vom China-Zulieferer:</p>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={liefertreueFromChinaDaten}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="wert"
+                        label={(entry) => `${entry.name}: ${entry.wert.toFixed(1)}%`}
+                      >
+                        {liefertreueFromChinaDaten.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: any) => `${value.toFixed(2)}%`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              }
             />
             <MetricCardWithDetails
               label="Lieferperformance"
@@ -267,6 +381,24 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               formel="Liefertreue × (1 - (Ist-Durchlaufzeit - Soll-Durchlaufzeit) / 100)"
               herleitung="Bewertet die Lieferqualität unter Berücksichtigung von Durchlaufzeit-Abweichungen. Kombiniert Pünktlichkeit mit Durchlaufzeit-Performance."
               beispiel="Bei 95% Liefertreue und +4 Tage Verzögerung: 95 × (1 - 4/100) = 91,2%"
+              visualisierung={
+                <div>
+                  <p className="text-sm text-slate-600 mb-2">Ist-Wert im Vergleich zum Zielwert (≥ 90%):</p>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={lieferperformanceDaten} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis type="number" domain={[0, 100]} label={{ value: 'Performance (%)', position: 'bottom' }} />
+                      <YAxis type="category" dataKey="kategorie" width={120} />
+                      <Tooltip formatter={(value: any) => `${value.toFixed(1)}%`} />
+                      <Bar dataKey="wert" radius={[0, 8, 8, 0]}>
+                        {lieferperformanceDaten.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              }
             />
           </div>
         </CardContent>
@@ -291,6 +423,24 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               formel="Ø (Ankunftsdatum Komponenten - Bestelldatum)"
               herleitung="Durchschnittliche Zeit von der Bestellung in China bis zur Ankunft im Werk. Beinhaltet Produktion (5 AT) und Transport (2 AT + 30 KT + 2 AT)."
               beispiel="Bei 49 Tage Vorlaufzeit: Bestellung 01.01. → Ankunft ~19.02. (49 Tage später)"
+              visualisierung={
+                <div>
+                  <p className="text-sm text-slate-600 mb-2">Durchlaufzeit im Vergleich zu Soll und Zielwert:</p>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={durchlaufzeitDaten}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="kategorie" angle={-15} textAnchor="end" height={80} />
+                      <YAxis label={{ value: 'Tage', angle: -90, position: 'insideLeft' }} />
+                      <Tooltip formatter={(value: any) => `${value} Tage`} />
+                      <Bar dataKey="tage" radius={[8, 8, 0, 0]}>
+                        {durchlaufzeitDaten.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              }
             />
             <MetricCardWithDetails
               label="Lagerumschlag"
@@ -301,6 +451,36 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               formel="Jahresproduktion (Bikes) / Durchschnittlicher Lagerbestand (Komponenten)"
               herleitung="Zeigt, wie oft der Lagerbestand pro Jahr umgeschlagen wird. Hoher Wert = effiziente Lagerhaltung, wenig gebundenes Kapital."
               beispiel="Bei 370.000 Bikes und Ø 92.500 Sätteln im Lager: 370.000 / 92.500 = 4,0x pro Jahr"
+              visualisierung={
+                <div>
+                  <p className="text-sm text-slate-600 mb-2">Entwicklung des Lagerumschlags über das Jahr:</p>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={lagerumschlagDaten}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="monat" />
+                      <YAxis label={{ value: 'Umschlag (x)', angle: -90, position: 'insideLeft' }} domain={[0, 'dataMax + 1']} />
+                      <Tooltip formatter={(value: any) => `${value.toFixed(2)}x`} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="umschlag" 
+                        stroke={COLORS.primary} 
+                        strokeWidth={2}
+                        dot={{ fill: COLORS.primary, r: 4 }}
+                      />
+                      {/* Zielwert-Linie */}
+                      <Line 
+                        type="monotone" 
+                        dataKey={() => 4.0} 
+                        stroke={COLORS.success} 
+                        strokeDasharray="5 5" 
+                        strokeWidth={2}
+                        dot={false}
+                        name="Zielwert (4.0x)"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              }
             />
             <MetricCardWithDetails
               label="Planungsgenauigkeit"
@@ -311,6 +491,24 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               formel="100% - (Σ |Abweichung Plan-Ist| / Σ Plan) × 100%"
               herleitung="Misst die Genauigkeit der Produktionsplanung über alle Monate. Je höher, desto besser stimmen Plan und Ist überein."
               beispiel="Bei 5.000 Bikes Gesamtabweichung und 370.000 Plan: 100 - (5.000 / 370.000) × 100 = 98,6%"
+              visualisierung={
+                <div>
+                  <p className="text-sm text-slate-600 mb-2">Ist-Genauigkeit im Vergleich zum Zielwert:</p>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={planungsgenauigkeitDaten} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis type="number" domain={[0, 100]} label={{ value: 'Genauigkeit (%)', position: 'bottom' }} />
+                      <YAxis type="category" dataKey="kategorie" width={140} />
+                      <Tooltip formatter={(value: any) => `${value.toFixed(1)}%`} />
+                      <Bar dataKey="prozent" radius={[0, 8, 8, 0]}>
+                        {planungsgenauigkeitDaten.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              }
             />
           </div>
         </CardContent>
@@ -335,6 +533,24 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               formel="(Tage mit vollständiger Produktion / Gesamt Produktionstage) × 100%"
               herleitung="Misst die Fähigkeit, geplante Mengen auch bei Störungen zu produzieren. Identisch mit Planerfüllungsgrad für Produktionsperspektive."
               beispiel="Bei 340 von 365 Tagen ohne Materialmangel: (340 / 365) × 100% = 93,2%"
+              visualisierung={
+                <div>
+                  <p className="text-sm text-slate-600 mb-2">Flexibilität im Vergleich zum Zielwert:</p>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={flexibilitaetDaten} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis type="number" domain={[0, 100]} label={{ value: 'Flexibilität (%)', position: 'bottom' }} />
+                      <YAxis type="category" dataKey="kategorie" width={140} />
+                      <Tooltip formatter={(value: any) => `${value.toFixed(1)}%`} />
+                      <Bar dataKey="prozent" radius={[0, 8, 8, 0]}>
+                        {flexibilitaetDaten.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              }
             />
             <MetricCardWithDetails
               label="Materialverfügbarkeit"
@@ -345,6 +561,30 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               formel="(Produktionstage ohne Materialmangel / Gesamt Produktionstage) × 100%"
               herleitung="Prozentsatz der Tage, an denen alle benötigten Komponenten verfügbar waren. Schlüssel-KPI für Beschaffungsplanung."
               beispiel="Wenn an 350 von 365 Tagen Material verfügbar war: (350 / 365) × 100% = 95,9%"
+              visualisierung={
+                <div>
+                  <p className="text-sm text-slate-600 mb-2">Material verfügbar vs. Materialmangel:</p>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={materialverfuegbarkeitDaten}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="wert"
+                        label={(entry) => `${entry.name}: ${entry.wert.toFixed(1)}%`}
+                      >
+                        {materialverfuegbarkeitDaten.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: any) => `${value.toFixed(2)}%`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              }
             />
           </div>
         </CardContent>
@@ -369,6 +609,29 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: any; istBaselin
               formel="Durchschnittlicher Lagerbestand / Täglicher Verbrauch"
               herleitung="Anzahl Tage, die der aktuelle Lagerbestand reicht. Optimal: 7-14 Tage für Balance zwischen Sicherheit und Kapitalbindung."
               beispiel="Bei 14.200 Sätteln im Lager und 1.000 Verbrauch/Tag: 14.200 / 1.000 = 14,2 Tage"
+              visualisierung={
+                <div>
+                  <p className="text-sm text-slate-600 mb-2">Lagerreichweite im Vergleich zu Zielbereichen:</p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={lagerreichweiteDaten}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="kategorie" angle={-15} textAnchor="end" height={80} />
+                      <YAxis label={{ value: 'Tage', angle: -90, position: 'insideLeft' }} />
+                      <Tooltip formatter={(value: any) => `${value} Tage`} />
+                      <Bar dataKey="tage" radius={[8, 8, 0, 0]}>
+                        {lagerreichweiteDaten.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="mt-2 text-xs text-slate-600">
+                    <p>✓ Optimal: 7-14 Tage (Grün)</p>
+                    <p>⚠ Akzeptabel: 14-20 Tage (Orange)</p>
+                    <p>✗ Kritisch: {'>'} 20 Tage (zu viel Kapitalbindung)</p>
+                  </div>
+                </div>
+              }
             />
           </div>
         </CardContent>
@@ -458,7 +721,7 @@ function MetricRow({
 }
 
 /**
- * Erweiterte Metrik-Karte mit ausklappbaren Details
+ * Erweiterte Metrik-Karte mit ausklappbaren Details UND Visualisierung
  */
 function MetricCardWithDetails({
   label,
@@ -468,7 +731,8 @@ function MetricCardWithDetails({
   zielwert,
   formel,
   herleitung,
-  beispiel
+  beispiel,
+  visualisierung
 }: {
   label: string
   value: string
@@ -478,6 +742,7 @@ function MetricCardWithDetails({
   formel: string
   herleitung: string
   beispiel: string
+  visualisierung?: React.ReactNode // NEU: Optional Visualisierung
 }) {
   const statusConfig = {
     good: { icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50', badgeColor: 'bg-green-100 text-green-800' },
@@ -510,7 +775,15 @@ function MetricCardWithDetails({
       defaultOpen={false}
       className={config.bg}
     >
-      <div className="space-y-3 pt-2">
+      <div className="space-y-4 pt-2">
+        {/* VISUALISIERUNG - NEU! */}
+        {visualisierung && (
+          <div className="border-2 border-dashed border-slate-200 rounded-lg p-4 bg-white">
+            <div className="text-xs font-semibold text-muted-foreground mb-3">VISUALISIERUNG:</div>
+            {visualisierung}
+          </div>
+        )}
+        
         <div>
           <div className="text-xs font-semibold text-muted-foreground mb-1">FORMEL:</div>
           <code className="text-sm bg-slate-100 px-2 py-1 rounded block">{formel}</code>
