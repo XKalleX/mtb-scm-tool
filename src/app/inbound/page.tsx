@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Ship, Package, Download, Calendar, Zap, Plus, Info } from 'lucide-react'
 import { CollapsibleInfo, CollapsibleInfoGroup, type InfoItem } from '@/components/ui/collapsible-info'
-import { BestellungenChart, VorlaufzeitChart } from '@/components/ui/table-charts'
+import { BestellungenChart } from '@/components/ui/table-charts'
 import { formatNumber, addDays, toLocalISODateString } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
 import ExcelTable from '@/components/excel-table'
@@ -533,81 +533,7 @@ export default function InboundPage() {
         </CollapsibleInfo>
       )}
 
-      {/* Übersicht Cards - MIT SZENARIO-DELTAS */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Bearbeitungszeit</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{lieferant.vorlaufzeitArbeitstage}</div>
-            <p className="text-xs text-muted-foreground">Arbeitstage Produktion</p>
-          </CardContent>
-        </Card>
 
-        <Card className={vorlaufzeitDelta > 0 ? 'border-orange-200' : ''}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">
-                Seefracht
-                {vorlaufzeitDelta > 0 && <Zap className="h-3 w-3 inline ml-1 text-orange-600" />}
-              </CardTitle>
-              <Ship className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <DeltaCell 
-              value={lieferant.vorlaufzeitKalendertage + vorlaufzeitDelta}
-              delta={vorlaufzeitDelta}
-              inverseLogic={true}
-            />
-            <p className="text-xs text-muted-foreground">Kalendertage Schiff (24/7)</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">LKW-Transport</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {lieferant.lkwTransportChinaArbeitstage + lieferant.lkwTransportDeutschlandArbeitstage}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              AT ({lieferant.lkwTransportChinaArbeitstage} China + {lieferant.lkwTransportDeutschlandArbeitstage} DE)
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Losgröße</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(lieferant.losgroesse, 0)}</div>
-            <p className="text-xs text-muted-foreground">Stück Mindestbestellung</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ✅ VISUALISIERUNG: Vorlaufzeit-Zusammensetzung */}
-      <VorlaufzeitChart
-        produktion={lieferant.vorlaufzeitArbeitstage}
-        lkwChina={lieferant.lkwTransportChinaArbeitstage}
-        seefracht={lieferant.vorlaufzeitKalendertage + vorlaufzeitDelta}
-        lkwDeutschland={lieferant.lkwTransportDeutschlandArbeitstage}
-        gesamt={gesamtVorlaufzeit}
-        height={200}
-      />
 
       {/* ✅ HAUPTSEKTION: Bestellansichten mit Tabs (Tägliche + Monatliche Ansicht) */}
       <Card className="border-orange-200 bg-orange-50">
