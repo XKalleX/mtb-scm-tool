@@ -19,7 +19,7 @@
  */
 
 import { Kalendertag, Feiertag } from '@/types'
-import { addDays, isWeekend, getDayOfYear, getWeekNumber, toLocalISODateString } from './utils'
+import { addDays, isWeekend, getDayOfYear, getWeekNumber, toLocalISODateString, daysBetween } from './utils'
 import feiertagsData from '@/data/feiertage-china.json'
 import feiertagsDeutschlandData from '@/data/feiertage-deutschland.json'
 import lieferantChinaData from '@/data/lieferant-china.json'
@@ -732,4 +732,208 @@ export function istBestellungRechtzeitigGlobal(
 ): boolean {
   const heute = getHeuteDatum()
   return istBestellungRechtzeitig(bedarfsdatum, heute, customFeiertage)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEUE MATERIALFLUSS-FUNKTIONEN (gemäß Issue-Anforderungen)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Prüft ob ein Datum ein Mittwoch ist (Schiffe fahren nur mittwochs ab)
+ * @param datum - Zu prüfendes Datum
+ * @returns True wenn Mittwoch
+ */
+export function istMittwoch(datum: Date): boolean {
+  return datum.getDay() === 3 // 0=Sonntag, 3=Mittwoch
+}
+
+/**
+ * Findet den nächsten Mittwoch ab einem Datum (inklusiv)
+ * Schiffe fahren NUR mittwochs ab Shanghai
+ * @param datum - Start-Datum
+ * @returns Nächster Mittwoch (oder das Datum selbst wenn Mittwoch)
+ */
+export function naechsterMittwoch(datum: Date): Date {
+  let aktuell = new Date(datum)
+  
+  // Maximal 7 Tage vorwärts suchen (ein Mittwoch ist garantiert dabei)
+  for (let i = 0; i < 7; i++) {
+    if (istMittwoch(aktuell)) {
+      return aktuell
+    }
+    aktuell = addDays(aktuell, 1)
+  }
+  
+  // Fallback (sollte nie erreicht werden)
+  return datum
+}
+
+/**
+ * Prüft ob ein Datum ein LKW-Fahrtag ist (Mo-Fr, kein Feiertag)
+ * LKWs fahren NICHT am Wochenende (Samstag/Sonntag)
+ * 
+ * In China: Prüft chinesische Feiertage
+ * In Deutschland: Prüft deutsche Feiertage
+ * 
+ * @param datum - Zu prüfendes Datum
+ * @param land - 'China' oder 'Deutschland'
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
+ * @returns True wenn LKW an diesem Tag fährt
+ */
+export function istLKWFahrtag(
+  datum: Date,
+  land: 'China' | 'Deutschland',
+  customFeiertage?: FeiertagsKonfiguration[]
+): boolean {
+  // Wochenende?
+  if (isWeekend(datum)) {
+    return false
+  }
+  
+  // Feiertag im entsprechenden Land?
+  if (land === 'China') {
+    return istChinaFeiertag(datum, customFeiertage).length === 0
+  } else {
+    return istDeutschlandFeiertag(datum, customFeiertage).length === 0
+  }
+}
+
+/**
+ * Berechnet das Datum X LKW-Fahrtage in der Zukunft
+ * LKWs fahren nur Mo-Fr (keine Wochenenden)
+ * 
+ * @param startDatum - Start-Datum
+ * @param fahrtage - Anzahl Fahrtage
+ * @param land - 'China' oder 'Deutschland'
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
+ * @returns Ziel-Datum
+ */
+export function addLKWFahrtage(
+  startDatum: Date,
+  fahrtage: number,
+  land: 'China' | 'Deutschland',
+  customFeiertage?: FeiertagsKonfiguration[]
+): Date {
+  let aktuell = new Date(startDatum)
+  let verbleibendeFahrtage = fahrtage
+  
+  // Maximal 365 Tage durchsuchen (Sicherheit)
+  for (let i = 0; i < 365 && verbleibendeFahrtage > 0; i++) {
+    aktuell = addDays(aktuell, 1)
+    
+    if (istLKWFahrtag(aktuell, land, customFeiertage)) {
+      verbleibendeFahrtage--
+    }
+  }
+  
+  return aktuell
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * DETAILLIERTER MATERIALFLUSS mit Zwischenlagerung
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * Neuer Materialfluss gemäß Issue-Anforderungen:
+ * 
+ * 1. OEM: Bestellung am Bestelldatum
+ * 2. Zulieferer (China): +5 AT Produktion → Warenausgang
+ * 3. LKW China: +2 AT (nur Mo-Fr) → Ankunft Hafen Shanghai
+ * 4. Hafen Shanghai: Warten auf nächsten Mittwoch → Schiff fährt ab
+ * 5. Schiff: +30 KT → Ankunft Hafen Hamburg
+ * 6. LKW Deutschland: +2 AT (nur Mo-Fr) → Ankunft Produktionsstandort
+ * 7. Verfügbarkeit: NÄCHSTER TAG nach Ankunft
+ * 
+ * @param bestelldatum - Datum der Bestellung beim Zulieferer
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
+ * @param lieferantKonfiguration - Optionale Vorlaufzeiten-Konfiguration
+ * @returns Detaillierter Materialfluss mit allen Zwischenstationen
+ */
+export interface MaterialflussDetails {
+  bestelldatum: Date              // Eingang Bestellung bei Zulieferer
+  produktionsende: Date           // Warenausgang beim Zulieferer (+5 AT)
+  lkwAbfahrtChina: Date           // Abfahrt LKW China
+  ankunftHafenShanghai: Date      // Ankunft Hafen Shanghai (+2 AT)
+  schiffAbfahrt: Date             // Abfahrt Schiff (nächster Mittwoch)
+  wartetageHafen: number          // Tage warten am Hafen auf Mittwoch
+  schiffAnkunftHamburg: Date      // Ankunft Hafen Hamburg (+30 KT)
+  lkwAbfahrtDeutschland: Date     // Abfahrt LKW Deutschland
+  ankunftProduktion: Date         // Ankunft am Produktionsstandort (+2 AT)
+  verfuegbarAb: Date              // Verfügbar für Produktion (nächster Tag!)
+  gesamtdauerTage: number         // Gesamte Vorlaufzeit in Kalendertagen
+}
+
+export function berechneMaterialflussDetails(
+  bestelldatum: Date,
+  customFeiertage?: FeiertagsKonfiguration[],
+  lieferantKonfiguration?: LieferantVorlaufzeitKonfiguration
+): MaterialflussDetails {
+  // Vorlaufzeiten aus Konfiguration oder Standard-Werte
+  const vorlaufzeiten = lieferantKonfiguration || STANDARD_VORLAUFZEITEN
+  
+  // Schritt 1: Produktion beim Zulieferer (+5 AT China)
+  const produktionsende = addArbeitstage(bestelldatum, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
+  
+  // Schritt 2: LKW-Transport China zum Hafen (+2 AT, nur Mo-Fr)
+  const lkwAbfahrtChina = produktionsende
+  const ankunftHafenShanghai = addLKWFahrtage(produktionsende, vorlaufzeiten.lkwTransportChinaArbeitstage, 'China', customFeiertage)
+  
+  // Schritt 3: Warten auf nächsten Mittwoch (Schiff fährt nur mittwochs!)
+  const schiffAbfahrt = naechsterMittwoch(addDays(ankunftHafenShanghai, 1)) // Nächster Mittwoch NACH Ankunft
+  const wartetageHafen = Math.max(0, daysBetween(ankunftHafenShanghai, schiffAbfahrt))
+  
+  // Schritt 4: Seefracht (+30 KT)
+  const schiffAnkunftHamburg = addDays(schiffAbfahrt, vorlaufzeiten.vorlaufzeitKalendertage)
+  
+  // Schritt 5: LKW-Transport Deutschland (+2 AT, nur Mo-Fr)
+  // LKW fährt am nächsten Fahrtag nach Ankunft
+  let lkwAbfahrtDeutschland = addDays(schiffAnkunftHamburg, 1)
+  while (!istLKWFahrtag(lkwAbfahrtDeutschland, 'Deutschland', customFeiertage)) {
+    lkwAbfahrtDeutschland = addDays(lkwAbfahrtDeutschland, 1)
+  }
+  
+  const ankunftProduktion = addLKWFahrtage(schiffAnkunftHamburg, vorlaufzeiten.lkwTransportDeutschlandArbeitstage, 'Deutschland', customFeiertage)
+  
+  // Schritt 6: Material ist NÄCHSTEN TAG nach Ankunft verfügbar!
+  const verfuegbarAb = addDays(ankunftProduktion, 1)
+  
+  // Gesamtdauer berechnen
+  const gesamtdauerTage = daysBetween(bestelldatum, verfuegbarAb)
+  
+  return {
+    bestelldatum,
+    produktionsende,
+    lkwAbfahrtChina,
+    ankunftHafenShanghai,
+    schiffAbfahrt,
+    wartetageHafen,
+    schiffAnkunftHamburg,
+    lkwAbfahrtDeutschland,
+    ankunftProduktion,
+    verfuegbarAb,
+    gesamtdauerTage
+  }
+}
+
+/**
+ * Berechnet Verfügbarkeitsdatum mit detailliertem Materialfluss
+ * Ersetzt die einfache berechneAnkunftsdatum Funktion für präzise Berechnungen
+ * 
+ * WICHTIG: Berücksichtigt:
+ * - Schiffe nur mittwochs
+ * - LKWs nicht am Wochenende
+ * - Material verfügbar am nächsten Tag nach Ankunft
+ * 
+ * @param bestelldatum - Wann wurde bestellt
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage
+ * @param lieferantKonfiguration - Optionale Vorlaufzeiten-Konfiguration
+ * @returns Datum ab wann Material für Produktion verfügbar ist
+ */
+export function berechneVerfuegbarkeitsdatum(
+  bestelldatum: Date,
+  customFeiertage?: FeiertagsKonfiguration[],
+  lieferantKonfiguration?: LieferantVorlaufzeitKonfiguration
+): Date {
+  const materialfluss = berechneMaterialflussDetails(bestelldatum, customFeiertage, lieferantKonfiguration)
+  return materialfluss.verfuegbarAb
 }

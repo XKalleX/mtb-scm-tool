@@ -5,15 +5,21 @@
  * 
  * Berechnet realistische Lagerbestandsentwicklung mit:
  * - Realistischen Losgrößen-basierten Lieferungen (500 Stück)
- * - 49 Tage Vorlaufzeit respektiert
+ * - NEUER Materialfluss mit Zwischenlagerung:
+ *   - Schiffe nur mittwochs
+ *   - LKWs nicht am Wochenende
+ *   - Material verfügbar am NÄCHSTEN TAG nach Ankunft
  * - ATP (Available-to-Promise) Checks vor Verbrauch
+ * - PROPORTIONALE ALLOKATION statt FCFS bei Engpässen
  * - Start mit 0 Lagerbestand
  * - Volle OEM-Inbound-Warehouse Integration
  * 
  * KONZEPT:
  * 1. Start mit 0 Lagerbestand
  * 2. Verarbeite Inbound-Lieferungen von generiereTaeglicheBestellungen
+ *    → NEU: Lieferungen nutzen verfuegbarAb Datum (nächster Tag nach Ankunft)
  * 3. Für jeden Produktionstag: ATP-Check → Verbrauch falls verfügbar
+ *    → NEU: Bei Engpass proportionale Verteilung statt FCFS
  * 4. Sammle Statistiken und Warnungen
  */
 
@@ -22,6 +28,7 @@ import type { TagesProduktionEntry } from './zentrale-produktionsplanung'
 import { addDays, toLocalISODateString } from '@/lib/utils'
 import { generiereTaeglicheBestellungen, type TaeglicheBestellung } from './inbound-china'
 import { istArbeitstag_Deutschland, FeiertagsKonfiguration } from '@/lib/kalender'
+import { berechneFaireProduktionszuteilung, validiereLosgroessenTeilbarkeit } from './proportionale-allokation'
 
 /**
  * Konvertiert FeiertagConfig[] zu FeiertagsKonfiguration[] für kalender.ts Funktionen
@@ -142,21 +149,26 @@ function berechneVerbrauchProBauteil(
 }
 
 /**
- * Gruppiert Bestellungen nach Ankunftsdatum
+ * Gruppiert Bestellungen nach Verfügbarkeitsdatum (NEU!)
+ * 
+ * WICHTIG: Verwendet verfuegbarAb statt erwarteteAnkunft!
+ * Material ist erst am NÄCHSTEN TAG nach Ankunft für Produktion verfügbar!
  */
-function gruppiereBestellungenNachAnkunft(
+function gruppiereBestellungenNachVerfuegbarkeit(
   bestellungen: TaeglicheBestellung[]
 ): Map<string, TaeglicheBestellung[]> {
   const grouped = new Map<string, TaeglicheBestellung[]>()
   
   bestellungen.forEach(bestellung => {
-    const ankunftStr = toLocalISODateString(bestellung.erwarteteAnkunft)
+    // NEU: Verwende verfuegbarAb (nächster Tag nach Ankunft) statt erwarteteAnkunft
+    const verfuegbarDatum = bestellung.verfuegbarAb || bestellung.erwarteteAnkunft
+    const verfuegbarStr = toLocalISODateString(verfuegbarDatum)
     
-    if (!grouped.has(ankunftStr)) {
-      grouped.set(ankunftStr, [])
+    if (!grouped.has(verfuegbarStr)) {
+      grouped.set(verfuegbarStr, [])
     }
     
-    grouped.get(ankunftStr)!.push(bestellung)
+    grouped.get(verfuegbarStr)!.push(bestellung)
   })
   
   return grouped
@@ -270,8 +282,8 @@ export function berechneIntegriertesWarehouse(
   const zeitraumEnde = bestellungen[bestellungen.length - 1].bestelldatum.toLocaleDateString('de-DE')
   console.log(`   Zeitraum: ${zeitraumStart} - ${zeitraumEnde}`)
   
-  // Gruppiere Bestellungen nach Ankunftsdatum
-  const lieferungenProTag = gruppiereBestellungenNachAnkunft(bestellungen)
+  // NEU: Gruppiere Bestellungen nach VERFÜGBARKEITSDATUM (nächster Tag nach Ankunft!)
+  const lieferungenProTag = gruppiereBestellungenNachVerfuegbarkeit(bestellungen)
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // STEP 2: INITIALISIERE LAGERBESTÄNDE MIT 0
@@ -281,9 +293,8 @@ export function berechneIntegriertesWarehouse(
   const aktuelleBestaende: Record<string, number> = {}
   
   // Start mit 0 Lagerbestand (keine imaginären Anfangsbestände)
-  // Anforderung: Tag 1-3 (01.01.-03.01.2027) haben KEINE Anfangsbestände
-  // Erste Lieferung: Tag 4 (04.01.2027) mit 500 Sätteln
-  // Vorlaufzeit: 49 Tage → Bestellung muss im November 2026 gestartet werden
+  // Anforderung: Material erst am nächsten Tag nach Ankunft verfügbar!
+  // Mit neuem Materialfluss: Schiffe nur mittwochs, LKWs nicht am Wochenende
   bauteile.forEach(bauteil => {
     aktuelleBestaende[bauteil.id] = 0
   })
