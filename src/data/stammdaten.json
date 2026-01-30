@@ -142,8 +142,8 @@
       "Nur 4 Sattel-Varianten (keine Gabeln, keine Rahmen)",
       "Transport: Nur Schiff (China→Hamburg) + LKW (Hamburg→Dortmund), keine Bahn",
       "Kein Outbound zu 6 internationalen Märkten",
-      "FCFS statt Solver-Optimierung (First-Come-First-Serve)",
-      "Vorlaufzeit: 49 Tage (7 Wochen), Losgröße: 500 Sättel"
+      "Proportionale Allokation statt Solver-Optimierung (faire Verteilung bei Engpässen)",
+      "Planungs-Vorlaufzeit: 49 Tage (fix, konfigurierbar), Losgröße: 500 Sättel"
     ],
     "datenquellen": {
       "beschreibung": "SINGLE SOURCE OF TRUTH - Alle anderen Daten in separaten JSON-Dateien",

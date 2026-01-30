@@ -26,7 +26,16 @@
         "einheit": "AT",
         "von": "Dengwong",
         "nach": "Hafen Shanghai",
-        "beschreibung": "LKW-Transport zum Hafen (Mo-Fr)"
+        "beschreibung": "LKW-Transport zum Hafen (Mo-Fr, NICHT Sa/So)"
+      },
+      {
+        "schritt": 2.5,
+        "typ": "Hafen",
+        "dauer": 0,
+        "einheit": "Wartetage",
+        "von": "Hafen Shanghai",
+        "nach": "Hafen Shanghai",
+        "beschreibung": "Warten auf Mittwoch - Schiffe fahren NUR mittwochs ab!"
       },
       {
         "schritt": 3,
@@ -35,7 +44,7 @@
         "einheit": "KT",
         "von": "Hafen Shanghai",
         "nach": "Hafen Hamburg",
-        "beschreibung": "Seefracht (24/7 unterwegs)"
+        "beschreibung": "Seefracht (24/7 unterwegs) - Abfahrt NUR mittwochs"
       },
       {
         "schritt": 4,
@@ -44,20 +53,49 @@
         "einheit": "AT",
         "von": "Hafen Hamburg",
         "nach": "Werk Dortmund",
-        "beschreibung": "LKW-Transport zum Werk (Mo-Fr)"
+        "beschreibung": "LKW-Transport zum Werk (Mo-Fr, NICHT Sa/So)"
+      },
+      {
+        "schritt": 5,
+        "typ": "Verfügbarkeit",
+        "dauer": 1,
+        "einheit": "Tag",
+        "von": "Werk Dortmund",
+        "nach": "Werk Dortmund",
+        "beschreibung": "Material verfügbar am NÄCHSTEN TAG nach Ankunft"
       }
     ],
     "losgroesse": 500,
     "kapazitaet": 50000,
     "lieferintervall": 14,
+    "schifffahrplan": {
+      "abfahrtstag": "Mittwoch",
+      "frequenz": "wöchentlich",
+      "beschreibung": "Schiffe fahren NUR einmal pro Woche am Mittwoch ab Shanghai"
+    },
+    "lkwRestriktionen": {
+      "fahrtage": ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"],
+      "keineFahrt": ["Samstag", "Sonntag"],
+      "beschreibung": "LKWs fahren NICHT am Wochenende (Sa/So)"
+    },
+    "allokationsprinzip": {
+      "typ": "proportional",
+      "beschreibung": "Proportionale Verteilung bei Engpass (gleicher % Anteil für alle Varianten)",
+      "ersetzt": "FCFS (First-Come-First-Serve)"
+    },
     "besonderheiten": [
       "Einziger Lieferant für Sättel",
       "Spring Festival: 28. Jan - 4. Feb 2027 (8 Tage Produktionsstopp)",
-      "Schiff-Transport: 44 Kalendertage (24/7 unterwegs)",
+      "NEU: Schiffe fahren NUR mittwochs ab Shanghai!",
+      "NEU: LKWs fahren NICHT am Wochenende (Sa/So)!",
+      "NEU: Material verfügbar am NÄCHSTEN TAG nach Ankunft!",
+      "NEU: Proportionale Allokation statt FCFS bei Engpässen!",
+      "Seefracht: 30 Kalendertage (24/7 unterwegs)",
       "Bearbeitung: 5 Arbeitstage (Mo-Fr ohne Feiertage)",
-      "Gesamte Vorlaufzeit: 49 Tage (7 Wochen)",
+      "Wartezeit am Hafen: 1-7 Tage (bis zum nächsten Mittwoch, mind. 1 Tag für Zoll/Beladung)",
+      "Planungs-Vorlaufzeit: 49 Tage (fix im KonfigurationContext, tatsächliche Lieferzeit kann abweichen)",
       "Mindestbestellung: 500 Stück Sättel (Losgröße)",
-      "Lieferintervall: Alle 14 Tage"
+      "Losgrößen-Teilbarkeit: 370.000 / 500 = 740 (ganzzahlig → volle Menge erreichbar)"
     ]
   },
   "komponenten": [
@@ -92,5 +130,5 @@
       "beschreibung": "Aerodynamischer Sattel für Speed"
     }
   },
-  "hinweis": "Nur 4 Sattel-Varianten statt 14 Bauteile. Jedes Bike benötigt genau 1 Sattel."
+  "hinweis": "Nur 4 Sattel-Varianten statt 14 Bauteile. Jedes Bike benötigt genau 1 Sattel. Proportionale Allokation bei Engpässen statt FCFS."
 }
