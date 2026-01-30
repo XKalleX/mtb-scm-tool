@@ -389,7 +389,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: SCORMetriken; i
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number | string) => `${typeof value === "number" ? value.toFixed(2)}%`} />
+                      <Tooltip formatter={(value: number | string) => typeof value === "number" ? `${value.toFixed(2)}%` : `${value}%`} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -423,7 +423,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: SCORMetriken; i
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number | string) => `${typeof value === "number" ? value.toFixed(2)}%`} />
+                      <Tooltip formatter={(value: number | string) => typeof value === "number" ? `${value.toFixed(2)}%` : `${value}%`} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -446,7 +446,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: SCORMetriken; i
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis type="number" domain={[0, 100]} label={{ value: 'Performance (%)', position: 'bottom' }} />
                       <YAxis type="category" dataKey="kategorie" width={120} />
-                      <Tooltip formatter={(value: number | string) => `${typeof value === "number" ? value.toFixed(1)}%`} />
+                      <Tooltip formatter={(value: number | string) => typeof value === "number" ? `${value.toFixed(1)}%` : `${value}%`} />
                       <Bar dataKey="wert" radius={[0, 8, 8, 0]}>
                         {lieferperformanceDaten.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -516,7 +516,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: SCORMetriken; i
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis dataKey="monat" />
                       <YAxis label={{ value: 'Umschlag (x)', angle: -90, position: 'insideLeft' }} domain={[0, 'dataMax + 1']} />
-                      <Tooltip formatter={(value: number | string) => typeof value === 'number' ? `${typeof value === "number" ? value.toFixed(2)}x` : `${value}x`} />
+                      <Tooltip formatter={(value: number | string) => typeof value === "number" ? `${value.toFixed(2)}x` : `${value}x`} />
                       <Line 
                         type="monotone" 
                         dataKey="umschlag" 
@@ -556,7 +556,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: SCORMetriken; i
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis type="number" domain={[0, 100]} label={{ value: 'Genauigkeit (%)', position: 'bottom' }} />
                       <YAxis type="category" dataKey="kategorie" width={140} />
-                      <Tooltip formatter={(value: number | string) => `${typeof value === "number" ? value.toFixed(1)}%`} />
+                      <Tooltip formatter={(value: number | string) => typeof value === "number" ? `${value.toFixed(1)}%` : `${value}%`} />
                       <Bar dataKey="prozent" radius={[0, 8, 8, 0]}>
                         {planungsgenauigkeitDaten.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -598,7 +598,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: SCORMetriken; i
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis type="number" domain={[0, 100]} label={{ value: 'Flexibilität (%)', position: 'bottom' }} />
                       <YAxis type="category" dataKey="kategorie" width={140} />
-                      <Tooltip formatter={(value: number | string) => `${typeof value === "number" ? value.toFixed(1)}%`} />
+                      <Tooltip formatter={(value: number | string) => typeof value === "number" ? `${value.toFixed(1)}%` : `${value}%`} />
                       <Bar dataKey="prozent" radius={[0, 8, 8, 0]}>
                         {flexibilitaetDaten.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -637,7 +637,7 @@ function SCORMetrikenView({ metriken, istBaseline }: { metriken: SCORMetriken; i
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number | string) => `${typeof value === "number" ? value.toFixed(2)}%`} />
+                      <Tooltip formatter={(value: number | string) => typeof value === "number" ? `${value.toFixed(2)}%` : `${value}%`} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
