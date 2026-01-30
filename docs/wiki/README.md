@@ -14,6 +14,10 @@ Dieses Verzeichnis enthält die vollständige Wiki-Dokumentation für das Mounta
 4. **[SSOT.md](SSOT.md)** - Single Source of Truth (JSON als Datenquelle)
 5. **[OEM-Planung.md](OEM-Planung.md)** - Zentrale Produktionsplanung als Berechnungsbasis
 
+### Präsentation & Dokumentation
+- **[Produktion-Warehouse-Praesentation.md](Produktion-Warehouse-Praesentation.md)** - 10-Minuten Präsentation für Produktion & Warehouse Module
+- **[Produktion-Warehouse-Praesentationsguide.md](Produktion-Warehouse-Praesentationsguide.md)** - Präsentationsguide mit Timing und Key Metrics
+- **[Produktion-Warehouse-Fehleranalyse.md](Produktion-Warehouse-Fehleranalyse.md)** - Systematische Fehleranalyse und Validierung
 ### Module-Dokumentation
 - **[Produktion-und-Warehouse.md](Produktion-und-Warehouse.md)** - Ausführliche Dokumentation der Produktionssteuerung und Warehouse Management (Fließtext)
 
@@ -72,6 +76,11 @@ Die Markdown-Dateien können auch direkt im Repository-Browser oder mit Tools wi
 3. [Error-Management.md](Error-Management.md) - Kernalgorithmus verstehen
 
 ### Für Prüfung/Präsentation
+1. [Produktion-Warehouse-Praesentation.md](Produktion-Warehouse-Praesentation.md) - 10-Minuten Präsentation (fertig!)
+2. [Produktion-Warehouse-Praesentationsguide.md](Produktion-Warehouse-Praesentationsguide.md) - Quick-Reference für Präsentation
+3. [Error-Management.md](Error-Management.md) - Zeigt Verständnis mathematischer Konzepte
+4. [ATP-Check.md](ATP-Check.md) - Zeigt Supply Chain Expertise
+5. [Frozen-Zone.md](Frozen-Zone.md) - Zeigt realistische Planung
 1. [Home.md](Home.md) - Gesamtübersicht
 2. [Produktion-Warehouse.md](Produktion-Warehouse.md) - **NEU:** Vollständige Dokumentation für 10-Min-Präsentation
 3. [Produktion-Warehouse-Praesentationshilfe.md](Produktion-Warehouse-Praesentationshilfe.md) - **NEU:** Schnellstart-Guide
@@ -83,6 +92,19 @@ Die Markdown-Dateien können auch direkt im Repository-Browser oder mit Tools wi
 
 ```
 docs/wiki/
+├── Home.md                                      # Einstiegsseite, Navigation
+├── Error-Management.md                          # Rundungsfehler-Korrektur
+├── Frozen-Zone.md                               # 'Heute'-Datum Konzept
+├── ATP-Check.md                                 # Available-To-Promise
+├── SSOT.md                                      # Single Source of Truth
+├── OEM-Planung.md                               # Zentrale Produktionsplanung
+├── Produktion-Warehouse-Praesentation.md        # 10-Min Präsentation
+├── Produktion-Warehouse-Praesentationsguide.md  # Präsentationsguide
+├── Produktion-Warehouse-Fehleranalyse.md        # Fehleranalyse & Validierung
+├── Installation-Setup.md                        # Installation & Setup
+├── FAQ.md                                       # Häufige Fragen
+├── Glossar.md                                   # Fachbegriffe A-Z
+└── README.md                                    # Diese Datei
 ├── Home.md                                         # Einstiegsseite, Navigation
 ├── Error-Management.md                             # Rundungsfehler-Korrektur
 ├── Frozen-Zone.md                                  # 'Heute'-Datum Konzept
@@ -109,11 +131,16 @@ Weitere Wiki-Seiten sind bereits vorhanden oder in Planung:
 - **Saisonalitaet.md** - Monatliche Verteilung Details
 - **Szenarien-System.md** - 4 Szenarien erklärt
 - **SCOR-Metriken.md** - KPI-Berechnungen
+- **Inbound-Logistik.md** - China-Beschaffung Details
 - **Inbound-Logistik.md** - China-Beschaffung
 - **Warehouse-Management.md** - Lagerbestandsführung (kurz)
 - **Produktionssteuerung.md** - Montageplanung (kurz)
 - **Feiertage.md** - Deutschland & China
 - **Troubleshooting.md** - Problemlösungen
+
+✅ **Neu hinzugefügt:**
+- ~~**Warehouse-Management.md**~~ → **Produktion-Warehouse-Praesentation.md** (komplett!)
+- ~~**Produktionssteuerung.md**~~ → **Produktion-Warehouse-Praesentation.md** (komplett!)
 
 ## 💡 Best Practices
 

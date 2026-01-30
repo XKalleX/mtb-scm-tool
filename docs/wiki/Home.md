@@ -17,13 +17,15 @@ Dieses Wiki dokumentiert alle Grundkonzepte, Features und technischen Details de
 
 ### Für Nutzer
 - [Installation & Setup](Installation-Setup.md) - Erste Schritte
-- [Benutzerhandbuch](Benutzerhandbuch.md) - Funktionen nutzen
 - [FAQ](FAQ.md) - Häufige Fragen
 
 ### Für Entwickler
-- [Code-Struktur](Code-Struktur.md) - Architektur-Übersicht
-- [Datenmodell](Datenmodell.md) - JSON-Struktur & SSOT
-- [Berechnungslogik](Berechnungslogik.md) - Kernalgorithmen
+- [SSOT](SSOT.md) - Single Source of Truth verstehen
+- [Error-Management](Error-Management.md) - Kernalgorithmus verstehen
+
+### Für Präsentation/Prüfung
+- **[Produktion-Warehouse-Praesentation.md](Produktion-Warehouse-Praesentation.md)** - 10-Min Präsentation (fertig!)
+- [OEM-Planung](OEM-Planung.md) - Produktionsplanung verstehen
 
 ## 🧠 Kernkonzepte
 
@@ -130,6 +132,18 @@ Das System erfüllt alle 13 Anforderungen der Aufgabenstellung:
 - **Da Yeon Kang** - Inbound Specialist
 - **Shauna Ré Erfurth** - Production & Warehouse Manager
 - **Taha Wischmann** - Distribution Manager
+
+## 🎤 Präsentation & Prüfung
+
+**Fertige Präsentationsmaterialien:**
+- **[Produktion-Warehouse-Praesentation.md](Produktion-Warehouse-Praesentation.md)** - 10-Minuten Präsentation für Produktion & Warehouse Module (3.591 Wörter, vollständig ausformuliert)
+- **[Produktion-Warehouse-Praesentationsguide.md](Produktion-Warehouse-Praesentationsguide.md)** - Quick-Reference mit Timing, Key Metrics und Demo-Walkthrough
+- **[Produktion-Warehouse-Fehleranalyse.md](Produktion-Warehouse-Fehleranalyse.md)** - Systematische Validierung aller Berechnungen (0 kritische Fehler, SEHR GUT ⭐⭐⭐⭐⭐)
+
+**Empfohlene Reihenfolge:**
+1. Lies die Präsentation einmal komplett durch
+2. Merke dir die Key Metrics aus dem Guide
+3. Übe mit der Web-App: https://mtb-scm-tool4.vercel.app/produktion
 
 ## 📚 Weitere Ressourcen
 
