@@ -1,103 +1,60 @@
 
 # Mountain Bike Supply Chain Management System
 
-## 🎯 Projektübersicht
+> **Supply Chain Management System für Adventure Works AG** - WI3 Projektaufgabe HAW Hamburg
 
-Comprehensive Supply Chain Management System für Adventure Works AG - entwickelt als Lösung für die Wirtschaftsinformatik 3 Projektaufgabe an der HAW Hamburg.
+Ein vollständiges SCM-System zur Planung und Steuerung der Mountain Bike Produktion (370.000 Bikes/Jahr) mit vereinfachter China-Beschaffung.
 
-**Optimiert und Vereinfacht** - Fokus auf China als einzigen Lieferanten für maximale Klarheit.
+## 📚 Dokumentation
 
-### Projektziele
+**Neu hier? Start hier:** [📖 Projekt-Wiki](./docs/README.md)
 
-* Erhöhung der Flexibilität in der Mountain Bike Produktion
-* Optimierung der Supply Chain mit **China-Beschaffung** (vereinfacht)
-* Operative Szenarioplanung mit **globalem State Management**
-* SCOR-basiertes Performance Monitoring mit Excel-ähnlichen Tabellen
+Das komplette Wiki mit allen Details:
 
-### Kernfunktionen
+- **[Aufgabenstellung](./docs/01-Aufgabenstellung.md)** - Geschäftsproblem & Kontext
+- **[Supply Chain Konzepte](./docs/02-Supply-Chain-Konzepte.md)** - SCOR, ATP/CTP, Metriken
+- **[Produktstruktur](./docs/03-Produktstruktur.md)** - 8 MTB-Varianten, 4 Sättel
+- **[Zeitparameter](./docs/04-Zeitparameter.md)** - Vorlaufzeiten, Feiertage, Saisonalität
+- **[Szenarien](./docs/05-Szenarien.md)** - 4 operative Szenarien
+- **[Bewertungskriterien](./docs/06-Bewertungskriterien.md)** - A1-A13 Anforderungen
+- **[Glossar](./docs/07-Glossar.md)** - Alle Fachbegriffe erklärt
 
-✅ **Programmplanung** - Wochenbasierte Produktionsplanung für 370.000 Bikes/Jahr mit Excel-Tabellen
+## 🎯 Kernfunktionen
 
-✅ **Stücklistenverwaltung** - Dynamische Konfiguration von 8 MTB-Varianten
+| Modul | Beschreibung |
+|-------|-------------|
+| **Programmplanung** | Wochenbasierte Planung für 370.000 Bikes/Jahr mit Saisonalität |
+| **Inbound China** | Bestellplanung mit 49 Tagen Vorlaufzeit & Losgrößen |
+| **Produktion** | ATP-Check, Kapazitätsplanung, Frozen Zone |
+| **Reporting** | 10+ SCOR-Metriken aus 5 Kategorien |
+| **Szenarien** | Global wirksame Simulationen (Marketingaktion, Ausfall, etc.) |
+| **Visualisierung** | Interaktive Charts & Excel-ähnliche Tabellen |
 
-✅ **Inbound Logistik** - **NUR CHINA** - Alle Komponenten von einem Lieferanten (vereinfacht)
+## 💡 Wichtigste Zahlen
 
-✅ **Produktionssteuerung** - Kapazitätsplanung mit ATP-Check und Excel-Tabellen
-
-✅ **Lagerbestandsmanagement** - Real-time Bestandsüberwachung mit Excel-Darstellung
-
-✅ **SCOR Metriken** - 10+ KPIs aus allen 5 SCOR-Kategorien mit Excel-Tabelle
-
-✅ **Szenario-Simulation** - **Global wirksam** - Szenarien persistieren über Tab-Wechsel
-
-✅ **Interaktive Visualisierungen** - Erweiterte Dashboards mit mehr Charts
-
----
+```
+370.000 Bikes/Jahr    │  8 MTB-Varianten   │  4 Sattel-Typen
+49 Tage Vorlaufzeit   │  April = 16% Peak  │  Losgröße: 500
+```
 
 ## 🏗️ Technologie-Stack
 
-### Frontend
+**Frontend:** Next.js 16, TypeScript, Tailwind CSS, shadcn/ui, Recharts  
+**Backend:** TypeScript Business Logic, JSON-Stammdaten  
+**Development:** Node.js 23+, npm/pnpm, ESLint
 
-* **Next.js 16** - React Framework mit App Router
-* **TypeScript** - Type-safe Development
-* **Tailwind CSS** - Utility-first Styling
-* **shadcn/ui** - UI Component Library
-* **Recharts** - Interaktive Datenvisualisierung
+## 🎓 Code-Ermäßigungen (Vereinfachungen)
 
-### Backend/Logic
+Um die Komplexität zu reduzieren (90% weniger Code):
 
-* **TypeScript** - Business Logic Implementation
-* **JSON** - Stammdaten und Konfiguration
-* **Error Management** - Rundungsfehler-Behandlung
+- ✅ **1 Zulieferer:** Nur China (statt Deutschland, Spanien, China)
+- ✅ **4 Komponenten:** Nur Sättel (statt 14 Bauteile mit Gabeln & Rahmen)
+- ✅ **Kein Outbound:** Keine Distribution zu 6 Märkten
+- ✅ **FCFS-Regel:** First-Come-First-Serve (statt Excel-Solver)
 
-### Development
+**Vorteil:** Fokus auf Kernkonzepte mit gleichen Lernzielen!
 
-* **Node.js 23+** - Runtime Environment
-* **pnpm/npm** - Package Management
-* **ESLint** - Code Quality
-* **Git** - Version Control
-
----
-
-## 📊 Datenmodell
-
-### Stammdaten (stammdaten-optimiert.json)
-
-```json
-{
-  "jahresproduktion": {
-    "gesamt": 370000,
-    "varianten": {
-      "MTBAllrounder": 111000,  // 30%
-      "MTBCompetition": 55500,   // 15%
-      "MTBDownhill": 37000,      // 10%
-      "MTBExtreme": 25900,       // 7%
-      "MTBFreeride": 18500,      // 5%
-      "MTBMarathon": 29600,      // 8%
-      "MTBPerformance": 44400,   // 12%
-      "MTBTrail": 48100          // 13%
-    }
-  },
-  "saisonalitaet": {
-    "peakMonth": "April (16%)",
-    "lowSeasonMonths": ["Oktober (3%)", "Dezember (3%)"]
-  }
-}
-```
-
-### Supply Chain Parameter (Vereinfacht)
-
-| Zulieferer  | Standort  | Liefert | Vorlaufzeit         | Transport | Losgröße |
-| ----------- | --------- | ------- | ------------------- | --------- | -------- |
-| **China**   | Dengwong  | **Sättel (4 Varianten)** | 49 Tage (7 Wochen) | 2 AT + 30 KT + 2 AT | 500     |
-
-**Code-Ermäßigung aktiv:**
-- ✅ Nur 1 Zulieferer: China (statt 3: Deutschland/Heilbronn, Spanien/Zaragoza, China)
-- ✅ Nur Sättel: 4 Varianten (statt 14 Bauteile inkl. Gabeln und Rahmen)
-- ✅ Transport: 2 AT LKW (China→Hafen) + 30 KT Schiff + 2 AT LKW (Hamburg→Dortmund), keine Bahn
-- ✅ Kein Outbound zu 6 Märkten
-
-**Legende:** AT = Arbeitstage, KT = Kalendertage
+Mehr Details: [📋 Aufgabenstellung](./docs/01-Aufgabenstellung.md)
 
 ---
 
@@ -110,12 +67,12 @@ Node.js >= 23.0.0
 npm >= 10.0.0 oder pnpm >= 8.0.0
 ```
 
-### Installation
+### Quick Start
 
 ```bash
 # Repository klonen
 git clone [repository-url]
-cd mtb-supply-chain
+cd mtb-scm-tool
 
 # Dependencies installieren
 npm install
@@ -128,270 +85,106 @@ npm run dev
 pnpm dev
 ```
 
-Anwendung öffnet sich automatisch unter `http://localhost:3000`
+Anwendung öffnet sich unter `http://localhost:3000`
 
----
-
-## 📖 Benutzerhandbuch
-
-### 1. Dashboard-Navigation
-
-Das System verwendet eine  **Excel-ähnliche Tab-Navigation** :
-
-* **Dashboard** - Übersicht mit aktiven Szenarien und Quick-Links
-* **Programmplanung** - Wochenweise Produktionsplanung mit Excel-Tabellen
-* **Stückliste** - Komponenten-Matrix (nur China-Komponenten)
-* **Inbound China** - Lieferplanung mit Excel-Darstellung
-* **Produktion** - Fertigungssteuerung mit ATP-Check und Excel-Tabellen
-* **Reporting** - SCOR Metriken mit Excel-Tabelle und erweiterten Charts
-* **Szenarien** - **Global wirksame** Simulationen (persistieren über Tabs)
-
-### 2. Programmplanung
-
-**Features:**
-
-* Wochenbasierte Planung (52 Wochen)
-* Saisonale Verteilung automatisch angewendet
-* Plan/Ist-Abgleich mit Abweichungsanalyse
-* Frozen Zone Berücksichtigung (aktuelles Datum)
-
-**Workflow:**
-
-1. Jahresproduktion wird automatisch auf Wochen verteilt
-2. Saisonale Faktoren werden angewendet (Peak im April)
-3. Manuelle Anpassungen möglich (+/- Mengen pro Woche)
-4. Änderungen propagieren automatisch zu Teilebedarf
-
-### 3. Szenarien-Manager (Global Wirksam!)
-
-**Wichtig:** Szenarien persistieren jetzt über Tab-Wechsel und beeinflussen alle Berechnungen!
-
-#### Verfügbare Szenarien (Nur China-relevant):
-
-**📈 Marketingaktion**
-
-* **Trigger:** Kampagne erhöht Nachfrage
-* **Auswirkung:** +15-30% Nachfrage für 2-6 Wochen
-* **Parameter:** Start-KW, Dauer, Erhöhung %
-* **Beispiel:** KW 28, 4 Wochen, +20% für alle Varianten
-
-**🔧 China Produktionsausfall**
-
-* **Trigger:** Produktionsausfall beim einzigen Lieferanten
-* **Auswirkung:** **ALLE Komponenten** betroffen (vereinfacht)
-* **Parameter:** Datum, Dauer, Reduktion %
-* **Beispiel:** 7 Tage, -60% Produktion in China
-
-**💧 Transport-Schaden**
-
-* **Trigger:** Container-Verlust auf Seefracht
-* **Auswirkung:** Sofortiger Bestandsverlust
-* **Parameter:** Datum, Menge
-* **Beispiel:** Container mit 1000 Teilen verloren
-
-**🚢 Schiffsverspätung**
-
-* **Trigger:** Wetterverhältnisse auf See
-* **Auswirkung:** Verlängerte Durchlaufzeit
-* **Parameter:** Geplante/neue Ankunft
-* **Beispiel:** +4 Tage Verspätung China → Hamburg
-
-#### Szenario-Workflow (NEU):
-
-1. Szenario aus Liste auswählen
-2. Parameter konfigurieren  
-3. "Szenario hinzufügen" klicken
-4. **Szenario bleibt aktiv über alle Tabs!**
-5. Mehrere Szenarien kombinierbar
-6. "Simulation starten" → Impact-Analyse
-7. Szenarien wirken sich auf **alle Module** aus
-
-### 4. SCOR Metriken Dashboard
-
-**10 Kern-Metriken aus 5 Kategorien:**
-
-#### Reliability (Zuverlässigkeit)
-
-* **RL.1.1** Perfect Order Fulfillment: 94.2% (Ziel: 95%)
-* **RL.2.1** Order Accuracy: 98.1% (Ziel: 98%)
-
-#### Responsiveness (Reaktionsfähigkeit)
-
-* **RS.1.1** Order Cycle Time: 39 Tage (Ziel: 49 Tage, Transport: 2 AT + 30 KT + 2 AT)
-* **RS.2.2** Production Cycle Time: 5.2 Std (Ziel: 6 Std)
-
-#### Agility (Flexibilität)
-
-* **AG.1.1** Supply Chain Flexibility: 87% (Ziel: 85%)
-* **AG.1.2** Upside Adaptability: 21 Tage (Ziel: 20 Tage)
-
-#### Cost (Kosten)
-
-* **CO.1.1** Total SC Cost: 12.5% (Ziel: 13%)
-* **CO.1.2** Cost of Goods Sold: 67% (Ziel: 70%)
-
-#### Assets (Vermögenswerte)
-
-* **AM.1.1** Cash-to-Cash Cycle: 56 Tage (Ziel: 60 Tage)
-* **AM.1.2** Inventory Days of Supply: 39 Tage (Ziel: 49 Tage)
-
-**Ampel-System:**
-
-* 🟢 Grün: Ziel erreicht (100%+)
-* 🟡 Gelb: Nahe Ziel (90-99%)
-* 🔴 Rot: Unter Ziel (<90%)
-
-### 5. Visualisierungen
-
-**Interaktive Charts:**
-
-* Produktionsverlauf (Plan vs. Ist)
-* Variantenverteilung (Pie Chart)
-* Lagerbestandsentwicklung (Multi-Line)
-* Produktionsauslastung (Area Chart)
-* Lieferanten-Performance (Scorecard)
-* SCOR Metriken (Progress Bars)
-
-**Features:**
-
-* Hover-Tooltips mit Detailinformationen
-* Zeitraum-Filter (Woche/Monat/Quartal/Jahr)
-* Export-Funktionen
-* Drill-Down Möglichkeiten
-
----
-
-## 🔧 Konfiguration
-
-### Stammdaten anpassen
-
-Datei: `/lib/stammdaten-optimiert.json`
-
-```json
-{
-  "jahresproduktion": {
-    "gesamt": 370000  // Anpassen für andere Szenarien
-  },
-  "zulieferer": {
-    "china": {
-      "vorlaufzeit": { "tage": 5 }  // Anpassbar
-    }
-  }
-}
-```
-
-### Feiertage konfigurieren
-
-Datei: `/lib/feiertage-china.json`
-
-```json
-{
-  "2027": [
-    {
-      "name": "Spring Festival",
-      "von": "2027-01-28",
-      "bis": "2027-02-10",
-      "produktionsstopp": true
-    }
-  ]
-}
-```
-
----
-
-## 🧪 Testing
+### Verfügbare Scripts
 
 ```bash
-# Unit Tests laufen (wenn konfiguriert)
-npm test
-
-# Plausiblilitätsprüfung
-# → Gesamtproduktion = Summe aller Varianten ✓
-# → Bestandsentwicklung ohne Sprünge ✓
-# → Rundungsfehler < ±1 Bike pro Jahr ✓
+npm run dev       # Development Server
+npm run build     # Production Build
+npm run start     # Production Server
+npm run lint      # ESLint Check
 ```
 
----
+## 📖 Projektstruktur
 
-## 📈 Bewertungskriterien (15-Punkte-Lösung)
+```
+mtb-scm-tool/
+├── docs/                    # 📚 Wiki-Dokumentation
+│   ├── README.md           # Wiki Home
+│   ├── 01-Aufgabenstellung.md
+│   ├── 02-Supply-Chain-Konzepte.md
+│   ├── 03-Produktstruktur.md
+│   ├── 04-Zeitparameter.md
+│   ├── 05-Szenarien.md
+│   ├── 06-Bewertungskriterien.md
+│   └── 07-Glossar.md
+├── src/
+│   ├── data/               # 📊 JSON Stammdaten (SSOT)
+│   ├── contexts/           # 🔄 React Context (KonfigurationContext)
+│   ├── lib/                # 🧮 Berechnungen & Helpers
+│   ├── components/         # 🎨 React Components
+│   └── app/                # 📱 Next.js App Router
+└── kontext/                # 📋 Original-Aufgabenstellung
+```
+
+## 🎯 Bewertungskriterien (A1-A13)
 
 ### ✅ Erfüllte Anforderungen
 
-#### Programmplanung
+| ID | Anforderung | Status | Details |
+|----|-------------|--------|---------|
+| **A1** | Wochenplanung + 'Heute'-Datum | ✅ | [→ A1](./docs/06-Bewertungskriterien.md#a1) |
+| **A2** | Saisonalität + Error Management | ✅ | [→ A2](./docs/06-Bewertungskriterien.md#a2) |
+| **A3** | Feiertage Deutschland (NRW) | ✅ | [→ A3](./docs/06-Bewertungskriterien.md#a3) |
+| **A4** | Sinnvoller Workflow | ✅ | [→ A4](./docs/06-Bewertungskriterien.md#a4) |
+| **A5** | Auftragsverbuchung China | ✅ | [→ A5](./docs/06-Bewertungskriterien.md#a5) |
+| **A6** | Vorlaufzeit 49 Tage korrekt | ✅ | [→ A6](./docs/06-Bewertungskriterien.md#a6) |
+| **A7** | Losgröße 500 Sättel | ✅ | [→ A7](./docs/06-Bewertungskriterien.md#a7) |
+| **A8** | Maschinenausfall-Szenario | ✅ | [→ A8](./docs/06-Bewertungskriterien.md#a8) |
+| **A9** | Spring Festival (8 Tage) | ✅ | [→ A9](./docs/06-Bewertungskriterien.md#a9) |
+| **A10** | Ende-zu-Ende Supply Chain | ✅ | [→ A10](./docs/06-Bewertungskriterien.md#a10) |
+| **A11** | 'Heute'-Datum global | ✅ | [→ A11](./docs/06-Bewertungskriterien.md#a11) |
+| **A12** | Marktverteilung | ✂️ | Entfallen (Code-Ermäßigung) |
+| **A13** | Szenarien + FCFS-Regel | ✅ | [→ A13](./docs/06-Bewertungskriterien.md#a13) |
 
-* [X] Programm auf Wochenbasis
-* [X] Gegenwärtiges Datum berücksichtigt (Frozen Zone)
-* [X] Saisonaler Verlauf korrekt implementiert
-* [X] +/- Mengen separat ausweisbar
-* [X] Variable Stückliste mit Plausibilisierung
+**Vollständige Details:** [📋 Bewertungskriterien](./docs/06-Bewertungskriterien.md)
 
-#### Supply Chain
+## 📊 SCOR-Metriken
 
-* [X] Vollständige SC-Abbildung (China → Dortmund)
-* [X] Korrekte Durchlaufzeiten (Arbeits-/Kalendertage)
-* [X] Fahrpläne für alle Transportmittel
-* [X] Lokale Feiertage (China Spring Festival)
-* [X] Losgrößen korrekt berücksichtigt
+Implementierte KPIs aus allen 5 SCOR-Kategorien:
 
-#### Szenarien
+- **Reliability:** Perfect Order Fulfillment (94.6%), On-Time Delivery
+- **Responsiveness:** Order Cycle Time (39 Tage), Production Cycle Time
+- **Agility:** Flexibility (87%), Upside Adaptability (21 Tage)
+- **Cost:** Total SC Cost (12.5%), COGS (67%)
+- **Assets:** Cash-to-Cash (56 Tage), Inventory Days (39 Tage)
 
-* [X] Marketingaktion mit Nachfrage-Peak
-* [X] Maschinenausfall beim Zulieferer
-* [X] Wasserschaden/Container-Verlust
-* [X] Schiffsverspätung
-
-#### Reporting
-
-* [X] Min. 10 SCOR Metriken (statt 5)
-* [X] Bestandsübersicht mit Engpass-Warnung
-* [X] Kumulative Darstellung Bedarf/Lieferung
-* [X] Interaktive Visualisierungen
-
-#### Software-Qualität
-
-* [X] Excel-ähnliche Bedienoberfläche
-* [X] Modulare Architektur
-* [X] Comprehensive German Commenting
-* [X] Error Management (Rundungsfehler)
-* [X] Präsentationsfähig
+Mehr Details: [🔗 Supply Chain Konzepte](./docs/02-Supply-Chain-Konzepte.md#scor-metriken)
 
 ---
 
-## 👥 Team
+## 👥 Team & Kontakt
 
 **Projekt-Team:**
-
-* Pascal - Supply Chain Lead, Full Stack Development
-* Da Yeon Kang - Inbound Specialist
-* Shauna Ré Erfurth - Production & Warehouse Manager
-* Taha Wischmann - Distribution Manager
+- Pascal Wagner - Supply Chain Lead & Full Stack Development
+- Da Yeon Kang - Inbound Specialist
+- Shauna Ré Erfurth - Production & Warehouse Manager
+- Taha Wischmann - Distribution Manager
 
 **Zielnote:** 15 Punkte (1+)
 
----
+**HAW Hamburg** - Wirtschaftsinformatik 3 | WiSe 2024/2025
 
-## 📚 Referenzen
+## 📚 Weitere Ressourcen
 
-* **SCOR Model:** Supply Chain Council / APICS
-* **Aufgabenstellung:** HAW Hamburg WI3 WiSe 2024/2025
-* **Referenzlösung:** MTB_v5_15pkt.xlsx (15-Punkte-Benchmark)
+- 📖 **[Komplettes Wiki](./docs/README.md)** - Alle Details von Grund auf
+- 📋 **[Bewertungskriterien](./docs/06-Bewertungskriterien.md)** - A1-A13 Checkliste
+- 📚 **[Glossar](./docs/07-Glossar.md)** - Alle Fachbegriffe
+- 🎭 **[Szenarien](./docs/05-Szenarien.md)** - Operative Szenarien
+- 📄 **Aufgabenstellung PDF** - `kontext/Aufgabenstellung.pdf`
 
----
+## 🆘 Support
+
+**Bei Fragen:**
+
+1. 📖 Start im [Wiki](./docs/README.md) - Grundlagen verstehen
+2. 📚 Im [Glossar](./docs/07-Glossar.md) nachschlagen - Begriffe klären
+3. ✅ [Bewertungskriterien](./docs/06-Bewertungskriterien.md) checken - Anforderungen prüfen
+4. 💻 Inline-Kommentare lesen - Code ist auf Deutsch dokumentiert
 
 ## 📝 Lizenz
 
 Dieses Projekt wurde für akademische Zwecke entwickelt.
 
 © 2024 HAW Hamburg - Wirtschaftsinformatik 3
-
----
-
-## 🆘 Support
-
-Bei Fragen zur Implementierung:
-
-1. Prüfen Sie die inline Code-Kommentare (auf Deutsch)
-2. Konsultieren Sie die Aufgabenstellung (WI_L_WI3_3.pdf)
-3. Vergleichen Sie mit Referenzlösung (MTB_v5_15pkt.xlsx)
-
-**Wichtig:** Alle Module sind präsentationsbereit mit ausführlicher deutscher Dokumentation!
