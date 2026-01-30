@@ -141,6 +141,10 @@ export default function ProduktionPage() {
   
   // ✅ NEU: Transformiere tagesProduktion mit ECHTEN Warehouse-Backlog-Daten
   // Nutzt die korrekten Backlog-Werte aus warehouse-management (basierend auf Material-Verfügbarkeit)
+  // 
+  // WICHTIG: Bestellungen werden in Losgrößen (500) durchgeführt.
+  // Wenn Gesamtbedarf / Losgröße = Ganzzahl (z.B. 370.000 / 500 = 740),
+  // wird das komplette Volumen produziert! Ist = Plan im Standardfall.
   const tagesProduktionFormatiert = useMemo(() => {
     // Aggregiere Produktions-Backlog aus Warehouse pro Tag (über alle Komponenten)
     const backlogProTag: Record<number, number> = {}
@@ -167,23 +171,31 @@ export default function ProduktionPage() {
       })
     })
     
+    // Berechne kumulative Werte neu basierend auf tatsächlicher Produktion
+    let kumulativIstNeu = 0
+    let kumulativPlanNeu = 0
+    
     return tagesProduktion.map(tag => {
       const warehouseTag = jahr2027Tage.find(wt => wt.tag === tag.tag)
       const hatMaterialEngpass = warehouseTag?.bauteile.some(b => !b.atpCheck.erfuellt) ?? false
       const tatsaechlicheProduktion = tatsaechlichVerbrauchtProTag[tag.tag] || 0
       const backlog = backlogProTag[tag.tag] || 0
-      const nichtProduziert = nichtProduziertProTag[tag.tag] || 0
+      
+      // Kumulative Werte aktualisieren
+      kumulativPlanNeu += tag.planMenge
+      kumulativIstNeu += tag.istArbeitstag ? tatsaechlicheProduktion : 0
       
       // Berechne tatsächliche Abweichung (negativ wenn nicht genug Material)
       // Abweichung = tatsächlich produziert - geplant
+      const tagesIst = tag.istArbeitstag ? tatsaechlicheProduktion : 0
       const tatsaechlicheAbweichung = tag.istArbeitstag 
-        ? tatsaechlicheProduktion - tag.planMenge 
+        ? tagesIst - tag.planMenge 
         : 0
       
       return {
         ...tag,
         // Zeige tatsächliche Ist-Menge basierend auf Material-Verfügbarkeit
-        istMenge: tag.istArbeitstag ? tatsaechlicheProduktion : 0,
+        istMenge: tagesIst,
         // Zeige Abweichung: negativ wenn weniger produziert als geplant
         abweichung: tatsaechlicheAbweichung,
         // Material-Status basierend auf ATP-Check
@@ -191,7 +203,10 @@ export default function ProduktionPage() {
           ? '-'  // An Wochenenden/Feiertagen: Kein Material-Check
           : hatMaterialEngpass ? '✗ Nein' : '✓ Ja',
         // Akkumulierter Produktions-Backlog (nicht-produzierte Mengen die nachgeholt werden müssen)
-        backlog: backlog
+        backlog: backlog,
+        // ✅ NEU: Kumulative Werte korrekt berechnet
+        kumulativPlan: kumulativPlanNeu,
+        kumulativIst: kumulativIstNeu
       }
     })
   }, [tagesProduktion, warehouseResult])
@@ -249,17 +264,21 @@ export default function ProduktionPage() {
     // Materialengpass-Tage aus Warehouse (dort ist es korrekt berechnet)
     const tageOhneMaterial = warehouseResult.jahresstatistik.tageMitBacklog
     
-    // Liefertreue aus Warehouse
-    const liefertreue = warehouseResult.jahresstatistik.liefertreue
+    // ✅ FIX: Planerfüllung = Produziert / Plan * 100 (nicht ATP-Erfolgsrate!)
+    // Die alte "liefertreue" war % der Tage ohne ATP-Fehler, was irreführend war.
+    // Korrekt: Wie viel % der geplanten Produktion wurde tatsächlich erreicht?
+    const planerfuellungProzent = geplantMenge > 0 
+      ? (summeIstProduktion / geplantMenge) * 100 
+      : 100
     
     const baseStats = berechneProduktionsStatistiken(tagesProduktion)
     
     if (hasSzenarien) {
       return {
         geplant: geplantMenge,
-        produziert: summeIstProduktion, // ✅ Korrekt: 370.000 aus tagesProduktion
-        abweichung: summeIstProduktion - geplantMenge, // 0 im Normalfall
-        planerfuellungsgrad: liefertreue,
+        produziert: summeIstProduktion,
+        abweichung: summeIstProduktion - geplantMenge,
+        planerfuellungsgrad: planerfuellungProzent,
         arbeitstage: statistiken.arbeitstage,
         schichtenGesamt: statistiken.schichtenGesamt,
         mitMaterialmangel: tageOhneMaterial,
@@ -270,9 +289,9 @@ export default function ProduktionPage() {
     return {
       ...baseStats,
       geplant: geplantMenge,
-      produziert: summeIstProduktion, // ✅ Korrekt: 370.000 aus tagesProduktion
-      abweichung: summeIstProduktion - geplantMenge, // 0 im Normalfall
-      planerfuellungsgrad: liefertreue,
+      produziert: summeIstProduktion,
+      abweichung: summeIstProduktion - geplantMenge,
+      planerfuellungsgrad: planerfuellungProzent,
       mitMaterialmangel: tageOhneMaterial
     }
   }, [tagesProduktion, hasSzenarien, statistiken, warehouseResult, konfiguration.jahresproduktion])
