@@ -1473,7 +1473,7 @@ function VisualisierungenView({
                     formatter={(value) => {
                       if (value === undefined || value === null) return 'N/A'
                       if (typeof value !== 'number') return String(value)
-                      return typeof value === "number" ? value.toFixed(1) + '%'
+                      return value.toFixed(1) + '%'
                     }}
                   />
                   <Legend wrapperStyle={{ paddingTop: '10px' }} />
