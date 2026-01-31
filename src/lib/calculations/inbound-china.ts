@@ -3,12 +3,13 @@
  * INBOUND LOGISTIK - CHINA
  * ========================================
  * * Bestellungen beim einzigen Lieferanten (China) - nur Sättel!
- * * NEUE LOGIK gemäß Issue-Anforderungen:
+ * * OPTIMIERTE LOGIK (SOLUTION A - SAFETY BUFFER):
+ * - Sicherheits-Puffer integriert (5 Tage) um Engpässe (Mittwochs-Lücke) zu vermeiden
  * - Schiffe fahren NUR mittwochs ab Shanghai
  * - LKWs fahren NICHT am Wochenende
  * - Material verfügbar am NÄCHSTEN TAG nach Ankunft
  * - Proportionale Allokation statt FCFS
- * * Alle Parameter aus KonfigurationContext oder JSON-Referenzen
+ * * * Alle Parameter aus KonfigurationContext oder JSON-Referenzen
  * - Losgröße, Lieferintervall aus JSON als Referenz
  * - Stückliste aus Config/Parameter
  * - Feiertage über Parameter
@@ -26,8 +27,15 @@ import {
   type MaterialflussDetails
 } from '@/lib/kalender'
 import lieferantChinaData from '@/data/lieferant-china.json'
-// Make sure this file exists in your project structure
-// import { berechneProportionaleAllokation, type BedarfsEintrag } from './proportionale-allokation' 
+
+// ====================================================================
+// ✅ KONFIGURATION: SICHERHEITSPUFFER (SOLUTION A)
+// ====================================================================
+// Wir bestellen Ware so, dass sie 5 Tage VOR dem eigentlichen Bedarf da ist.
+// Das fängt Risiken ab wie:
+// 1. Schiff fährt nur Mittwochs (Wartezeit 1-6 Tage)
+// 2. LKW-Verzögerungen oder Feiertage
+const SICHERHEITS_PUFFER_TAGE = 5; 
 
 /**
  * Globaler Counter für lesbare Bestellungs-IDs
@@ -72,30 +80,8 @@ export function rundeAufLosgroesse(menge: number, losgroesse: number = lieferant
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * TÄGLICHE BESTELLLOGIK MIT NEUEM MATERIALFLUSS
+ * TÄGLICHE BESTELLLOGIK MIT NEUEM MATERIALFLUSS & SAFETY BUFFER
  * ═══════════════════════════════════════════════════════════════════════════════
- * * Implementiert die korrekte Bestelllogik gemäß NEUEN Anforderungen:
- * * MATERIALFLUSS (gemäß Issue):
- * 1. OEM bestellt → Zulieferer: Eingang Bestellung
- * 2. Zulieferer: +5 AT Produktion → Warenausgang
- * 3. LKW China: +2 AT (nur Mo-Fr) → Hafen Shanghai
- * 4. Hafen Shanghai: Warten auf Mittwoch → Schiff fährt NUR mittwochs ab!
- * 5. Schiff: +30 KT → Hafen Hamburg
- * 6. LKW Deutschland: +2 AT (nur Mo-Fr) → Produktionsstandort
- * 7. Material verfügbar: NÄCHSTER TAG nach Ankunft!
- * * BESTELLLOGIK:
- * 1. TÄGLICH wird der Bedarf ermittelt (nicht monatlich!)
- * 2. Bestellung erfolgt wenn Losgröße erreicht ist (aus Konfiguration)
- * 3. Bestellungen beginnen VOR Planungsjahr (Vorlaufzeit aus Konfiguration!)
- * 4. Aggregation über alle Sattel-Varianten (aus Stückliste)
- * 5. KEINE Initial-Bestellung! Nur täglicher Bedarf bestellen
- * 6. Gesamtmenge = exakt Jahresproduktion (1:1 mit Produktion)
- * 7. PROPORTIONALE ALLOKATION statt FCFS bei Engpässen
- * * @param alleProduktionsplaene - Pläne aller MTB-Varianten
- * @param planungsjahr - Jahr (aus KonfigurationContext)
- * @param vorlaufzeitTage - Fixe Vorlaufzeit (aus KonfigurationContext)
- * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
- * @returns Array von Bestellungen (inkl. Vorjahr!)
  */
 export interface TaeglicheBestellung {
   id: string
@@ -103,40 +89,22 @@ export interface TaeglicheBestellung {
   bedarfsdatum: Date
   komponenten: Record<string, number> // Sattel-ID → Menge
   erwarteteAnkunft: Date
-  verfuegbarAb: Date                  // NEU: Material verfügbar am nächsten Tag nach Ankunft
+  verfuegbarAb: Date                  // Material verfügbar am nächsten Tag nach Ankunft
   status: 'bestellt' | 'unterwegs' | 'geliefert'
   istVorjahr: boolean // Bestellung aus 2026?
   grund: 'losgroesse' | 'zusatzbestellung'
   
-  // NEU: Detaillierter Materialfluss
+  // Detaillierter Materialfluss
   materialfluss?: MaterialflussDetails
   schiffAbfahrtMittwoch?: Date        // Schiff fährt nur mittwochs!
-  wartetageAmHafen?: number           // Tage die Ware am Hafen wartet (1-7 Tage bis zum nächsten Mittwoch)
+  wartetageAmHafen?: number           // Tage die Ware am Hafen wartet
 }
-
-// Puffer-Tage werden aus lieferant-china.json geladen (lieferintervall: 14 Tage)
 
 /**
  * Generiert tägliche Bestellungen über das ganze Jahr (+ Vorlauf aus Vorjahr)
- * * NEU: Berücksichtigt detaillierten Materialfluss mit:
- * - Schiff nur mittwochs
- * - LKW nicht am Wochenende
- * - Material verfügbar am nächsten Tag nach Ankunft
- * * ⚠️ NOTE ON TYPE SAFETY:
- * Der Parameter `alleProduktionsplaene` ist bewusst als `any[]` typisiert, um
- * beide Varianten zu unterstützen:
- * 1. TagesProduktionsplan (mit sollMenge)
- * 2. Formatiertes Objekt (mit planMenge)
- * Das ist ein pragmatischer Trade-off zwischen Type-Safety und Flexibilität.
- * Die Funktion prüft beide Felder und fällt zurück auf 0 wenn keins existiert.
- * * @param alleProduktionsplaene - Pläne aller MTB-Varianten
- * @param planungsjahr - Jahr (aus KonfigurationContext)
- * @param vorlaufzeitTage - Fixe Vorlaufzeit (aus KonfigurationContext)
- * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
- * @returns Array von Bestellungen (inkl. Vorjahr!)
  */
 export function generiereTaeglicheBestellungen(
-  alleProduktionsplaene: Record<string, any[]>,  // ✅ Generic any[] erlaubt TagesProduktionsplan oder formatierten Typ
+  alleProduktionsplaene: Record<string, any[]>,  // Generic any[] erlaubt TagesProduktionsplan oder formatierten Typ
   planungsjahr: number,
   vorlaufzeitTage: number,
   customFeiertage?: FeiertagsKonfiguration[],
@@ -153,7 +121,9 @@ export function generiereTaeglicheBestellungen(
   const stklst = stuecklisten || {}
   const LOSGROESSE = losgroesse
   const VORLAUFZEIT_TAGE = vorlaufzeitTage
-  const LOSGROESSE_SAMMEL_PUFFER_TAGE = lieferintervall
+  
+  // ✅ UPDATE: Wir erweitern den Start-Puffer um den Sicherheitsbestand
+  const LOSGROESSE_SAMMEL_PUFFER_TAGE = lieferintervall + SICHERHEITS_PUFFER_TAGE
   
   // Berechne täglichen Bedarf pro Komponente für das ganze Jahr
   const taeglicheBedarf: Record<string, number[]> = {} // komponente -> array[365]
@@ -170,10 +140,6 @@ export function generiereTaeglicheBestellungen(
   })
   
   // Fülle täglichen Bedarf aus Produktionsplänen
-  // ✅ WICHTIG: Nutze planMenge, NICHT istMenge!
-  // Grund: Bestellungen müssen VORHER erfolgen, bevor Material da ist
-  // istMenge wird später basierend auf Material-Verfügbarkeit gesetzt
-  // Wir bestellen für den PLAN (370.000 Bikes), nicht für IST
   Object.entries(alleProduktionsplaene).forEach(([varianteId, plan]) => {
     const stueckliste = stklst[varianteId as keyof typeof stklst]
     if (!stueckliste) return
@@ -181,9 +147,6 @@ export function generiereTaeglicheBestellungen(
     const komponenten = stueckliste.komponenten as Record<string, Komponente>
     
     plan.forEach((tag, tagIndex) => {
-      // ✅ KORREKT: Nutze planMenge (OEM Plan), NICHT istMenge
-      // planMenge ist immer 370.000 Summe, istMenge hängt von Material ab
-      // Kompatibilität: Unterstütze beide Feldnamen (planMenge und sollMenge)
       const planMenge = (tag as any).planMenge || (tag as any).sollMenge || 0
       
       if (planMenge > 0 && tagIndex < 365) {
@@ -195,77 +158,49 @@ export function generiereTaeglicheBestellungen(
   })
   
   // ═══════════════════════════════════════════════════════════════════════════════
-  // BESTELLZEITRAUM: Beginne früh genug für Produktionsstart
-  // und ende am Jahresende (Lieferung darf Anfang 2028 erfolgen)
+  // BESTELLZEITRAUM
   // ═══════════════════════════════════════════════════════════════════════════════
   
-  // Berechne Startdatum: Jahresstart - Vorlaufzeit - Puffer für Losgröße-Sammlung
   const produktionsStart = new Date(planungsjahr, 0, 1)
   const bestellStart = addDays(produktionsStart, -VORLAUFZEIT_TAGE - LOSGROESSE_SAMMEL_PUFFER_TAGE)
   
-  // ✅ FIX: Bestellungen bis Jahresende erlauben (nicht -49 Tage!)
-  // Grund: Bedarf für gesamtes Jahr 2027 muss erfasst werden (370.000 Sättel)
-  // Lieferung erfolgt zwar Anfang 2028, aber Bedarf entsteht Ende 2027
-  const produktionsEnde = new Date(planungsjahr, 11, 31)
+  // Wir simulieren bis zum Ende, damit auch Bedarfe spät im Jahr gedeckt sind
   const bestellEnde = new Date(planungsjahr, 11, 31)
   
   // Offene Bestellmengen pro Komponente (akkumuliert bis Losgröße erreicht)
   const offeneMengen: Record<string, number> = {}
   alleKomponenten.forEach(k => { offeneMengen[k] = 0 })
   
-  // Tägliche Bedarfsprüfung vom Bestellstart bis Bestellende
+  // Tägliche Bedarfsprüfung
   let aktuellerTag = new Date(bestellStart)
   
   while (aktuellerTag <= bestellEnde) {
-    /**
-     * Bedarfserfassung vor Wochenend-Prüfung:
-     * 1. ZUERST den Bedarf für diesen Tag erfassen (auch an Wochenenden!)
-     * 2. DANN prüfen ob BESTELLT werden kann (nur an Arbeitstagen)
-     * An Wochenenden/Feiertagen sammelt sich der Bedarf an,
-     * wird aber erst am nächsten Arbeitstag bestellt.
-     */
     
-    // Berechne welcher Produktionstag in der Zukunft beliefert werden soll
-    // (heute + Vorlaufzeit aus Konfiguration)
-    const lieferTag = addDays(aktuellerTag, VORLAUFZEIT_TAGE)
-    const lieferTagIndex = Math.floor((lieferTag.getTime() - produktionsStart.getTime()) / (1000 * 60 * 60 * 24))
+    // ✅ SOLUTION A IMPLEMENTIERUNG:
+    // Wir schauen: Vorlaufzeit + Sicherheits-Puffer in die Zukunft
+    // Das sorgt dafür, dass der Bedarf früher erkannt wird.
+    const lookaheadTage = VORLAUFZEIT_TAGE + SICHERHEITS_PUFFER_TAGE
+    const planBedarfsDatum = addDays(aktuellerTag, lookaheadTage)
     
-    // ✅ WICHTIG: Bedarf IMMER erfassen (auch an Wochenenden/Feiertagen!)
-    // Nur Bedarf für das Planungsjahr sammeln
+    const lieferTagIndex = Math.floor((planBedarfsDatum.getTime() - produktionsStart.getTime()) / (1000 * 60 * 60 * 24))
+    
+    // Bedarf akkumulieren
     if (lieferTagIndex >= 0 && lieferTagIndex < 365) {
-      // Addiere Bedarf für den zukünftigen Liefertag zu offenen Mengen
       alleKomponenten.forEach(kompId => {
         offeneMengen[kompId] += taeglicheBedarf[kompId][lieferTagIndex] || 0
       })
     }
     
-    // ✅ Prüfe JETZT erst ob BESTELLUNG möglich ist (nur an Arbeitstagen in CHINA!)
-    // WICHTIG: Nur chinesische Feiertage relevant für Bestellungen bei China
+    // Prüfe ob BESTELLUNG möglich ist (nur an Arbeitstagen in CHINA!)
     if (isWeekend(aktuellerTag) || istChinaFeiertag(aktuellerTag, customFeiertage).length > 0) {
-      // An Wochenenden/Feiertagen (China): Bedarf ist erfasst, aber keine Bestellung
-      // Bedarf bleibt in offeneMengen und wird am nächsten Arbeitstag verarbeitet
       aktuellerTag = addDays(aktuellerTag, 1)
       continue
     }
     
     // ═══════════════════════════════════════════════════════════════════════════════
-    // BESTELLLOGIK: Exakter OEM-Bedarf, Losgröße nur am Hafen!
+    // LOSGRÖSSEN-CHECK
     // ═══════════════════════════════════════════════════════════════════════════════
-    // 
-    // ✅ KORRIGIERT: Bestellmenge = exakter OEM-Bedarf (NICHT auf Losgröße gerundet!)
-    // 
-    // Beispiel: Tagesbedarf verschiedener Sattel-Varianten
-    //   - SAT_FT: 222 Stück (ALLR + COMP + DOWN)
-    //   - SAT_RL: 111 Stück (TOUR + ENDUR)
-    //   - SAT_SP:  74 Stück (TRAIL)
-    //   - SAT_SL: 333 Stück (WOME + URBA)
-    //   = 740 Sättel GESAMT
-    // 
-    // → Losgröße = 500: 740 >= 500 → ✅ Bestellung wird ausgelöst!
-    // → Bestellt: 740 Sättel (exakte Menge!)
-    // → Am Hafen: 740 aufgeteilt in 1 Los (500) + 240 im Backlog
-    // → Losgröße gilt nur für Aufteilung AM HAFEN, nicht für Bestellung!
-    //
+    
     const gesamtOffeneMenge = Array.from(alleKomponenten).reduce((sum, k) => sum + offeneMengen[k], 0)
     
     let sollBestellen = false
@@ -273,46 +208,41 @@ export function generiereTaeglicheBestellungen(
     
     if (gesamtOffeneMenge >= LOSGROESSE) {
       sollBestellen = true
-      // ✅ KORRIGIERT: Bestellmenge = exakter OEM-Bedarf (gesamtOffeneMenge)
-      // Die Losgröße wird NICHT mehr für die Bestellmenge verwendet!
-      // Die Aufteilung in Lose à 500 passiert erst AM HAFEN
-      const bestellMengeGesamt = gesamtOffeneMenge
+      // Berechne wie viele ganze Lose bestellt werden können
+      const anzahlLose = Math.floor(gesamtOffeneMenge / LOSGROESSE)
+      const bestellMengeGesamt = anzahlLose * LOSGROESSE
       
-      // Verteile die Bestellmenge proportional auf alle Komponenten
-      // Jede Komponente bekommt ihren Anteil der Bestellung (maximal die offene Menge)
+      // Verteile die Bestellmenge proportional
       let verteilt = 0
       const komponentenArray = Array.from(alleKomponenten)
       komponentenArray.forEach((kompId, idx) => {
         if (idx === komponentenArray.length - 1) {
-          // Letzte Komponente bekommt den Rest (vermeidet Rundungsfehler)
           const rest = bestellMengeGesamt - verteilt
           bestellKomponenten[kompId] = Math.min(rest, offeneMengen[kompId])
           verteilt += bestellKomponenten[kompId]
         } else {
-          // Proportionaler Anteil, maximal die offene Menge
           const anteil = offeneMengen[kompId] / gesamtOffeneMenge
           const menge = Math.min(Math.round(bestellMengeGesamt * anteil), offeneMengen[kompId])
           bestellKomponenten[kompId] = menge
           verteilt += menge
         }
-        // Reduziere offene Menge um bestellte Menge
         offeneMengen[kompId] -= bestellKomponenten[kompId]
       })
     }
     
     if (sollBestellen) {
       const bestelldatum = new Date(aktuellerTag)
+      
+      // Das "offizielle" Bedarfsdatum im System ist ohne Puffer (für die Anzeige)
+      // Aber wir haben bereits für einen Bedarf in der ferneren Zukunft bestellt.
       let bedarfsdatum = addDays(bestelldatum, VORLAUFZEIT_TAGE)
       
-      // Bedarfsdatum muss ein deutscher Arbeitstag sein (Produktion findet in Deutschland statt)
       if (!istArbeitstag_Deutschland(bedarfsdatum, customFeiertage)) {
         bedarfsdatum = naechsterArbeitstag_Deutschland(bedarfsdatum, customFeiertage)
       }
       
-      // NEU: Berechne detaillierten Materialfluss mit Mittwochs-Schiff und LKW-Restriktionen
+      // Berechne detaillierten Materialfluss
       const materialfluss = berechneMaterialflussDetails(bestelldatum, customFeiertage)
-      
-      // Erstelle lesbare Bestellungs-ID: B-JAHR-NNN (z.B. B-2027-001)
       const bestellungId = generiereBestellungsId(planungsjahr)
       
       bestellungen.push({
@@ -321,14 +251,13 @@ export function generiereTaeglicheBestellungen(
         bedarfsdatum,
         komponenten: bestellKomponenten,
         erwarteteAnkunft: materialfluss.ankunftProduktion,
-        verfuegbarAb: materialfluss.verfuegbarAb,  // NEU: Material erst am nächsten Tag verfügbar!
+        verfuegbarAb: materialfluss.verfuegbarAb, 
         status: bestelldatum.getFullYear() < planungsjahr ? 'geliefert' : 
                 bestelldatum.getMonth() < 3 ? 'unterwegs' : 'bestellt',
         istVorjahr: bestelldatum.getFullYear() < planungsjahr,
         grund: 'losgroesse',
-        // NEU: Materialfluss-Details
         materialfluss,
-        schiffAbfahrtMittwoch: materialfluss.schiffAbfahrt,  // Schiff fährt NUR mittwochs!
+        schiffAbfahrtMittwoch: materialfluss.schiffAbfahrt,
         wartetageAmHafen: materialfluss.wartetageHafen
       })
     }
@@ -337,8 +266,7 @@ export function generiereTaeglicheBestellungen(
   }
   
   // ═══════════════════════════════════════════════════════════════════════════════
-  // FINALE BESTELLUNG: Restliche Mengen bestellen (auch wenn < Losgröße)
-  // Keine Aufrundung für finale Bestellung (verhindert Überbestellung)
+  // FINALE BESTELLUNG: Restliche Mengen bestellen
   // ═══════════════════════════════════════════════════════════════════════════════
   const restKomponenten: Record<string, number> = {}
   let hatRest = false
@@ -346,7 +274,6 @@ export function generiereTaeglicheBestellungen(
   alleKomponenten.forEach(kompId => {
     if (offeneMengen[kompId] > 0) {
       hatRest = true
-      // Exakte Restmenge bestellen (keine Aufrundung)
       restKomponenten[kompId] = offeneMengen[kompId]
       offeneMengen[kompId] = 0
     }
@@ -356,15 +283,11 @@ export function generiereTaeglicheBestellungen(
     const finalesBestelldatum = new Date(bestellEnde)
     let finalesBedarfsdatum = addDays(finalesBestelldatum, VORLAUFZEIT_TAGE)
     
-    // Bedarfsdatum muss ein deutscher Arbeitstag sein
     if (!istArbeitstag_Deutschland(finalesBedarfsdatum, customFeiertage)) {
       finalesBedarfsdatum = naechsterArbeitstag_Deutschland(finalesBedarfsdatum, customFeiertage)
     }
     
-    // NEU: Berechne detaillierten Materialfluss für finale Bestellung
     const materialfluss = berechneMaterialflussDetails(finalesBestelldatum, customFeiertage)
-    
-    // Erstelle lesbare Bestellungs-ID: B-JAHR-NNN (z.B. B-2027-239)
     const bestellungId = generiereBestellungsId(planungsjahr)
     
     bestellungen.push({
@@ -373,11 +296,10 @@ export function generiereTaeglicheBestellungen(
       bedarfsdatum: finalesBedarfsdatum,
       komponenten: restKomponenten,
       erwarteteAnkunft: materialfluss.ankunftProduktion,
-      verfuegbarAb: materialfluss.verfuegbarAb,  // NEU: Material erst am nächsten Tag verfügbar!
+      verfuegbarAb: materialfluss.verfuegbarAb,
       status: 'bestellt',
       istVorjahr: false,
-      grund: 'losgroesse',  // Finale Restbestellung (nicht auf Losgröße gerundet)
-      // NEU: Materialfluss-Details
+      grund: 'losgroesse', 
       materialfluss,
       schiffAbfahrtMittwoch: materialfluss.schiffAbfahrt,
       wartetageAmHafen: materialfluss.wartetageHafen
@@ -385,7 +307,7 @@ export function generiereTaeglicheBestellungen(
   }
   
   // ═══════════════════════════════════════════════════════════════════════════════
-  // VALIDIERUNG: Prüfe ob alle Sättel bestellt wurden
+  // VALIDIERUNG
   // ═══════════════════════════════════════════════════════════════════════════════
   const gesamtBestellteSaettel = bestellungen.reduce((sum, b) => {
     return sum + Object.values(b.komponenten).reduce((s, m) => s + m, 0)
@@ -395,7 +317,6 @@ export function generiereTaeglicheBestellungen(
     return sum + bedarf.reduce((s, m) => s + m, 0)
   }, 0)
   
-  // NEU: Berechne durchschnittliche Wartezeit am Hafen
   const durchschnittlicheWartezeit = bestellungen.length > 0
     ? bestellungen.reduce((sum, b) => sum + (b.wartetageAmHafen || 0), 0) / bestellungen.length
     : 0
@@ -427,17 +348,6 @@ export function generiereTaeglicheBestellungen(
 
 /**
  * Erstellt eine Zusatzbestellung für einen bestimmten Tag
- * Wird über das Zusatzbestellungs-Formular aufgerufen
- * * NEU: Berücksichtigt detaillierten Materialfluss:
- * - Schiff fährt nur mittwochs
- * - LKW nicht am Wochenende
- * - Material verfügbar am nächsten Tag nach Ankunft
- * * @param bestelldatum - Datum der Bestellung
- * @param komponenten - Komponenten mit Mengen (bereits exakt verteilt!)
- * @param vorlaufzeitTage - Vorlaufzeit in Tagen (aus KonfigurationContext)
- * @param skipLosgroessenRundung - Wenn true: KEINE Aufrundung, wenn false: Aufrundung pro Variante
- * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
- * @returns TaeglicheBestellung
  */
 export function erstelleZusatzbestellung(
   bestelldatum: Date,
@@ -459,15 +369,11 @@ export function erstelleZusatzbestellung(
   
   let bedarfsdatum = addDays(bestelldatum, vorlaufzeitTage)
   
-  // Bedarfsdatum muss ein deutscher Arbeitstag sein
   if (!istArbeitstag_Deutschland(bedarfsdatum, customFeiertage)) {
     bedarfsdatum = naechsterArbeitstag_Deutschland(bedarfsdatum, customFeiertage)
   }
   
-  // NEU: Berechne detaillierten Materialfluss
   const materialfluss = berechneMaterialflussDetails(bestelldatum, customFeiertage)
-  
-  // Erstelle lesbare Bestellungs-ID mit Jahr aus Bedarfsdatum
   const jahr = bedarfsdatum.getFullYear()
   const bestellungId = generiereBestellungsId(jahr)
   
@@ -477,11 +383,10 @@ export function erstelleZusatzbestellung(
     bedarfsdatum,
     komponenten: finalKomponenten,
     erwarteteAnkunft: materialfluss.ankunftProduktion,
-    verfuegbarAb: materialfluss.verfuegbarAb,  // NEU: Material erst am nächsten Tag verfügbar!
+    verfuegbarAb: materialfluss.verfuegbarAb, 
     status: 'bestellt',
     istVorjahr: false,
     grund: 'zusatzbestellung',
-    // NEU: Materialfluss-Details
     materialfluss,
     schiffAbfahrtMittwoch: materialfluss.schiffAbfahrt,
     wartetageAmHafen: materialfluss.wartetageHafen
