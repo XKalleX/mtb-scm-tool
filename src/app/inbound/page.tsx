@@ -23,7 +23,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Ship, Package, Download, Calendar, CalendarDays, CalendarRange, Zap, Plus, Info } from 'lucide-react'
 import { CollapsibleInfo, CollapsibleInfoGroup, type InfoItem } from '@/components/ui/collapsible-info'
-import { BestellungenChart } from '@/components/ui/table-charts'
 import { formatNumber, addDays, toLocalISODateString } from '@/lib/utils'
 import { exportToJSON } from '@/lib/export'
 import ExcelTable from '@/components/excel-table'
@@ -35,7 +34,7 @@ import { generiereAlleVariantenProduktionsplaene, type TagesProduktionEntry } fr
 import { generiereTaeglicheBestellungen, erstelleZusatzbestellung, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
 import { berechneBedarfsBacklog, type BedarfsBacklogErgebnis } from '@/lib/calculations/bedarfs-backlog-rechnung'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
-import { istDeutschlandFeiertag, ladeDeutschlandFeiertage } from '@/lib/kalender'
+import { istDeutschlandFeiertag, ladeDeutschlandFeiertage, istChinaFeiertag } from '@/lib/kalender'
 import { isWeekend, getWeekNumber } from '@/lib/utils'
 import type { TagesProduktionsplan } from '@/types'
 
@@ -1010,6 +1009,7 @@ export default function InboundPage() {
                  <ExcelTable 
                    columns={[
                     { key: 'bestellungsIds', label: 'Bestellungs-ID(s)', width: '140px', align: 'left', sumable: false, format: (v: string) => v || '-' },
+                    { key: 'bedarfsdatumFormatiert', label: 'Bedarfsdatum', width: '130px', align: 'center', sumable: false },
                     { key: 'bestelldatumFormatiert', label: '0️⃣ Bestellung', width: '130px', align: 'center', sumable: false },
                     { key: 'produktionsstart', label: '1️⃣ Prod. Fertig', width: '130px', align: 'center', sumable: false, format: (v: string) => v || '-' },
                     { key: 'lkwAbfahrtChina', label: '2️⃣ LKW ab CN', width: '130px', align: 'center', sumable: false, format: (v: string) => v || '-' },
@@ -1027,6 +1027,28 @@ export default function InboundPage() {
                    sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel bestellt`}
                    dateColumnKey="bedarfsdatum"
                    highlightRow={(row) => {
+                     // ✅ KRITISCH: Prüfe BESTELLDATUM für China-Feiertage (nicht Bedarfsdatum!)
+                     // Da wir mit China-Lieferanten arbeiten, ist das Bestelldatum relevant
+                     const bestelldatum = row.bestelldatum instanceof Date ? row.bestelldatum : new Date(row.bestelldatum)
+                     const istChinaFeiertagDate = istChinaFeiertag(bestelldatum, konfiguration.feiertage).length > 0
+                     const istBestelldatumWochenende = isWeekend(bestelldatum)
+                     
+                     // Highlight für China-Feiertage und Wochenenden am Bestelldatum
+                     if (istChinaFeiertagDate) {
+                       const feiertagName = istChinaFeiertag(bestelldatum, konfiguration.feiertage)[0]?.name || 'Feiertag'
+                       return { 
+                         color: 'bg-red-100 hover:bg-red-200 border-l-4 border-red-500', 
+                         tooltip: `🔴 China-Feiertag am Bestelldatum: ${feiertagName}` 
+                       }
+                     }
+                     if (istBestelldatumWochenende) {
+                       return { 
+                         color: 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500', 
+                         tooltip: `🟡 Wochenende am Bestelldatum` 
+                       }
+                     }
+                     
+                     // Verspätungs-Highlighting (bestehende Logik)
                      if (row.hatBestellung && row.erwarteteAnkunft && row.bedarfsdatum) {
                        const ankunft = row.erwarteteAnkunft instanceof Date ? row.erwarteteAnkunft : new Date(row.erwarteteAnkunft)
                        const bedarf = row.bedarfsdatum instanceof Date ? row.bedarfsdatum : new Date(row.bedarfsdatum)
@@ -1271,20 +1293,6 @@ export default function InboundPage() {
                   return row.bundleColor ? { color: row.bundleColor + ' border-l-4 border-blue-400', tooltip: `Bundle ${row.bundleMarker}` } : null
                 }}
               />
-              
-              {/* Chart: Monatliche Liefermengen */}
-              <div className="mt-4">
-                <BestellungenChart
-                  daten={taeglicheBestellungen.map(b => ({
-                    bestelldatum: b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum),
-                    menge: Object.values(b.komponenten).reduce((sum, m) => sum + m, 0),
-                    komponenten: b.komponenten,
-                    status: b.status
-                  }))}
-                  aggregation="monat"
-                  height={250}
-                />
-              </div>
             </div>
           </div>
         </CardContent>
