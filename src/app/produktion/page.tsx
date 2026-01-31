@@ -35,7 +35,7 @@ import {
   type TagesProduktionEntry
 } from '@/lib/calculations/zentrale-produktionsplanung'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
-import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport } from '@/lib/calculations/warehouse-management'
+import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport, korrigiereProduktionsplaeneMitWarehouse } from '@/lib/calculations/warehouse-management'
 import { berechneBedarfsBacklog } from '@/lib/calculations/bedarfs-backlog-rechnung'
 import { TagesproduktionChart, LagerbestandChart, FertigerzeugnisseChart, BacklogChart } from '@/components/ui/table-charts'
 
@@ -139,77 +139,83 @@ export default function ProduktionPage() {
     )
   }, [konfiguration, variantenProduktionsplaeneForWarehouse])
   
-  // ✅ NEU: Transformiere tagesProduktion mit ECHTEN Warehouse-Backlog-Daten
-  // Nutzt die korrekten Backlog-Werte aus warehouse-management (basierend auf Material-Verfügbarkeit)
-  // 
-  // WICHTIG: Bestellungen werden in Losgrößen (500) durchgeführt.
-  // Wenn Gesamtbedarf / Losgröße = Ganzzahl (z.B. 370.000 / 500 = 740),
-  // wird das komplette Volumen produziert! Ist = Plan im Standardfall.
+  // 🎯 KERN-FIX: Korrigiere Produktionspläne mit tatsächlichen Warehouse-Daten
+  // Dies löst das Delta-Problem: istMenge wird auf Basis des tatsächlichen
+  // Material-Verbrauchs gesetzt, nicht auf planMenge!
+  const korrigiertePlaene = useMemo(() => {
+    return korrigiereProduktionsplaeneMitWarehouse(
+      variantenProduktionsplaeneForWarehouse,
+      warehouseResult,
+      konfiguration
+    )
+  }, [variantenProduktionsplaeneForWarehouse, warehouseResult, konfiguration])
+  
+  // ✅ NEU: Nutze korrigierte Pläne für Tagesproduktion-Anzeige
+  // Aggregiere über alle Varianten für Gesamt-Tagesansicht
   const tagesProduktionFormatiert = useMemo(() => {
-    // Aggregiere Produktions-Backlog aus Warehouse pro Tag (über alle Komponenten)
-    const backlogProTag: Record<number, number> = {}
-    const tatsaechlichVerbrauchtProTag: Record<number, number> = {}
-    const nichtProduziertProTag: Record<number, number> = {}
-    const nachgeholtProTag: Record<number, number> = {}
+    // Erstelle aggregierte Tagesansicht aus korrigierten Varianten-Plänen
+    const tagesAggregiert: TagesProduktionEntry[] = []
     
-    // Nur 2027 Tage verwenden
+    // Hole Warehouse-Backlog-Daten für Visualisierung
     const jahr2027Tage = warehouseResult.tage.filter(t => t.tag >= 1 && t.tag <= 365)
+    const backlogProTag: Record<number, number> = {}
     
     jahr2027Tage.forEach(warehouseTag => {
-      if (!backlogProTag[warehouseTag.tag]) {
-        backlogProTag[warehouseTag.tag] = 0
-        tatsaechlichVerbrauchtProTag[warehouseTag.tag] = 0
-        nichtProduziertProTag[warehouseTag.tag] = 0
-        nachgeholtProTag[warehouseTag.tag] = 0
-      }
-      
+      let tagesBacklog = 0
       warehouseTag.bauteile.forEach(bauteil => {
-        backlogProTag[warehouseTag.tag] += bauteil.produktionsBacklog.backlogNachher
-        tatsaechlichVerbrauchtProTag[warehouseTag.tag] += bauteil.verbrauch
-        nichtProduziertProTag[warehouseTag.tag] += bauteil.produktionsBacklog.nichtProduziertHeute
-        nachgeholtProTag[warehouseTag.tag] += bauteil.produktionsBacklog.nachgeholt
+        tagesBacklog += bauteil.produktionsBacklog.backlogNachher
       })
+      backlogProTag[warehouseTag.tag] = tagesBacklog
     })
     
-    // Berechne kumulative Werte neu basierend auf tatsächlicher Produktion
-    let kumulativIstNeu = 0
-    let kumulativPlanNeu = 0
+    // Initialisiere 365 Tage
+    for (let tag = 1; tag <= 365; tag++) {
+      // Hole ersten Tag als Template (alle haben gleiche Basis-Infos)
+      const ersterPlan = Object.values(korrigiertePlaene)[0]
+      if (!ersterPlan || tag - 1 >= ersterPlan.tage.length) continue
+      
+      const templateTag = ersterPlan.tage[tag - 1]
+      
+      // Aggregiere Plan und Ist über alle Varianten
+      let gesamtPlan = 0
+      let gesamtIst = 0
+      let hatMaterialEngpass = false
+      
+      Object.values(korrigiertePlaene).forEach(plan => {
+        const variantenTag = plan.tage[tag - 1]
+        gesamtPlan += variantenTag.planMenge
+        gesamtIst += variantenTag.istMenge
+        if (!variantenTag.materialVerfuegbar) {
+          hatMaterialEngpass = true
+        }
+      })
+      
+      tagesAggregiert.push({
+        ...templateTag,
+        planMenge: gesamtPlan,
+        istMenge: gesamtIst,
+        abweichung: gesamtIst - gesamtPlan,
+        materialVerfuegbar: !templateTag.istArbeitstag 
+          ? false  // An Wochenenden/Feiertagen: false
+          : !hatMaterialEngpass,
+        // @ts-expect-error - Füge backlog für Visualisierung hinzu
+        backlog: backlogProTag[tag] || 0
+      })
+    }
     
-    return tagesProduktion.map(tag => {
-      const warehouseTag = jahr2027Tage.find(wt => wt.tag === tag.tag)
-      const hatMaterialEngpass = warehouseTag?.bauteile.some(b => !b.atpCheck.erfuellt) ?? false
-      const tatsaechlicheProduktion = tatsaechlichVerbrauchtProTag[tag.tag] || 0
-      const backlog = backlogProTag[tag.tag] || 0
-      
-      // Kumulative Werte aktualisieren
-      kumulativPlanNeu += tag.planMenge
-      kumulativIstNeu += tag.istArbeitstag ? tatsaechlicheProduktion : 0
-      
-      // Berechne tatsächliche Abweichung (negativ wenn nicht genug Material)
-      // Abweichung = tatsächlich produziert - geplant
-      const tagesIst = tag.istArbeitstag ? tatsaechlicheProduktion : 0
-      const tatsaechlicheAbweichung = tag.istArbeitstag 
-        ? tagesIst - tag.planMenge 
-        : 0
-      
-      return {
-        ...tag,
-        // Zeige tatsächliche Ist-Menge basierend auf Material-Verfügbarkeit
-        istMenge: tagesIst,
-        // Zeige Abweichung: negativ wenn weniger produziert als geplant
-        abweichung: tatsaechlicheAbweichung,
-        // Material-Status basierend auf ATP-Check
-        materialVerfuegbar: !tag.istArbeitstag 
-          ? '-'  // An Wochenenden/Feiertagen: Kein Material-Check
-          : hatMaterialEngpass ? '✗ Nein' : '✓ Ja',
-        // Akkumulierter Produktions-Backlog (nicht-produzierte Mengen die nachgeholt werden müssen)
-        backlog: backlog,
-        // ✅ NEU: Kumulative Werte korrekt berechnet
-        kumulativPlan: kumulativPlanNeu,
-        kumulativIst: kumulativIstNeu
-      }
+    // Berechne kumulative Werte
+    let kumulativPlan = 0
+    let kumulativIst = 0
+    tagesAggregiert.forEach(tag => {
+      kumulativPlan += tag.planMenge
+      kumulativIst += tag.istMenge
+      tag.kumulativPlan = kumulativPlan
+      tag.kumulativIst = kumulativIst
+      tag.kumulativSoll = kumulativPlan
     })
-  }, [tagesProduktion, warehouseResult])
+    
+    return tagesAggregiert
+  }, [korrigiertePlaene, warehouseResult])
   
   // Konvertiere für Darstellung (nur 2027 Tage)
   const tagesLagerbestaende = useMemo(() => {

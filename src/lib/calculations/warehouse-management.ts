@@ -28,7 +28,6 @@ import type { TagesProduktionEntry } from './zentrale-produktionsplanung'
 import { addDays, toLocalISODateString } from '@/lib/utils'
 import { generiereTaeglicheBestellungen, type TaeglicheBestellung } from './inbound-china'
 import { istArbeitstag_Deutschland, FeiertagsKonfiguration } from '@/lib/kalender'
-import { berechneFaireProduktionszuteilung, validiereLosgroessenTeilbarkeit } from './proportionale-allokation'
 
 /**
  * Konvertiert FeiertagConfig[] zu FeiertagsKonfiguration[] für kalender.ts Funktionen
@@ -225,7 +224,7 @@ export function berechneIntegriertesWarehouse(
   })
   
   // Konvertiere Produktionspläne zu TagesProduktionsplan Format
-  const produktionsplaeneFormatiert: Record<string, any[]> = {}
+  const produktionsplaeneFormatiert: Record<string, Array<{datum: Date; varianteId: string; istMenge: number; planMenge: number}>> = {}
   Object.entries(variantenProduktionsplaene).forEach(([varianteId, plan]) => {
     produktionsplaeneFormatiert[varianteId] = plan.tage.map(tag => ({
       datum: tag.datum,
@@ -417,7 +416,7 @@ export function berechneIntegriertesWarehouse(
       let atpErfuellt = true
       let atpGrund: string | undefined
       let benoetigt = 0
-      let backlogVorher = produktionsBacklog[bauteilId]
+      const backlogVorher = produktionsBacklog[bauteilId]
       let nichtProduziertHeute = 0
       let nachgeholt = 0
       
@@ -815,6 +814,135 @@ export function berechneIntegriertesWarehouse(
  * EXPORT HELPERS
  * ═══════════════════════════════════════════════════════════════════════════════
  */
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * PRODUKTIONSPLAN-KORREKTUR MIT WAREHOUSE-DATEN
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * 🎯 KERN-FIX: Korrigiert Produktionspläne mit tatsächlichen Warehouse-Verbrauchs-Daten
+ * 
+ * PROBLEM:
+ * - OEM Plant 370.000 Bikes → setzt istMenge = planMenge
+ * - Warehouse verbraucht nur was verfügbar ist → Delta entsteht!
+ * - Produktion zeigt falsches IST, da Material-Engpässe nicht berücksichtigt
+ * 
+ * LÖSUNG:
+ * - Warehouse kennt tatsächlichen Verbrauch pro Tag und Bauteil
+ * - Rechne zurück: Verbrauch → Bikes pro Variante
+ * - Update istMenge in Produktionsplänen
+ * 
+ * @param variantenProduktionsplaene - Original-Pläne (mit PLAN = IST)
+ * @param warehouseResult - Warehouse-Daten mit tatsächlichem Verbrauch
+ * @param konfiguration - Für Stücklisten-Zuordnung
+ * @returns Korrigierte Produktionspläne mit echten IST-Mengen
+ */
+export function korrigiereProduktionsplaeneMitWarehouse(
+  variantenProduktionsplaene: Record<string, { tage: TagesProduktionEntry[] }>,
+  warehouseResult: WarehouseJahresResult,
+  konfiguration: KonfigurationData
+): Record<string, { tage: TagesProduktionEntry[] }> {
+  
+  // Kopiere Original-Pläne (nicht mutieren!)
+  const korrigiertePlaene: Record<string, { tage: TagesProduktionEntry[] }> = {}
+  
+  Object.entries(variantenProduktionsplaene).forEach(([varianteId, plan]) => {
+    korrigiertePlaene[varianteId] = {
+      tage: plan.tage.map(tag => ({ ...tag })) // Shallow copy
+    }
+  })
+  
+  // Für jeden Tag im Warehouse
+  warehouseResult.tage.forEach(warehouseTag => {
+    const tagImJahr = warehouseTag.tag
+    
+    // Nur Tage im Planungsjahr (1-365)
+    if (tagImJahr < 1 || tagImJahr > 365) return
+    
+    // Für jede Variante
+    Object.entries(korrigiertePlaene).forEach(([varianteId, plan]) => {
+      const tagesIndex = tagImJahr - 1 // Array ist 0-basiert
+      if (tagesIndex < 0 || tagesIndex >= plan.tage.length) return
+      
+      const produktionsTag = plan.tage[tagesIndex]
+      
+      // Finde welches Bauteil diese Variante nutzt (aus Stückliste)
+      const stuecklistenPos = konfiguration.stueckliste.find(
+        s => s.mtbVariante === varianteId
+      )
+      
+      if (!stuecklistenPos) return
+      
+      const bauteilId = stuecklistenPos.bauteilId
+      const mengeFaktor = stuecklistenPos.menge // Normalerweise 1 (1 Sattel = 1 Bike)
+      
+      // Finde Bauteil-Verbrauch im Warehouse
+      const bauteil = warehouseTag.bauteile.find(b => b.bauteilId === bauteilId)
+      if (!bauteil) return
+      
+      // Berechne tatsächliche Bike-Produktion aus Bauteil-Verbrauch
+      // Verbrauch = Anzahl verbrauchter Sättel
+      // Bikes = Verbrauch / mengeFaktor (z.B. 740 Sättel / 1 = 740 Bikes)
+      const tatsaechlichProduzierteBikes = mengeFaktor > 0 
+        ? Math.floor(bauteil.verbrauch / mengeFaktor)
+        : 0
+      
+      // WICHTIG: Verteilung auf Varianten bei gemeinsamen Bauteilen!
+      // Wenn mehrere Varianten dasselbe Bauteil nutzen, müssen wir proportional verteilen
+      // Finde alle Varianten die dieses Bauteil nutzen
+      const variantenMitBauteil = Object.keys(korrigiertePlaene).filter(vId => 
+        konfiguration.stueckliste.some(s => s.mtbVariante === vId && s.bauteilId === bauteilId)
+      )
+      
+      if (variantenMitBauteil.length > 1) {
+        // PROPORTIONALE VERTEILUNG
+        // Berechne Gesamt-PLAN für dieses Bauteil heute
+        let gesamtPlan = 0
+        const variantenPlaene: Record<string, number> = {}
+        
+        variantenMitBauteil.forEach(vId => {
+          const vPlan = korrigiertePlaene[vId].tage[tagesIndex]
+          variantenPlaene[vId] = vPlan.planMenge
+          gesamtPlan += vPlan.planMenge
+        })
+        
+        // Verteile tatsächliche Produktion proportional
+        if (gesamtPlan > 0) {
+          const anteilDieseVariante = variantenPlaene[varianteId] / gesamtPlan
+          const istMengeDieseVariante = Math.round(tatsaechlichProduzierteBikes * anteilDieseVariante)
+          
+          // Update IST-Menge
+          produktionsTag.istMenge = istMengeDieseVariante
+        } else {
+          // Kein Plan → keine Produktion
+          produktionsTag.istMenge = 0
+        }
+      } else {
+        // NUR DIESE VARIANTE nutzt das Bauteil → direkte Zuordnung
+        produktionsTag.istMenge = tatsaechlichProduzierteBikes
+      }
+      
+      // Berechne Abweichung neu
+      produktionsTag.abweichung = produktionsTag.istMenge - produktionsTag.planMenge
+      
+      // Update materialVerfuegbar Flag
+      produktionsTag.materialVerfuegbar = bauteil.atpCheck.erfuellt
+    })
+  })
+  
+  // Berechne kumulative Werte neu
+  Object.values(korrigiertePlaene).forEach(plan => {
+    let kumulativIst = 0
+    plan.tage.forEach(tag => {
+      kumulativIst += tag.istMenge
+      tag.kumulativIst = kumulativIst
+    })
+  })
+  
+  return korrigiertePlaene
+}
 
 /**
  * Konvertiert Warehouse-Result zu Export-Format
