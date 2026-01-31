@@ -24,7 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CollapsibleInfo, CollapsibleInfoGroup, InfoItem } from '@/components/ui/collapsible-info'
 import { SaisonalitaetChart, VariantenPieChart, TagesproduktionChart, KomponentenBarChart } from '@/components/ui/table-charts'
-import { TrendingUp, AlertCircle, Download, Zap, Info } from 'lucide-react'
+import { TrendingUp, AlertCircle, Download, Zap, Info, Calendar, CalendarDays, CalendarRange, Edit2, Check, X } from 'lucide-react'
 import { formatNumber, formatDate, toLocalISODateString } from '@/lib/utils'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { exportToCSV, exportToJSON } from '@/lib/export'
@@ -32,13 +32,24 @@ import { showError, showSuccess } from '@/lib/notifications'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { DeltaCell, DeltaBadge } from '@/components/DeltaCell'
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import { 
   generiereAlleVariantenProduktionsplaene,
   berechneProduktionsStatistiken
 } from '@/lib/calculations/zentrale-produktionsplanung'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { getDateRowBackgroundClasses, getDateTooltip } from '@/lib/date-classification'
+import { 
+  aggregiereNachWoche, 
+  aggregiereNachMonat,
+  WochenProduktionEntry,
+  MonatsProduktionEntry
+} from '@/lib/helpers/programm-aggregation'
+
+/**
+ * Zeitperioden für die Ansichtswahl
+ */
+type ZeitperiodeTyp = 'tag' | 'woche' | 'monat'
 
 /**
  * Type für Stücklisten-Komponenten
@@ -58,6 +69,14 @@ interface StuecklistenKomponente {
  */
 export default function OEMProgrammPage() {
   const [selectedVariante, setSelectedVariante] = useState('MTBAllrounder')
+  // State für Zeitperioden-Ansicht (Tag/Woche/Monat)
+  const [zeitperiode, setZeitperiode] = useState<ZeitperiodeTyp>('tag')
+  // State für manuelle Produktionsanpassungen (Wochen- oder Monatsbasis)
+  // Key: "<zeitperiode>_<periode>_<varianteId>", Value: Anpassungsmenge (+ oder -)
+  const [produktionsAnpassungen, setProduktionsAnpassungen] = useState<Record<string, number>>({})
+  // Editing State
+  const [editingCell, setEditingCell] = useState<{row: number, varianteId: string} | null>(null)
+  const [editValue, setEditValue] = useState<string>('')
   
   // Hole Konfiguration aus Context
   const { konfiguration, isInitialized, getArbeitstageProJahr, getJahresproduktionProVariante } = useKonfiguration()
@@ -276,12 +295,11 @@ export default function OEMProgrammPage() {
       </div>
 
       {/* Hauptinhalt mit Tabs */}
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs defaultValue="allVariants" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="allVariants">Tagesplanung (Alle Varianten)</TabsTrigger>
           <TabsTrigger value="overview">Übersicht</TabsTrigger>
           <TabsTrigger value="stueckliste">Stückliste</TabsTrigger>
-          <TabsTrigger value="details">Tagesplanung (Einzeln)</TabsTrigger>
-          <TabsTrigger value="allVariants">Tagesplanung (Alle Varianten)</TabsTrigger>
           <TabsTrigger value="error">Error-Management</TabsTrigger>
         </TabsList>
 
@@ -583,508 +601,511 @@ export default function OEMProgrammPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="details" className="space-y-4">
-          {/* Statistik-Cards für ausgewählte Variante */}
-          {produktionsplaene && selectedVariante && (() => {
-            const variantePlan = produktionsplaene[selectedVariante]
-            const stats = berechneProduktionsStatistiken(variantePlan.tage)
-            const stl = stuecklistenMap[selectedVariante]
-            const sattel = stl ? Object.values(stl.komponenten)[0] as StuecklistenKomponente : null
-            const peakMonat = konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max)
-            
-            return (
-              <div className="grid gap-4 md:grid-cols-5 mb-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium text-muted-foreground">Jahresproduktion</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-bold">{formatNumber(stats.produziert, 0)}</div>
-                    <p className="text-xs text-muted-foreground">Bikes</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium text-muted-foreground">Produktionstage</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-bold">{stats.arbeitstage}</div>
-                    <p className="text-xs text-muted-foreground">von 365 Tagen</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium text-muted-foreground">Ø pro Tag</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-bold">{formatNumber(stats.produziert / stats.arbeitstage, 1)}</div>
-                    <p className="text-xs text-muted-foreground">Bikes/Tag</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium text-muted-foreground">Peak Tag</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-bold">{formatNumber(Math.max(...variantePlan.tage.map(t => t.istMenge)), 0)}</div>
-                    <p className="text-xs text-muted-foreground">im {peakMonat.name}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium text-muted-foreground">Sattel benötigt</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-bold text-blue-600">{formatNumber(stats.produziert, 0)}</div>
-                    <p className="text-xs text-muted-foreground">{sattel?.name}</p>
-                  </CardContent>
-                </Card>
-              </div>
-            )
-          })()}
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Vollständige Tagesplanung {konfiguration.planungsjahr} - {konfiguration.varianten.find(v => v.id === selectedVariante)?.name}</CardTitle>
-              <CardDescription>
-                Alle {produktionsplaene?.[selectedVariante]?.tage.filter(t => t.istMenge > 0).length} Produktionstage mit Error-Management (scrollbar nutzen)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Varianten-Auswahl */}
-              <div className="mb-4 flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-medium">Variante wählen:</span>
-                {konfiguration.varianten.map(v => (
-                  <Button
-                    key={v.id}
-                    variant={selectedVariante === v.id ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedVariante(v.id)}
-                  >
-                    {v.name}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Formel-Karten */}
-              <div className="grid gap-4 md:grid-cols-2 mb-6">
-                <FormulaCard
-                  title="Soll-Menge Berechnung"
-                  formula="Soll-Menge = (Jahresproduktion / Arbeitstage) × Saisonaler Faktor"
-                  description={`Die tägliche Soll-Menge berücksichtigt die saisonale Verteilung (${konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max).name}-Peak ${konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max).anteil}%).`}
-                  example={`MTB Allrounder: ${formatNumber(Math.round(konfiguration.jahresproduktion * 0.3), 0)} / ${arbeitstage} AT × ${(konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max).anteil / 8.33).toFixed(1)} = ${formatNumber(Math.round(konfiguration.jahresproduktion * 0.3) / arbeitstage * (konfiguration.saisonalitaet.reduce((max, m) => m.anteil > max.anteil ? m : max).anteil / 8.33), 2)} Bikes/Tag`}
-                />
-                <FormulaCard
-                  title="Error-Management Formel"
-                  formula="Kum. Error(t) = Kum. Error(t-1) + (Soll(t) - Ist(t))"
-                  description="Der kumulierte Fehler stellt sicher, dass Rundungsfehler nicht akkumulieren."
-                  example="Tag 1: Error = 0,61 → Tag 2: Error = 1,22 → Ist wird auf 72 aufgerundet"
-                />
-              </div>
-
-              {/* Excel-ähnliche Tabelle mit allen Tagen */}
-              {produktionsplaene && (() => {
-                return (
-                  <ExcelTable
-                    columns={[
-                      {
-                        key: 'datum',
-                        label: 'Datum',
-                        width: '110px',
-                        format: (val) => formatDate(new Date(val)),
-                        sumable: false
-                      },
-                      {
-                        key: 'wochentag',
-                        label: 'Tag',
-                        width: '70px',
-                        align: 'center',
-                        format: (val) => ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(val).getDay()],
-                        sumable: false
-                      },
-                      {
-                        key: 'kw',
-                        label: 'KW',
-                        width: '60px',
-                        align: 'center',
-                        sumable: false
-                      },
-                      {
-                        key: 'monat',
-                        label: 'Monat',
-                        width: '80px',
-                        align: 'center',
-                        sumable: false
-                      },
-                      {
-                        key: 'status',
-                        label: 'Status',
-                        width: '160px',
-                        align: 'left',
-                        sumable: false
-                      },
-                      {
-                        key: 'sollDezimal',
-                        label: 'Soll (Dezimal)',
-                        width: '120px',
-                        align: 'right',
-                        formula: 'Monatsmenge / Arbeitstage',
-                        format: (val) => val === 0 ? '-' : formatNumber(val, 2),
-                        sumable: true
-                      },
-                      {
-                        key: 'planMenge',
-                        label: 'Plan (Gerundet)',
-                        width: '130px',
-                        align: 'right',
-                        formula: 'RUNDEN(Soll + MonatsFehler)',
-                        format: (val) => val === 0 ? '-' : formatNumber(val, 0),
-                        sumable: true
-                      },
-                      {
-                        key: 'tagesError',
-                        label: 'Tages-Error',
-                        width: '110px',
-                        align: 'right',
-                        formula: 'Soll(Dez) - Plan(Int)',
-                        format: (val) => {
-                          if (val === 0 || val === undefined) return '-'
-                          const formatted = formatNumber(val, 3)
-                          return val > 0 ? `+${formatted}` : formatted
-                        },
-                        sumable: false
-                      },
-                      {
-                        key: 'monatsFehler',
-                        label: 'Monats-Error',
-                        width: '120px',
-                        align: 'right',
-                        formula: 'Kumuliert im Monat',
-                        format: (val) => {
-                          if (val === undefined) return '-'
-                          const formatted = formatNumber(val, 3)
-                          return val > 0 ? `+${formatted}` : formatted
-                        },
-                        sumable: false
-                      },
-                      {
-                        key: 'korrektur',
-                        label: 'Korrektur',
-                        width: '90px',
-                        align: 'center',
-                        formula: 'Error-Korrektur?',
-                        format: (val) => val ? '✓' : '-',
-                        sumable: false
-                      },
-                      {
-                        key: 'sattelBedarf',
-                        label: `Sättel`,
-                        width: '100px',
-                        align: 'right',
-                        formula: 'Plan × 1',
-                        format: (val) => val === 0 ? '-' : formatNumber(val, 0),
-                        sumable: true
-                      },
-                      {
-                        key: 'kumulativPlan',
-                        label: 'Σ Plan',
-                        width: '110px',
-                        align: 'right',
-                        format: (val) => formatNumber(val, 0),
-                        sumable: false
-                      }
-                    ]}
-                    data={(() => {
-                      let kumulativPlan = 0
-                      // Zeige ALLE Tage (inkl. Wochenenden/Feiertage)
-                      return produktionsplaene[selectedVariante]?.tage
-                        ?.map(tag => {
-                          const date = tag.datum
-                          // ISO week calculation
-                          const thursday = new Date(date.getTime())
-                          thursday.setDate(thursday.getDate() - (date.getDay() + 6) % 7 + 3)
-                          const firstThursday = new Date(thursday.getFullYear(), 0, 4)
-                          const weekNumber = Math.ceil(((thursday.getTime() - firstThursday.getTime()) / 86400000 + 1) / 7)
-                          
-                          kumulativPlan += tag.planMenge
-                          
-                          // Status für Wochenenden/Feiertage/Arbeitstage
-                          let status = '🟢 Produktionstag'
-                          const wochentag = date.getDay()
-                          const istWochenende = wochentag === 0 || wochentag === 6
-                          
-                          if (tag.istFeiertag && tag.feiertagsName) {
-                            status = `🔴 ${tag.feiertagsName}`
-                          } else if (istWochenende) {
-                            status = wochentag === 0 ? '🟡 Sonntag' : '🟡 Samstag'
-                          }
-                          
-                          return {
-                            datum: date,
-                            wochentag: date,
-                            kw: weekNumber,
-                            monat: tag.monatName,
-                            status: status,
-                            sollDezimal: tag.sollProduktionDezimal,
-                            planMenge: tag.planMenge,
-                            tagesError: tag.tagesError,
-                            monatsFehler: tag.monatsFehlerNachher,
-                            korrektur: tag.errorKorrekturAngewendet,
-                            sattelBedarf: tag.planMenge, // 1:1 Verhältnis
-                            kumulativPlan: kumulativPlan
-                          }
-                        }) || []
-                    })()}
-                    maxHeight="500px"
-                    showFormulas={true}
-                    showSums={true}
-                    sumRowLabel="JAHRESSUMME"
-                    groupBy="monat"
-                    subtotalLabel="Monatssumme"
-                    dateColumnKey="datum"
-                  />
-                )
-              })()}
-              
-              {/* 📊 VISUALISIERUNG: Tagesproduktions-Chart */}
-              {produktionsplaene && selectedVariante && (() => {
-                const plan = produktionsplaene[selectedVariante]
-                return (
-                  <div className="mt-6">
-                    <TagesproduktionChart
-                      daten={plan.tage.map((tag, idx) => ({
-                        tag: idx + 1,
-                        datum: tag.datum,
-                        planMenge: tag.planMenge,
-                        istMenge: tag.istMenge,
-                        monat: tag.datum.getMonth() + 1
-                      }))}
-                      aggregation="monat"
-                      height={300}
-                      showDelta={false}
-                    />
-                  </div>
-                )
-              })()}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* NEU: Alle Varianten in einer Ansicht */}
         <TabsContent value="allVariants" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Tagesplanung - Alle Varianten im Überblick</CardTitle>
-              <CardDescription>
-                Produktionsplanung für alle 8 MTB-Varianten mit kumulativem Error Management.
-                Zeigt alle 365 Tage inkl. Wochenenden/Feiertage (markiert).
-              </CardDescription>
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Produktionsplanung - Alle Varianten</CardTitle>
+                  <CardDescription>
+                    Produktionsplanung für alle 8 MTB-Varianten mit kumulativem Error Management
+                  </CardDescription>
+                </div>
+                {/* Zeitperioden-Schalter */}
+                <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+                  <Button
+                    variant={zeitperiode === 'tag' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setZeitperiode('tag')}
+                    className="gap-1"
+                  >
+                    <Calendar className="h-4 w-4" />
+                    Tag
+                  </Button>
+                  <Button
+                    variant={zeitperiode === 'woche' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setZeitperiode('woche')}
+                    className="gap-1"
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                    Woche
+                  </Button>
+                  <Button
+                    variant={zeitperiode === 'monat' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setZeitperiode('monat')}
+                    className="gap-1"
+                  >
+                    <CalendarRange className="h-4 w-4" />
+                    Monat
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              {/* Aggregierte Statistik */}
-              <div className="grid gap-4 md:grid-cols-4 mb-6">
+              {/* Kompakte Varianten-Statistik (8 Kacheln in einer Zeile) */}
+              <div className="grid grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
                 {Object.entries(produktionsplaene).map(([varianteId, plan]) => {
                   const stats = berechneProduktionsStatistiken(plan.tage)
                   const variante = konfiguration.varianten.find(v => v.id === varianteId)
                   
                   return (
-                    <Card key={varianteId} className="border-blue-200">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">{variante?.name}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-1">
-                        <div className="text-xs text-muted-foreground">Jahresproduktion:</div>
-                        <div className="text-lg font-bold">{formatNumber(stats.produziert, 0)}</div>
-                        <div className="text-xs text-muted-foreground">
-                          Abweichung: {formatNumber(plan.abweichung, 0)} Bikes
-                        </div>
-                        <div className={`text-xs font-semibold ${Math.abs(plan.abweichung) <= 1 ? 'text-green-600' : 'text-orange-600'}`}>
-                          {Math.abs(plan.abweichung) <= 1 ? '✓ Error Management OK' : '⚠ Prüfung nötig'}
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <div 
+                      key={varianteId} 
+                      className={`border rounded-lg p-2 text-center ${Math.abs(plan.abweichung) <= 1 ? 'border-green-300 bg-green-50' : 'border-orange-300 bg-orange-50'}`}
+                    >
+                      <div className="text-xs font-medium truncate" title={variante?.name}>
+                        {variante?.name.replace('MTB ', '')}
+                      </div>
+                      <div className="text-sm font-bold">{formatNumber(stats.produziert, 0)}</div>
+                      <div className={`text-[10px] ${Math.abs(plan.abweichung) <= 1 ? 'text-green-600' : 'text-orange-600'}`}>
+                        {Math.abs(plan.abweichung) <= 1 ? '✓ OK' : `Δ ${plan.abweichung}`}
+                      </div>
+                    </div>
                   )
                 })}
               </div>
 
-              {/* Erklärung */}
-              <div className="mb-4">
+              {/* Tabellen-Ansicht basierend auf Zeitperiode */}
+              {produktionsplaene && (() => {
+                const referenzVariante = Object.values(produktionsplaene)[0]
+                
+                // Generiere aggregierte Daten je nach Zeitperiode
+                if (zeitperiode === 'woche') {
+                  // Wochenansicht
+                  const wochenDaten = konfiguration.varianten.map(v => ({
+                    varianteId: v.id,
+                    varianteName: v.name,
+                    wochen: aggregiereNachWoche(produktionsplaene[v.id].tage)
+                  }))
+                  
+                  // Finde alle eindeutigen Kalenderwochen
+                  const alleKWs = [...new Set(wochenDaten.flatMap(v => v.wochen.map(w => w.kalenderwoche)))].sort((a, b) => a - b)
+                  
+                  return (
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="bg-slate-50 p-2 border-b flex items-center justify-between">
+                        <h4 className="font-semibold text-sm">
+                          Wochenansicht (KW 1-{Math.max(...alleKWs)}) - {alleKWs.length} Kalenderwochen
+                        </h4>
+                        <span className="text-xs text-muted-foreground">
+                          Doppelklick auf Zelle zum Bearbeiten
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead className="sticky top-0 bg-slate-100 border-b">
+                            <tr>
+                              <th className="p-2 text-left font-medium">KW</th>
+                              <th className="p-2 text-left font-medium">Zeitraum</th>
+                              <th className="p-2 text-center font-medium">AT</th>
+                              {konfiguration.varianten.map(v => (
+                                <th key={v.id} className="p-2 text-right font-medium border-l">
+                                  {v.name.replace('MTB ', '')}
+                                </th>
+                              ))}
+                              <th className="p-2 text-right font-medium border-l bg-slate-200">Gesamt</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {alleKWs.map((kw, rowIdx) => {
+                              let gesamt = 0
+                              
+                              return (
+                                <tr key={kw} className="border-b hover:bg-slate-50">
+                                  <td className="p-2 text-left font-medium">KW {kw}</td>
+                                  <td className="p-2 text-left text-xs text-muted-foreground">
+                                    {(() => {
+                                      const woche = wochenDaten[0]?.wochen.find(w => w.kalenderwoche === kw)
+                                      if (woche) {
+                                        return `${formatDate(woche.startDatum)} - ${formatDate(woche.endDatum)}`
+                                      }
+                                      return '-'
+                                    })()}
+                                  </td>
+                                  <td className="p-2 text-center text-xs">
+                                    {wochenDaten[0]?.wochen.find(w => w.kalenderwoche === kw)?.anzahlArbeitstage || 0}
+                                  </td>
+                                  {konfiguration.varianten.map(v => {
+                                    const varianteData = wochenDaten.find(vd => vd.varianteId === v.id)
+                                    const woche = varianteData?.wochen.find(w => w.kalenderwoche === kw)
+                                    const menge = woche?.planMenge || 0
+                                    gesamt += menge
+                                    
+                                    const isEditing = editingCell?.row === rowIdx && editingCell?.varianteId === v.id
+                                    
+                                    return (
+                                      <td 
+                                        key={`${kw}-${v.id}`} 
+                                        className="p-2 text-right border-l cursor-pointer hover:bg-blue-50"
+                                        onDoubleClick={() => {
+                                          setEditingCell({ row: rowIdx, varianteId: v.id })
+                                          setEditValue(menge.toString())
+                                        }}
+                                      >
+                                        {isEditing ? (
+                                          <div className="flex items-center gap-1">
+                                            <input
+                                              type="number"
+                                              className="w-16 px-1 py-0.5 text-right border rounded text-sm"
+                                              value={editValue}
+                                              onChange={(e) => setEditValue(e.target.value)}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  const newValue = parseInt(editValue) || 0
+                                                  const delta = newValue - menge
+                                                  if (delta !== 0) {
+                                                    setProduktionsAnpassungen(prev => ({
+                                                      ...prev,
+                                                      [`woche_${kw}_${v.id}`]: (prev[`woche_${kw}_${v.id}`] || 0) + delta
+                                                    }))
+                                                    showSuccess(`KW ${kw}, ${v.name}: ${delta > 0 ? '+' : ''}${delta} Bikes angepasst`)
+                                                  }
+                                                  setEditingCell(null)
+                                                } else if (e.key === 'Escape') {
+                                                  setEditingCell(null)
+                                                }
+                                              }}
+                                              autoFocus
+                                            />
+                                            <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => setEditingCell(null)}>
+                                              <X className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          formatNumber(menge, 0)
+                                        )}
+                                      </td>
+                                    )
+                                  })}
+                                  <td className="p-2 text-right font-bold border-l bg-slate-50">{formatNumber(gesamt, 0)}</td>
+                                </tr>
+                              )
+                            })}
+                            {/* Summenzeile */}
+                            <tr className="bg-slate-100 font-bold border-t-2">
+                              <td className="p-2" colSpan={3}>JAHRESSUMME</td>
+                              {konfiguration.varianten.map(v => {
+                                const varianteData = wochenDaten.find(vd => vd.varianteId === v.id)
+                                const summe = varianteData?.wochen.reduce((sum, w) => sum + w.planMenge, 0) || 0
+                                return (
+                                  <td key={`sum-${v.id}`} className="p-2 text-right border-l">{formatNumber(summe, 0)}</td>
+                                )
+                              })}
+                              <td className="p-2 text-right border-l bg-slate-200">
+                                {formatNumber(wochenDaten.reduce((total, vd) => 
+                                  total + vd.wochen.reduce((sum, w) => sum + w.planMenge, 0), 0
+                                ), 0)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                } else if (zeitperiode === 'monat') {
+                  // Monatsansicht
+                  const monatsDaten = konfiguration.varianten.map(v => ({
+                    varianteId: v.id,
+                    varianteName: v.name,
+                    monate: aggregiereNachMonat(produktionsplaene[v.id].tage)
+                  }))
+                  
+                  return (
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="bg-slate-50 p-2 border-b flex items-center justify-between">
+                        <h4 className="font-semibold text-sm">
+                          Monatsansicht (Januar - Dezember)
+                        </h4>
+                        <span className="text-xs text-muted-foreground">
+                          Doppelklick auf Zelle zum Bearbeiten
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead className="sticky top-0 bg-slate-100 border-b">
+                            <tr>
+                              <th className="p-2 text-left font-medium">Monat</th>
+                              <th className="p-2 text-center font-medium">AT</th>
+                              <th className="p-2 text-center font-medium">Saisonalität</th>
+                              {konfiguration.varianten.map(v => (
+                                <th key={v.id} className="p-2 text-right font-medium border-l">
+                                  {v.name.replace('MTB ', '')}
+                                </th>
+                              ))}
+                              <th className="p-2 text-right font-medium border-l bg-slate-200">Gesamt</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {monatsDaten[0]?.monate.map((monat, rowIdx) => {
+                              let gesamt = 0
+                              const saisonAnteil = konfiguration.saisonalitaet.find(s => s.monat === monat.monat)?.anteil || 0
+                              
+                              return (
+                                <tr key={monat.monat} className="border-b hover:bg-slate-50">
+                                  <td className="p-2 text-left font-medium">{monat.monatName}</td>
+                                  <td className="p-2 text-center text-xs">{monat.anzahlArbeitstage}</td>
+                                  <td className="p-2 text-center">
+                                    <span className={`text-xs px-2 py-0.5 rounded ${saisonAnteil >= 12 ? 'bg-green-100 text-green-700' : 'bg-slate-100'}`}>
+                                      {saisonAnteil}%
+                                    </span>
+                                  </td>
+                                  {konfiguration.varianten.map(v => {
+                                    const varianteData = monatsDaten.find(vd => vd.varianteId === v.id)
+                                    const monatEntry = varianteData?.monate.find(m => m.monat === monat.monat)
+                                    const menge = monatEntry?.planMenge || 0
+                                    gesamt += menge
+                                    
+                                    const isEditing = editingCell?.row === rowIdx && editingCell?.varianteId === v.id
+                                    
+                                    return (
+                                      <td 
+                                        key={`${monat.monat}-${v.id}`} 
+                                        className="p-2 text-right border-l cursor-pointer hover:bg-blue-50"
+                                        onDoubleClick={() => {
+                                          setEditingCell({ row: rowIdx, varianteId: v.id })
+                                          setEditValue(menge.toString())
+                                        }}
+                                      >
+                                        {isEditing ? (
+                                          <div className="flex items-center gap-1">
+                                            <input
+                                              type="number"
+                                              className="w-20 px-1 py-0.5 text-right border rounded text-sm"
+                                              value={editValue}
+                                              onChange={(e) => setEditValue(e.target.value)}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  const newValue = parseInt(editValue) || 0
+                                                  const delta = newValue - menge
+                                                  if (delta !== 0) {
+                                                    setProduktionsAnpassungen(prev => ({
+                                                      ...prev,
+                                                      [`monat_${monat.monat}_${v.id}`]: (prev[`monat_${monat.monat}_${v.id}`] || 0) + delta
+                                                    }))
+                                                    showSuccess(`${monat.monatName}, ${v.name}: ${delta > 0 ? '+' : ''}${delta} Bikes angepasst`)
+                                                  }
+                                                  setEditingCell(null)
+                                                } else if (e.key === 'Escape') {
+                                                  setEditingCell(null)
+                                                }
+                                              }}
+                                              autoFocus
+                                            />
+                                            <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => setEditingCell(null)}>
+                                              <X className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          formatNumber(menge, 0)
+                                        )}
+                                      </td>
+                                    )
+                                  })}
+                                  <td className="p-2 text-right font-bold border-l bg-slate-50">{formatNumber(gesamt, 0)}</td>
+                                </tr>
+                              )
+                            })}
+                            {/* Summenzeile */}
+                            <tr className="bg-slate-100 font-bold border-t-2">
+                              <td className="p-2" colSpan={3}>JAHRESSUMME</td>
+                              {konfiguration.varianten.map(v => {
+                                const varianteData = monatsDaten.find(vd => vd.varianteId === v.id)
+                                const summe = varianteData?.monate.reduce((sum, m) => sum + m.planMenge, 0) || 0
+                                return (
+                                  <td key={`sum-${v.id}`} className="p-2 text-right border-l">{formatNumber(summe, 0)}</td>
+                                )
+                              })}
+                              <td className="p-2 text-right border-l bg-slate-200">
+                                {formatNumber(monatsDaten.reduce((total, vd) => 
+                                  total + vd.monate.reduce((sum, m) => sum + m.planMenge, 0), 0
+                                ), 0)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                } else {
+                  // Tagesansicht (Standard)
+                  const alleTage = referenzVariante.tage
+                  
+                  // Erstelle Daten für ALLE Tage
+                  const data = alleTage.map(refTag => {
+                    const wochentag = refTag.datum.getDay()
+                    const istWochenende = wochentag === 0 || wochentag === 6
+                    
+                    // Status-Ermittlung
+                    let status = '🟢 Produktionstag'
+                    if (refTag.istFeiertag && refTag.feiertagsName) {
+                      status = `🔴 ${refTag.feiertagsName}`
+                    } else if (istWochenende) {
+                      status = wochentag === 0 ? '🟡 Sonntag' : '🟡 Samstag'
+                    }
+                    
+                    const row: Record<string, string | number | Date> = {
+                      datum: refTag.datum,
+                      wochentag: refTag.wochentag,
+                      status: status
+                    }
+                    
+                    let gesamt = 0
+                    
+                    // Füge Daten für jede Variante hinzu
+                    konfiguration.varianten.forEach(v => {
+                      const plan = produktionsplaene[v.id]
+                      const tag = plan?.tage.find(t => 
+                        toLocalISODateString(t.datum) === toLocalISODateString(refTag.datum)
+                      )
+                      
+                      if (tag) {
+                        row[`${v.id}_menge`] = tag.planMenge
+                        row[`${v.id}_error`] = tag.monatsFehlerNachher
+                        gesamt += tag.planMenge
+                      } else {
+                        row[`${v.id}_menge`] = 0
+                        row[`${v.id}_error`] = 0
+                      }
+                    })
+                    
+                    row.gesamt = gesamt
+                    
+                    return row
+                  })
+                  
+                  return (
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="bg-slate-50 p-2 border-b">
+                        <h4 className="font-semibold text-sm">
+                          Legende: <span className="text-muted-foreground font-normal">🔴 = Feiertag | 🟡 = Wochenende | 🟢 = Produktionstag | Error = Monatlicher Error-Tracker (±0.5 = optimal)</span>
+                        </h4>
+                      </div>
+                      <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead className="sticky top-0 bg-slate-100 border-b">
+                            <tr>
+                              <th className="p-2 text-left font-medium">Datum</th>
+                              <th className="p-2 text-center font-medium">Tag</th>
+                              <th className="p-2 text-left font-medium">Status</th>
+                              {konfiguration.varianten.map(v => (
+                                <th key={v.id} colSpan={2} className="p-2 text-center font-medium border-l">
+                                  {v.name.replace('MTB ', '')}
+                                </th>
+                              ))}
+                              <th className="p-2 text-right font-medium border-l bg-slate-200">Gesamt</th>
+                            </tr>
+                            <tr className="bg-slate-50 text-xs text-muted-foreground">
+                              <th className="p-1"></th>
+                              <th className="p-1"></th>
+                              <th className="p-1"></th>
+                              {konfiguration.varianten.map(v => (
+                                <React.Fragment key={`${v.id}-sub`}>
+                                  <th className="p-1 text-right border-l">Bikes</th>
+                                  <th className="p-1 text-right">Error</th>
+                                </React.Fragment>
+                              ))}
+                              <th className="p-1 text-right border-l bg-slate-200">Bikes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {data.map((row, idx) => {
+                              const date = row.datum as Date
+                              const dateClasses = getDateRowBackgroundClasses(date) || 'hover:bg-slate-50'
+                              const tooltip = getDateTooltip(date)
+                              
+                              return (
+                                <tr key={idx} className={`border-b ${dateClasses}`} title={tooltip}>
+                                  <td className="p-2 text-left">{formatDate(row.datum as Date)}</td>
+                                  <td className="p-2 text-center">{row.wochentag as string}</td>
+                                  <td className="p-2 text-left text-xs">{row.status as string}</td>
+                                  {konfiguration.varianten.map(v => {
+                                    const menge = row[`${v.id}_menge`] as number
+                                    const error = row[`${v.id}_error`] as number
+                                    const errorClass = Math.abs(error) > 0.5 ? 'text-orange-600 font-semibold' : ''
+                                    
+                                    return (
+                                      <React.Fragment key={`${v.id}-data`}>
+                                        <td className="p-2 text-right border-l">{menge === 0 ? '-' : formatNumber(menge, 0)}</td>
+                                        <td className={`p-2 text-right ${errorClass}`}>{formatNumber(error, 2)}</td>
+                                      </React.Fragment>
+                                    )
+                                  })}
+                                  <td className="p-2 text-right font-bold border-l bg-slate-50">{(row.gesamt as number) === 0 ? '-' : formatNumber(row.gesamt as number, 0)}</td>
+                                </tr>
+                              )
+                            })}
+                            {/* Summenzeile */}
+                            {(() => {
+                              const gesamtSumme = konfiguration.varianten.reduce((total, v) => {
+                                const plan = produktionsplaene[v.id]
+                                const varianteSumme = plan?.tage.reduce((sum, t) => sum + t.planMenge, 0) || 0
+                                return total + varianteSumme
+                              }, 0)
+                              
+                              return (
+                                <tr className="bg-slate-100 font-bold border-t-2">
+                                  <td className="p-2" colSpan={3}>JAHRESSUMME</td>
+                                  {konfiguration.varianten.map(v => {
+                                    const plan = produktionsplaene[v.id]
+                                    const summe = plan?.tage.reduce((sum, t) => sum + t.planMenge, 0) || 0
+                                    const finalError = plan && plan.tage.length > 0 
+                                      ? plan.tage.filter(t => t.istArbeitstag).slice(-1)[0]?.monatsFehlerNachher || 0
+                                      : 0
+                                    
+                                    return (
+                                      <React.Fragment key={`${v.id}-sum`}>
+                                        <td className="p-2 text-right border-l">{formatNumber(summe, 0)}</td>
+                                        <td className="p-2 text-right">{formatNumber(finalError, 3)}</td>
+                                      </React.Fragment>
+                                    )
+                                  })}
+                                  <td className="p-2 text-right border-l bg-slate-200">
+                                    {formatNumber(gesamtSumme, 0)}
+                                  </td>
+                                </tr>
+                              )
+                            })()}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                }
+              })()}
+
+              {/* Info-Box UNTER der Tabelle */}
+              <div className="mt-4">
                 <CollapsibleInfo
                   title="Ansicht-Erklärung: Alle Varianten gleichzeitig"
                   variant="info"
+                  defaultOpen={false}
                 >
                   <div className="text-sm text-blue-800 space-y-2">
                     <p>
-                      Diese Ansicht zeigt die Tagesproduktion <strong>aller 8 MTB-Varianten</strong> in einer kompakten Tabelle.
+                      Diese Ansicht zeigt die Produktionsplanung <strong>aller 8 MTB-Varianten</strong> in einer kompakten Tabelle.
                     </p>
                     <p>
-                    <strong>Pro Tag sehen Sie:</strong>
-                  </p>
-                  <ul className="list-disc list-inside ml-2 space-y-1">
-                    <li>Produktionsmenge jeder Variante (Ist-Menge mit Error Management)</li>
-                    <li>Kumulativen Error pro Variante (sollte nahe 0 bleiben)</li>
-                    <li>Gesamtproduktion über alle Varianten</li>
-                    <li>🔴 = Feiertag | 🟡 = Wochenende | 🟢 = Produktionstag</li>
-                  </ul>
-                  <p className="pt-2 border-t border-blue-300">
-                    <strong>Vorteil:</strong> Schneller Überblick über die gesamte Produktion und Engpass-Identifikation.
-                  </p>
-                </div>
-              </CollapsibleInfo>
-              </div>
-
-              {/* Alle-Varianten Tabelle */}
-              {produktionsplaene && (() => {
-                // Zeige ALLE Tage (inkl. Wochenenden/Feiertage)
-                const referenzVariante = Object.values(produktionsplaene)[0]
-                const alleTage = referenzVariante.tage
-                
-                // Erstelle Daten für ALLE Tage
-                const data = alleTage.map(refTag => {
-                  const wochentag = refTag.datum.getDay()
-                  const istWochenende = wochentag === 0 || wochentag === 6
-                  
-                  // Status-Ermittlung
-                  let status = '🟢 Produktionstag'
-                  if (refTag.istFeiertag && refTag.feiertagsName) {
-                    status = `🔴 ${refTag.feiertagsName}`
-                  } else if (istWochenende) {
-                    status = wochentag === 0 ? '🟡 Sonntag' : '🟡 Samstag'
-                  }
-                  
-                  const row: Record<string, string | number | Date> = {
-                    datum: refTag.datum,
-                    wochentag: refTag.wochentag,
-                    status: status
-                  }
-                  
-                  let gesamt = 0
-                  
-                  // Füge Daten für jede Variante hinzu
-                  konfiguration.varianten.forEach(v => {
-                    const plan = produktionsplaene[v.id]
-                    const tag = plan?.tage.find(t => 
-                      toLocalISODateString(t.datum) === toLocalISODateString(refTag.datum)
-                    )
-                    
-                    if (tag) {
-                      row[`${v.id}_menge`] = tag.planMenge
-                      // ✅ KORRIGIERT: Monatlicher Error-Tracker (sollte ±0.5 bleiben!)
-                      row[`${v.id}_error`] = tag.monatsFehlerNachher
-                      gesamt += tag.planMenge
-                    } else {
-                      row[`${v.id}_menge`] = 0
-                      row[`${v.id}_error`] = 0
-                    }
-                  })
-                  
-                  row.gesamt = gesamt
-                  
-                  return row
-                })
-                
-                return (
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="bg-slate-50 p-3 border-b">
-                      <h4 className="font-semibold text-sm">
-                        Legende: <span className="text-muted-foreground font-normal">🔴 = Feiertag | 🟡 = Wochenende | 🟢 = Produktionstag | Error = Monatlicher Error-Tracker (±0.5 = optimal)</span>
-                      </h4>
-                    </div>
-                    <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                      <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-slate-100 border-b">
-                          <tr>
-                            <th className="p-2 text-left font-medium">Datum</th>
-                            <th className="p-2 text-center font-medium">Tag</th>
-                            <th className="p-2 text-left font-medium">Status</th>
-                            {konfiguration.varianten.map(v => (
-                              <th key={v.id} colSpan={2} className="p-2 text-center font-medium border-l">
-                                {v.name.replace('MTB ', '')}
-                              </th>
-                            ))}
-                            <th className="p-2 text-right font-medium border-l bg-slate-200">Gesamt</th>
-                          </tr>
-                          <tr className="bg-slate-50 text-xs text-muted-foreground">
-                            <th className="p-1"></th>
-                            <th className="p-1"></th>
-                            <th className="p-1"></th>
-                            {konfiguration.varianten.map(v => (
-                              <React.Fragment key={`${v.id}-sub`}>
-                                <th className="p-1 text-right border-l">Bikes</th>
-                                <th className="p-1 text-right">Error</th>
-                              </React.Fragment>
-                            ))}
-                            <th className="p-1 text-right border-l bg-slate-200">Bikes</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.map((row, idx) => {
-                            // Bestimme Hintergrundfarbe basierend auf Datum
-                            const date = row.datum as Date
-                            const dateClasses = getDateRowBackgroundClasses(date) || 'hover:bg-slate-50'
-                            const tooltip = getDateTooltip(date)
-                            
-                            return (
-                              <tr key={idx} className={`border-b ${dateClasses}`} title={tooltip}>
-                                <td className="p-2 text-left">{formatDate(row.datum as Date)}</td>
-                                <td className="p-2 text-center">{row.wochentag as string}</td>
-                                <td className="p-2 text-left text-xs">{row.status as string}</td>
-                                {konfiguration.varianten.map(v => {
-                                  const menge = row[`${v.id}_menge`] as number
-                                  const error = row[`${v.id}_error`] as number
-                                  const errorClass = Math.abs(error) > 0.5 ? 'text-orange-600 font-semibold' : ''
-                                  
-                                  return (
-                                    <React.Fragment key={`${v.id}-data`}>
-                                      <td className="p-2 text-right border-l">{menge === 0 ? '-' : formatNumber(menge, 0)}</td>
-                                      <td className={`p-2 text-right ${errorClass}`}>{formatNumber(error, 2)}</td>
-                                    </React.Fragment>
-                                  )
-                                })}
-                                <td className="p-2 text-right font-bold border-l bg-slate-50">{(row.gesamt as number) === 0 ? '-' : formatNumber(row.gesamt as number, 0)}</td>
-                              </tr>
-                            )
-                          })}
-                          {/* Summenzeile */}
-                          {(() => {
-                            // ✅ SZENARIO-AWARE: Berechne Gesamtsumme aus allen Varianten-Plänen
-                            // Damit die Tabelle die Szenarien-Auswirkungen korrekt widerspiegelt
-                            const gesamtSumme = konfiguration.varianten.reduce((total, v) => {
-                              const plan = produktionsplaene[v.id]
-                              const varianteSumme = plan?.tage.reduce((sum, t) => sum + t.planMenge, 0) || 0
-                              return total + varianteSumme
-                            }, 0)
-                            
-                            return (
-                              <tr className="bg-slate-100 font-bold border-t-2">
-                                <td className="p-2" colSpan={3}>JAHRESSUMME</td>
-                                {konfiguration.varianten.map(v => {
-                                  const plan = produktionsplaene[v.id]
-                                  const summe = plan?.tage.reduce((sum, t) => sum + t.planMenge, 0) || 0
-                                  // Letzter Monatsfehler des Jahres (Dezember)
-                                  const finalError = plan && plan.tage.length > 0 
-                                    ? plan.tage.filter(t => t.istArbeitstag).slice(-1)[0]?.monatsFehlerNachher || 0
-                                    : 0
-                                  
-                                  return (
-                                    <React.Fragment key={`${v.id}-sum`}>
-                                      <td className="p-2 text-right border-l">{formatNumber(summe, 0)}</td>
-                                      <td className="p-2 text-right">{formatNumber(finalError, 3)}</td>
-                                    </React.Fragment>
-                                  )
-                                })}
-                                <td className="p-2 text-right border-l bg-slate-200">
-                                  {formatNumber(gesamtSumme, 0)}
-                                </td>
-                              </tr>
-                            )
-                          })()}
-                        </tbody>
-                      </table>
-                    </div>
+                      <strong>Zeitperioden-Schalter:</strong> Wechseln Sie zwischen Tag, Woche und Monat-Ansicht mit den Buttons oben rechts.
+                    </p>
+                    <p>
+                      <strong>Bearbeitung:</strong> In der Wochen- und Monatsansicht können Sie Werte per Doppelklick bearbeiten. 
+                      Änderungen wirken sich auf alle nachfolgenden Berechnungen aus.
+                    </p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li>Produktionsmenge jeder Variante (Plan-Menge mit Error Management)</li>
+                      <li>Kumulativen Error pro Variante (sollte nahe 0 bleiben)</li>
+                      <li>Gesamtproduktion über alle Varianten</li>
+                      <li>🔴 = Feiertag | 🟡 = Wochenende | 🟢 = Produktionstag</li>
+                    </ul>
+                    <p className="pt-2 border-t border-blue-300">
+                      <strong>Vorteil:</strong> Schneller Überblick über die gesamte Produktion und Engpass-Identifikation.
+                    </p>
                   </div>
-                )
-              })()}
+                </CollapsibleInfo>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
