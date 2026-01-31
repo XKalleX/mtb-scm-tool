@@ -249,10 +249,10 @@ export function generiereTaeglicheBestellungen(
     }
     
     // ═══════════════════════════════════════════════════════════════════════════════
-    // LOSGRÖSSEN-CHECK: Gilt für TAGESGESAMTMENGE aller Sättel
+    // BESTELLLOGIK: Exakter OEM-Bedarf, Losgröße nur am Hafen!
     // ═══════════════════════════════════════════════════════════════════════════════
     // 
-    // ✅ KORREKT IMPLEMENTIERT: Losgröße wird auf GESAMTMENGE angewendet!
+    // ✅ KORRIGIERT: Bestellmenge = exakter OEM-Bedarf (NICHT auf Losgröße gerundet!)
     // 
     // Beispiel: Tagesbedarf verschiedener Sattel-Varianten
     //   - SAT_FT: 222 Stück (ALLR + COMP + DOWN)
@@ -261,9 +261,10 @@ export function generiereTaeglicheBestellungen(
     //   - SAT_SL: 333 Stück (WOME + URBA)
     //   = 740 Sättel GESAMT
     // 
-    // → Wenn Losgröße = 500: 740 >= 500 → ✅ Bestellung wird ausgelöst!
-    // → Bestellt: 1x Losgröße = 500 Sättel (proportional verteilt)
-    // → Rest (240 Stk) bleibt im Backlog für nächste Bestellung
+    // → Losgröße = 500: 740 >= 500 → ✅ Bestellung wird ausgelöst!
+    // → Bestellt: 740 Sättel (exakte Menge!)
+    // → Am Hafen: 740 aufgeteilt in 1 Los (500) + 240 im Backlog
+    // → Losgröße gilt nur für Aufteilung AM HAFEN, nicht für Bestellung!
     //
     const gesamtOffeneMenge = Array.from(alleKomponenten).reduce((sum, k) => sum + offeneMengen[k], 0)
     
@@ -272,9 +273,10 @@ export function generiereTaeglicheBestellungen(
     
     if (gesamtOffeneMenge >= LOSGROESSE) {
       sollBestellen = true
-      // Berechne wie viele ganze Lose bestellt werden können
-      const anzahlLose = Math.floor(gesamtOffeneMenge / LOSGROESSE)
-      const bestellMengeGesamt = anzahlLose * LOSGROESSE
+      // ✅ KORRIGIERT: Bestellmenge = exakter OEM-Bedarf (gesamtOffeneMenge)
+      // Die Losgröße wird NICHT mehr für die Bestellmenge verwendet!
+      // Die Aufteilung in Lose à 500 passiert erst AM HAFEN
+      const bestellMengeGesamt = gesamtOffeneMenge
       
       // Verteile die Bestellmenge proportional auf alle Komponenten
       // Jede Komponente bekommt ihren Anteil der Bestellung (maximal die offene Menge)
