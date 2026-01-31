@@ -5,8 +5,8 @@
     "land": "China",
     "vorlaufzeitKalendertage": 30,
     "vorlaufzeitArbeitstage": 5,
-    "lkwTransportArbeitstage": 3,
-    "lkwTransportChinaArbeitstage": 1,
+    "lkwTransportArbeitstage": 4,
+    "lkwTransportChinaArbeitstage": 2,
     "lkwTransportDeutschlandArbeitstage": 2,
     "gesamtVorlaufzeitTage": 49,
     "transportSequenz": [
@@ -22,11 +22,11 @@
       {
         "schritt": 2,
         "typ": "LKW",
-        "dauer": 1,
+        "dauer": 2,
         "einheit": "AT",
         "von": "Dengwong",
         "nach": "Hafen Shanghai",
-        "beschreibung": "LKW-Transport zum Hafen (Mo-Fr, ankommt am nächsten Tag)"
+        "beschreibung": "LKW-Transport zum Hafen (Mo-Fr, 2 Arbeitstage)"
       },
       {
         "schritt": 2.5,
