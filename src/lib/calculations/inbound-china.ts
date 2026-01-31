@@ -196,18 +196,19 @@ export function generiereTaeglicheBestellungen(
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // BESTELLZEITRAUM: Beginne früh genug für Produktionsstart
-  // und ende am Jahresende (Lieferung darf Anfang 2028 erfolgen)
+  // und ende rechtzeitig für Jahresende-Bedarf
   // ═══════════════════════════════════════════════════════════════════════════════
   
-  // Berechne Startdatum: Jahresstart - Vorlaufzeit - Puffer für Losgröße-Sammlung
+  // Berechne Startdatum: Jahresstart - Vorlaufzeit
+  // KEIN PUFFER mehr! Der Bedarf für Tag 1 muss exakt 49 Tage vorher erfasst werden.
   const produktionsStart = new Date(planungsjahr, 0, 1)
-  const bestellStart = addDays(produktionsStart, -VORLAUFZEIT_TAGE - LOSGROESSE_SAMMEL_PUFFER_TAGE)
+  const bestellStart = addDays(produktionsStart, -VORLAUFZEIT_TAGE)
   
-  // ✅ FIX: Bestellungen bis Jahresende erlauben (nicht -49 Tage!)
-  // Grund: Bedarf für gesamtes Jahr 2027 muss erfasst werden (370.000 Sättel)
-  // Lieferung erfolgt zwar Anfang 2028, aber Bedarf entsteht Ende 2027
+  // ✅ KORRIGIERT: Bestellende = letzter Tag für den wir noch Bedarf erfassen müssen
+  // Für Produktionsende (31.12.2027) muss Bestellung 49 Tage vorher erfolgen (12.11.2027)
+  // Danach gibt es keinen Bedarf mehr für 2027!
   const produktionsEnde = new Date(planungsjahr, 11, 31)
-  const bestellEnde = new Date(planungsjahr, 11, 31)
+  const bestellEnde = addDays(produktionsEnde, -VORLAUFZEIT_TAGE)
   
   // Offene Bestellmengen pro Komponente (akkumuliert bis Losgröße erreicht)
   const offeneMengen: Record<string, number> = {}
@@ -273,30 +274,28 @@ export function generiereTaeglicheBestellungen(
     
     if (gesamtOffeneMenge >= LOSGROESSE) {
       sollBestellen = true
-      // ✅ KORRIGIERT: Bestellmenge = exakter OEM-Bedarf (gesamtOffeneMenge)
-      // Die Losgröße wird NICHT mehr für die Bestellmenge verwendet!
-      // Die Aufteilung in Lose à 500 passiert erst AM HAFEN
-      const bestellMengeGesamt = gesamtOffeneMenge
-      
-      // Verteile die Bestellmenge proportional auf alle Komponenten
-      // Jede Komponente bekommt ihren Anteil der Bestellung (maximal die offene Menge)
-      let verteilt = 0
-      const komponentenArray = Array.from(alleKomponenten)
-      komponentenArray.forEach((kompId, idx) => {
-        if (idx === komponentenArray.length - 1) {
-          // Letzte Komponente bekommt den Rest (vermeidet Rundungsfehler)
-          const rest = bestellMengeGesamt - verteilt
-          bestellKomponenten[kompId] = Math.min(rest, offeneMengen[kompId])
-          verteilt += bestellKomponenten[kompId]
-        } else {
-          // Proportionaler Anteil, maximal die offene Menge
-          const anteil = offeneMengen[kompId] / gesamtOffeneMenge
-          const menge = Math.min(Math.round(bestellMengeGesamt * anteil), offeneMengen[kompId])
-          bestellKomponenten[kompId] = menge
-          verteilt += menge
-        }
-        // Reduziere offene Menge um bestellte Menge
-        offeneMengen[kompId] -= bestellKomponenten[kompId]
+      // ═══════════════════════════════════════════════════════════════════════════════
+      // ✅ KORRIGIERT: Bestelle EXAKT die offenen Mengen pro Komponente!
+      // ═══════════════════════════════════════════════════════════════════════════════
+      // 
+      // LOGIK:
+      // - Wenn Losgröße erreicht → bestelle ALLES was offen ist
+      // - Keine Proportionalberechnung mit Rundung (verhindert Verluste!)
+      // - Jede Komponente bekommt exakt ihre offene Menge
+      // - Die Losgröße gilt nur als AUSLÖSER, nicht als Begrenzung
+      // 
+      // Beispiel bei 740 Sättel offen:
+      //   SAT_FT: 222 → bestelle 222
+      //   SAT_RL: 111 → bestelle 111
+      //   SAT_SP:  74 → bestelle 74
+      //   SAT_SL: 333 → bestelle 333
+      //   = 740 Sättel (exakt!)
+      //
+      alleKomponenten.forEach(kompId => {
+        // ✅ Bestelle EXAKT die offene Menge - keine Rundung!
+        bestellKomponenten[kompId] = offeneMengen[kompId]
+        // Setze offene Menge auf 0 (alles bestellt)
+        offeneMengen[kompId] = 0
       })
     }
     
