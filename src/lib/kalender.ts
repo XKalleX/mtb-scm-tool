@@ -579,13 +579,15 @@ export function berechneBestelldatum(
   let datumNachSeefracht = addDays(bedarfsdatum, -vorlaufzeiten.vorlaufzeitKalendertage)
   
   // Schritt 2: LKW-Transport Deutschland abziehen
-  datumNachSeefracht = subtractArbeitstage(datumNachSeefracht, vorlaufzeiten.lkwTransportDeutschlandArbeitstage, customFeiertage)
+  // ✅ KORRIGIERT: "2 AT" = Ankunft am 2. Tag = nur 1 AT subtrahieren
+  datumNachSeefracht = subtractArbeitstage(datumNachSeefracht, vorlaufzeiten.lkwTransportDeutschlandArbeitstage - 1, customFeiertage)
   
   // Schritt 3: Bearbeitungszeit abziehen (berücksichtigt chinesische Feiertage)
   let nachProduktion = subtractArbeitstage(datumNachSeefracht, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
   
   // Schritt 4: LKW-Transport China abziehen
-  let bestelldatum = subtractArbeitstage(nachProduktion, vorlaufzeiten.lkwTransportChinaArbeitstage, customFeiertage)
+  // ✅ KORRIGIERT: "2 AT" = Ankunft am 2. Tag = nur 1 AT subtrahieren
+  let bestelldatum = subtractArbeitstage(nachProduktion, vorlaufzeiten.lkwTransportChinaArbeitstage - 1, customFeiertage)
   
   // Schritt 5: Einen zusätzlichen Tag Puffer (Best Practice)
   bestelldatum = addDays(bestelldatum, -1)
@@ -621,13 +623,15 @@ export function berechneAnkunftsdatum(
   let nachBearbeitung = addArbeitstage(bestelldatum, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
   
   // Schritt 2: LKW-Transport China zum Hafen - nutzt CHINESISCHE Arbeitstage
-  let nachLKWChina = addArbeitstage(nachBearbeitung, vorlaufzeiten.lkwTransportChinaArbeitstage, customFeiertage)
+  // ✅ KORRIGIERT: "2 AT" = Ankunft am 2. Tag = nur 1 AT addieren
+  let nachLKWChina = addArbeitstage(nachBearbeitung, vorlaufzeiten.lkwTransportChinaArbeitstage - 1, customFeiertage)
   
   // Schritt 3: Seefracht - Kalendertage (Schiff fährt 24/7)
   let nachSeefracht = addDays(nachLKWChina, vorlaufzeiten.vorlaufzeitKalendertage)
   
   // Schritt 4: LKW-Transport Hamburg nach Dortmund - nutzt DEUTSCHE Arbeitstage
-  let ankunftsdatum = addArbeitstage_Deutschland(nachSeefracht, vorlaufzeiten.lkwTransportDeutschlandArbeitstage, customFeiertage)
+  // ✅ KORRIGIERT: "2 AT" = Ankunft am 2. Tag = nur 1 AT addieren
+  let ankunftsdatum = addArbeitstage_Deutschland(nachSeefracht, vorlaufzeiten.lkwTransportDeutschlandArbeitstage - 1, customFeiertage)
   
   return ankunftsdatum
 }
