@@ -994,8 +994,7 @@ export default function InboundPage() {
                   columns={[
                     { key: 'kalenderwoche', label: 'KW', width: '60px', align: 'center', sumable: false, format: (v: number) => `KW ${v}` },
                     { key: 'bestellungen', label: 'Best.', width: '70px', align: 'right', sumable: true },
-                    { key: 'gesamtMenge', label: 'Bestellmenge', width: '120px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' },
-                    { key: 'oemBedarf', label: 'OEM-Bedarf', width: '120px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' }
+                    { key: 'gesamtMenge', label: 'Bestellmenge', width: '150px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' }
                   ]}
                   data={bestellungenNachWoche} 
                   maxHeight="500px" 
