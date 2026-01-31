@@ -769,44 +769,42 @@ export function naechsterMittwoch(datum: Date): Date {
 }
 
 /**
- * Prüft ob ein Datum ein LKW-Fahrtag ist (Mo-Fr, kein Feiertag)
+ * Prüft ob ein Datum ein LKW-Fahrtag ist
  * LKWs fahren NICHT am Wochenende (Samstag/Sonntag)
+ * LKWs fahren aber an Feiertagen (Feiertage betreffen nur Produktionstage!)
  * 
- * In China: Prüft chinesische Feiertage
- * In Deutschland: Prüft deutsche Feiertage
+ * ✅ KORRIGIERT: LKWs können an Feiertagen fahren, aber NICHT an Wochenenden
  * 
  * @param datum - Zu prüfendes Datum
- * @param land - 'China' oder 'Deutschland'
- * @param customFeiertage - Optionale benutzerdefinierte Feiertage
- * @returns True wenn LKW an diesem Tag fährt
+ * @param land - 'China' oder 'Deutschland' (aktuell nicht verwendet, da nur Wochenende geprüft wird)
+ * @param customFeiertage - Optionale benutzerdefinierte Feiertage (aktuell nicht verwendet)
+ * @returns True wenn LKW an diesem Tag fährt (Mo-Fr, inkl. Feiertage)
  */
 export function istLKWFahrtag(
   datum: Date,
   land: 'China' | 'Deutschland',
   customFeiertage?: FeiertagsKonfiguration[]
 ): boolean {
-  // Wochenende?
-  if (isWeekend(datum)) {
-    return false
-  }
-  
-  // Feiertag im entsprechenden Land?
-  if (land === 'China') {
-    return istChinaFeiertag(datum, customFeiertage).length === 0
-  } else {
-    return istDeutschlandFeiertag(datum, customFeiertage).length === 0
-  }
+  // LKWs fahren NUR NICHT am Wochenende (Sa/So)
+  // Feiertage sind kein Problem für LKW-Transport!
+  return !isWeekend(datum)
 }
 
 /**
  * Berechnet das Datum X LKW-Fahrtage in der Zukunft
- * LKWs fahren nur Mo-Fr (keine Wochenenden)
+ * LKWs fahren nur Mo-Fr (keine Wochenenden, aber Feiertage sind OK!)
  * 
- * @param startDatum - Start-Datum
- * @param fahrtage - Anzahl Fahrtage
+ * ✅ KORRIGIERT: LKWs können an Feiertagen fahren, warten aber an Wochenenden
+ * 
+ * Beispiel: LKW startet 25.12 (Do, Feiertag) → kann fahren
+ *           LKW startet 26.12 (Fr, Feiertag) → kann fahren, aber 27-28.12 (Sa/So) warten
+ *           → Ankunft nach 2 Fahrtagen am 28.12 (nach Weekend)
+ * 
+ * @param startDatum - Start-Datum (LKW-Abfahrt)
+ * @param fahrtage - Anzahl Fahrtage (Kalendertage, aber nur Mo-Fr gezählt)
  * @param land - 'China' oder 'Deutschland'
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
- * @returns Ziel-Datum
+ * @returns Ziel-Datum (Ankunft nach X Fahrtagen)
  */
 export function addLKWFahrtage(
   startDatum: Date,
@@ -821,6 +819,7 @@ export function addLKWFahrtage(
   for (let i = 0; i < 365 && verbleibendeFahrtage > 0; i++) {
     aktuell = addDays(aktuell, 1)
     
+    // LKW fährt nur Mo-Fr (Wochenenden werden übersprungen, Feiertage nicht!)
     if (istLKWFahrtag(aktuell, land, customFeiertage)) {
       verbleibendeFahrtage--
     }
@@ -874,7 +873,8 @@ export function berechneMaterialflussDetails(
   // Schritt 1: Produktion beim Zulieferer (+5 AT China)
   const produktionsende = addArbeitstage(bestelldatum, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
   
-  // Schritt 2: LKW-Transport China zum Hafen (+2 AT, nur Mo-Fr)
+  // Schritt 2: LKW-Transport China zum Hafen (+1 AT, nur Mo-Fr aber inkl. Feiertage!)
+  // ✅ KORRIGIERT: LKW kann an Feiertagen fahren, aber nicht am Wochenende
   const lkwAbfahrtChina = produktionsende
   const ankunftHafenShanghai = addLKWFahrtage(produktionsende, vorlaufzeiten.lkwTransportChinaArbeitstage, 'China', customFeiertage)
   
@@ -888,15 +888,23 @@ export function berechneMaterialflussDetails(
   // Schritt 4: Seefracht (+30 KT)
   const schiffAnkunftHamburg = addDays(schiffAbfahrt, vorlaufzeiten.vorlaufzeitKalendertage)
   
-  // Schritt 5: LKW-Transport Deutschland (+2 KT, NICHT Arbeitstage!)
-  // ✅ KORRIGIERT: LKW-Transport in Deutschland nutzt KALENDERTAGE, nicht Arbeitstage!
-  // WICHTIG: vorlaufzeiten.lkwTransportDeutschlandArbeitstage enthält 2, wird aber als Kalendertage interpretiert!
-  // Beispiel: Schiff kommt am 25.12 (Feiertag) an
-  //   → +1 Tag Entladung = 26.12 (LKW-Abfahrt)
-  //   → +2 Kalendertage LKW-Transport = 28.12 (LKW-Ankunft am Werk)
-  //   → +1 Tag Verfügbarkeit = 29.12 (Material für Produktion verfügbar)
-  const lkwAbfahrtDeutschland = addDays(schiffAnkunftHamburg, 1) // Entladung 1 Tag
-  const ankunftProduktion = addDays(lkwAbfahrtDeutschland, vorlaufzeiten.lkwTransportDeutschlandArbeitstage) // +2 Kalendertage (nicht Arbeitstage!)
+  // Schritt 5: LKW-Transport Deutschland (+2 Fahrtage, nur Mo-Fr aber inkl. Feiertage!)
+  // ✅ KORRIGIERT: LKW kann an Feiertagen fahren, aber nicht am Wochenende!
+  // Beispiel: Schiff kommt am 25.12 (Do, Feiertag) an
+  //   → LKW kann am 25.12 losfahren (Feiertag OK!)
+  //   → Fährt 25.12 (Tag 1) + wartet Wochenende + fährt 28.12 (Tag 2)
+  //   → Ankunft: 28.12
+  //   → Verfügbar: 29.12 (nächster Tag)
+  // 
+  // WICHTIG: Wir nutzen jetzt addLKWFahrtage() statt addDays()!
+  // LKW startet am Tag der Schiffankunft (oder nächster Nicht-Wochenend-Tag)
+  let lkwAbfahrtDeutschland = new Date(schiffAnkunftHamburg)
+  // Falls Schiff am Wochenende ankommt, warte bis Montag
+  while (isWeekend(lkwAbfahrtDeutschland)) {
+    lkwAbfahrtDeutschland = addDays(lkwAbfahrtDeutschland, 1)
+  }
+  // Berechne Ankunft mit LKW-Fahrtagen (überspringt Wochenenden, aber nicht Feiertage)
+  const ankunftProduktion = addLKWFahrtage(lkwAbfahrtDeutschland, vorlaufzeiten.lkwTransportDeutschlandArbeitstage, 'Deutschland', customFeiertage)
   
   // Schritt 6: Material ist NÄCHSTEN TAG nach Ankunft verfügbar!
   const verfuegbarAb = addDays(ankunftProduktion, 1)
