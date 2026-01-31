@@ -34,6 +34,27 @@ import {
 import lieferantChinaData from '@/data/lieferant-china.json'
 import { berechneProportionaleAllokation, type BedarfsEintrag } from './proportionale-allokation'
 
+/**
+ * Globaler Counter für lesbare Bestellungs-IDs
+ * Format: B-JAHR-NNN (z.B. B-2027-001)
+ */
+let globalBestellungsNummer = 1
+
+/**
+ * Setzt den Bestellungs-Counter zurück (für neue Berechnungen)
+ */
+export function resetBestellungsNummer(): void {
+  globalBestellungsNummer = 1
+}
+
+/**
+ * Generiert eine lesbare Bestellungs-ID
+ * Format: B-JAHR-NNN (z.B. B-2027-001)
+ */
+function generiereBestellungsId(jahr: number): string {
+  return `B-${jahr}-${String(globalBestellungsNummer++).padStart(3, '0')}`
+}
+
 // Type für Komponente
 type Komponente = {
   name: string;
@@ -137,6 +158,9 @@ export function generiereTaeglicheBestellungen(
   lieferintervall: number = lieferantChinaData.lieferant.lieferintervall
 ): TaeglicheBestellung[] {
   const bestellungen: TaeglicheBestellung[] = []
+  
+  // Reset Bestellungs-Counter für neue Berechnung
+  resetBestellungsNummer()
   
   // Verwende übergebene Stücklisten oder leeres Objekt als Fallback
   const stklst = stuecklisten || {}
@@ -297,8 +321,11 @@ export function generiereTaeglicheBestellungen(
       // NEU: Berechne detaillierten Materialfluss mit Mittwochs-Schiff und LKW-Restriktionen
       const materialfluss = berechneMaterialflussDetails(bestelldatum, customFeiertage)
       
+      // Erstelle lesbare Bestellungs-ID: B-JAHR-NNN (z.B. B-2027-001)
+      const bestellungId = generiereBestellungsId(planungsjahr)
+      
       bestellungen.push({
-        id: generateId(),
+        id: bestellungId,
         bestelldatum,
         bedarfsdatum,
         komponenten: bestellKomponenten,
@@ -346,8 +373,11 @@ export function generiereTaeglicheBestellungen(
     // NEU: Berechne detaillierten Materialfluss für finale Bestellung
     const materialfluss = berechneMaterialflussDetails(finalesBestelldatum, customFeiertage)
     
+    // Erstelle lesbare Bestellungs-ID: B-JAHR-NNN (z.B. B-2027-239)
+    const bestellungId = generiereBestellungsId(planungsjahr)
+    
     bestellungen.push({
-      id: generateId(),
+      id: bestellungId,
       bestelldatum: finalesBestelldatum,
       bedarfsdatum: finalesBedarfsdatum,
       komponenten: restKomponenten,
@@ -448,8 +478,12 @@ export function erstelleZusatzbestellung(
   // NEU: Berechne detaillierten Materialfluss
   const materialfluss = berechneMaterialflussDetails(bestelldatum, customFeiertage)
   
+  // Erstelle lesbare Bestellungs-ID mit Jahr aus Bedarfsdatum
+  const jahr = bedarfsdatum.getFullYear()
+  const bestellungId = generiereBestellungsId(jahr)
+  
   return {
-    id: generateId(),
+    id: bestellungId,
     bestelldatum,
     bedarfsdatum,
     komponenten: finalKomponenten,
