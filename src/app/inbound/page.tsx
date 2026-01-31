@@ -72,6 +72,13 @@ interface InboundTableRow {
   akkumulierterBacklog: number  // Backlog der sich bis zu diesem Tag angehäuft hat
   // ✅ NEU: Bestellungs-IDs
   bestellungsIds?: string       // Komma-getrennte Liste von Bestellungs-IDs
+  // ✅ NEU: Detaillierter Materialfluss (wie Referenz-Implementierung)
+  produktionsstart?: string     // 1_Produktion_Fertig (Produktionsende bei Zulieferer)
+  lkwAbfahrtChina?: string      // 2_Abfahrt_LKW_CN
+  ankunftHafenChina?: string    // 3_Ankunft_Hafen_CN (Shanghai)
+  schiffAbfahrt?: string        // 4_Abfahrt_Schiff (nur Mittwoch!)
+  ankunftHafenDE?: string       // 5_Ankunft_Hafen_DE (Hamburg)
+  verfuegbarAb?: string         // 6_Verfügbar_OEM (Verfügbarkeitsdatum)
 }
 
 /**
@@ -372,6 +379,9 @@ export default function InboundPage() {
         // ✅ NEU: Sammle Bestellungs-IDs
         const bestellungsIds = bestellungenFuerTag.map(b => b.id).join(', ')
         
+        // ✅ NEU: Extrahiere Materialfluss-Details von der ersten Bestellung
+        const materialfluss = bestellung.materialfluss
+        
         alleTage.push({
           bedarfsdatum,
           bedarfsdatumFormatiert,
@@ -400,7 +410,38 @@ export default function InboundPage() {
           tagesBedarf,
           akkumulierterBacklog,
           // ✅ NEU: Bestellungs-IDs
-          bestellungsIds
+          bestellungsIds,
+          // ✅ NEU: Detaillierter Materialfluss (wie Referenz-Implementierung)
+          produktionsstart: materialfluss?.produktionsende 
+            ? (materialfluss.produktionsende instanceof Date 
+                ? materialfluss.produktionsende.toLocaleDateString('de-DE') 
+                : new Date(materialfluss.produktionsende).toLocaleDateString('de-DE'))
+            : undefined,
+          lkwAbfahrtChina: materialfluss?.lkwAbfahrtChina
+            ? (materialfluss.lkwAbfahrtChina instanceof Date
+                ? materialfluss.lkwAbfahrtChina.toLocaleDateString('de-DE')
+                : new Date(materialfluss.lkwAbfahrtChina).toLocaleDateString('de-DE'))
+            : undefined,
+          ankunftHafenChina: materialfluss?.ankunftHafenShanghai
+            ? (materialfluss.ankunftHafenShanghai instanceof Date
+                ? materialfluss.ankunftHafenShanghai.toLocaleDateString('de-DE')
+                : new Date(materialfluss.ankunftHafenShanghai).toLocaleDateString('de-DE'))
+            : undefined,
+          schiffAbfahrt: bestellung.schiffAbfahrtMittwoch
+            ? (bestellung.schiffAbfahrtMittwoch instanceof Date
+                ? bestellung.schiffAbfahrtMittwoch.toLocaleDateString('de-DE') + ' (Mi)'
+                : new Date(bestellung.schiffAbfahrtMittwoch).toLocaleDateString('de-DE') + ' (Mi)')
+            : undefined,
+          ankunftHafenDE: materialfluss?.schiffAnkunftHamburg
+            ? (materialfluss.schiffAnkunftHamburg instanceof Date
+                ? materialfluss.schiffAnkunftHamburg.toLocaleDateString('de-DE')
+                : new Date(materialfluss.schiffAnkunftHamburg).toLocaleDateString('de-DE'))
+            : undefined,
+          verfuegbarAb: bestellung.verfuegbarAb
+            ? (bestellung.verfuegbarAb instanceof Date
+                ? bestellung.verfuegbarAb.toLocaleDateString('de-DE')
+                : new Date(bestellung.verfuegbarAb).toLocaleDateString('de-DE'))
+            : undefined
         })
       } else {
         // Kein Bedarf/Keine Bestellung für dieses Datum - ermittle Grund
@@ -683,129 +724,89 @@ export default function InboundPage() {
                   )}
                 </div>
 
-                {/* ✅ NEU: ZWEI CHARTS - OEM Bedarf vs. Losgrößen-Lieferungen */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-                  {/* Chart 1: OEM-Bedarf (täglich, OHNE Losgrößen) */}
-                  <div className="bg-white rounded-lg p-4 border">
-                    <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-blue-600" />
-                      Täglicher OEM-Bedarf (aus Produktionsplan)
-                    </h4>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Zeigt tatsächlichen Tagesbedarf laut OEM-Planung (NICHT Losgrößen)
-                    </p>
-                    <BestellungenChart
-                      daten={(() => {
-                        // Berechne täglichen Bedarf aus Produktionsplänen
-                        const tagesbedarf: Array<{ bestelldatum: Date; menge: number }> = []
-                        
-                        // Durchlaufe alle Tage des Jahres
-                        for (let tag = 1; tag <= 365; tag++) {
-                          const datum = new Date(konfiguration.planungsjahr, 0, tag)
-                          let tagesMenge = 0
-                          
-                          // Summiere Bedarf aller Varianten für diesen Tag
-                          Object.values(produktionsplaene).forEach(plan => {
-                            const tagesplan = plan.tage[tag - 1]
-                            if (tagesplan) {
-                              // Nutze planMenge (OEM Plan), NICHT istMenge
-                              tagesMenge += tagesplan.planMenge
-                            }
-                          })
-                          
-                          if (tagesMenge > 0) {
-                            tagesbedarf.push({
-                              bestelldatum: datum,
-                              menge: tagesMenge
-                            })
-                          }
-                        }
-                        
-                        return tagesbedarf
-                      })()}
-                      aggregation="woche"
-                      height={250}
-                    />
-                  </div>
-
-                  {/* Chart 2: Losgrößen-Lieferungen (mit IDs) */}
-                  <div className="bg-white rounded-lg p-4 border">
-                    <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                      <Ship className="h-4 w-4 text-orange-600" />
-                      Losgrößen-Lieferungen (am Hafen gebündelt)
-                    </h4>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Tatsächliche Bestellungen mit Losgrößen (500er Bündel am Hafen)
-                    </p>
-                    <BestellungenChart
-                      daten={taeglicheBestellungen.map(b => ({
-                        bestelldatum: b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum),
-                        menge: Object.values(b.komponenten).reduce((sum, m) => sum + m, 0),
-                        komponenten: b.komponenten,
-                        status: b.status
-                      }))}
-                      aggregation="woche"
-                      height={250}
-                    />
-                  </div>
-                </div>
-
-                {/* Excel-Tabelle: Fokus auf Bestellungen nach China */}
+                {/* Excel-Tabelle: Tägliche Bestelllogik mit detailliertem Materialfluss */}
                 <div className="mb-2 text-xs text-muted-foreground">
-                  ✅ Zeigt Bestellungen bei China-Zulieferer mit IDs | 🟢 = Bestellung ausgelöst | 🟡 = Wochenende | 🔴 = Feiertag | Bestelldatum = {gesamtVorlaufzeit} Tage vor Bedarfsdatum
+                  ✅ Zeigt granulare Materialfluss-Stationen wie Referenz-Gruppe | 🟢 = Bestellung | Vorlaufzeit = {gesamtVorlaufzeit} Tage
                 </div>
                 <ExcelTable
                   columns={[
                     {
                       key: 'bestellungsIds',
                       label: 'Bestellungs-ID(s)',
-                      width: '180px',
+                      width: '140px',
                       align: 'left',
                       sumable: false,
                       format: (v: string) => v || '-'
                     },
                     {
-                      key: 'bedarfsdatumFormatiert',
-                      label: 'Bedarfsdatum',
+                      key: 'bestelldatumFormatiert',
+                      label: '0️⃣ Bestellung',
+                      width: '110px',
+                      align: 'center',
+                      sumable: false
+                    },
+                    {
+                      key: 'produktionsstart',
+                      label: '1️⃣ Prod. Fertig',
+                      width: '110px',
+                      align: 'center',
+                      sumable: false,
+                      format: (v: string) => v || '-'
+                    },
+                    {
+                      key: 'lkwAbfahrtChina',
+                      label: '2️⃣ LKW ab CN',
+                      width: '110px',
+                      align: 'center',
+                      sumable: false,
+                      format: (v: string) => v || '-'
+                    },
+                    {
+                      key: 'ankunftHafenChina',
+                      label: '3️⃣ Hafen CN',
+                      width: '110px',
+                      align: 'center',
+                      sumable: false,
+                      format: (v: string) => v || '-'
+                    },
+                    {
+                      key: 'schiffAbfahrt',
+                      label: '4️⃣ Schiff ab',
                       width: '120px',
                       align: 'center',
-                      sumable: false
+                      sumable: false,
+                      format: (v: string) => v || '-'
                     },
                     {
-                      key: 'bestelldatumFormatiert',
-                      label: 'Bestelldatum (China)',
-                      width: '130px',
+                      key: 'ankunftHafenDE',
+                      label: '5️⃣ Hafen DE',
+                      width: '110px',
                       align: 'center',
-                      sumable: false
-                    },
-                    {
-                      key: 'menge',
-                      label: 'Bestellmenge',
-                      width: '130px',
-                      align: 'right',
-                      sumable: true,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Sättel' : '-'
-                    },
-                    {
-                      key: 'grundFormatiert',
-                      label: 'Status',
-                      width: '250px',
-                      align: 'left',
-                      sumable: false
-                    },
-                    {
-                      key: 'vorlaufzeitFormatiert',
-                      label: 'Vorlaufzeit',
-                      width: '100px',
-                      align: 'center',
-                      sumable: false
+                      sumable: false,
+                      format: (v: string) => v || '-'
                     },
                     {
                       key: 'erwarteteAnkunftFormatiert',
-                      label: 'Ankunft Dortmund',
-                      width: '130px',
+                      label: '6️⃣ Ank. Werk',
+                      width: '110px',
                       align: 'center',
                       sumable: false
+                    },
+                    {
+                      key: 'verfuegbarAb',
+                      label: '7️⃣ Verfügbar',
+                      width: '110px',
+                      align: 'center',
+                      sumable: false,
+                      format: (v: string) => v || '-'
+                    },
+                    {
+                      key: 'menge',
+                      label: 'OEM-Bedarf',
+                      width: '110px',
+                      align: 'right',
+                      sumable: true,
+                      format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-'
                     }
                   ]}
                   data={alleTageMitBestellungen}
@@ -906,92 +907,66 @@ export default function InboundPage() {
                     </div>
                   </div>
 
-                  {/* Shipment Tracking Table */}
+                  {/* Shipment Tracking Table mit Bundle-Visualisierung */}
+                  <div className="mb-2 text-xs text-muted-foreground">
+                    ✅ Bestellungen werden am Hafen Shanghai gebündelt | Farbige Markierung zeigt Bundles
+                  </div>
                   <ExcelTable
                     columns={[
-                      {
-                        key: 'bestellungId',
-                        label: 'Bestellungs-ID',
-                        width: '180px',
-                        align: 'left',
-                        sumable: false
-                      },
-                      {
-                        key: 'bestelldatumFormatiert',
-                        label: 'Bestelldatum',
-                        width: '110px',
-                        align: 'center',
-                        sumable: false
-                      },
-                      {
-                        key: 'menge',
-                        label: 'Losgröße',
-                        width: '100px',
-                        align: 'right',
-                        sumable: true,
-                        format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-'
-                      },
-                      {
-                        key: 'schiffAbfahrt',
-                        label: 'Schiff ab Shanghai',
-                        width: '130px',
-                        align: 'center',
-                        sumable: false
-                      },
-                      {
-                        key: 'wartetage',
-                        label: 'Wartezeit Hafen',
-                        width: '120px',
-                        align: 'center',
-                        sumable: false
-                      },
-                      {
-                        key: 'erwarteteAnkunftFormatiert',
-                        label: 'Ankunft Hamburg',
-                        width: '130px',
-                        align: 'center',
-                        sumable: false
-                      },
-                      {
-                        key: 'verfuegbarAb',
-                        label: 'Verfügbar ab',
-                        width: '130px',
-                        align: 'center',
-                        sumable: false
-                      }
+                      { key: 'bundleMarker', label: 'Bundle', width: '70px', align: 'center', sumable: false },
+                      { key: 'bestellungId', label: 'Best.-ID', width: '120px', align: 'left', sumable: false },
+                      { key: 'bestelldatumFormatiert', label: 'Bestellung', width: '100px', align: 'center', sumable: false },
+                      { key: 'ankunftHafen', label: 'Hafen CN', width: '100px', align: 'center', sumable: false },
+                      { key: 'menge', label: 'Menge', width: '90px', align: 'right', sumable: true, format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-' },
+                      { key: 'schiffAbfahrt', label: 'Schiff ab', width: '110px', align: 'center', sumable: false },
+                      { key: 'wartetage', label: 'Wait', width: '60px', align: 'center', sumable: false },
+                      { key: 'erwarteteAnkunftFormatiert', label: 'Hamburg', width: '100px', align: 'center', sumable: false },
+                      { key: 'verfuegbarAb', label: 'Verfügbar', width: '100px', align: 'center', sumable: false },
+                      { key: 'hafenBacklog', label: 'Am Hafen', width: '100px', align: 'right', sumable: false }
                     ]}
-                    data={taeglicheBestellungen
-                      .filter(b => Object.values(b.komponenten).reduce((sum, m) => sum + m, 0) > 0)
-                      .map(b => {
+                    data={(() => {
+                      const sorted = taeglicheBestellungen
+                        .filter(b => Object.values(b.komponenten).reduce((sum, m) => sum + m, 0) > 0)
+                        .sort((a, b) => {
+                          const dA = a.schiffAbfahrtMittwoch instanceof Date ? a.schiffAbfahrtMittwoch : new Date(a.schiffAbfahrtMittwoch || a.bestelldatum)
+                          const dB = b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch : new Date(b.schiffAbfahrtMittwoch || b.bestelldatum)
+                          return dA.getTime() - dB.getTime()
+                        })
+                      const bundleMap = new Map<string, number>()
+                      let bundleNr = 1
+                      let hafenMenge = 0
+                      const colors = ['bg-blue-50', 'bg-green-50', 'bg-purple-50', 'bg-orange-50', 'bg-pink-50', 'bg-yellow-50']
+                      return sorted.map((b, idx) => {
                         const menge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
+                        const key = b.schiffAbfahrtMittwoch ? (b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch.toISOString() : new Date(b.schiffAbfahrtMittwoch).toISOString()) : 'none'
+                        if (!bundleMap.has(key)) bundleMap.set(key, bundleNr++)
+                        const bid = bundleMap.get(key)
+                        hafenMenge += menge
+                        const next = sorted[idx + 1]
+                        const nextKey = next?.schiffAbfahrtMittwoch ? (next.schiffAbfahrtMittwoch instanceof Date ? next.schiffAbfahrtMittwoch.toISOString() : new Date(next.schiffAbfahrtMittwoch).toISOString()) : 'x'
+                        const isLast = key !== nextKey
+                        const backlog = isLast ? `✈️ ${formatNumber(hafenMenge, 0)}` : `⏳ ${formatNumber(hafenMenge, 0)}`
+                        if (isLast) hafenMenge = 0
                         return {
+                          bundleMarker: bid ? `#${bid}` : '-',
+                          bundleColor: colors[(bid || 1) % colors.length],
                           bestellungId: b.id,
-                          bestelldatumFormatiert: b.bestelldatum instanceof Date 
-                            ? b.bestelldatum.toLocaleDateString('de-DE')
-                            : new Date(b.bestelldatum).toLocaleDateString('de-DE'),
+                          bestelldatumFormatiert: (b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum)).toLocaleDateString('de-DE'),
+                          ankunftHafen: b.materialfluss?.ankunftHafenShanghai ? ((b.materialfluss.ankunftHafenShanghai instanceof Date ? b.materialfluss.ankunftHafenShanghai : new Date(b.materialfluss.ankunftHafenShanghai)).toLocaleDateString('de-DE')) : '-',
                           menge,
-                          schiffAbfahrt: b.schiffAbfahrtMittwoch 
-                            ? (b.schiffAbfahrtMittwoch instanceof Date 
-                                ? b.schiffAbfahrtMittwoch.toLocaleDateString('de-DE') + ' (Mi)' 
-                                : new Date(b.schiffAbfahrtMittwoch).toLocaleDateString('de-DE') + ' (Mi)')
-                            : '-',
-                          wartetage: b.wartetageAmHafen !== undefined 
-                            ? b.wartetageAmHafen + ' Tage' 
-                            : '-',
-                          erwarteteAnkunftFormatiert: b.erwarteteAnkunft instanceof Date 
-                            ? b.erwarteteAnkunft.toLocaleDateString('de-DE')
-                            : new Date(b.erwarteteAnkunft).toLocaleDateString('de-DE'),
-                          verfuegbarAb: b.verfuegbarAb 
-                            ? (b.verfuegbarAb instanceof Date 
-                                ? b.verfuegbarAb.toLocaleDateString('de-DE')
-                                : new Date(b.verfuegbarAb).toLocaleDateString('de-DE'))
-                            : '-'
+                          schiffAbfahrt: b.schiffAbfahrtMittwoch ? ((b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch : new Date(b.schiffAbfahrtMittwoch)).toLocaleDateString('de-DE') + ' (Mi)') : '-',
+                          wartetage: b.wartetageAmHafen !== undefined ? b.wartetageAmHafen + 'd' : '-',
+                          erwarteteAnkunftFormatiert: (b.erwarteteAnkunft instanceof Date ? b.erwarteteAnkunft : new Date(b.erwarteteAnkunft)).toLocaleDateString('de-DE'),
+                          verfuegbarAb: b.verfuegbarAb ? ((b.verfuegbarAb instanceof Date ? b.verfuegbarAb : new Date(b.verfuegbarAb)).toLocaleDateString('de-DE')) : '-',
+                          hafenBacklog: backlog
                         }
-                      })}
-                    maxHeight="400px"
+                      })
+                    })()}
+                    maxHeight="500px"
                     showFormulas={false}
                     showSums={true}
-                    sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Lieferungen`}
+                    sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Lieferungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel`}
+                    highlightRow={(row: any) => row.bundleColor ? { color: row.bundleColor + ' border-l-4 border-blue-400', tooltip: `Bundle ${row.bundleMarker}` } : null}
                   />
                   
                   {/* Chart: Monatliche Liefermengen */}
