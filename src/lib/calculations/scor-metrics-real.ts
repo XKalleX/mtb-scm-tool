@@ -331,9 +331,12 @@ export function berechneSCORMetrikenReal(
       return Math.floor((verfuegbar.getTime() - bestellung.getTime()) / 86400000)
     })
   
+  // Fallback auf konfigurierten Sollwert falls keine Bestellungen vorhanden
+  const sollVorlaufzeit = konfiguration.lieferant?.gesamtVorlaufzeitTage || 49
+  
   const durchlaufzeit_wert = durchlaufzeiten.length > 0
     ? durchlaufzeiten.reduce((sum, d) => sum + d, 0) / durchlaufzeiten.length
-    : 49 // Sollwert aus lieferant-china.json
+    : sollVorlaufzeit
   
   // Breakdown und monatliche Daten
   const durchlaufzeitDetails = {

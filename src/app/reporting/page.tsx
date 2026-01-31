@@ -148,7 +148,19 @@ export default function ReportingPage() {
             />
             <KPICard 
               metrik={metriken.liefertreueChina}
-              zeitreiheDaten={[95, 96, 94, 95, 97, 96, 95, 94, 96, 95, 94, 96]} // Approximation
+              zeitreiheDaten={zeitreihen.liefertreueLieferungen.length > 0 
+                ? Array.from({ length: 12 }, (_, i) => {
+                    const monat = i + 1
+                    const lieferungenImMonat = zeitreihen.liefertreueLieferungen.filter(l => {
+                      const bestellMonat = new Date(l.bestelldatum).getMonth() + 1
+                      return bestellMonat === monat
+                    })
+                    if (lieferungenImMonat.length === 0) return 100
+                    const puenktlich = lieferungenImMonat.filter(l => l.puenktlich).length
+                    return (puenktlich / lieferungenImMonat.length) * 100
+                  })
+                : Array(12).fill(100)
+              }
             />
             <KPICard 
               metrik={metriken.durchlaufzeit}
