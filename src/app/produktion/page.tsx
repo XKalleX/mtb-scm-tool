@@ -372,13 +372,15 @@ export default function ProduktionPage() {
       }
     })
     
-    // ✅ DEBUG: Log Fertigerzeugnisse-Daten
-    console.log(`📊 Fertigerzeugnisse-Daten generiert:`)
-    console.log(`   Anzahl Tage: ${result.length}`)
-    console.log(`   Erster Tag (Tag 1):`, result[0])
-    console.log(`   Letzter Tag (Tag 365):`, result[result.length - 1])
-    console.log(`   Kumulative IST am Jahresende: ${result[result.length - 1]?.kumulativIst.toLocaleString('de-DE')} Bikes`)
-    console.log(`   Kumulative PLAN am Jahresende: ${result[result.length - 1]?.kumulativPlan.toLocaleString('de-DE')} Bikes`)
+    // ✅ DEBUG: Log Fertigerzeugnisse-Daten nur in Development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📊 Fertigerzeugnisse-Daten generiert:`)
+      console.log(`   Anzahl Tage: ${result.length}`)
+      console.log(`   Erster Tag (Tag 1):`, result[0])
+      console.log(`   Letzter Tag (Tag 365):`, result[result.length - 1])
+      console.log(`   Kumulative IST am Jahresende: ${result[result.length - 1]?.kumulativIst.toLocaleString('de-DE')} Bikes`)
+      console.log(`   Kumulative PLAN am Jahresende: ${result[result.length - 1]?.kumulativPlan.toLocaleString('de-DE')} Bikes`)
+    }
     
     return result
   }, [tagesProduktionFormatiert, konfiguration.varianten, korrigiertePlaene])

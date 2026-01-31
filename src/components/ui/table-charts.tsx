@@ -885,11 +885,13 @@ export function FertigerzeugnisseChart({
         }
       })
       
-      // ✅ DEBUG: Log chart data
-      console.log(`📊 FertigerzeugnisseChart - chartData generated:`)
-      console.log(`   Anzahl Wochen: ${result.length}`)
-      console.log(`   Erste Woche:`, result[0])
-      console.log(`   Letzte Woche:`, result[result.length - 1])
+      // ✅ DEBUG: Log chart data nur in Development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`📊 FertigerzeugnisseChart - chartData generated:`)
+        console.log(`   Anzahl Wochen: ${result.length}`)
+        console.log(`   Erste Woche:`, result[0])
+        console.log(`   Letzte Woche:`, result[result.length - 1])
+      }
       
       return result
     } else {
