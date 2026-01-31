@@ -109,7 +109,7 @@ export default function InboundPage() {
   // ✅ NEU: State für Zusatzbestellungen
   const [zusatzBestellungen, setZusatzBestellungen] = useState<TaeglicheBestellung[]>([])
   const [neueBestellungDatum, setNeueBestellungDatum] = useState<string>('')
-  const [neueBestellungMenge, setNeueBestellungMenge] = useState<string>('500')
+  const [neueBestellungMenge, setNeueBestellungMenge] = useState<string>(String(konfiguration.lieferant.losgroesse))
   
   // ✅ NEU: Handler für Zusatzbestellung
   const handleZusatzbestellung = useCallback(() => {
@@ -149,8 +149,8 @@ export default function InboundPage() {
     
     setZusatzBestellungen(prev => [...prev, neueBestellung])
     // Datum NICHT zurücksetzen, damit weitere Bestellungen mit ähnlichem Datum einfacher sind
-    setNeueBestellungMenge('500')  // Nur Menge zurücksetzen
-  }, [neueBestellungDatum, neueBestellungMenge, konfiguration.lieferant.gesamtVorlaufzeitTage])
+    setNeueBestellungMenge(String(konfiguration.lieferant.losgroesse))  // Nur Menge zurücksetzen
+  }, [neueBestellungDatum, neueBestellungMenge, konfiguration.lieferant.gesamtVorlaufzeitTage, konfiguration.lieferant.losgroesse])
   
   // Lieferant aus Konfiguration
   const lieferant = konfiguration.lieferant
@@ -1122,7 +1122,7 @@ export default function InboundPage() {
                     <strong>🚢 (Schiff):</strong> Das Schiff legt ab. Diese Zahl ist die <strong>gesamte Ladung vor Losgröße-Anwendung</strong>.
                   </li>
                   <li>
-                    <strong>📦 Verschifft:</strong> Tatsächlich verschiffte Menge (auf Losgröße 500 abgerundet, z.B. 3700 → 3500).
+                    <strong>📦 Verschifft:</strong> Tatsächlich verschiffte Menge (auf Losgröße {lieferant.losgroesse} abgerundet, z.B. 3700 → 3500).
                   </li>
                   <li>
                     <strong>⚓ Am Hafen:</strong> Verbleibende Menge (wartet auf nächstes Schiff, z.B. 200 von 3700).
