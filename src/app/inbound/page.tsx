@@ -70,6 +70,8 @@ interface InboundTableRow {
   // NEU: Backlog-Tracking
   tagesBedarf: number           // Bedarf für diesen Tag (aus OEM-Plan)
   akkumulierterBacklog: number  // Backlog der sich bis zu diesem Tag angehäuft hat
+  // ✅ NEU: Bestellungs-IDs
+  bestellungsIds?: string       // Komma-getrennte Liste von Bestellungs-IDs
 }
 
 /**
@@ -367,6 +369,9 @@ export default function InboundPage() {
           })
         })
         
+        // ✅ NEU: Sammle Bestellungs-IDs
+        const bestellungsIds = bestellungenFuerTag.map(b => b.id).join(', ')
+        
         alleTage.push({
           bedarfsdatum,
           bedarfsdatumFormatiert,
@@ -375,8 +380,8 @@ export default function InboundPage() {
           istVorjahr: bestellung.istVorjahr,
           vorlaufzeit: vorlaufzeit,
           vorlaufzeitFormatiert: `${vorlaufzeit} Tage`,
-          menge: gesamtMenge,  // ✅ AGGREGIERTE MENGE!
-          mengeFormatiert: formatNumber(gesamtMenge, 0) + ' Stk',
+          menge: tagesBedarf,  // ✅ TÄGLICHER OEM-BEDARF (nicht Losgröße!)
+          mengeFormatiert: formatNumber(tagesBedarf, 0) + ' Sättel (OEM-Bedarf)',
           // ✅ NEU: Komponenten-Details einzeln
           SAT_FT_bestellt: komponentenAggregiert['SAT_FT'] || 0,
           SAT_RL_bestellt: komponentenAggregiert['SAT_RL'] || 0,
@@ -393,7 +398,9 @@ export default function InboundPage() {
           feiertagName: istFeiertag ? feiertag[0].name : undefined,
           // NEU: Backlog-Tracking
           tagesBedarf,
-          akkumulierterBacklog
+          akkumulierterBacklog,
+          // ✅ NEU: Bestellungs-IDs
+          bestellungsIds
         })
       } else {
         // Kein Bedarf/Keine Bestellung für dieses Datum - ermittle Grund
@@ -676,12 +683,87 @@ export default function InboundPage() {
                   )}
                 </div>
 
+                {/* ✅ NEU: ZWEI CHARTS - OEM Bedarf vs. Losgrößen-Lieferungen */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                  {/* Chart 1: OEM-Bedarf (täglich, OHNE Losgrößen) */}
+                  <div className="bg-white rounded-lg p-4 border">
+                    <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-blue-600" />
+                      Täglicher OEM-Bedarf (aus Produktionsplan)
+                    </h4>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Zeigt tatsächlichen Tagesbedarf laut OEM-Planung (NICHT Losgrößen)
+                    </p>
+                    <BestellungenChart
+                      daten={(() => {
+                        // Berechne täglichen Bedarf aus Produktionsplänen
+                        const tagesbedarf: Array<{ bestelldatum: Date; menge: number }> = []
+                        
+                        // Durchlaufe alle Tage des Jahres
+                        for (let tag = 1; tag <= 365; tag++) {
+                          const datum = new Date(konfiguration.planungsjahr, 0, tag)
+                          let tagesMenge = 0
+                          
+                          // Summiere Bedarf aller Varianten für diesen Tag
+                          Object.values(produktionsplaene).forEach(plan => {
+                            const tagesplan = plan.tage[tag - 1]
+                            if (tagesplan) {
+                              // Nutze planMenge (OEM Plan), NICHT istMenge
+                              tagesMenge += tagesplan.planMenge
+                            }
+                          })
+                          
+                          if (tagesMenge > 0) {
+                            tagesbedarf.push({
+                              bestelldatum: datum,
+                              menge: tagesMenge
+                            })
+                          }
+                        }
+                        
+                        return tagesbedarf
+                      })()}
+                      aggregation="woche"
+                      height={250}
+                    />
+                  </div>
+
+                  {/* Chart 2: Losgrößen-Lieferungen (mit IDs) */}
+                  <div className="bg-white rounded-lg p-4 border">
+                    <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                      <Ship className="h-4 w-4 text-orange-600" />
+                      Losgrößen-Lieferungen (am Hafen gebündelt)
+                    </h4>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Tatsächliche Bestellungen mit Losgrößen (500er Bündel am Hafen)
+                    </p>
+                    <BestellungenChart
+                      daten={taeglicheBestellungen.map(b => ({
+                        bestelldatum: b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum),
+                        menge: Object.values(b.komponenten).reduce((sum, m) => sum + m, 0),
+                        komponenten: b.komponenten,
+                        status: b.status
+                      }))}
+                      aggregation="woche"
+                      height={250}
+                    />
+                  </div>
+                </div>
+
                 {/* Excel-Tabelle: Fokus auf Bestellungen nach China */}
                 <div className="mb-2 text-xs text-muted-foreground">
-                  ✅ Zeigt Bestellungen bei China-Zulieferer | 🟢 = Bestellung ausgelöst | 🟡 = Wochenende | 🔴 = Feiertag | Bestelldatum = {gesamtVorlaufzeit} Tage vor Bedarfsdatum
+                  ✅ Zeigt Bestellungen bei China-Zulieferer mit IDs | 🟢 = Bestellung ausgelöst | 🟡 = Wochenende | 🔴 = Feiertag | Bestelldatum = {gesamtVorlaufzeit} Tage vor Bedarfsdatum
                 </div>
                 <ExcelTable
                   columns={[
+                    {
+                      key: 'bestellungsIds',
+                      label: 'Bestellungs-ID(s)',
+                      width: '180px',
+                      align: 'left',
+                      sumable: false,
+                      format: (v: string) => v || '-'
+                    },
                     {
                       key: 'bedarfsdatumFormatiert',
                       label: 'Bedarfsdatum',
@@ -828,6 +910,13 @@ export default function InboundPage() {
                   <ExcelTable
                     columns={[
                       {
+                        key: 'bestellungId',
+                        label: 'Bestellungs-ID',
+                        width: '180px',
+                        align: 'left',
+                        sumable: false
+                      },
+                      {
                         key: 'bestelldatumFormatiert',
                         label: 'Bestelldatum',
                         width: '110px',
@@ -876,6 +965,7 @@ export default function InboundPage() {
                       .map(b => {
                         const menge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
                         return {
+                          bestellungId: b.id,
                           bestelldatumFormatiert: b.bestelldatum instanceof Date 
                             ? b.bestelldatum.toLocaleDateString('de-DE')
                             : new Date(b.bestelldatum).toLocaleDateString('de-DE'),

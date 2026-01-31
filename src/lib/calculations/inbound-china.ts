@@ -34,6 +34,27 @@ import {
 import lieferantChinaData from '@/data/lieferant-china.json'
 import { berechneProportionaleAllokation, type BedarfsEintrag } from './proportionale-allokation'
 
+/**
+ * Globaler Counter für lesbare Bestellungs-IDs
+ * Format: B-JAHR-NNN (z.B. B-2027-001)
+ */
+let globalBestellungsNummer = 1
+
+/**
+ * Setzt den Bestellungs-Counter zurück (für neue Berechnungen)
+ */
+export function resetBestellungsNummer(): void {
+  globalBestellungsNummer = 1
+}
+
+/**
+ * Generiert eine lesbare Bestellungs-ID
+ * Format: B-JAHR-NNN (z.B. B-2027-001)
+ */
+function generiereBestellungsId(jahr: number): string {
+  return `B-${jahr}-${String(globalBestellungsNummer++).padStart(3, '0')}`
+}
+
 // Type für Komponente
 type Komponente = {
   name: string;
@@ -113,6 +134,14 @@ export interface TaeglicheBestellung {
  * - LKW nicht am Wochenende
  * - Material verfügbar am nächsten Tag nach Ankunft
  * 
+ * ⚠️ NOTE ON TYPE SAFETY:
+ * Der Parameter `alleProduktionsplaene` ist bewusst als `any[]` typisiert, um
+ * beide Varianten zu unterstützen:
+ * 1. TagesProduktionsplan (mit sollMenge)
+ * 2. Formatiertes Objekt (mit planMenge)
+ * Das ist ein pragmatischer Trade-off zwischen Type-Safety und Flexibilität.
+ * Die Funktion prüft beide Felder und fällt zurück auf 0 wenn keins existiert.
+ * 
  * @param alleProduktionsplaene - Pläne aller MTB-Varianten
  * @param planungsjahr - Jahr (aus KonfigurationContext)
  * @param vorlaufzeitTage - Fixe Vorlaufzeit (aus KonfigurationContext)
@@ -120,7 +149,7 @@ export interface TaeglicheBestellung {
  * @returns Array von Bestellungen (inkl. Vorjahr!)
  */
 export function generiereTaeglicheBestellungen(
-  alleProduktionsplaene: Record<string, TagesProduktionsplan[]>,
+  alleProduktionsplaene: Record<string, any[]>,  // ✅ Generic any[] erlaubt TagesProduktionsplan oder formatierten Typ
   planungsjahr: number,
   vorlaufzeitTage: number,
   customFeiertage?: FeiertagsKonfiguration[],
@@ -129,6 +158,9 @@ export function generiereTaeglicheBestellungen(
   lieferintervall: number = lieferantChinaData.lieferant.lieferintervall
 ): TaeglicheBestellung[] {
   const bestellungen: TaeglicheBestellung[] = []
+  
+  // Reset Bestellungs-Counter für neue Berechnung
+  resetBestellungsNummer()
   
   // Verwende übergebene Stücklisten oder leeres Objekt als Fallback
   const stklst = stuecklisten || {}
@@ -151,6 +183,10 @@ export function generiereTaeglicheBestellungen(
   })
   
   // Fülle täglichen Bedarf aus Produktionsplänen
+  // ✅ WICHTIG: Nutze planMenge, NICHT istMenge!
+  // Grund: Bestellungen müssen VORHER erfolgen, bevor Material da ist
+  // istMenge wird später basierend auf Material-Verfügbarkeit gesetzt
+  // Wir bestellen für den PLAN (370.000 Bikes), nicht für IST
   Object.entries(alleProduktionsplaene).forEach(([varianteId, plan]) => {
     const stueckliste = stklst[varianteId as keyof typeof stklst]
     if (!stueckliste) return
@@ -158,9 +194,14 @@ export function generiereTaeglicheBestellungen(
     const komponenten = stueckliste.komponenten as Record<string, Komponente>
     
     plan.forEach((tag, tagIndex) => {
-      if (tag.istMenge > 0 && tagIndex < 365) {
+      // ✅ KORREKT: Nutze planMenge (OEM Plan), NICHT istMenge
+      // planMenge ist immer 370.000 Summe, istMenge hängt von Material ab
+      // Kompatibilität: Unterstütze beide Feldnamen (planMenge und sollMenge)
+      const planMenge = (tag as any).planMenge || (tag as any).sollMenge || 0
+      
+      if (planMenge > 0 && tagIndex < 365) {
         Object.entries(komponenten).forEach(([kompId, komp]) => {
-          taeglicheBedarf[kompId][tagIndex] += tag.istMenge * komp.menge
+          taeglicheBedarf[kompId][tagIndex] += planMenge * komp.menge
         })
       }
     })
@@ -280,8 +321,11 @@ export function generiereTaeglicheBestellungen(
       // NEU: Berechne detaillierten Materialfluss mit Mittwochs-Schiff und LKW-Restriktionen
       const materialfluss = berechneMaterialflussDetails(bestelldatum, customFeiertage)
       
+      // Erstelle lesbare Bestellungs-ID: B-JAHR-NNN (z.B. B-2027-001)
+      const bestellungId = generiereBestellungsId(planungsjahr)
+      
       bestellungen.push({
-        id: generateId(),
+        id: bestellungId,
         bestelldatum,
         bedarfsdatum,
         komponenten: bestellKomponenten,
@@ -329,8 +373,11 @@ export function generiereTaeglicheBestellungen(
     // NEU: Berechne detaillierten Materialfluss für finale Bestellung
     const materialfluss = berechneMaterialflussDetails(finalesBestelldatum, customFeiertage)
     
+    // Erstelle lesbare Bestellungs-ID: B-JAHR-NNN (z.B. B-2027-239)
+    const bestellungId = generiereBestellungsId(planungsjahr)
+    
     bestellungen.push({
-      id: generateId(),
+      id: bestellungId,
       bestelldatum: finalesBestelldatum,
       bedarfsdatum: finalesBedarfsdatum,
       komponenten: restKomponenten,
@@ -431,8 +478,12 @@ export function erstelleZusatzbestellung(
   // NEU: Berechne detaillierten Materialfluss
   const materialfluss = berechneMaterialflussDetails(bestelldatum, customFeiertage)
   
+  // Erstelle lesbare Bestellungs-ID mit Jahr aus Bedarfsdatum
+  const jahr = bedarfsdatum.getFullYear()
+  const bestellungId = generiereBestellungsId(jahr)
+  
   return {
-    id: generateId(),
+    id: bestellungId,
     bestelldatum,
     bedarfsdatum,
     komponenten: finalKomponenten,
