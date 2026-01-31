@@ -317,10 +317,27 @@ export function berechneIntegriertesWarehouse(
     new Date(planungsjahr, 0, 1).getTime() // 01.01.2027
   ))
   
-  // Simulationszeitraum: Von frühester Bestellung bis 31.12.2027
-  // + ZUSÄTZLICHE TAGE nach Jahresende um Lagerbestände vollständig zu verbrauchen
+  // Simulationszeitraum: Von frühester Bestellung bis LETZTE LIEFERUNG + Puffer
+  // WICHTIG: Letzte Bestellungen für Dezember-Produktion können im Januar 2028 ankommen!
   const simulationStart = new Date(fruehesteDatum)
-  const simulationEnde = new Date(planungsjahr, 11, 31) // 31.12.2027
+  
+  // Finde letzte Lieferung (verfuegbarAb Datum)
+  const letzteLieferung = bestellungen.reduce((max, b) => {
+    const verfuegbar = b.verfuegbarAb || b.erwarteteAnkunft
+    return verfuegbar > max ? verfuegbar : max
+  }, bestellungen[0].verfuegbarAb || bestellungen[0].erwarteteAnkunft)
+  
+  // Simulation läuft bis Ende des Planungsjahres ODER bis letzte Lieferung + 7 Tage (für Verarbeitung)
+  const jahresEnde = new Date(planungsjahr, 11, 31)
+  const simulationEnde = new Date(Math.max(
+    jahresEnde.getTime(),
+    letzteLieferung.getTime() + 7 * 24 * 60 * 60 * 1000  // +7 Tage Puffer
+  ))
+  
+  console.log(`📅 Simulationszeitraum:`)
+  console.log(`   Start: ${simulationStart.toLocaleDateString('de-DE')}`)
+  console.log(`   Ende: ${simulationEnde.toLocaleDateString('de-DE')}`)
+  console.log(`   Letzte Lieferung verfügbar: ${letzteLieferung.toLocaleDateString('de-DE')}`)
   
   let aktuellesDatum = new Date(simulationStart)
   let tagIndex = 0
@@ -425,19 +442,35 @@ export function berechneIntegriertesWarehouse(
         gesamtBedarf += benoetigt
         
         // ═════════════════════════════════════════════════════════════════════════
-        // STEP 3c: ATP-CHECK MIT BACKLOG MANAGEMENT
+        // STEP 3c: ATP-CHECK MIT BACKLOG MANAGEMENT & KAPAZITÄTSPRÜFUNG
         // ═════════════════════════════════════════════════════════════════════════
+        
+        // Berechne maximale Produktionskapazität für heute (nur an Arbeitstagen)
+        // Produktionskapazität aus KonfigurationContext
+        const kapazitaetProSchicht = 
+          konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
+        
+        // WICHTIG: Wir produzieren an Arbeitstagen IMMER mindestens 1 Schicht
+        // Für Backlog-Abbau können wir bis zu 3 Schichten fahren
+        const maxSchichten = 3
+        const maxProduktionKapazitaet = istArbeitstag ? kapazitaetProSchicht * maxSchichten : 0
         
         // Gesamtbedarf = heutiger Bedarf + offener Backlog
         const gesamtBedarfHeute = benoetigt + backlogVorher
         const verfuegbarFuerProduktion = aktuelleBestaende[bauteilId]
         
-        if (gesamtBedarfHeute > verfuegbarFuerProduktion) {
-          // NICHT GENUG MATERIAL für alles!
+        // TRIPLE-CHECK: Material UND Kapazität berücksichtigen!
+        // 1. Material-Check: Haben wir genug Rohstoffe?
+        // 2. Kapazitäts-Check: Können wir das produzieren?
+        // 3. Kombination: Was ist möglich?
+        const maxMoeglich = Math.min(verfuegbarFuerProduktion, maxProduktionKapazitaet)
+        
+        if (gesamtBedarfHeute > maxMoeglich) {
+          // NICHT GENUG MATERIAL ODER KAPAZITÄT für alles!
           atpErfuellt = false
           
-          // Produziere was möglich ist
-          verbrauch = Math.max(0, verfuegbarFuerProduktion)
+          // Produziere was möglich ist (limitiert durch Material UND Kapazität)
+          verbrauch = Math.max(0, maxMoeglich)
           
           // Berechne wie viel vom Backlog nachgeholt wurde
           if (verbrauch > benoetigt) {
@@ -454,11 +487,18 @@ export function berechneIntegriertesWarehouse(
             nachgeholt = 0
           }
           
-          atpGrund = `Nicht genug Material (Bedarf: ${benoetigt}, Backlog: ${backlogVorher}, Verfügbar: ${verfuegbarFuerProduktion})`
+          // Bestimme Grund für ATP-Fehler
+          if (verfuegbarFuerProduktion < gesamtBedarfHeute && maxProduktionKapazitaet >= gesamtBedarfHeute) {
+            atpGrund = `Nicht genug Material (Bedarf: ${gesamtBedarfHeute}, Verfügbar: ${verfuegbarFuerProduktion}, Kapazität: ${maxProduktionKapazitaet})`
+          } else if (maxProduktionKapazitaet < gesamtBedarfHeute && verfuegbarFuerProduktion >= gesamtBedarfHeute) {
+            atpGrund = `Nicht genug Kapazität (Bedarf: ${gesamtBedarfHeute}, Material: ${verfuegbarFuerProduktion}, Kapazität: ${maxProduktionKapazitaet})`
+          } else {
+            atpGrund = `Material UND Kapazität limitiert (Bedarf: ${gesamtBedarfHeute}, Material: ${verfuegbarFuerProduktion}, Kapazität: ${maxProduktionKapazitaet})`
+          }
           
           if (nichtProduziertHeute > 0) {
             warnungen.push(
-              `⚠️ ${datumStr} (Tag ${tagImJahr}): ATP-Check fehlgeschlagen für ${bauteil.name}! Fehlmenge: ${nichtProduziertHeute}`
+              `⚠️ ${datumStr} (Tag ${tagImJahr}): ATP-Check fehlgeschlagen für ${bauteil.name}! ${atpGrund}, Fehlmenge: ${nichtProduziertHeute}`
             )
           }
         } else {
@@ -698,9 +738,11 @@ export function berechneIntegriertesWarehouse(
     
     console.log(`
       ═══════════════════════════════════════════════════════════════════════════════
-      WAREHOUSE MANAGEMENT - JAHRESSTATISTIK (inkl. Post-Verarbeitung)
+      WAREHOUSE MANAGEMENT - JAHRESSTATISTIK
       ═══════════════════════════════════════════════════════════════════════════════
       Simulierte Tage:           ${anzahlTage}
+      Simulationszeitraum:       ${tageErgebnisse[0]?.datumStr} - ${tageErgebnisse[anzahlTage-1]?.datumStr}
+      
       Gesamt Lieferungen:        ${gesamtLieferungen.toLocaleString('de-DE')} Stück
       Gesamt Verbrauch:          ${gesamtVerbrauch.toLocaleString('de-DE')} Stück
       Differenz (Lager Ende):    ${(gesamtLieferungen - gesamtVerbrauch).toLocaleString('de-DE')} Stück
@@ -708,7 +750,7 @@ export function berechneIntegriertesWarehouse(
       ✅ VERIFIKATION: ${verifikationOK ? 'BESTANDEN' : 'FEHLER!'}
       ${verifikationOK ? '   Alle gelieferten Teile wurden produziert!' : '   ACHTUNG: Diskrepanz zwischen Lieferungen und Verbrauch!'}
       
-      Rohstofflager Ende:        ${endLagerbestand.toLocaleString('de-DE')} Stück ${endLagerbestand === 0 ? '✅' : '⚠️'}
+      Rohstofflager Ende:        ${endLagerbestand.toLocaleString('de-DE')} Stück ${endLagerbestand === 0 ? '✅' : endLagerbestand < 1000 ? '⚠️' : '❌'}
       
       Gesamt Bedarf (Plan):      ${gesamtBedarf.toLocaleString('de-DE')} Stück
       Tatsächl. produziert:      ${gesamtProduziertTatsaechlich.toLocaleString('de-DE')} Stück
@@ -724,6 +766,10 @@ export function berechneIntegriertesWarehouse(
       Backlog am Jahresende:     ${gesamtBacklogEndstand.toLocaleString('de-DE')} Stück
       Maximaler Backlog:         ${maximalerBacklog.toLocaleString('de-DE')} Stück
       Tage mit Backlog:          ${tageMitBacklog}
+      
+      PRODUKTIONSKAPAZITÄT:
+      Kapazität pro Schicht:     ${konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht} Bikes
+      Max. Schichten pro Tag:    3 (für Backlog-Abbau)
       
       Warnungen:                 ${warnungen.length}
       ═══════════════════════════════════════════════════════════════════════════════
