@@ -2,16 +2,13 @@
  * ========================================
  * INBOUND LOGISTIK - CHINA
  * ========================================
- * 
- * Bestellungen beim einzigen Lieferanten (China) - nur Sättel!
- * 
- * NEUE LOGIK gemäß Issue-Anforderungen:
+ * * Bestellungen beim einzigen Lieferanten (China) - nur Sättel!
+ * * NEUE LOGIK gemäß Issue-Anforderungen:
  * - Schiffe fahren NUR mittwochs ab Shanghai
  * - LKWs fahren NICHT am Wochenende
  * - Material verfügbar am NÄCHSTEN TAG nach Ankunft
  * - Proportionale Allokation statt FCFS
- * 
- * Alle Parameter aus KonfigurationContext oder JSON-Referenzen
+ * * Alle Parameter aus KonfigurationContext oder JSON-Referenzen
  * - Losgröße, Lieferintervall aus JSON als Referenz
  * - Stückliste aus Config/Parameter
  * - Feiertage über Parameter
@@ -26,13 +23,11 @@ import {
   naechsterArbeitstag_Deutschland,
   FeiertagsKonfiguration,
   berechneMaterialflussDetails,
-  berechneVerfuegbarkeitsdatum,
-  naechsterMittwoch,
-  istMittwoch,
   type MaterialflussDetails
 } from '@/lib/kalender'
 import lieferantChinaData from '@/data/lieferant-china.json'
-import { berechneProportionaleAllokation, type BedarfsEintrag } from './proportionale-allokation'
+// Make sure this file exists in your project structure
+// import { berechneProportionaleAllokation, type BedarfsEintrag } from './proportionale-allokation' 
 
 /**
  * Globaler Counter für lesbare Bestellungs-IDs
@@ -64,8 +59,7 @@ type Komponente = {
 
 /**
  * Rundet Bestellmenge auf Losgröße auf
- * 
- * @param menge - Benötigte Menge
+ * * @param menge - Benötigte Menge
  * @param losgroesse - Losgröße (aus KonfigurationContext oder JSON-Referenz)
  * @returns Aufgerundete Bestellmenge
  */
@@ -80,10 +74,8 @@ export function rundeAufLosgroesse(menge: number, losgroesse: number = lieferant
  * ═══════════════════════════════════════════════════════════════════════════════
  * TÄGLICHE BESTELLLOGIK MIT NEUEM MATERIALFLUSS
  * ═══════════════════════════════════════════════════════════════════════════════
- * 
- * Implementiert die korrekte Bestelllogik gemäß NEUEN Anforderungen:
- * 
- * MATERIALFLUSS (gemäß Issue):
+ * * Implementiert die korrekte Bestelllogik gemäß NEUEN Anforderungen:
+ * * MATERIALFLUSS (gemäß Issue):
  * 1. OEM bestellt → Zulieferer: Eingang Bestellung
  * 2. Zulieferer: +5 AT Produktion → Warenausgang
  * 3. LKW China: +2 AT (nur Mo-Fr) → Hafen Shanghai
@@ -91,8 +83,7 @@ export function rundeAufLosgroesse(menge: number, losgroesse: number = lieferant
  * 5. Schiff: +30 KT → Hafen Hamburg
  * 6. LKW Deutschland: +2 AT (nur Mo-Fr) → Produktionsstandort
  * 7. Material verfügbar: NÄCHSTER TAG nach Ankunft!
- * 
- * BESTELLLOGIK:
+ * * BESTELLLOGIK:
  * 1. TÄGLICH wird der Bedarf ermittelt (nicht monatlich!)
  * 2. Bestellung erfolgt wenn Losgröße erreicht ist (aus Konfiguration)
  * 3. Bestellungen beginnen VOR Planungsjahr (Vorlaufzeit aus Konfiguration!)
@@ -100,8 +91,7 @@ export function rundeAufLosgroesse(menge: number, losgroesse: number = lieferant
  * 5. KEINE Initial-Bestellung! Nur täglicher Bedarf bestellen
  * 6. Gesamtmenge = exakt Jahresproduktion (1:1 mit Produktion)
  * 7. PROPORTIONALE ALLOKATION statt FCFS bei Engpässen
- * 
- * @param alleProduktionsplaene - Pläne aller MTB-Varianten
+ * * @param alleProduktionsplaene - Pläne aller MTB-Varianten
  * @param planungsjahr - Jahr (aus KonfigurationContext)
  * @param vorlaufzeitTage - Fixe Vorlaufzeit (aus KonfigurationContext)
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
@@ -128,21 +118,18 @@ export interface TaeglicheBestellung {
 
 /**
  * Generiert tägliche Bestellungen über das ganze Jahr (+ Vorlauf aus Vorjahr)
- * 
- * NEU: Berücksichtigt detaillierten Materialfluss mit:
+ * * NEU: Berücksichtigt detaillierten Materialfluss mit:
  * - Schiff nur mittwochs
  * - LKW nicht am Wochenende
  * - Material verfügbar am nächsten Tag nach Ankunft
- * 
- * ⚠️ NOTE ON TYPE SAFETY:
+ * * ⚠️ NOTE ON TYPE SAFETY:
  * Der Parameter `alleProduktionsplaene` ist bewusst als `any[]` typisiert, um
  * beide Varianten zu unterstützen:
  * 1. TagesProduktionsplan (mit sollMenge)
  * 2. Formatiertes Objekt (mit planMenge)
  * Das ist ein pragmatischer Trade-off zwischen Type-Safety und Flexibilität.
  * Die Funktion prüft beide Felder und fällt zurück auf 0 wenn keins existiert.
- * 
- * @param alleProduktionsplaene - Pläne aller MTB-Varianten
+ * * @param alleProduktionsplaene - Pläne aller MTB-Varianten
  * @param planungsjahr - Jahr (aus KonfigurationContext)
  * @param vorlaufzeitTage - Fixe Vorlaufzeit (aus KonfigurationContext)
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
@@ -437,13 +424,11 @@ export function generiereTaeglicheBestellungen(
 /**
  * Erstellt eine Zusatzbestellung für einen bestimmten Tag
  * Wird über das Zusatzbestellungs-Formular aufgerufen
- * 
- * NEU: Berücksichtigt detaillierten Materialfluss:
+ * * NEU: Berücksichtigt detaillierten Materialfluss:
  * - Schiff fährt nur mittwochs
  * - LKW nicht am Wochenende
  * - Material verfügbar am nächsten Tag nach Ankunft
- * 
- * @param bestelldatum - Datum der Bestellung
+ * * @param bestelldatum - Datum der Bestellung
  * @param komponenten - Komponenten mit Mengen (bereits exakt verteilt!)
  * @param vorlaufzeitTage - Vorlaufzeit in Tagen (aus KonfigurationContext)
  * @param skipLosgroessenRundung - Wenn true: KEINE Aufrundung, wenn false: Aufrundung pro Variante
