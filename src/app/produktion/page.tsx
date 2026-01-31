@@ -198,7 +198,6 @@ export default function ProduktionPage() {
         materialVerfuegbar: !templateTag.istArbeitstag 
           ? false  // An Wochenenden/Feiertagen: false
           : !hatMaterialEngpass,
-        // @ts-expect-error - Füge backlog für Visualisierung hinzu
         backlog: backlogProTag[tag] || 0
       })
     }

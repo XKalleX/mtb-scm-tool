@@ -131,8 +131,9 @@
     "standort": "Dortmund",
     "kapazitaetProStunde": 130,
     "stundenProSchicht": 8,
+    "maxSchichtenProTag": 3,
     "durchlaufzeitMontageMinuten": 325,
-    "beschreibung": "130 Fahrräder pro Stunde Produktionskapazität, 8h Schichten, Durchlaufzeit Montage 325 Minuten"
+    "beschreibung": "130 Fahrräder pro Stunde Produktionskapazität, 8h Schichten, max 3 Schichten/Tag, Durchlaufzeit Montage 325 Minuten"
   },
   "hinweise": {
     "codeLoesung": "ERMÄSSIGUNG: Nur Sättel von China-Zulieferer, Transport per Schiff + LKW, kein Outbound zu Märkten",

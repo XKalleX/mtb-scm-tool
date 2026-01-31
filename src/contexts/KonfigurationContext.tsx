@@ -101,6 +101,7 @@ export interface LieferantConfig {
 export interface ProduktionConfig {
   kapazitaetProStunde: number
   stundenProSchicht: number
+  maxSchichtenProTag: number
   durchlaufzeitMontageMinuten: number
 }
 
@@ -258,6 +259,7 @@ const STANDARD_LIEFERANT: LieferantConfig = lieferantChinaData.lieferant as Lief
 const STANDARD_PRODUKTION: ProduktionConfig = {
   kapazitaetProStunde: (stammdatenData as any).produktion?.kapazitaetProStunde || 130,
   stundenProSchicht: (stammdatenData as any).produktion?.stundenProSchicht || 8,
+  maxSchichtenProTag: (stammdatenData as any).produktion?.maxSchichtenProTag || 3,
   durchlaufzeitMontageMinuten: (stammdatenData as any).produktion?.durchlaufzeitMontageMinuten || 325
 }
 

@@ -661,8 +661,13 @@ export function berechneIntegriertesWarehouse(
       // An Arbeitstagen verbrauchen wir so viel Material wie möglich
       let verbrauch = 0
       if (istHeuteArbeitstag && anfangsBestand > 0) {
-        // Verbrauche bis zu 1000 Teile pro Tag (realistische Produktionskapazität)
-        verbrauch = Math.min(anfangsBestand, 1000)
+        // Maximale Tageskapazität aus Schichtsystem:
+        // kapazitaetProStunde * stundenProSchicht * maxSchichtenProTag
+        const maxTageskapazitaet = 
+          konfiguration.produktion.kapazitaetProStunde * 
+          konfiguration.produktion.stundenProSchicht * 
+          (konfiguration.produktion.maxSchichtenProTag || 3)
+        verbrauch = Math.min(anfangsBestand, maxTageskapazitaet)
         aktuelleBestaende[bauteilId] -= verbrauch
         gesamtVerbrauch += verbrauch
       }
@@ -735,6 +740,12 @@ export function berechneIntegriertesWarehouse(
     const endLagerbestand = bauteile.reduce((sum, b) => sum + aktuelleBestaende[b.id], 0)
     const verifikationOK = Math.abs(gesamtLieferungen - gesamtVerbrauch) <= 10
     
+    // Maximale Tageskapazität für Vergleiche
+    const maxTageskapazitaet = 
+      konfiguration.produktion.kapazitaetProStunde * 
+      konfiguration.produktion.stundenProSchicht * 
+      (konfiguration.produktion.maxSchichtenProTag || 3)
+    
     console.log(`
       ═══════════════════════════════════════════════════════════════════════════════
       WAREHOUSE MANAGEMENT - JAHRESSTATISTIK
@@ -749,7 +760,7 @@ export function berechneIntegriertesWarehouse(
       ✅ VERIFIKATION: ${verifikationOK ? 'BESTANDEN' : 'FEHLER!'}
       ${verifikationOK ? '   Alle gelieferten Teile wurden produziert!' : '   ACHTUNG: Diskrepanz zwischen Lieferungen und Verbrauch!'}
       
-      Rohstofflager Ende:        ${endLagerbestand.toLocaleString('de-DE')} Stück ${endLagerbestand === 0 ? '✅' : endLagerbestand < 1000 ? '⚠️' : '❌'}
+      Rohstofflager Ende:        ${endLagerbestand.toLocaleString('de-DE')} Stück ${endLagerbestand === 0 ? '✅' : endLagerbestand < maxTageskapazitaet ? '⚠️' : '❌'}
       
       Gesamt Bedarf (Plan):      ${gesamtBedarf.toLocaleString('de-DE')} Stück
       Tatsächl. produziert:      ${gesamtProduziertTatsaechlich.toLocaleString('de-DE')} Stück
