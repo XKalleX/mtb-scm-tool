@@ -869,7 +869,7 @@ export function FertigerzeugnisseChart({
           varianten: d.varianten
         }
       })
-      return Object.entries(wochen).map(([woche, values]) => {
+      const result = Object.entries(wochen).map(([woche, values]) => {
         const variantenFlat: Record<string, number> = {}
         if (values.varianten) {
           Object.entries(values.varianten).forEach(([id, v]) => {
@@ -884,6 +884,16 @@ export function FertigerzeugnisseChart({
           ...variantenFlat
         }
       })
+      
+      // ✅ DEBUG: Log chart data nur in Development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`📊 FertigerzeugnisseChart - chartData generated:`)
+        console.log(`   Anzahl Wochen: ${result.length}`)
+        console.log(`   Erste Woche:`, result[0])
+        console.log(`   Letzte Woche:`, result[result.length - 1])
+      }
+      
+      return result
     } else {
       // Nimm letzten Wert jedes Monats
       const monatNamen = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
