@@ -873,10 +873,16 @@ export function berechneMaterialflussDetails(
   // Schritt 1: Produktion beim Zulieferer (+5 AT China)
   const produktionsende = addArbeitstage(bestelldatum, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
   
-  // Schritt 2: LKW-Transport China zum Hafen (+1 AT, nur Mo-Fr aber inkl. Feiertage!)
-  // ✅ KORRIGIERT: LKW kann an Feiertagen fahren, aber nicht am Wochenende
+  // Schritt 2: LKW-Transport China zum Hafen (+1 Kalendertag, aber nicht an Wochenenden!)
+  // ✅ KORRIGIERT: LKW kann an Feiertagen fahren, aber nicht am Wochenende!
+  // "1 AT" bedeutet 1 Kalendertag Transport, aber LKW kann nur Mo-Fr starten
+  // Wenn Ankunft auf Wochenende fällt, wird auf Montag verschoben
   const lkwAbfahrtChina = produktionsende
-  const ankunftHafenShanghai = addLKWFahrtage(produktionsende, vorlaufzeiten.lkwTransportChinaArbeitstage, 'China', customFeiertage)
+  let ankunftHafenShanghai = addDays(produktionsende, vorlaufzeiten.lkwTransportChinaArbeitstage)
+  // Wenn Ankunft auf Wochenende fällt, verschiebe auf Montag
+  while (isWeekend(ankunftHafenShanghai)) {
+    ankunftHafenShanghai = addDays(ankunftHafenShanghai, 1)
+  }
   
   // Schritt 3: Warten auf nächsten Mittwoch (Schiff fährt nur mittwochs!)
   // WICHTIG: Ware die am Hafen ankommt muss mindestens 1 Tag zur Verarbeitung warten,
@@ -888,23 +894,31 @@ export function berechneMaterialflussDetails(
   // Schritt 4: Seefracht (+30 KT)
   const schiffAnkunftHamburg = addDays(schiffAbfahrt, vorlaufzeiten.vorlaufzeitKalendertage)
   
-  // Schritt 5: LKW-Transport Deutschland (+2 Fahrtage, nur Mo-Fr aber inkl. Feiertage!)
+  // Schritt 5: LKW-Transport Deutschland (+2 Kalendertage, aber nicht an Wochenenden!)
   // ✅ KORRIGIERT: LKW kann an Feiertagen fahren, aber nicht am Wochenende!
-  // Beispiel: Schiff kommt am 25.12 (Do, Feiertag) an
+  // 
+  // WICHTIG: "2 AT" bedeutet 2 Kalendertage Transport-Dauer, aber:
+  // - LKW kann NUR an Werktagen (Mo-Fr) starten
+  // - LKW fährt 2 Kalendertage lang (auch durch Wochenenden)
+  // - Wenn Ankunft auf Wochenende fällt, verschiebt sich auf Montag
+  // 
+  // Beispiel: Schiff kommt am 25.12 (Fr, Feiertag) an
   //   → LKW kann am 25.12 losfahren (Feiertag OK!)
-  //   → Fährt 25.12 (Tag 1) + wartet Wochenende + fährt 28.12 (Tag 2)
-  //   → Ankunft: 28.12
+  //   → Fährt 2 Kalendertage: 25.12 → 27.12 (So)
+  //   → Ankunft fällt auf Wochenende → verschoben auf 28.12 (Mo)
   //   → Verfügbar: 29.12 (nächster Tag)
   // 
-  // WICHTIG: Wir nutzen jetzt addLKWFahrtage() statt addDays()!
-  // LKW startet am Tag der Schiffankunft (oder nächster Nicht-Wochenend-Tag)
   let lkwAbfahrtDeutschland = new Date(schiffAnkunftHamburg)
-  // Falls Schiff am Wochenende ankommt, warte bis Montag
+  // Falls Schiff am Wochenende ankommt, warte bis Montag für LKW-Start
   while (isWeekend(lkwAbfahrtDeutschland)) {
     lkwAbfahrtDeutschland = addDays(lkwAbfahrtDeutschland, 1)
   }
-  // Berechne Ankunft mit LKW-Fahrtagen (überspringt Wochenenden, aber nicht Feiertage)
-  const ankunftProduktion = addLKWFahrtage(lkwAbfahrtDeutschland, vorlaufzeiten.lkwTransportDeutschlandArbeitstage, 'Deutschland', customFeiertage)
+  // LKW fährt N Kalendertage
+  let ankunftProduktion = addDays(lkwAbfahrtDeutschland, vorlaufzeiten.lkwTransportDeutschlandArbeitstage)
+  // Wenn Ankunft auf Wochenende fällt, verschiebe auf nächsten Montag
+  while (isWeekend(ankunftProduktion)) {
+    ankunftProduktion = addDays(ankunftProduktion, 1)
+  }
   
   // Schritt 6: Material ist NÄCHSTEN TAG nach Ankunft verfügbar!
   const verfuegbarAb = addDays(ankunftProduktion, 1)
