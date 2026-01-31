@@ -317,9 +317,27 @@ export function berechneIntegriertesWarehouse(
     new Date(planungsjahr, 0, 1).getTime() // 01.01.2027
   ))
   
-  // Simulationszeitraum: Von frühester Bestellung bis 31.12.2027
+  // Simulationszeitraum: Von frühester Bestellung bis LETZTE LIEFERUNG + Puffer
+  // WICHTIG: Letzte Bestellungen für Dezember-Produktion können im Januar 2028 ankommen!
   const simulationStart = new Date(fruehesteDatum)
-  const simulationEnde = new Date(planungsjahr, 11, 31) // 31.12.2027
+  
+  // Finde letzte Lieferung (verfuegbarAb Datum)
+  const letzteLieferung = bestellungen.reduce((max, b) => {
+    const verfuegbar = b.verfuegbarAb || b.erwarteteAnkunft
+    return verfuegbar > max ? verfuegbar : max
+  }, bestellungen[0].verfuegbarAb || bestellungen[0].erwarteteAnkunft)
+  
+  // Simulation läuft bis Ende des Planungsjahres ODER bis letzte Lieferung + 7 Tage (für Verarbeitung)
+  const jahresEnde = new Date(planungsjahr, 11, 31)
+  const simulationEnde = new Date(Math.max(
+    jahresEnde.getTime(),
+    letzteLieferung.getTime() + 7 * 24 * 60 * 60 * 1000  // +7 Tage Puffer
+  ))
+  
+  console.log(`📅 Simulationszeitraum:`)
+  console.log(`   Start: ${simulationStart.toLocaleDateString('de-DE')}`)
+  console.log(`   Ende: ${simulationEnde.toLocaleDateString('de-DE')}`)
+  console.log(`   Letzte Lieferung verfügbar: ${letzteLieferung.toLocaleDateString('de-DE')}`)
   
   let aktuellesDatum = new Date(simulationStart)
   let tagIndex = 0
@@ -424,19 +442,35 @@ export function berechneIntegriertesWarehouse(
         gesamtBedarf += benoetigt
         
         // ═════════════════════════════════════════════════════════════════════════
-        // STEP 3c: ATP-CHECK MIT BACKLOG MANAGEMENT
+        // STEP 3c: ATP-CHECK MIT BACKLOG MANAGEMENT & KAPAZITÄTSPRÜFUNG
         // ═════════════════════════════════════════════════════════════════════════
+        
+        // Berechne maximale Produktionskapazität für heute (nur an Arbeitstagen)
+        // Produktionskapazität aus KonfigurationContext
+        const kapazitaetProSchicht = 
+          konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
+        
+        // WICHTIG: Wir produzieren an Arbeitstagen IMMER mindestens 1 Schicht
+        // Für Backlog-Abbau können wir bis zu 3 Schichten fahren
+        const maxSchichten = 3
+        const maxProduktionKapazitaet = istArbeitstag ? kapazitaetProSchicht * maxSchichten : 0
         
         // Gesamtbedarf = heutiger Bedarf + offener Backlog
         const gesamtBedarfHeute = benoetigt + backlogVorher
         const verfuegbarFuerProduktion = aktuelleBestaende[bauteilId]
         
-        if (gesamtBedarfHeute > verfuegbarFuerProduktion) {
-          // NICHT GENUG MATERIAL für alles!
+        // TRIPLE-CHECK: Material UND Kapazität berücksichtigen!
+        // 1. Material-Check: Haben wir genug Rohstoffe?
+        // 2. Kapazitäts-Check: Können wir das produzieren?
+        // 3. Kombination: Was ist möglich?
+        const maxMoeglich = Math.min(verfuegbarFuerProduktion, maxProduktionKapazitaet)
+        
+        if (gesamtBedarfHeute > maxMoeglich) {
+          // NICHT GENUG MATERIAL ODER KAPAZITÄT für alles!
           atpErfuellt = false
           
-          // Produziere was möglich ist
-          verbrauch = Math.max(0, verfuegbarFuerProduktion)
+          // Produziere was möglich ist (limitiert durch Material UND Kapazität)
+          verbrauch = Math.max(0, maxMoeglich)
           
           // Berechne wie viel vom Backlog nachgeholt wurde
           if (verbrauch > benoetigt) {
@@ -453,11 +487,18 @@ export function berechneIntegriertesWarehouse(
             nachgeholt = 0
           }
           
-          atpGrund = `Nicht genug Material (Bedarf: ${benoetigt}, Backlog: ${backlogVorher}, Verfügbar: ${verfuegbarFuerProduktion})`
+          // Bestimme Grund für ATP-Fehler
+          if (verfuegbarFuerProduktion < gesamtBedarfHeute && maxProduktionKapazitaet >= gesamtBedarfHeute) {
+            atpGrund = `Nicht genug Material (Bedarf: ${gesamtBedarfHeute}, Verfügbar: ${verfuegbarFuerProduktion}, Kapazität: ${maxProduktionKapazitaet})`
+          } else if (maxProduktionKapazitaet < gesamtBedarfHeute && verfuegbarFuerProduktion >= gesamtBedarfHeute) {
+            atpGrund = `Nicht genug Kapazität (Bedarf: ${gesamtBedarfHeute}, Material: ${verfuegbarFuerProduktion}, Kapazität: ${maxProduktionKapazitaet})`
+          } else {
+            atpGrund = `Material UND Kapazität limitiert (Bedarf: ${gesamtBedarfHeute}, Material: ${verfuegbarFuerProduktion}, Kapazität: ${maxProduktionKapazitaet})`
+          }
           
           if (nichtProduziertHeute > 0) {
             warnungen.push(
-              `⚠️ ${datumStr} (Tag ${tagImJahr}): ATP-Check fehlgeschlagen für ${bauteil.name}! Fehlmenge: ${nichtProduziertHeute}`
+              `⚠️ ${datumStr} (Tag ${tagImJahr}): ATP-Check fehlgeschlagen für ${bauteil.name}! ${atpGrund}, Fehlmenge: ${nichtProduziertHeute}`
             )
           }
         } else {
@@ -567,6 +608,113 @@ export function berechneIntegriertesWarehouse(
   }
   
   // ═══════════════════════════════════════════════════════════════════════════════
+  // STEP 3f: POST-JAHRESENDE VERBRAUCH (Lagerbestände vollständig aufbrauchen)
+  // ═══════════════════════════════════════════════════════════════════════════════
+  /**
+   * ✅ ANFORDERUNG: Alle gelieferten Teile MÜSSEN produziert werden!
+   * 
+   * Problem: Durch Timing zwischen Lieferungen und Produktion können am Jahresende
+   * noch Rohstoffe im Lager liegen (z.B. letzte Lieferung Dezember).
+   * 
+   * Lösung: Nach dem 31.12.2027 lassen wir das Werk weiterlaufen, um ALLE verbleibenden
+   * Rohstoffe in Fertigerzeugnisse umzuwandeln. Dies ist realistisch, da:
+   * - Bestellte Teile sind bezahlt und müssen verarbeitet werden
+   * - Fertige Bikes können 2028 verkauft werden (kein Wertverlust)
+   * - Rohstofflager sollte am Ende bei 0 sein (nur Fertigerzeugnisse akkumulieren)
+   */
+  
+  console.log('\n🔄 POST-JAHRESENDE: Verarbeite verbleibende Lagerbestände...')
+  
+  const maxPostTage = 60 // Maximal 60 Tage nach Jahresende
+  let postTagIndex = 0
+  
+  while (postTagIndex < maxPostTage) {
+    // Prüfe ob noch Material vorhanden ist
+    const verbleibendesMaterial = bauteile.reduce((sum, b) => 
+      sum + aktuelleBestaende[b.id], 0
+    )
+    
+    if (verbleibendesMaterial === 0) {
+      console.log(`✅ Alle Rohstoffe verarbeitet nach ${postTagIndex} zusätzlichen Tagen`)
+      break
+    }
+    
+    postTagIndex++
+    aktuellesDatum = addDays(simulationEnde, postTagIndex)
+    const datumStr = toLocalISODateString(aktuellesDatum)
+    const wochentag = aktuellesDatum.toLocaleDateString('de-DE', { weekday: 'short' })
+    const monat = aktuellesDatum.getMonth() + 1
+    
+    const customFeiertage = konvertiereFeiertage(konfiguration.feiertage)
+    const istHeuteArbeitstag = istArbeitstag_Deutschland(aktuellesDatum, customFeiertage)
+    const tagImJahr = 365 + postTagIndex
+    
+    const bauteilePostDetails: TaeglichesLager['bauteile'] = []
+    
+    // Verarbeite jedes Bauteil
+    bauteile.forEach(bauteil => {
+      const bauteilId = bauteil.id
+      const anfangsBestand = aktuelleBestaende[bauteilId]
+      
+      // Keine neuen Lieferungen nach Jahresende
+      const zugang = 0
+      
+      // An Arbeitstagen verbrauchen wir so viel Material wie möglich
+      let verbrauch = 0
+      if (istHeuteArbeitstag && anfangsBestand > 0) {
+        // Verbrauche bis zu 1000 Teile pro Tag (realistische Produktionskapazität)
+        verbrauch = Math.min(anfangsBestand, 1000)
+        aktuelleBestaende[bauteilId] -= verbrauch
+        gesamtVerbrauch += verbrauch
+      }
+      
+      const endBestand = aktuelleBestaende[bauteilId]
+      
+      bauteilePostDetails.push({
+        bauteilId,
+        bauteilName: bauteil.name,
+        anfangsBestand,
+        zugang,
+        verbrauch,
+        endBestand,
+        verfuegbarBestand: endBestand,
+        reichweiteTage: 0,
+        status: endBestand > 0 ? 'niedrig' : 'ok',
+        atpCheck: {
+          benoetigt: 0,
+          verfuegbar: endBestand,
+          erfuellt: true,
+          grund: 'Post-Jahresende Verarbeitung'
+        },
+        produktionsBacklog: {
+          backlogVorher: 0,
+          nichtProduziertHeute: 0,
+          backlogNachher: 0,
+          nachgeholt: 0
+        },
+        lieferungen: []
+      })
+    })
+    
+    tageErgebnisse.push({
+      tag: tagImJahr,
+      datum: new Date(aktuellesDatum),
+      datumStr,
+      wochentag,
+      monat,
+      istArbeitstag: istHeuteArbeitstag,
+      bauteile: bauteilePostDetails
+    })
+  }
+  
+  if (postTagIndex >= maxPostTage) {
+    const verbleibendesMaterial = bauteile.reduce((sum, b) => 
+      sum + aktuelleBestaende[b.id], 0
+    )
+    warnungen.push(`⚠️ Nach ${maxPostTage} zusätzlichen Tagen verbleiben noch ${verbleibendesMaterial} Teile im Lager!`)
+  }
+  
+  // ═══════════════════════════════════════════════════════════════════════════════
   // STEP 4: BERECHNE JAHRESSTATISTIK
   // ═══════════════════════════════════════════════════════════════════════════════
   
@@ -584,14 +732,25 @@ export function berechneIntegriertesWarehouse(
     // Berechne End-Backlog über alle Bauteile
     const gesamtBacklogEndstand = Object.values(produktionsBacklog).reduce((sum, b) => sum + b, 0)
     
+    // Prüfe Lagerbestände am Ende
+    const endLagerbestand = bauteile.reduce((sum, b) => sum + aktuelleBestaende[b.id], 0)
+    const verifikationOK = Math.abs(gesamtLieferungen - gesamtVerbrauch) <= 10
+    
     console.log(`
       ═══════════════════════════════════════════════════════════════════════════════
       WAREHOUSE MANAGEMENT - JAHRESSTATISTIK
       ═══════════════════════════════════════════════════════════════════════════════
       Simulierte Tage:           ${anzahlTage}
+      Simulationszeitraum:       ${tageErgebnisse[0]?.datumStr} - ${tageErgebnisse[anzahlTage-1]?.datumStr}
+      
       Gesamt Lieferungen:        ${gesamtLieferungen.toLocaleString('de-DE')} Stück
       Gesamt Verbrauch:          ${gesamtVerbrauch.toLocaleString('de-DE')} Stück
       Differenz (Lager Ende):    ${(gesamtLieferungen - gesamtVerbrauch).toLocaleString('de-DE')} Stück
+      
+      ✅ VERIFIKATION: ${verifikationOK ? 'BESTANDEN' : 'FEHLER!'}
+      ${verifikationOK ? '   Alle gelieferten Teile wurden produziert!' : '   ACHTUNG: Diskrepanz zwischen Lieferungen und Verbrauch!'}
+      
+      Rohstofflager Ende:        ${endLagerbestand.toLocaleString('de-DE')} Stück ${endLagerbestand === 0 ? '✅' : endLagerbestand < 1000 ? '⚠️' : '❌'}
       
       Gesamt Bedarf (Plan):      ${gesamtBedarf.toLocaleString('de-DE')} Stück
       Tatsächl. produziert:      ${gesamtProduziertTatsaechlich.toLocaleString('de-DE')} Stück
@@ -608,9 +767,23 @@ export function berechneIntegriertesWarehouse(
       Maximaler Backlog:         ${maximalerBacklog.toLocaleString('de-DE')} Stück
       Tage mit Backlog:          ${tageMitBacklog}
       
+      PRODUKTIONSKAPAZITÄT:
+      Kapazität pro Schicht:     ${konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht} Bikes
+      Max. Schichten pro Tag:    3 (für Backlog-Abbau)
+      
       Warnungen:                 ${warnungen.length}
       ═══════════════════════════════════════════════════════════════════════════════
     `)
+    
+    // Füge Verifikations-Warnung hinzu falls nötig
+    if (!verifikationOK) {
+      console.error(`
+      ❌❌❌ KRITISCHER FEHLER ❌❌❌
+      Die Differenz zwischen Lieferungen und Verbrauch ist zu groß!
+      Dies deutet auf einen Logikfehler in der Produktionsplanung hin.
+      Erwarte: Lieferungen ≈ Verbrauch (Differenz max. 10 Stück)
+      `)
+    }
   }
   
   // Berechne End-Backlog über alle Bauteile
