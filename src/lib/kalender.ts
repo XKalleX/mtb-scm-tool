@@ -579,13 +579,15 @@ export function berechneBestelldatum(
   let datumNachSeefracht = addDays(bedarfsdatum, -vorlaufzeiten.vorlaufzeitKalendertage)
   
   // Schritt 2: LKW-Transport Deutschland abziehen
-  datumNachSeefracht = subtractArbeitstage(datumNachSeefracht, vorlaufzeiten.lkwTransportDeutschlandArbeitstage, customFeiertage)
+  // ✅ KORRIGIERT: "2 AT" = Ankunft am 2. Tag = nur 1 AT subtrahieren
+  datumNachSeefracht = subtractArbeitstage(datumNachSeefracht, vorlaufzeiten.lkwTransportDeutschlandArbeitstage - 1, customFeiertage)
   
   // Schritt 3: Bearbeitungszeit abziehen (berücksichtigt chinesische Feiertage)
   let nachProduktion = subtractArbeitstage(datumNachSeefracht, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
   
   // Schritt 4: LKW-Transport China abziehen
-  let bestelldatum = subtractArbeitstage(nachProduktion, vorlaufzeiten.lkwTransportChinaArbeitstage, customFeiertage)
+  // ✅ KORRIGIERT: "2 AT" = Ankunft am 2. Tag = nur 1 AT subtrahieren
+  let bestelldatum = subtractArbeitstage(nachProduktion, vorlaufzeiten.lkwTransportChinaArbeitstage - 1, customFeiertage)
   
   // Schritt 5: Einen zusätzlichen Tag Puffer (Best Practice)
   bestelldatum = addDays(bestelldatum, -1)
@@ -621,13 +623,15 @@ export function berechneAnkunftsdatum(
   let nachBearbeitung = addArbeitstage(bestelldatum, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
   
   // Schritt 2: LKW-Transport China zum Hafen - nutzt CHINESISCHE Arbeitstage
-  let nachLKWChina = addArbeitstage(nachBearbeitung, vorlaufzeiten.lkwTransportChinaArbeitstage, customFeiertage)
+  // ✅ KORRIGIERT: "2 AT" = Ankunft am 2. Tag = nur 1 AT addieren
+  let nachLKWChina = addArbeitstage(nachBearbeitung, vorlaufzeiten.lkwTransportChinaArbeitstage - 1, customFeiertage)
   
   // Schritt 3: Seefracht - Kalendertage (Schiff fährt 24/7)
   let nachSeefracht = addDays(nachLKWChina, vorlaufzeiten.vorlaufzeitKalendertage)
   
   // Schritt 4: LKW-Transport Hamburg nach Dortmund - nutzt DEUTSCHE Arbeitstage
-  let ankunftsdatum = addArbeitstage_Deutschland(nachSeefracht, vorlaufzeiten.lkwTransportDeutschlandArbeitstage, customFeiertage)
+  // ✅ KORRIGIERT: "2 AT" = Ankunft am 2. Tag = nur 1 AT addieren
+  let ankunftsdatum = addArbeitstage_Deutschland(nachSeefracht, vorlaufzeiten.lkwTransportDeutschlandArbeitstage - 1, customFeiertage)
   
   return ankunftsdatum
 }
@@ -873,12 +877,17 @@ export function berechneMaterialflussDetails(
   // Schritt 1: Produktion beim Zulieferer (+5 AT China)
   const produktionsende = addArbeitstage(bestelldatum, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
   
-  // Schritt 2: LKW-Transport China zum Hafen (+2 AT = 2 Arbeitstage, Mo-Fr, keine Feiertage!)
-  // ✅ FIX: LKW-Transport muss Arbeitstage berücksichtigen (Wochenenden + chinesische Feiertage ausschließen)
-  // "2 AT" bedeutet 2 Arbeitstage (Mo-Fr, keine chinesischen Feiertage)
-  // JSON-Spezifikation: "LKW-Transport zum Hafen (Mo-Fr, 2 Arbeitstage)"
+  // Schritt 2: LKW-Transport China zum Hafen
+  // ✅ KORRIGIERT: "2 AT" bedeutet Ankunft am 2. Arbeitstag (Abfahrt = Tag 1, Ankunft = Tag 2)
+  // Das heißt: Abfahrt am 23.11. → Ankunft am 24.11. (1 Tag später, nicht 2!)
+  // LKW kann an Feiertagen fahren, aber nicht am Wochenende!
   const lkwAbfahrtChina = produktionsende
-  const ankunftHafenShanghai = addArbeitstage(produktionsende, vorlaufzeiten.lkwTransportChinaArbeitstage, customFeiertage)
+  // "2 AT" = Ankunft am 2. Tag = +1 Kalendertag (nicht +2!)
+  let ankunftHafenShanghai = addDays(produktionsende, vorlaufzeiten.lkwTransportChinaArbeitstage - 1)
+  // Wenn Ankunft auf Wochenende fällt, verschiebe auf Montag
+  while (isWeekend(ankunftHafenShanghai)) {
+    ankunftHafenShanghai = addDays(ankunftHafenShanghai, 1)
+  }
   
   // Schritt 3: Warten auf nächsten Mittwoch (Schiff fährt nur mittwochs!)
   // WICHTIG: Ware die am Hafen ankommt muss mindestens 1 Tag zur Verarbeitung warten,
@@ -890,12 +899,28 @@ export function berechneMaterialflussDetails(
   // Schritt 4: Seefracht (+30 KT)
   const schiffAnkunftHamburg = addDays(schiffAbfahrt, vorlaufzeiten.vorlaufzeitKalendertage)
   
-  // Schritt 5: LKW-Transport Deutschland (+2 AT = 2 Arbeitstage, Mo-Fr, keine deutschen Feiertage!)
-  // ✅ FIX: LKW-Transport muss Arbeitstage berücksichtigen (Wochenenden + deutsche Feiertage ausschließen)
-  // "2 AT" bedeutet 2 Arbeitstage (Mo-Fr, keine deutschen Feiertage)
-  // JSON-Spezifikation: "LKW-Transport zum Werk (Mo-Fr, NICHT Sa/So)"
-  const lkwAbfahrtDeutschland = schiffAnkunftHamburg
-  const ankunftProduktion = addArbeitstage_Deutschland(schiffAnkunftHamburg, vorlaufzeiten.lkwTransportDeutschlandArbeitstage, customFeiertage)
+  // Schritt 5: LKW-Transport Deutschland
+  // ✅ KORRIGIERT: "2 AT" bedeutet Ankunft am 2. Arbeitstag (Abfahrt = Tag 1, Ankunft = Tag 2)
+  // Das heißt: Abfahrt am 23.11. → Ankunft am 24.11. (1 Tag später, nicht 2!)
+  // LKW kann an Feiertagen fahren, aber nicht am Wochenende!
+  // 
+  // Beispiel: Schiff kommt am 25.12 (Fr, Feiertag) an
+  //   → LKW kann am 25.12 losfahren (Feiertag OK!)
+  //   → "2 AT" = Ankunft am 26.12 (1 Kalendertag später)
+  //   → 26.12 ist Sa → verschoben auf 28.12 (Mo)
+  //   → Verfügbar: 29.12 (nächster Tag)
+  // 
+  let lkwAbfahrtDeutschland = new Date(schiffAnkunftHamburg)
+  // Falls Schiff am Wochenende ankommt, warte bis Montag für LKW-Start
+  while (isWeekend(lkwAbfahrtDeutschland)) {
+    lkwAbfahrtDeutschland = addDays(lkwAbfahrtDeutschland, 1)
+  }
+  // "2 AT" = Ankunft am 2. Tag = +1 Kalendertag (nicht +2!)
+  let ankunftProduktion = addDays(lkwAbfahrtDeutschland, vorlaufzeiten.lkwTransportDeutschlandArbeitstage - 1)
+  // Wenn Ankunft auf Wochenende fällt, verschiebe auf nächsten Montag
+  while (isWeekend(ankunftProduktion)) {
+    ankunftProduktion = addDays(ankunftProduktion, 1)
+  }
   
   // Schritt 6: Material ist NÄCHSTEN TAG nach Ankunft verfügbar!
   const verfuegbarAb = addDays(ankunftProduktion, 1)
