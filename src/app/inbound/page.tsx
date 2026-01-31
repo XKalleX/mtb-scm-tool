@@ -975,11 +975,10 @@ export default function InboundPage() {
                   columns={[
                     { key: 'monatName', label: 'Monat', width: '120px', align: 'left', sumable: false },
                     { key: 'bestellungen', label: 'Bestellungen', width: '100px', align: 'right', sumable: true },
-                    { key: 'gesamtMenge', label: 'Bestellmenge', width: '120px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' },
-                    { key: 'oemBedarf', label: 'OEM-Bedarf', width: '120px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' }
+                    { key: 'gesamtMenge', label: 'Bestellmenge', width: '120px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' }
                   ]} 
                   data={bestellungenNachMonat} 
-                  maxHeight="400px" 
+                  maxHeight="600px" 
                   showFormulas={false}
                   showSums={true}
                   sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen`}
@@ -997,7 +996,7 @@ export default function InboundPage() {
                     { key: 'gesamtMenge', label: 'Bestellmenge', width: '150px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' }
                   ]}
                   data={bestellungenNachWoche} 
-                  maxHeight="500px" 
+                  maxHeight="600px" 
                   showFormulas={false}
                   showSums={true}
                   sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen`}
@@ -1022,7 +1021,7 @@ export default function InboundPage() {
                     { key: 'bestellmenge', label: 'Bestellmenge', width: '130px', align: 'right', sumable: true, format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-' }
                    ]}
                    data={nurBestellungen} 
-                   maxHeight="500px" 
+                   maxHeight="600px" 
                    showFormulas={false}
                    showSums={true}
                    sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel bestellt`}
