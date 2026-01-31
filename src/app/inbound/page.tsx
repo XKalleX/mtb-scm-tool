@@ -726,7 +726,7 @@ export default function InboundPage() {
 
                 {/* Excel-Tabelle: Tägliche Bestelllogik mit detailliertem Materialfluss */}
                 <div className="mb-2 text-xs text-muted-foreground">
-                  ✅ Zeigt granulare Materialfluss-Stationen wie Referenz-Gruppe | 🟢 = Bestellung | Vorlaufzeit = {gesamtVorlaufzeit} Tage
+                  ✅ Zeigt granulare Materialfluss-Stationen (0️⃣-7️⃣) wie Referenz-Gruppe | Vorlaufzeit = {gesamtVorlaufzeit} Tage
                 </div>
                 <ExcelTable
                   columns={[
@@ -932,24 +932,26 @@ export default function InboundPage() {
                           const dB = b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch : new Date(b.schiffAbfahrtMittwoch || b.bestelldatum)
                           return dA.getTime() - dB.getTime()
                         })
+                      // Bundle-Farben für visuelle Gruppierung (außerhalb der Schleife für Performance)
+                      const BUNDLE_COLORS = ['bg-blue-50', 'bg-green-50', 'bg-purple-50', 'bg-orange-50', 'bg-pink-50', 'bg-yellow-50']
                       const bundleMap = new Map<string, number>()
                       let bundleNr = 1
-                      let hafenMenge = 0
-                      const colors = ['bg-blue-50', 'bg-green-50', 'bg-purple-50', 'bg-orange-50', 'bg-pink-50', 'bg-yellow-50']
+                      let akkumuliertAmHafen = 0
                       return sorted.map((b, idx) => {
                         const menge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
                         const key = b.schiffAbfahrtMittwoch ? (b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch.toISOString() : new Date(b.schiffAbfahrtMittwoch).toISOString()) : 'none'
                         if (!bundleMap.has(key)) bundleMap.set(key, bundleNr++)
                         const bid = bundleMap.get(key)
-                        hafenMenge += menge
+                        akkumuliertAmHafen += menge
                         const next = sorted[idx + 1]
                         const nextKey = next?.schiffAbfahrtMittwoch ? (next.schiffAbfahrtMittwoch instanceof Date ? next.schiffAbfahrtMittwoch.toISOString() : new Date(next.schiffAbfahrtMittwoch).toISOString()) : 'x'
                         const isLast = key !== nextKey
-                        const backlog = isLast ? `✈️ ${formatNumber(hafenMenge, 0)}` : `⏳ ${formatNumber(hafenMenge, 0)}`
-                        if (isLast) hafenMenge = 0
+                        // Zeigt akkumulierte Menge am Hafen: ⏳ = wartet noch, ✈️ = wird verschifft
+                        const hafenAnzeige = isLast ? `✈️ ${formatNumber(akkumuliertAmHafen, 0)}` : `⏳ ${formatNumber(akkumuliertAmHafen, 0)}`
+                        if (isLast) akkumuliertAmHafen = 0
                         return {
                           bundleMarker: bid ? `#${bid}` : '-',
-                          bundleColor: colors[(bid || 1) % colors.length],
+                          bundleColor: BUNDLE_COLORS[(bid || 1) % BUNDLE_COLORS.length],
                           bestellungId: b.id,
                           bestelldatumFormatiert: (b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum)).toLocaleDateString('de-DE'),
                           ankunftHafen: b.materialfluss?.ankunftHafenShanghai ? ((b.materialfluss.ankunftHafenShanghai instanceof Date ? b.materialfluss.ankunftHafenShanghai : new Date(b.materialfluss.ankunftHafenShanghai)).toLocaleDateString('de-DE')) : '-',
@@ -958,7 +960,7 @@ export default function InboundPage() {
                           wartetage: b.wartetageAmHafen !== undefined ? b.wartetageAmHafen + 'd' : '-',
                           erwarteteAnkunftFormatiert: (b.erwarteteAnkunft instanceof Date ? b.erwarteteAnkunft : new Date(b.erwarteteAnkunft)).toLocaleDateString('de-DE'),
                           verfuegbarAb: b.verfuegbarAb ? ((b.verfuegbarAb instanceof Date ? b.verfuegbarAb : new Date(b.verfuegbarAb)).toLocaleDateString('de-DE')) : '-',
-                          hafenBacklog: backlog
+                          hafenBacklog: hafenAnzeige
                         }
                       })
                     })()}

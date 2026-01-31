@@ -220,7 +220,7 @@ export function generiereTaeglicheBestellungen(
   // Grund: Bedarf für gesamtes Jahr 2027 muss erfasst werden (370.000 Sättel)
   // Lieferung erfolgt zwar Anfang 2028, aber Bedarf entsteht Ende 2027
   const produktionsEnde = new Date(planungsjahr, 11, 31)
-  const bestellEnde = new Date(planungsjahr, 11, 31)  // Bis Jahresende bestellen!
+  const bestellEnde = new Date(planungsjahr, 11, 31)
   
   // Offene Bestellmengen pro Komponente (akkumuliert bis Losgröße erreicht)
   const offeneMengen: Record<string, number> = {}
