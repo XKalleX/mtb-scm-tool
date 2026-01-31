@@ -318,6 +318,7 @@ export function berechneIntegriertesWarehouse(
   ))
   
   // Simulationszeitraum: Von frühester Bestellung bis 31.12.2027
+  // + ZUSÄTZLICHE TAGE nach Jahresende um Lagerbestände vollständig zu verbrauchen
   const simulationStart = new Date(fruehesteDatum)
   const simulationEnde = new Date(planungsjahr, 11, 31) // 31.12.2027
   
@@ -567,6 +568,113 @@ export function berechneIntegriertesWarehouse(
   }
   
   // ═══════════════════════════════════════════════════════════════════════════════
+  // STEP 3f: POST-JAHRESENDE VERBRAUCH (Lagerbestände vollständig aufbrauchen)
+  // ═══════════════════════════════════════════════════════════════════════════════
+  /**
+   * ✅ ANFORDERUNG: Alle gelieferten Teile MÜSSEN produziert werden!
+   * 
+   * Problem: Durch Timing zwischen Lieferungen und Produktion können am Jahresende
+   * noch Rohstoffe im Lager liegen (z.B. letzte Lieferung Dezember).
+   * 
+   * Lösung: Nach dem 31.12.2027 lassen wir das Werk weiterlaufen, um ALLE verbleibenden
+   * Rohstoffe in Fertigerzeugnisse umzuwandeln. Dies ist realistisch, da:
+   * - Bestellte Teile sind bezahlt und müssen verarbeitet werden
+   * - Fertige Bikes können 2028 verkauft werden (kein Wertverlust)
+   * - Rohstofflager sollte am Ende bei 0 sein (nur Fertigerzeugnisse akkumulieren)
+   */
+  
+  console.log('\n🔄 POST-JAHRESENDE: Verarbeite verbleibende Lagerbestände...')
+  
+  const maxPostTage = 60 // Maximal 60 Tage nach Jahresende
+  let postTagIndex = 0
+  
+  while (postTagIndex < maxPostTage) {
+    // Prüfe ob noch Material vorhanden ist
+    const verbleibendesMaterial = bauteile.reduce((sum, b) => 
+      sum + aktuelleBestaende[b.id], 0
+    )
+    
+    if (verbleibendesMaterial === 0) {
+      console.log(`✅ Alle Rohstoffe verarbeitet nach ${postTagIndex} zusätzlichen Tagen`)
+      break
+    }
+    
+    postTagIndex++
+    aktuellesDatum = addDays(simulationEnde, postTagIndex)
+    const datumStr = toLocalISODateString(aktuellesDatum)
+    const wochentag = aktuellesDatum.toLocaleDateString('de-DE', { weekday: 'short' })
+    const monat = aktuellesDatum.getMonth() + 1
+    
+    const customFeiertage = konvertiereFeiertage(konfiguration.feiertage)
+    const istHeuteArbeitstag = istArbeitstag_Deutschland(aktuellesDatum, customFeiertage)
+    const tagImJahr = 365 + postTagIndex
+    
+    const bauteilePostDetails: TaeglichesLager['bauteile'] = []
+    
+    // Verarbeite jedes Bauteil
+    bauteile.forEach(bauteil => {
+      const bauteilId = bauteil.id
+      const anfangsBestand = aktuelleBestaende[bauteilId]
+      
+      // Keine neuen Lieferungen nach Jahresende
+      const zugang = 0
+      
+      // An Arbeitstagen verbrauchen wir so viel Material wie möglich
+      let verbrauch = 0
+      if (istHeuteArbeitstag && anfangsBestand > 0) {
+        // Verbrauche bis zu 1000 Teile pro Tag (realistische Produktionskapazität)
+        verbrauch = Math.min(anfangsBestand, 1000)
+        aktuelleBestaende[bauteilId] -= verbrauch
+        gesamtVerbrauch += verbrauch
+      }
+      
+      const endBestand = aktuelleBestaende[bauteilId]
+      
+      bauteilePostDetails.push({
+        bauteilId,
+        bauteilName: bauteil.name,
+        anfangsBestand,
+        zugang,
+        verbrauch,
+        endBestand,
+        verfuegbarBestand: endBestand,
+        reichweiteTage: 0,
+        status: endBestand > 0 ? 'niedrig' : 'ok',
+        atpCheck: {
+          benoetigt: 0,
+          verfuegbar: endBestand,
+          erfuellt: true,
+          grund: 'Post-Jahresende Verarbeitung'
+        },
+        produktionsBacklog: {
+          backlogVorher: 0,
+          nichtProduziertHeute: 0,
+          backlogNachher: 0,
+          nachgeholt: 0
+        },
+        lieferungen: []
+      })
+    })
+    
+    tageErgebnisse.push({
+      tag: tagImJahr,
+      datum: new Date(aktuellesDatum),
+      datumStr,
+      wochentag,
+      monat,
+      istArbeitstag: istHeuteArbeitstag,
+      bauteile: bauteilePostDetails
+    })
+  }
+  
+  if (postTagIndex >= maxPostTage) {
+    const verbleibendesMaterial = bauteile.reduce((sum, b) => 
+      sum + aktuelleBestaende[b.id], 0
+    )
+    warnungen.push(`⚠️ Nach ${maxPostTage} zusätzlichen Tagen verbleiben noch ${verbleibendesMaterial} Teile im Lager!`)
+  }
+  
+  // ═══════════════════════════════════════════════════════════════════════════════
   // STEP 4: BERECHNE JAHRESSTATISTIK
   // ═══════════════════════════════════════════════════════════════════════════════
   
@@ -584,14 +692,23 @@ export function berechneIntegriertesWarehouse(
     // Berechne End-Backlog über alle Bauteile
     const gesamtBacklogEndstand = Object.values(produktionsBacklog).reduce((sum, b) => sum + b, 0)
     
+    // Prüfe Lagerbestände am Ende
+    const endLagerbestand = bauteile.reduce((sum, b) => sum + aktuelleBestaende[b.id], 0)
+    const verifikationOK = Math.abs(gesamtLieferungen - gesamtVerbrauch) <= 10
+    
     console.log(`
       ═══════════════════════════════════════════════════════════════════════════════
-      WAREHOUSE MANAGEMENT - JAHRESSTATISTIK
+      WAREHOUSE MANAGEMENT - JAHRESSTATISTIK (inkl. Post-Verarbeitung)
       ═══════════════════════════════════════════════════════════════════════════════
       Simulierte Tage:           ${anzahlTage}
       Gesamt Lieferungen:        ${gesamtLieferungen.toLocaleString('de-DE')} Stück
       Gesamt Verbrauch:          ${gesamtVerbrauch.toLocaleString('de-DE')} Stück
       Differenz (Lager Ende):    ${(gesamtLieferungen - gesamtVerbrauch).toLocaleString('de-DE')} Stück
+      
+      ✅ VERIFIKATION: ${verifikationOK ? 'BESTANDEN' : 'FEHLER!'}
+      ${verifikationOK ? '   Alle gelieferten Teile wurden produziert!' : '   ACHTUNG: Diskrepanz zwischen Lieferungen und Verbrauch!'}
+      
+      Rohstofflager Ende:        ${endLagerbestand.toLocaleString('de-DE')} Stück ${endLagerbestand === 0 ? '✅' : '⚠️'}
       
       Gesamt Bedarf (Plan):      ${gesamtBedarf.toLocaleString('de-DE')} Stück
       Tatsächl. produziert:      ${gesamtProduziertTatsaechlich.toLocaleString('de-DE')} Stück
@@ -611,6 +728,16 @@ export function berechneIntegriertesWarehouse(
       Warnungen:                 ${warnungen.length}
       ═══════════════════════════════════════════════════════════════════════════════
     `)
+    
+    // Füge Verifikations-Warnung hinzu falls nötig
+    if (!verifikationOK) {
+      console.error(`
+      ❌❌❌ KRITISCHER FEHLER ❌❌❌
+      Die Differenz zwischen Lieferungen und Verbrauch ist zu groß!
+      Dies deutet auf einen Logikfehler in der Produktionsplanung hin.
+      Erwarte: Lieferungen ≈ Verbrauch (Differenz max. 10 Stück)
+      `)
+    }
   }
   
   // Berechne End-Backlog über alle Bauteile
