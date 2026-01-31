@@ -1,6 +1,6 @@
 # Zusammenfassung der Korrekturen
 
-## Datum: $(date)
+## Datum: 2024 (Build-Zeit automatisch)
 ## Bearbeiter: AI Assistant (Spezialisierter WI3 Agent)
 
 ---

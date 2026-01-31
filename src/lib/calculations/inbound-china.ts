@@ -113,6 +113,14 @@ export interface TaeglicheBestellung {
  * - LKW nicht am Wochenende
  * - Material verfügbar am nächsten Tag nach Ankunft
  * 
+ * ⚠️ NOTE ON TYPE SAFETY:
+ * Der Parameter `alleProduktionsplaene` ist bewusst als `any[]` typisiert, um
+ * beide Varianten zu unterstützen:
+ * 1. TagesProduktionsplan (mit sollMenge)
+ * 2. Formatiertes Objekt (mit planMenge)
+ * Das ist ein pragmatischer Trade-off zwischen Type-Safety und Flexibilität.
+ * Die Funktion prüft beide Felder und fällt zurück auf 0 wenn keins existiert.
+ * 
  * @param alleProduktionsplaene - Pläne aller MTB-Varianten
  * @param planungsjahr - Jahr (aus KonfigurationContext)
  * @param vorlaufzeitTage - Fixe Vorlaufzeit (aus KonfigurationContext)
