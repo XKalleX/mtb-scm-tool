@@ -356,9 +356,12 @@ export function generiereTagesproduktion(
     const abweichung = istMenge - planMenge
     const materialVerfuegbar = istArbeitstag
     
+    // Kapazitätsberechnung mit Schichtsystem aus KonfigurationContext
+    // 130 Bikes/h * 8h/Schicht = 1040 Bikes/Schicht
     const kapazitaetProSchicht = 
       konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
-    const schichten = istArbeitstag ? Math.ceil(istMenge / kapazitaetProSchicht) : 0
+    const maxSchichtenProTag = konfiguration.produktion.maxSchichtenProTag || 3
+    const schichten = istArbeitstag ? Math.min(Math.ceil(istMenge / kapazitaetProSchicht), maxSchichtenProTag) : 0
     
     const maxKapazitaet = schichten > 0 ? schichten * kapazitaetProSchicht : 0
     const auslastung = maxKapazitaet > 0 ? (istMenge / maxKapazitaet) * 100 : 0
