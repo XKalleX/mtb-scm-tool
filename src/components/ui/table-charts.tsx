@@ -13,7 +13,7 @@
  * WICHTIG: Alle Daten werden DYNAMISCH aus dem Kontext bezogen!
  */
 
-import { useMemo } from 'react'
+import { useMemo, Fragment } from 'react'
 import {
   LineChart,
   Line,
@@ -838,12 +838,22 @@ export function FertigerzeugnisseChart({
       // Zeige jeden 5. Tag für bessere Lesbarkeit
       return daten
         .filter((_, i) => i % 5 === 0)
-        .map(d => ({
-          label: `Tag ${d.tag}`,
-          kumulativIst: d.kumulativIst,
-          kumulativPlan: d.kumulativPlan,
-          ...(d.varianten || {})
-        }))
+        .map(d => {
+          // ✅ Flatten Varianten-Daten für Chart
+          const variantenFlat: Record<string, number> = {}
+          if (d.varianten) {
+            Object.entries(d.varianten).forEach(([id, v]) => {
+              variantenFlat[`${id}_ist`] = v.ist
+              variantenFlat[`${id}_plan`] = v.plan
+            })
+          }
+          return {
+            label: `Tag ${d.tag}`,
+            kumulativIst: d.kumulativIst,
+            kumulativPlan: d.kumulativPlan,
+            ...variantenFlat
+          }
+        })
     } else if (aggregation === 'woche') {
       // Nimm letzten Wert jeder Woche
       const wochen: Record<number, { 
@@ -864,6 +874,7 @@ export function FertigerzeugnisseChart({
         if (values.varianten) {
           Object.entries(values.varianten).forEach(([id, v]) => {
             variantenFlat[`${id}_ist`] = v.ist
+            variantenFlat[`${id}_plan`] = v.plan  // ✅ NEU: Auch PLAN-Werte
           })
         }
         return {
@@ -896,6 +907,7 @@ export function FertigerzeugnisseChart({
         if (values.varianten) {
           Object.entries(values.varianten).forEach(([id, v]) => {
             variantenFlat[`${id}_ist`] = v.ist
+            variantenFlat[`${id}_plan`] = v.plan  // ✅ NEU: Auch PLAN-Werte
           })
         }
         return {
@@ -941,41 +953,58 @@ export function FertigerzeugnisseChart({
               }}
             />
             <Legend />
-            {/* Gesamt Plan (gestrichelt) */}
-            <Area 
-              type="monotone" 
-              dataKey="kumulativPlan" 
-              fill={COLORS.secondary}
-              fillOpacity={0.1}
-              stroke={COLORS.secondary}
-              strokeWidth={2}
-              strokeDasharray="5 5"
-              name="Plan (Gesamt)"
-            />
             {/* Varianten-Linien wenn aktiviert */}
             {showPerVariante && varianten ? (
-              varianten.map((v, idx) => (
-                <Line
-                  key={v.id}
-                  type="monotone"
-                  dataKey={`${v.id}_ist`}
-                  stroke={VARIANTEN_FARBEN[idx % VARIANTEN_FARBEN.length]}
-                  strokeWidth={2}
-                  dot={false}
-                  name={v.name}
-                />
-              ))
+              <>
+                {varianten.map((v, idx) => (
+                  <Fragment key={v.id}>
+                    {/* IST-Linie pro Variante (dick) */}
+                    <Line
+                      type="monotone"
+                      dataKey={`${v.id}_ist`}
+                      stroke={VARIANTEN_FARBEN[idx % VARIANTEN_FARBEN.length]}
+                      strokeWidth={2.5}
+                      dot={false}
+                      name={`${v.name} (IST)`}
+                    />
+                    {/* SOLL-Linie pro Variante (gestrichelt, dünner) */}
+                    <Line
+                      type="monotone"
+                      dataKey={`${v.id}_plan`}
+                      stroke={VARIANTEN_FARBEN[idx % VARIANTEN_FARBEN.length]}
+                      strokeWidth={1.5}
+                      strokeDasharray="3 3"
+                      strokeOpacity={0.6}
+                      dot={false}
+                      name={`${v.name} (SOLL)`}
+                    />
+                  </Fragment>
+                ))}
+              </>
             ) : (
-              /* Gesamt Ist (wenn keine Varianten) */
-              <Area 
-                type="monotone" 
-                dataKey="kumulativIst" 
-                fill={COLORS.success}
-                fillOpacity={0.4}
-                stroke={COLORS.success}
-                strokeWidth={3}
-                name="Ist (Gesamt)"
-              />
+              <>
+                {/* Gesamt Plan (gestrichelt) */}
+                <Area 
+                  type="monotone" 
+                  dataKey="kumulativPlan" 
+                  fill={COLORS.secondary}
+                  fillOpacity={0.1}
+                  stroke={COLORS.secondary}
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  name="Plan (Gesamt)"
+                />
+                {/* Gesamt Ist */}
+                <Area 
+                  type="monotone" 
+                  dataKey="kumulativIst" 
+                  fill={COLORS.success}
+                  fillOpacity={0.4}
+                  stroke={COLORS.success}
+                  strokeWidth={3}
+                  name="Ist (Gesamt)"
+                />
+              </>
             )}
           </ComposedChart>
         </ResponsiveContainer>

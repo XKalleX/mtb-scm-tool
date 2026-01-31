@@ -120,7 +120,7 @@ export interface TaeglicheBestellung {
  * @returns Array von Bestellungen (inkl. Vorjahr!)
  */
 export function generiereTaeglicheBestellungen(
-  alleProduktionsplaene: Record<string, TagesProduktionsplan[]>,
+  alleProduktionsplaene: Record<string, any[]>,  // ✅ Generic any[] erlaubt TagesProduktionsplan oder formatierten Typ
   planungsjahr: number,
   vorlaufzeitTage: number,
   customFeiertage?: FeiertagsKonfiguration[],
@@ -151,6 +151,10 @@ export function generiereTaeglicheBestellungen(
   })
   
   // Fülle täglichen Bedarf aus Produktionsplänen
+  // ✅ WICHTIG: Nutze planMenge, NICHT istMenge!
+  // Grund: Bestellungen müssen VORHER erfolgen, bevor Material da ist
+  // istMenge wird später basierend auf Material-Verfügbarkeit gesetzt
+  // Wir bestellen für den PLAN (370.000 Bikes), nicht für IST
   Object.entries(alleProduktionsplaene).forEach(([varianteId, plan]) => {
     const stueckliste = stklst[varianteId as keyof typeof stklst]
     if (!stueckliste) return
@@ -158,9 +162,14 @@ export function generiereTaeglicheBestellungen(
     const komponenten = stueckliste.komponenten as Record<string, Komponente>
     
     plan.forEach((tag, tagIndex) => {
-      if (tag.istMenge > 0 && tagIndex < 365) {
+      // ✅ KORREKT: Nutze planMenge (OEM Plan), NICHT istMenge
+      // planMenge ist immer 370.000 Summe, istMenge hängt von Material ab
+      // Kompatibilität: Unterstütze beide Feldnamen (planMenge und sollMenge)
+      const planMenge = (tag as any).planMenge || (tag as any).sollMenge || 0
+      
+      if (planMenge > 0 && tagIndex < 365) {
         Object.entries(komponenten).forEach(([kompId, komp]) => {
-          taeglicheBedarf[kompId][tagIndex] += tag.istMenge * komp.menge
+          taeglicheBedarf[kompId][tagIndex] += planMenge * komp.menge
         })
       }
     })

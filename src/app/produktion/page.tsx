@@ -325,42 +325,48 @@ export default function ProduktionPage() {
   // ✅ NEU: Fertigerzeugnisse-Daten (kumulative Bike-Produktion)
   // Zeigt wie viele Bikes bereits produziert wurden (kumulativ)
   // Muss am Jahresende exakt 370.000 erreichen!
-  // NEU: Auch pro Variante für detailliertere Ansicht
+  // ✅ KORRIGIERT: Nutze ECHTE Varianten-Produktionspläne statt proportionale Verteilung
   const fertigerzeugnisseDaten = useMemo(() => {
-    let kumulativIst = 0
-    let kumulativPlan = 0
+    // Initialisiere kumulative Werte
+    let kumulativIstGesamt = 0
+    let kumulativPlanGesamt = 0
     
-    // Kumulative Werte pro Variante
+    // Kumulative Werte pro Variante (aus ECHTEN Produktionsplänen)
     const variantenKumulativ: Record<string, { plan: number, ist: number }> = {}
     konfiguration.varianten.forEach(v => {
       variantenKumulativ[v.id] = { plan: 0, ist: 0 }
     })
     
-    return tagesProduktionFormatiert.map(tag => {
-      kumulativPlan += tag.planMenge
-      kumulativIst += tag.istMenge
+    return tagesProduktionFormatiert.map((tag, tagIndex) => {
+      // Gesamt-Kumulativ (über alle Varianten aggregiert)
+      kumulativPlanGesamt += tag.planMenge
+      kumulativIstGesamt += tag.istMenge
       
-      // Berechne pro Variante (proportional zur Variantenverteilung)
-      konfiguration.varianten.forEach(v => {
-        const anteil = v.anteilPrognose
-        variantenKumulativ[v.id].plan += Math.round(tag.planMenge * anteil)
-        variantenKumulativ[v.id].ist += Math.round(tag.istMenge * anteil)
+      // ✅ KORREKT: Pro Variante aus ECHTEN Produktionsplänen
+      // Nutze variantenProduktionsplaeneForWarehouse für echte Varianten-Daten
+      Object.entries(variantenProduktionsplaeneForWarehouse).forEach(([varianteId, plan]) => {
+        if (tagIndex < plan.tage.length) {
+          const varianteTag = plan.tage[tagIndex]
+          // Addiere zu kumulativen Werten dieser Variante
+          variantenKumulativ[varianteId].plan += varianteTag.planMenge
+          variantenKumulativ[varianteId].ist += varianteTag.istMenge
+        }
       })
       
       return {
         tag: tag.tag,
         datum: tag.datum,
-        kumulativIst,
-        kumulativPlan,
+        kumulativIst: kumulativIstGesamt,
+        kumulativPlan: kumulativPlanGesamt,
         monat: tag.monat,
-        // NEU: Pro Variante
+        // ✅ NEU: Echte Pro-Variante Werte (nicht proportional!)
         varianten: Object.entries(variantenKumulativ).reduce((acc, [id, values]) => {
           acc[id] = { plan: values.plan, ist: values.ist }
           return acc
         }, {} as Record<string, { plan: number, ist: number }>)
       }
     })
-  }, [tagesProduktionFormatiert, konfiguration.varianten])
+  }, [tagesProduktionFormatiert, konfiguration.varianten, variantenProduktionsplaeneForWarehouse])
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
