@@ -69,14 +69,18 @@ export default function ExcelTable({
   
   /**
    * Berechnet Summen oder Durchschnitte für numerische Spalten
+   * Filtert Zusammenfassungszeilen (isSummary: true) heraus
    */
   const calculateSums = (dataToSum: any[]) => {
     const sums: Record<string, number> = {}
     
+    // Filtere Zusammenfassungszeilen heraus (z.B. "→ Verschifft", "→ Am Hafen")
+    const dataWithoutSummaries = dataToSum.filter(row => !row.isSummary)
+    
     columns.forEach(col => {
       if (col.sumable !== false) {
         // Standardmäßig alle numerischen Spalten summieren/durchschnittlich berechnen
-        const values = dataToSum.map(row => row[col.key])
+        const values = dataWithoutSummaries.map(row => row[col.key])
         const numericValues = values.filter(v => typeof v === 'number')
         
         if (numericValues.length > 0) {

@@ -109,7 +109,7 @@ export default function InboundPage() {
   // ✅ NEU: State für Zusatzbestellungen
   const [zusatzBestellungen, setZusatzBestellungen] = useState<TaeglicheBestellung[]>([])
   const [neueBestellungDatum, setNeueBestellungDatum] = useState<string>('')
-  const [neueBestellungMenge, setNeueBestellungMenge] = useState<string>('500')
+  const [neueBestellungMenge, setNeueBestellungMenge] = useState<string>(String(konfiguration.lieferant.losgroesse))
   
   // ✅ NEU: Handler für Zusatzbestellung
   const handleZusatzbestellung = useCallback(() => {
@@ -149,8 +149,8 @@ export default function InboundPage() {
     
     setZusatzBestellungen(prev => [...prev, neueBestellung])
     // Datum NICHT zurücksetzen, damit weitere Bestellungen mit ähnlichem Datum einfacher sind
-    setNeueBestellungMenge('500')  // Nur Menge zurücksetzen
-  }, [neueBestellungDatum, neueBestellungMenge, konfiguration.lieferant.gesamtVorlaufzeitTage])
+    setNeueBestellungMenge(String(konfiguration.lieferant.losgroesse))  // Nur Menge zurücksetzen
+  }, [neueBestellungDatum, neueBestellungMenge, konfiguration.lieferant.gesamtVorlaufzeitTage, konfiguration.lieferant.losgroesse])
   
   // Lieferant aus Konfiguration
   const lieferant = konfiguration.lieferant
@@ -1006,7 +1006,7 @@ export default function InboundPage() {
 
             {zeitperiode === 'tag' && (
               <>
-                 <div className="mb-2 text-xs text-muted-foreground">✅ Zeigt granulare Materialfluss-Stationen (0️⃣-7️⃣) wie Referenz-Gruppe | Vorlaufzeit = {gesamtVorlaufzeit} Tage</div>
+                 <div className="mb-2 text-xs text-muted-foreground">✅ Zeigt granulare Materialfluss-Stationen (0️⃣-7️⃣) | Vorlaufzeit = {gesamtVorlaufzeit} Tage</div>
                  <ExcelTable 
                    columns={[
                     { key: 'bestellungsIds', label: 'Bestellungs-ID(s)', width: '140px', align: 'left', sumable: false, format: (v: string) => v || '-' },
@@ -1119,7 +1119,16 @@ export default function InboundPage() {
                     <strong>⚓ (Anker):</strong> Ware wartet am Hafen. Die Zahl ist die <strong>akkumulierte Menge</strong> (Running Total).
                   </li>
                   <li>
-                    <strong>🚢 (Schiff):</strong> Das Schiff legt ab. Diese Zahl ist die <strong>gesamte Ladung</strong>, die auf Reisen geht.
+                    <strong>🚢 (Schiff):</strong> Das Schiff legt ab. Diese Zahl ist die <strong>gesamte Ladung vor Losgröße-Anwendung</strong>.
+                  </li>
+                  <li>
+                    <strong>📦 Verschifft:</strong> Tatsächlich verschiffte Menge (auf Losgröße {lieferant.losgroesse} abgerundet, z.B. 3700 → 3500).
+                  </li>
+                  <li>
+                    <strong>⚓ Am Hafen:</strong> Verbleibende Menge (wartet auf nächstes Schiff, z.B. 200 von 3700).
+                  </li>
+                  <li>
+                    <strong>Proportionale Verteilung:</strong> Wenn Teile am Hafen bleiben, werden sie proportional nach Bestellmenge verteilt.
                   </li>
                 </ul>
               </div>
@@ -1138,6 +1147,7 @@ export default function InboundPage() {
                   { key: 'hafenBacklog', label: 'Am Hafen', width: '160px', align: 'right', sumable: false }
                 ]}
                 data={(() => {
+                  const LOSGROESSE = lieferant.losgroesse // 500 Stück
                   const sorted = taeglicheBestellungen
                     .filter(b => Object.values(b.komponenten).reduce((sum, m) => sum + m, 0) > 0)
                     .sort((a, b) => {
@@ -1150,12 +1160,20 @@ export default function InboundPage() {
                   const bundleMap = new Map<string, number>()
                   let bundleNr = 1
                   let akkumuliertAmHafen = 0
+                  let restVonVorherigemBundle = 0 // Übertrag vom vorherigen Bundle
                   
-                  return sorted.map((b, idx) => {
+                  const rows: any[] = []
+                  
+                  sorted.forEach((b, idx) => {
                     const menge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
                     const key = b.schiffAbfahrtMittwoch ? (b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch.toISOString() : new Date(b.schiffAbfahrtMittwoch).toISOString()) : 'none'
                     
-                    if (!bundleMap.has(key)) bundleMap.set(key, bundleNr++)
+                    if (!bundleMap.has(key)) {
+                      bundleMap.set(key, bundleNr++)
+                      // Neues Bundle startet mit Restbestand vom vorherigen Bundle
+                      akkumuliertAmHafen = restVonVorherigemBundle
+                      restVonVorherigemBundle = 0
+                    }
                     const bid = bundleMap.get(key)
                     
                     akkumuliertAmHafen += menge
@@ -1164,14 +1182,12 @@ export default function InboundPage() {
                     const nextKey = next?.schiffAbfahrtMittwoch ? (next.schiffAbfahrtMittwoch instanceof Date ? next.schiffAbfahrtMittwoch.toISOString() : new Date(next.schiffAbfahrtMittwoch).toISOString()) : 'x'
                     const isLast = key !== nextKey
                     
-                    // ✅ UPDATED ICONS: Anchor for waiting, Ship for departing
+                    // Zeige akkumulierte Menge am Hafen
                     const hafenAnzeige = isLast 
                       ? `🚢 ${formatNumber(akkumuliertAmHafen, 0)}` 
                       : `⚓ ${formatNumber(akkumuliertAmHafen, 0)}`
                     
-                    if (isLast) akkumuliertAmHafen = 0
-                    
-                    return {
+                    rows.push({
                       bundleMarker: bid ? `#${bid}` : '-',
                       bundleColor: BUNDLE_COLORS[(bid || 1) % BUNDLE_COLORS.length],
                       bestellungId: b.id,
@@ -1183,14 +1199,77 @@ export default function InboundPage() {
                       erwarteteAnkunftFormatiert: (b.erwarteteAnkunft instanceof Date ? b.erwarteteAnkunft : new Date(b.erwarteteAnkunft)).toLocaleDateString('de-DE'),
                       verfuegbarAb: b.verfuegbarAb ? ((b.verfuegbarAb instanceof Date ? b.verfuegbarAb : new Date(b.verfuegbarAb)).toLocaleDateString('de-DE')) : '-',
                       hafenBacklog: hafenAnzeige
+                    })
+                    
+                    // Am Ende des Bundles: Losgröße anwenden und Summenzeilen hinzufügen
+                    if (isLast) {
+                      // Berechne verschiffte Menge (auf Losgröße abgerundet)
+                      const verschiffteMenge = Math.floor(akkumuliertAmHafen / LOSGROESSE) * LOSGROESSE
+                      const verbleibendeMenge = akkumuliertAmHafen - verschiffteMenge
+                      
+                      // Zeile 1: Verschiffte Menge
+                      rows.push({
+                        bundleMarker: '',
+                        bundleColor: BUNDLE_COLORS[(bid || 1) % BUNDLE_COLORS.length],
+                        bestellungId: '→ Verschifft',
+                        bestelldatumFormatiert: '',
+                        ankunftHafen: '',
+                        menge: verschiffteMenge,
+                        schiffAbfahrt: `${Math.floor(verschiffteMenge / LOSGROESSE)} × ${LOSGROESSE} Stk`,
+                        wartetage: '',
+                        erwarteteAnkunftFormatiert: '',
+                        verfuegbarAb: '',
+                        hafenBacklog: `📦 ${formatNumber(verschiffteMenge, 0)}`,
+                        isSummary: true,
+                        summaryType: 'verschifft'
+                      })
+                      
+                      // Zeile 2: Verbleibende Menge am Hafen
+                      rows.push({
+                        bundleMarker: '',
+                        bundleColor: BUNDLE_COLORS[(bid || 1) % BUNDLE_COLORS.length],
+                        bestellungId: '→ Am Hafen',
+                        bestelldatumFormatiert: '',
+                        ankunftHafen: '',
+                        menge: verbleibendeMenge,
+                        schiffAbfahrt: verbleibendeMenge > 0 ? `wartet auf nächstes Schiff` : '-',
+                        wartetage: '',
+                        erwarteteAnkunftFormatiert: '',
+                        verfuegbarAb: '',
+                        hafenBacklog: verbleibendeMenge > 0 ? `⚓ ${formatNumber(verbleibendeMenge, 0)}` : '-',
+                        isSummary: true,
+                        summaryType: 'verbleibend'
+                      })
+                      
+                      // Übertrag für nächstes Bundle
+                      restVonVorherigemBundle = verbleibendeMenge
+                      akkumuliertAmHafen = 0
                     }
                   })
+                  
+                  return rows
                 })()}
                 maxHeight="500px"
                 showFormulas={false}
                 showSums={true}
                 sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Lieferungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel`}
-                highlightRow={(row: any) => row.bundleColor ? { color: row.bundleColor + ' border-l-4 border-blue-400', tooltip: `Bundle ${row.bundleMarker}` } : null}
+                highlightRow={(row: any) => {
+                  if (row.isSummary) {
+                    // Summenzeilen: fett und mit speziellem Hintergrund
+                    if (row.summaryType === 'verschifft') {
+                      return { 
+                        color: 'bg-green-100 border-l-4 border-green-600 font-semibold', 
+                        tooltip: 'Verschiffte Menge (Losgröße angewendet)' 
+                      }
+                    } else if (row.summaryType === 'verbleibend') {
+                      return { 
+                        color: 'bg-amber-100 border-l-4 border-amber-600 font-semibold', 
+                        tooltip: 'Verbleibende Menge am Hafen (wartet auf nächstes Schiff)' 
+                      }
+                    }
+                  }
+                  return row.bundleColor ? { color: row.bundleColor + ' border-l-4 border-blue-400', tooltip: `Bundle ${row.bundleMarker}` } : null
+                }}
               />
               
               {/* Chart: Monatliche Liefermengen */}
