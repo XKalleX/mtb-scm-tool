@@ -170,6 +170,11 @@ export default function ProduktionPage() {
       backlogProTag[warehouseTag.tag] = tagesBacklog
     })
     
+    // Kapazitätsberechnung: 130 Bikes/h * 8h = 1040 Bikes pro Schicht
+    const kapazitaetProSchicht = 
+      konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
+    const maxSchichtenProTag = konfiguration.produktion.maxSchichtenProTag || 3
+    
     // Initialisiere 365 Tage
     for (let tag = 1; tag <= 365; tag++) {
       // Hole ersten Tag als Template (alle haben gleiche Basis-Infos)
@@ -192,15 +197,33 @@ export default function ProduktionPage() {
         }
       })
       
+      // ✅ FIX: Berechne Schichten basierend auf tatsächlicher IST-Menge + Backlog
+      // Bei Backlog benötigen wir mehr Schichten um aufzuholen
+      const tagesBacklog = backlogProTag[tag] || 0
+      const gesamtProduktionsbedarf = gesamtIst + tagesBacklog
+      const schichten = templateTag.istArbeitstag 
+        ? Math.min(Math.ceil(gesamtProduktionsbedarf / kapazitaetProSchicht), maxSchichtenProTag) 
+        : 0
+      
+      // ✅ FIX: Berechne Auslastung basierend auf tatsächlicher Produktion
+      // Auslastung = (Tatsächlich produziert / Max. Kapazität) * 100
+      const maxKapazitaetHeute = schichten * kapazitaetProSchicht
+      const auslastung = maxKapazitaetHeute > 0 
+        ? (gesamtIst / maxKapazitaetHeute) * 100 
+        : 0
+      
       tagesAggregiert.push({
         ...templateTag,
         planMenge: gesamtPlan,
         istMenge: gesamtIst,
         abweichung: gesamtIst - gesamtPlan,
+        // ✅ FIX: schichten und auslastung korrekt berechnet
+        schichten: schichten,
+        auslastung: Math.round(auslastung * 10) / 10,
         materialVerfuegbar: !templateTag.istArbeitstag 
           ? false  // An Wochenenden/Feiertagen: false
           : !hatMaterialEngpass,
-        backlog: backlogProTag[tag] || 0
+        backlog: tagesBacklog
       })
     }
     
@@ -216,7 +239,7 @@ export default function ProduktionPage() {
     })
     
     return tagesAggregiert
-  }, [korrigiertePlaene, warehouseResult])
+  }, [korrigiertePlaene, warehouseResult, konfiguration.produktion])
   
   // Konvertiere für Darstellung (nur 2027 Tage)
   const tagesLagerbestaende = useMemo(() => {
@@ -694,7 +717,14 @@ export default function ProduktionPage() {
                 width: '100px',
                 align: 'center',
                 formula: 'ATP-Check',
-                format: (val) => val,
+                format: (val, row) => {
+                  // An Nicht-Arbeitstagen zeigen wir "-"
+                  if (row && row.istArbeitstag === false) return '-'
+                  // Boolean zu Ja/Nein konvertieren
+                  if (val === true) return '✅ Ja'
+                  if (val === false) return '❌ Nein'
+                  return '-'
+                },
                 sumable: false
               },
               {
