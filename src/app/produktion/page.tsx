@@ -38,6 +38,8 @@ import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport, korrigiereProduktionsplaeneMitWarehouse } from '@/lib/calculations/warehouse-management'
 import { berechneBedarfsBacklog } from '@/lib/calculations/bedarfs-backlog-rechnung'
 import { TagesproduktionChart, LagerbestandChart, FertigerzeugnisseChart, BacklogChart } from '@/components/ui/table-charts'
+import { TestFertigerzeugnisseChart } from '@/components/ui/test-chart'
+import { FertigerzeugnisseChartV2 } from '@/components/ui/fertigerzeugnisse-chart-v2'
 
 /**
  * Produktion Hauptseite
@@ -377,6 +379,8 @@ export default function ProduktionPage() {
       console.log(`📊 Fertigerzeugnisse-Daten generiert:`)
       console.log(`   Anzahl Tage: ${result.length}`)
       console.log(`   Erster Tag (Tag 1):`, result[0])
+      console.log(`   Erster Tag Varianten:`, result[0]?.varianten)
+      console.log(`   Tag 7 Varianten:`, result[6]?.varianten)
       console.log(`   Letzter Tag (Tag 365):`, result[result.length - 1])
       console.log(`   Kumulative IST am Jahresende: ${result[result.length - 1]?.kumulativIst.toLocaleString('de-DE')} Bikes`)
       console.log(`   Kumulative PLAN am Jahresende: ${result[result.length - 1]?.kumulativPlan.toLocaleString('de-DE')} Bikes`)
@@ -992,17 +996,12 @@ export default function ProduktionPage() {
               />
             </div>
             
-            {/* ✅ NEU: FERTIGERZEUGNISSE-CHART (Kumulative Bike-Produktion) */}
-            {/* Zeigt wie Bikes über das Jahr akkumulieren - Ziel: 370.000 am Jahresende */}
-            {/* ✅ KORRIGIERT: Mit separaten Linien pro MTB-Variante (showPerVariante=true) */}
+            {/* ✅ FERTIGERZEUGNISSE-CHART V2 - Working Version */}
             <div className="mt-6">
-              <FertigerzeugnisseChart
+              <FertigerzeugnisseChartV2
                 daten={fertigerzeugnisseDaten}
-                jahresproduktion={konfiguration.jahresproduktion}
-                aggregation="woche"
-                height={350}
                 varianten={konfiguration.varianten}
-                showPerVariante={true}
+                jahresproduktion={konfiguration.jahresproduktion}
               />
             </div>
             

@@ -833,7 +833,30 @@ export function FertigerzeugnisseChart({
   varianten,
   showPerVariante = false
 }: FertigerzeugnisseChartProps) {
+  // ✅ DEBUG: Log Props beim Render
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`📊 FertigerzeugnisseChart PROPS:`, {
+      showPerVariante,
+      variantenCount: varianten?.length,
+      variantenIds: varianten?.map(v => v.id),
+      aggregation,
+      datenCount: daten.length
+    })
+  }
+
   const chartData = useMemo(() => {
+    // ✅ DEBUG: Input-Daten
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📊 FertigerzeugnisseChart - chartData Berechnung START:`, {
+        datenLength: daten.length,
+        ersteDaten: daten[0],
+        ersteVarianten: daten[0]?.varianten,
+        aggregation,
+        showPerVariante,
+        varianten: varianten?.map(v => v.id)
+      })
+    }
+
     if (aggregation === 'tag') {
       // Zeige jeden 5. Tag für bessere Lesbarkeit
       return daten
@@ -890,7 +913,13 @@ export function FertigerzeugnisseChart({
         console.log(`📊 FertigerzeugnisseChart - chartData generated:`)
         console.log(`   Anzahl Wochen: ${result.length}`)
         console.log(`   Erste Woche:`, result[0])
+        console.log(`   Erste Woche Keys:`, Object.keys(result[0] || {}))
+        console.log(`   Erste Woche MTBAllrounder_ist:`, (result[0] as any)?.MTBAllrounder_ist)
+        console.log(`   Erste Woche MTBAllrounder_plan:`, (result[0] as any)?.MTBAllrounder_plan)
         console.log(`   Letzte Woche:`, result[result.length - 1])
+        console.log(`   showPerVariante:`, showPerVariante)
+        console.log(`   varianten:`, varianten?.map(v => v.id))
+        console.log(`   varianten length:`, varianten?.length)
       }
       
       return result
@@ -939,84 +968,102 @@ export function FertigerzeugnisseChart({
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={height}>
-          <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-            <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={aggregation === 'woche' ? 3 : 0} />
-            <YAxis 
-              tick={{ fontSize: 11 }} 
-              tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-              domain={[0, jahresproduktion * 1.05]}
-            />
-            <Tooltip 
-              formatter={(value: number, name: string) => {
-                const labelMap: Record<string, string> = {
-                  kumulativIst: 'Produziert (Gesamt)',
-                  kumulativPlan: 'Geplant (Gesamt)'
-                }
-                // Handle Varianten-Keys
-                if (name.endsWith('_ist') && varianten) {
-                  const varId = name.replace('_ist', '')
-                  const variante = varianten.find(v => v.id === varId)
-                  return [value.toLocaleString('de-DE') + ' Bikes', variante?.name || varId]
-                }
-                return [value.toLocaleString('de-DE') + ' Bikes', labelMap[name] || name]
-              }}
-            />
-            <Legend />
-            {/* Varianten-Linien wenn aktiviert */}
-            {showPerVariante && varianten ? (
-              <>
-                {varianten.map((v, idx) => (
-                  <Fragment key={v.id}>
-                    {/* IST-Linie pro Variante (dick) */}
-                    <Line
-                      type="monotone"
-                      dataKey={`${v.id}_ist`}
-                      stroke={VARIANTEN_FARBEN[idx % VARIANTEN_FARBEN.length]}
-                      strokeWidth={2.5}
-                      dot={false}
-                      name={`${v.name} (IST)`}
-                    />
-                    {/* SOLL-Linie pro Variante (gestrichelt, dünner) */}
-                    <Line
-                      type="monotone"
-                      dataKey={`${v.id}_plan`}
-                      stroke={VARIANTEN_FARBEN[idx % VARIANTEN_FARBEN.length]}
-                      strokeWidth={1.5}
-                      strokeDasharray="3 3"
-                      strokeOpacity={0.6}
-                      dot={false}
-                      name={`${v.name} (SOLL)`}
-                    />
-                  </Fragment>
-                ))}
-              </>
-            ) : (
-              <>
-                {/* Gesamt Plan (gestrichelt) */}
-                <Area 
-                  type="monotone" 
-                  dataKey="kumulativPlan" 
-                  fill={COLORS.secondary}
-                  fillOpacity={0.1}
-                  stroke={COLORS.secondary}
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  name="Plan (Gesamt)"
-                />
-                {/* Gesamt Ist */}
-                <Area 
-                  type="monotone" 
-                  dataKey="kumulativIst" 
+          {showPerVariante && varianten && varianten.length > 0 ? (
+            /* ✅ LineChart für Varianten-Ansicht */
+            <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+              <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={aggregation === 'woche' ? 3 : 0} />
+              <YAxis 
+                tick={{ fontSize: 11 }} 
+                tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+              />
+              <Tooltip 
+                formatter={(value: number, name: string) => {
+                  // Handle Varianten-Keys (IST + PLAN)
+                  if ((name.endsWith('_ist') || name.endsWith('_plan')) && varianten) {
+                    const varId = name.replace('_ist', '').replace('_plan', '')
+                    const variante = varianten.find(v => v.id === varId)
+                    const suffix = name.endsWith('_ist') ? ' (IST)' : ' (SOLL)'
+                    return [
+                      value.toLocaleString('de-DE') + ' Bikes', 
+                      (variante?.name || varId) + suffix
+                    ]
+                  }
+                  return [value.toLocaleString('de-DE') + ' Bikes', name]
+                }}
+              />
+              <Legend />
+              {/* Varianten-Linien */}
+              {varianten.map((v, idx) => (
+                <Fragment key={v.id}>
+                  {/* IST-Linie pro Variante (dick, durchgehend) */}
+                  <Line
+                    type="monotone"
+                    dataKey={`${v.id}_ist`}
+                    stroke={VARIANTEN_FARBEN[idx % VARIANTEN_FARBEN.length]}
+                    strokeWidth={2.5}
+                    dot={false}
+                    name={`${v.name} (IST)`}
+                    isAnimationActive={false}
+                  />
+                  {/* SOLL-Linie pro Variante (gestrichelt, dünner) */}
+                  <Line
+                    type="monotone"
+                    dataKey={`${v.id}_plan`}
+                    stroke={VARIANTEN_FARBEN[idx % VARIANTEN_FARBEN.length]}
+                    strokeWidth={1.5}
+                    strokeDasharray="3 3"
+                    strokeOpacity={0.6}
+                    dot={false}
+                    name={`${v.name} (SOLL)`}
+                    isAnimationActive={false}
+                  />
+                </Fragment>
+              ))}
+            </LineChart>
+          ) : (
+            /* ✅ ComposedChart für aggregierte Ansicht */
+            <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+              <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={aggregation === 'woche' ? 3 : 0} />
+              <YAxis 
+                tick={{ fontSize: 11 }} 
+                tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                domain={[0, jahresproduktion * 1.05]}
+              />
+              <Tooltip 
+                formatter={(value: number, name: string) => {
+                  const labelMap: Record<string, string> = {
+                    kumulativIst: 'Produziert (Gesamt)',
+                    kumulativPlan: 'Geplant (Gesamt)'
+                  }
+                  return [value.toLocaleString('de-DE') + ' Bikes', labelMap[name] || name]
+                }}
+              />
+              <Legend />
+              {/* Gesamt Plan (gestrichelt) */}
+              <Area 
+                type="monotone" 
+                dataKey="kumulativPlan" 
+                fill={COLORS.secondary}
+                fillOpacity={0.1}
+                stroke={COLORS.secondary}
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                name="Plan (Gesamt)"
+              />
+              {/* Gesamt Ist */}
+              <Area 
+                type="monotone" 
+                dataKey="kumulativIst" 
                   fill={COLORS.success}
                   fillOpacity={0.4}
-                  stroke={COLORS.success}
-                  strokeWidth={3}
-                  name="Ist (Gesamt)"
-                />
-              </>
-            )}
-          </ComposedChart>
+                stroke={COLORS.success}
+                strokeWidth={3}
+                name="Ist (Gesamt)"
+              />
+            </ComposedChart>
+          )}
         </ResponsiveContainer>
         <p className="text-xs text-center text-muted-foreground mt-2">
           ✅ Zeigt kumulative Produktion fertiger Bikes. Ziel: {jahresproduktion.toLocaleString('de-DE')} am Jahresende.
