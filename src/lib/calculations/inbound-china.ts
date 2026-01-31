@@ -196,16 +196,18 @@ export function generiereTaeglicheBestellungen(
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // BESTELLZEITRAUM: Beginne früh genug für Produktionsstart
-  // und ende bei Jahresende - Vorlaufzeit
+  // und ende am Jahresende (Lieferung darf Anfang 2028 erfolgen)
   // ═══════════════════════════════════════════════════════════════════════════════
   
   // Berechne Startdatum: Jahresstart - Vorlaufzeit - Puffer für Losgröße-Sammlung
   const produktionsStart = new Date(planungsjahr, 0, 1)
   const bestellStart = addDays(produktionsStart, -VORLAUFZEIT_TAGE - LOSGROESSE_SAMMEL_PUFFER_TAGE)
   
-  // Berechne Enddatum: Letzte Bestellung muss Vorlaufzeit vor Jahresende erfolgen
+  // ✅ FIX: Bestellungen bis Jahresende erlauben (nicht -49 Tage!)
+  // Grund: Bedarf für gesamtes Jahr 2027 muss erfasst werden (370.000 Sättel)
+  // Lieferung erfolgt zwar Anfang 2028, aber Bedarf entsteht Ende 2027
   const produktionsEnde = new Date(planungsjahr, 11, 31)
-  const bestellEnde = addDays(produktionsEnde, -VORLAUFZEIT_TAGE)
+  const bestellEnde = new Date(planungsjahr, 11, 31)
   
   // Offene Bestellmengen pro Komponente (akkumuliert bis Losgröße erreicht)
   const offeneMengen: Record<string, number> = {}
