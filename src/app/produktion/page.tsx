@@ -330,26 +330,26 @@ export default function ProduktionPage() {
   // ✅ NEU: Fertigerzeugnisse-Daten (kumulative Bike-Produktion)
   // Zeigt wie viele Bikes bereits produziert wurden (kumulativ)
   // Muss am Jahresende exakt 370.000 erreichen!
-  // ✅ KORRIGIERT: Nutze ECHTE Varianten-Produktionspläne statt proportionale Verteilung
+  // ✅ KORRIGIERT: Nutze ECHTE Varianten-Produktionspläne mit korrigierten IST-Werten
   const fertigerzeugnisseDaten = useMemo(() => {
     // Initialisiere kumulative Werte
     let kumulativIstGesamt = 0
     let kumulativPlanGesamt = 0
     
-    // Kumulative Werte pro Variante (aus ECHTEN Produktionsplänen)
+    // Kumulative Werte pro Variante (aus korrigierten Produktionsplänen)
     const variantenKumulativ: Record<string, { plan: number, ist: number }> = {}
     konfiguration.varianten.forEach(v => {
       variantenKumulativ[v.id] = { plan: 0, ist: 0 }
     })
     
-    return tagesProduktionFormatiert.map((tag, tagIndex) => {
+    const result = tagesProduktionFormatiert.map((tag, tagIndex) => {
       // Gesamt-Kumulativ (über alle Varianten aggregiert)
       kumulativPlanGesamt += tag.planMenge
       kumulativIstGesamt += tag.istMenge
       
-      // ✅ KORREKT: Pro Variante aus ECHTEN Produktionsplänen
-      // Nutze variantenProduktionsplaeneForWarehouse für echte Varianten-Daten
-      Object.entries(variantenProduktionsplaeneForWarehouse).forEach(([varianteId, plan]) => {
+      // ✅ KORREKT: Pro Variante aus korrigierten Produktionsplänen
+      // Nutze korrigiertePlaene für echte IST-Werte (nach Material-Check)
+      Object.entries(korrigiertePlaene).forEach(([varianteId, plan]) => {
         if (tagIndex < plan.tage.length) {
           const varianteTag = plan.tage[tagIndex]
           // Addiere zu kumulativen Werten dieser Variante
@@ -364,14 +364,24 @@ export default function ProduktionPage() {
         kumulativIst: kumulativIstGesamt,
         kumulativPlan: kumulativPlanGesamt,
         monat: tag.monat,
-        // ✅ NEU: Echte Pro-Variante Werte (nicht proportional!)
+        // ✅ NEU: Echte Pro-Variante Werte (mit korrigierten IST-Werten!)
         varianten: Object.entries(variantenKumulativ).reduce((acc, [id, values]) => {
           acc[id] = { plan: values.plan, ist: values.ist }
           return acc
         }, {} as Record<string, { plan: number, ist: number }>)
       }
     })
-  }, [tagesProduktionFormatiert, konfiguration.varianten, variantenProduktionsplaeneForWarehouse])
+    
+    // ✅ DEBUG: Log Fertigerzeugnisse-Daten
+    console.log(`📊 Fertigerzeugnisse-Daten generiert:`)
+    console.log(`   Anzahl Tage: ${result.length}`)
+    console.log(`   Erster Tag (Tag 1):`, result[0])
+    console.log(`   Letzter Tag (Tag 365):`, result[result.length - 1])
+    console.log(`   Kumulative IST am Jahresende: ${result[result.length - 1]?.kumulativIst.toLocaleString('de-DE')} Bikes`)
+    console.log(`   Kumulative PLAN am Jahresende: ${result[result.length - 1]?.kumulativPlan.toLocaleString('de-DE')} Bikes`)
+    
+    return result
+  }, [tagesProduktionFormatiert, konfiguration.varianten, korrigiertePlaene])
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
@@ -990,7 +1000,7 @@ export default function ProduktionPage() {
                 aggregation="woche"
                 height={350}
                 varianten={konfiguration.varianten}
-                showPerVariante={true}
+                showPerVariante={false}
               />
             </div>
             
