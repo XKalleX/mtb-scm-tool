@@ -890,12 +890,13 @@ export function berechneMaterialflussDetails(
   
   // Schritt 5: LKW-Transport Deutschland (+2 KT, NICHT Arbeitstage!)
   // ✅ KORRIGIERT: LKW-Transport in Deutschland nutzt KALENDERTAGE, nicht Arbeitstage!
+  // WICHTIG: vorlaufzeiten.lkwTransportDeutschlandArbeitstage enthält 2, wird aber als Kalendertage interpretiert!
   // Beispiel: Schiff kommt am 25.12 (Feiertag) an
   //   → +1 Tag Entladung = 26.12 (LKW-Abfahrt)
-  //   → +2 Kalendertage = 28.12 (Ankunft Produktion)
-  //   → +1 Tag Verfügbarkeit = 29.12 (Material verfügbar)
+  //   → +2 Kalendertage LKW-Transport = 28.12 (LKW-Ankunft am Werk)
+  //   → +1 Tag Verfügbarkeit = 29.12 (Material für Produktion verfügbar)
   const lkwAbfahrtDeutschland = addDays(schiffAnkunftHamburg, 1) // Entladung 1 Tag
-  const ankunftProduktion = addDays(lkwAbfahrtDeutschland, vorlaufzeiten.lkwTransportDeutschlandArbeitstage) // +2 Kalendertage
+  const ankunftProduktion = addDays(lkwAbfahrtDeutschland, vorlaufzeiten.lkwTransportDeutschlandArbeitstage) // +2 Kalendertage (nicht Arbeitstage!)
   
   // Schritt 6: Material ist NÄCHSTEN TAG nach Ankunft verfügbar!
   const verfuegbarAb = addDays(ankunftProduktion, 1)
