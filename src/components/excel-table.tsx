@@ -26,7 +26,7 @@ interface ExcelTableColumn {
   align?: 'left' | 'center' | 'right'
   width?: string
   formula?: string // Optional: Formel-Erklärung
-  format?: (value: any) => string
+  format?: (value: any, row?: any) => string
   sumable?: boolean // Spalte kann summiert werden
   sumLabel?: string // Optionales Label für Summe (z.B. "Gesamt")
 }
@@ -229,7 +229,7 @@ export default function ExcelTable({
                             }`}
                             style={{ minWidth: col.width || '120px' }}
                           >
-                            {col.format ? col.format(row[col.key]) : row[col.key]}
+                            {col.format ? col.format(row[col.key], row) : row[col.key]}
                           </td>
                         ))}
                       </tr>
