@@ -1156,31 +1156,30 @@ export default function OEMProgrammPage() {
                     />
                   )
                 } else {
-                  // Tagesansicht - jeden 7. Tag zeigen für Übersichtlichkeit
+                  // Tagesansicht - ALLE Tage zeigen für präzise Darstellung
+                  // Jeder einzelne Tag wird als Datenpunkt dargestellt
                   const referenzVariante = Object.values(produktionsplaene)[0]
                   const alleTage = referenzVariante.tage
                   
-                  const chartData = alleTage
-                    .filter((_, idx) => idx % 7 === 0) // Jeden 7. Tag zeigen
-                    .map(refTag => {
-                      const dataPoint: { label: string; gesamt: number; varianten: Record<string, number>; [key: string]: string | number | Record<string, number> } = {
-                        label: formatDate(refTag.datum),
-                        gesamt: 0,
-                        varianten: {}
-                      }
-                      
-                      konfiguration.varianten.forEach(v => {
-                        const tag = produktionsplaene[v.id]?.tage.find(t => 
-                          toLocalISODateString(t.datum) === toLocalISODateString(refTag.datum)
-                        )
-                        const menge = tag?.planMenge || 0
-                        dataPoint[v.id] = menge
-                        dataPoint.varianten[v.id] = menge
-                        dataPoint.gesamt += menge
-                      })
-                      
-                      return dataPoint
+                  const chartData = alleTage.map(refTag => {
+                    const dataPoint: { label: string; gesamt: number; varianten: Record<string, number>; [key: string]: string | number | Record<string, number> } = {
+                      label: formatDate(refTag.datum),
+                      gesamt: 0,
+                      varianten: {}
+                    }
+                    
+                    konfiguration.varianten.forEach(v => {
+                      const tag = produktionsplaene[v.id]?.tage.find(t => 
+                        toLocalISODateString(t.datum) === toLocalISODateString(refTag.datum)
+                      )
+                      const menge = tag?.planMenge || 0
+                      dataPoint[v.id] = menge
+                      dataPoint.varianten[v.id] = menge
+                      dataPoint.gesamt += menge
                     })
+                    
+                    return dataPoint
+                  })
                   
                   return (
                     <AlleVariantenProduktionChart
