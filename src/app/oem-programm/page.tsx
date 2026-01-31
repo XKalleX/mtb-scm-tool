@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CollapsibleInfo, CollapsibleInfoGroup, InfoItem } from '@/components/ui/collapsible-info'
-import { SaisonalitaetChart, VariantenPieChart, TagesproduktionChart, KomponentenBarChart } from '@/components/ui/table-charts'
+import { SaisonalitaetChart, VariantenPieChart, TagesproduktionChart, KomponentenBarChart, AlleVariantenProduktionChart } from '@/components/ui/table-charts'
 import { TrendingUp, AlertCircle, Download, Zap, Info, Calendar, CalendarDays, CalendarRange, Edit2, Check, X } from 'lucide-react'
 import { formatNumber, formatDate, toLocalISODateString } from '@/lib/utils'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
@@ -1074,6 +1074,121 @@ export default function OEMProgrammPage() {
                         </table>
                       </div>
                     </div>
+                  )
+                }
+              })()}
+
+              {/* Produktionsverlauf-Chart - passt sich an Zeitperiode an */}
+              {produktionsplaene && (() => {
+                // Varianten-Namen Map erstellen
+                const variantenNamen: Record<string, string> = {}
+                konfiguration.varianten.forEach(v => {
+                  variantenNamen[v.id] = v.name
+                })
+
+                // Chart-Daten basierend auf Zeitperiode generieren
+                if (zeitperiode === 'monat') {
+                  // Monatsansicht
+                  const monatsDaten = konfiguration.varianten.map(v => ({
+                    varianteId: v.id,
+                    monate: aggregiereNachMonat(produktionsplaene[v.id].tage)
+                  }))
+                  
+                  const chartData = monatsDaten[0]?.monate.map(monat => {
+                    const dataPoint: { label: string; gesamt: number; varianten: Record<string, number>; [key: string]: string | number | Record<string, number> } = {
+                      label: monat.monatName.substring(0, 3),
+                      gesamt: 0,
+                      varianten: {}
+                    }
+                    
+                    konfiguration.varianten.forEach(v => {
+                      const varianteMonat = monatsDaten.find(md => md.varianteId === v.id)?.monate.find(m => m.monat === monat.monat)
+                      const menge = varianteMonat?.planMenge || 0
+                      dataPoint[v.id] = menge
+                      dataPoint.varianten[v.id] = menge
+                      dataPoint.gesamt += menge
+                    })
+                    
+                    return dataPoint
+                  }) || []
+                  
+                  return (
+                    <AlleVariantenProduktionChart
+                      daten={chartData}
+                      variantenNamen={variantenNamen}
+                      zeitperiode="monat"
+                      height={350}
+                    />
+                  )
+                } else if (zeitperiode === 'woche') {
+                  // Wochenansicht
+                  const wochenDaten = konfiguration.varianten.map(v => ({
+                    varianteId: v.id,
+                    wochen: aggregiereNachWoche(produktionsplaene[v.id].tage)
+                  }))
+                  
+                  const alleKWs = [...new Set(wochenDaten.flatMap(wd => wd.wochen.map(w => w.kalenderwoche)))].sort((a, b) => a - b)
+                  
+                  const chartData = alleKWs.map(kw => {
+                    const dataPoint: { label: string; gesamt: number; varianten: Record<string, number>; [key: string]: string | number | Record<string, number> } = {
+                      label: `KW ${kw}`,
+                      gesamt: 0,
+                      varianten: {}
+                    }
+                    
+                    konfiguration.varianten.forEach(v => {
+                      const varianteWoche = wochenDaten.find(wd => wd.varianteId === v.id)?.wochen.find(w => w.kalenderwoche === kw)
+                      const menge = varianteWoche?.planMenge || 0
+                      dataPoint[v.id] = menge
+                      dataPoint.varianten[v.id] = menge
+                      dataPoint.gesamt += menge
+                    })
+                    
+                    return dataPoint
+                  })
+                  
+                  return (
+                    <AlleVariantenProduktionChart
+                      daten={chartData}
+                      variantenNamen={variantenNamen}
+                      zeitperiode="woche"
+                      height={350}
+                    />
+                  )
+                } else {
+                  // Tagesansicht - jeden 7. Tag zeigen für Übersichtlichkeit
+                  const referenzVariante = Object.values(produktionsplaene)[0]
+                  const alleTage = referenzVariante.tage
+                  
+                  const chartData = alleTage
+                    .filter((_, idx) => idx % 7 === 0) // Jeden 7. Tag zeigen
+                    .map(refTag => {
+                      const dataPoint: { label: string; gesamt: number; varianten: Record<string, number>; [key: string]: string | number | Record<string, number> } = {
+                        label: formatDate(refTag.datum),
+                        gesamt: 0,
+                        varianten: {}
+                      }
+                      
+                      konfiguration.varianten.forEach(v => {
+                        const tag = produktionsplaene[v.id]?.tage.find(t => 
+                          toLocalISODateString(t.datum) === toLocalISODateString(refTag.datum)
+                        )
+                        const menge = tag?.planMenge || 0
+                        dataPoint[v.id] = menge
+                        dataPoint.varianten[v.id] = menge
+                        dataPoint.gesamt += menge
+                      })
+                      
+                      return dataPoint
+                    })
+                  
+                  return (
+                    <AlleVariantenProduktionChart
+                      daten={chartData}
+                      variantenNamen={variantenNamen}
+                      zeitperiode="tag"
+                      height={350}
+                    />
                   )
                 }
               })()}

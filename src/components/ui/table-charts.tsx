@@ -1168,3 +1168,126 @@ export function BacklogChart({ daten, height = 300 }: BacklogChartProps) {
     </ResponsiveContainer>
   )
 }
+
+/**
+ * ========================================
+ * ALLE VARIANTEN PRODUKTIONS-CHART
+ * ========================================
+ * 
+ * Zeigt Produktionsverlauf aller MTB-Varianten über Zeit
+ * X-Achse passt sich an: Tag / Woche / Monat
+ */
+export interface AlleVariantenProduktionChartProps {
+  daten: Array<{
+    label: string  // Tag-Datum, KW, oder Monat
+    gesamt: number
+    varianten: Record<string, number>  // varianteId -> menge
+  }>
+  variantenNamen: Record<string, string>  // varianteId -> name
+  zeitperiode: 'tag' | 'woche' | 'monat'
+  height?: number
+}
+
+export function AlleVariantenProduktionChart({ 
+  daten, 
+  variantenNamen,
+  zeitperiode,
+  height = 350 
+}: AlleVariantenProduktionChartProps) {
+  // Zeitperioden-Label für Chart-Titel
+  const zeitperiodeLabel = {
+    tag: 'Tagesansicht',
+    woche: 'Wochenansicht (KW)',
+    monat: 'Monatsansicht'
+  }[zeitperiode]
+
+  // X-Achsen-Interval basierend auf Zeitperiode
+  const xAxisInterval = zeitperiode === 'tag' ? 6 : zeitperiode === 'woche' ? 4 : 0
+
+  // Varianten-IDs extrahieren
+  const variantenIds = Object.keys(variantenNamen)
+
+  return (
+    <Card className="mt-4">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium flex items-center gap-2">
+          📊 Produktionsverlauf alle Varianten - {zeitperiodeLabel}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={height}>
+          <ComposedChart data={daten} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+            <XAxis 
+              dataKey="label" 
+              tick={{ fontSize: 10 }} 
+              interval={xAxisInterval}
+              angle={zeitperiode === 'tag' ? -45 : 0}
+              textAnchor={zeitperiode === 'tag' ? 'end' : 'middle'}
+              height={zeitperiode === 'tag' ? 60 : 30}
+            />
+            <YAxis 
+              yAxisId="left"
+              tick={{ fontSize: 11 }} 
+              tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value.toString()}
+              label={{ value: 'Bikes', angle: -90, position: 'insideLeft', fontSize: 11 }}
+            />
+            <YAxis 
+              yAxisId="right"
+              orientation="right"
+              tick={{ fontSize: 11 }} 
+              tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value.toString()}
+              label={{ value: 'Gesamt', angle: 90, position: 'insideRight', fontSize: 11 }}
+            />
+            <Tooltip 
+              formatter={(value: number, name: string) => {
+                const displayName = variantenNamen[name] || (name === 'gesamt' ? 'Gesamt' : name)
+                return [value.toLocaleString('de-DE'), displayName.replace('MTB ', '')]
+              }}
+              labelFormatter={(label) => {
+                if (zeitperiode === 'tag') return `Datum: ${label}`
+                if (zeitperiode === 'woche') return `Kalenderwoche: ${label}`
+                return `Monat: ${label}`
+              }}
+              contentStyle={{ fontSize: 12 }}
+            />
+            <Legend 
+              formatter={(value: string) => {
+                const displayName = variantenNamen[value] || (value === 'gesamt' ? 'Gesamt' : value)
+                return displayName.replace('MTB ', '')
+              }}
+              wrapperStyle={{ fontSize: 11 }}
+            />
+            
+            {/* Stacked Area für alle Varianten */}
+            {variantenIds.map((varianteId, index) => (
+              <Area
+                key={varianteId}
+                yAxisId="left"
+                type="monotone"
+                dataKey={varianteId}
+                stackId="1"
+                stroke={VARIANTEN_FARBEN[index % VARIANTEN_FARBEN.length]}
+                fill={VARIANTEN_FARBEN[index % VARIANTEN_FARBEN.length]}
+                fillOpacity={0.6}
+                name={varianteId}
+              />
+            ))}
+            
+            {/* Gesamtlinie */}
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="gesamt"
+              stroke="#1f2937"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              dot={false}
+              name="gesamt"
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  )
+}
