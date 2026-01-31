@@ -77,6 +77,9 @@ export interface TagesProduktionEntry {
   kumulativPlan: number          // Σ Plan bis heute
   kumulativIst: number           // Σ Ist bis heute
   kumulativSoll?: number         // Σ Soll bis heute (inkl. Marketing)
+  
+  // Warehouse Integration (optional, wird von produktion/page.tsx hinzugefügt)
+  backlog?: number               // Produktions-Backlog aus Warehouse (nicht produzierte Mengen)
 }
 
 /**
