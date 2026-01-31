@@ -69,7 +69,7 @@ interface StuecklistenKomponente {
  */
 export default function OEMProgrammPage() {
   const [selectedVariante, setSelectedVariante] = useState('MTBAllrounder')
-  // State für Zeitperioden-Ansicht (Tag/Woche/Monat)
+  // State für Zeitperiodenansicht (Tag/Woche/Monat)
   const [zeitperiode, setZeitperiode] = useState<ZeitperiodeTyp>('tag')
   // State für manuelle Produktionsanpassungen (Wochen- oder Monatsbasis)
   // Key: "<zeitperiode>_<periode>_<varianteId>", Value: Anpassungsmenge (+ oder -)
@@ -613,7 +613,7 @@ export default function OEMProgrammPage() {
                   </CardDescription>
                 </div>
                 {/* Zeitperioden-Schalter */}
-                <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+                <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1" role="group" aria-label="Zeitperioden-Auswahl">
                   <Button
                     variant={zeitperiode === 'tag' ? 'default' : 'ghost'}
                     size="sm"
@@ -752,6 +752,7 @@ export default function OEMProgrammPage() {
                                               className="w-16 px-1 py-0.5 text-right border rounded text-sm"
                                               value={editValue}
                                               onChange={(e) => setEditValue(e.target.value)}
+                                              aria-label={`Produktionsmenge für ${v.name} in KW ${kw} bearbeiten`}
                                               onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
                                                   const newValue = parseInt(editValue) || 0
@@ -876,6 +877,7 @@ export default function OEMProgrammPage() {
                                               className="w-20 px-1 py-0.5 text-right border rounded text-sm"
                                               value={editValue}
                                               onChange={(e) => setEditValue(e.target.value)}
+                                              aria-label={`Produktionsmenge für ${v.name} in ${monat.monatName} bearbeiten`}
                                               onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
                                                   const newValue = parseInt(editValue) || 0
