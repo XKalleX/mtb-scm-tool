@@ -994,7 +994,7 @@ export default function ProduktionPage() {
             
             {/* ✅ NEU: FERTIGERZEUGNISSE-CHART (Kumulative Bike-Produktion) */}
             {/* Zeigt wie Bikes über das Jahr akkumulieren - Ziel: 370.000 am Jahresende */}
-            {/* NEU: Mit separaten Linien pro MTB-Variante */}
+            {/* ✅ KORRIGIERT: Mit separaten Linien pro MTB-Variante (showPerVariante=true) */}
             <div className="mt-6">
               <FertigerzeugnisseChart
                 daten={fertigerzeugnisseDaten}
@@ -1002,7 +1002,7 @@ export default function ProduktionPage() {
                 aggregation="woche"
                 height={350}
                 varianten={konfiguration.varianten}
-                showPerVariante={false}
+                showPerVariante={true}
               />
             </div>
             
