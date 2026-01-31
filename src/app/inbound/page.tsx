@@ -891,7 +891,7 @@ export default function InboundPage() {
                     { key: 'oemBedarf', label: 'OEM-Bedarf', width: '120px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' }
                   ]}
                   data={bestellungenNachMonat}
-                  maxHeight="400px"
+                  maxHeight="600px"
                   showFormulas={false}
                   showSums={true}
                   sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen`}
@@ -913,7 +913,7 @@ export default function InboundPage() {
                     { key: 'oemBedarf', label: 'OEM-Bedarf', width: '120px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' }
                   ]}
                   data={bestellungenNachWoche}
-                  maxHeight="500px"
+                  maxHeight="600px"
                   showFormulas={false}
                   showSums={true}
                   sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen`}
@@ -926,7 +926,7 @@ export default function InboundPage() {
               <>
                 {/* Excel-Tabelle: Tägliche Bestelllogik mit detailliertem Materialfluss */}
                 <div className="mb-2 text-xs text-muted-foreground">
-                  ✅ Zeigt granulare Materialfluss-Stationen (0️⃣-7️⃣) wie Referenz-Gruppe | Vorlaufzeit = {gesamtVorlaufzeit} Tage
+                  ✅ Zeigt granulare Materialfluss-Stationen (0️⃣-7️⃣) | Vorlaufzeit = {gesamtVorlaufzeit} Tage
                 </div>
                 <ExcelTable
                   columns={[
@@ -1010,7 +1010,7 @@ export default function InboundPage() {
                     }
                   ]}
                   data={nurBestellungen}
-                  maxHeight="500px"
+                  maxHeight="600px"
                   showFormulas={false}
                   showSums={true}
                   sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel bestellt`}
@@ -1166,7 +1166,7 @@ export default function InboundPage() {
                         }
                       })
                     })()}
-                    maxHeight="500px"
+                    maxHeight="600px"
                     showFormulas={false}
                     showSums={true}
                     sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Lieferungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel`}
