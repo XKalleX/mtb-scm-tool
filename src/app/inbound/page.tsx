@@ -4,8 +4,7 @@
  * ========================================
  * INBOUND LOGISTIK - CHINA
  * ========================================
- * 
- * Verwaltung des China-Lieferanten mit:
+ * * Verwaltung des China-Lieferanten mit:
  * - Vorlaufzeiten-Berechnung mit detailliertem Materialfluss
  * - Schiffe fahren NUR mittwochs ab Shanghai!
  * - LKWs fahren NICHT am Wochenende (Sa/So)
@@ -14,8 +13,7 @@
  * - Losgrößen-Optimierung
  * - Proportionale Allokation statt FCFS
  * - Bestellplanung
- * 
- * ✅ NEU: Szenarien-Integration global wirksam!
+ * * ✅ NEU: Szenarien-Integration global wirksam!
  * ✅ Zeigt Deltas (+X / -X) bei Schiffsverspätungen etc.
  */
 
@@ -705,9 +703,7 @@ export default function InboundPage() {
         </CollapsibleInfo>
       )}
 
-
-
-      {/* ✅ HAUPTSEKTION: Bestellansichten mit Tabs (Tägliche + Monatliche Ansicht) */}
+      {/* ✅ HAUPTSEKTION: Bestellansichten mit Tabs */}
       <Card className="border-orange-200 bg-orange-50">
         <CardHeader>
           <div className="flex items-center space-x-2">
@@ -720,8 +716,9 @@ export default function InboundPage() {
             Tägliche und monatliche Ansicht der Bestellungen
           </CardDescription>
         </CardHeader>
+        
         <CardContent>
-          {/* Statistik-Karten */}
+          {/* 1. Statistik-Karten (Bleiben oben) */}
           <div className="grid gap-4 md:grid-cols-4 mb-6">
             <Card className="bg-white">
               <CardHeader className="pb-3">
@@ -770,8 +767,106 @@ export default function InboundPage() {
             </Card>
           </div>
 
-          {/* ✅ BESTELLLOGIK MIT TAG/KW/MONAT TOGGLE */}
-          <div className="bg-white rounded-lg p-4">
+          {/* ✅ HIERHIN VERSCHOBEN: 
+              Detaillierte Informationen (Lieferant, Rückwärtsrechnung, Losgröße)
+              Platziert VOR der Tabelle, damit man die Regeln kennt, bevor man die Daten sieht.
+          */}
+          <div className="mb-8">
+            <CollapsibleInfoGroup
+              groupTitle="Detaillierte Informationen & Regeln"
+              items={[
+                {
+                  id: 'lieferant-details',
+                  title: `${lieferant.land === 'China' ? '🇨🇳' : '🏭'} ${lieferant.name} - Lieferanten-Details`,
+                  icon: <Ship className="h-4 w-4" />,
+                  variant: 'info',
+                  content: (
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Einziger Lieferant für alle {konfiguration.bauteile.length} Komponenten
+                      </p>
+                      
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <h4 className="font-semibold mb-2 text-sm">Transport-Sequenz (Reihenfolge wichtig für Feiertage!):</h4>
+                          <ul className="space-y-1 text-sm">
+                            {lieferant.transportSequenz && lieferant.transportSequenz.map((step, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="font-bold text-blue-600">{step.schritt}.</span>
+                                <span>
+                                  <strong>{step.typ}:</strong> {step.dauer} {step.einheit} 
+                                  {step.von !== step.nach && ` (${step.von} → ${step.nach})`}
+                                  <span className="text-muted-foreground text-xs ml-1">- {step.beschreibung}</span>
+                                </span>
+                              </li>
+                            ))}
+                            <li className="pt-2 border-t mt-2">
+                              <strong>Gesamt: {gesamtVorlaufzeit} Tage ({Math.ceil(gesamtVorlaufzeit / 7)} Wochen)</strong>
+                            </li>
+                          </ul>
+                        </div>
+                        
+                        <div>
+                          <h4 className="font-semibold mb-2 text-sm">Besonderheiten:</h4>
+                          <ul className="space-y-1 text-sm">
+                            {lieferant.besonderheiten.map((b, idx) => (
+                              <li key={idx}>✓ {b}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                },
+                {
+                  id: 'bedarfsdatum-bestelldatum',
+                  title: 'Bedarfsdatum → Bestelldatum (Rückwärtsrechnung)',
+                  icon: <Calendar className="h-4 w-4" />,
+                  variant: 'info',
+                  content: (
+                    <div className="text-sm space-y-2">
+                      <p><strong>Logik:</strong> Vom Bedarfsdatum {gesamtVorlaufzeit} Tage (Gesamtvorlaufzeit) abziehen.</p>
+                      <div className="bg-slate-50 p-2 rounded border">
+                        <strong>Detailaufschlüsselung:</strong>
+                        <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+                          <li>2 AT LKW-Transport (Hamburg → Dortmund)</li>
+                          <li>{lieferant.vorlaufzeitKalendertage} KT Seefracht (Shanghai → Hamburg)</li>
+                          <li>2 AT LKW-Transport (China → Hafen Shanghai)</li>
+                          <li>{lieferant.vorlaufzeitArbeitstage} AT Produktion beim Zulieferer</li>
+                        </ul>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Zusätzlich: 1 Tag Puffer für Bestellverarbeitung abziehen & Sicherstellen dass Bestelldatum ein Arbeitstag ist.
+                      </p>
+                    </div>
+                  )
+                },
+                {
+                  id: 'losgroessen-aufrundung',
+                  title: 'Losgrößen-Aufrundung',
+                  icon: <Package className="h-4 w-4" />,
+                  variant: 'success',
+                  content: (
+                    <div className="space-y-2 text-sm">
+                      <p>
+                        Jede Bestellung wird auf Vielfache von <strong>{formatNumber(lieferant.losgroesse, 0)} Stück</strong> aufgerundet.
+                      </p>
+                      <div className="bg-green-50 p-2 rounded border border-green-100 text-green-800">
+                        <strong>Beispiel:</strong><br/>
+                        Bedarf 3.500 Stück → Bestellung <strong>{formatNumber(Math.ceil(3500 / lieferant.losgroesse) * lieferant.losgroesse, 0)} Stück</strong> ({Math.ceil(3500 / lieferant.losgroesse)}x Losgröße)
+                      </div>
+                    </div>
+                  )
+                }
+              ]}
+              variant="info"
+              icon={<Info className="h-5 w-5" />}
+              defaultOpen={false} // Standardmäßig zugeklappt für Übersichtlichkeit
+            />
+          </div>
+
+          {/* 3. Bestelllogik Sektion (Tabellen & Forms) */}
+          <div className="bg-white rounded-lg p-4 shadow-sm border">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-lg font-semibold">Bestelllogik (Ordering)</h3>
@@ -811,86 +906,80 @@ export default function InboundPage() {
               </div>
             </div>
 
-            {/* ✅ NEU: Zusatzbestellungs-Formular */}
+            {/* Zusatzbestellungs-Formular */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Zusatzbestellung eingeben
-                  </h4>
-                  <div className="flex flex-wrap gap-4 items-end">
-                    <div className="flex-1 min-w-[200px]">
-                      <Label htmlFor="bestelldatum" className="text-xs text-blue-800">
-                        Bestelldatum
-                      </Label>
-                      <Input
-                        id="bestelldatum"
-                        type="date"
-                        value={neueBestellungDatum}
-                        onChange={(e) => setNeueBestellungDatum(e.target.value)}
-                        min={`${konfiguration.planungsjahr - 1}-10-01`}
-                        max={`${konfiguration.planungsjahr}-11-12`}
-                        className="bg-white"
-                      />
-                      {neueBestellungDatum && (
-                        <p className="text-xs text-blue-600 mt-1">
-                          Gewählt: {(() => {
-                            const date = new Date(neueBestellungDatum);
-                            return isNaN(date.getTime()) ? 'Ungültiges Datum' : date.toLocaleDateString('de-DE');
-                          })()}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-[150px]">
-                      <Label htmlFor="bestellmenge" className="text-xs text-blue-800">
-                        Menge (Sättel)
-                      </Label>
-                      <Input
-                        id="bestellmenge"
-                        type="number"
-                        value={neueBestellungMenge}
-                        onChange={(e) => setNeueBestellungMenge(e.target.value)}
-                        min={lieferant.losgroesse}
-                        step={lieferant.losgroesse}
-                        placeholder={`Min. ${lieferant.losgroesse}`}
-                        className="bg-white"
-                      />
-                    </div>
-                    <div className="text-xs text-blue-700 flex-1 min-w-[150px]">
-                      Ankunft: {neueBestellungDatum 
-                        ? addDays(new Date(neueBestellungDatum), gesamtVorlaufzeit).toLocaleDateString('de-DE')
-                        : '-'
-                      }
-                    </div>
-                    <Button 
-                      onClick={handleZusatzbestellung}
-                      disabled={!neueBestellungDatum || !neueBestellungMenge}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Nachbestellen
-                    </Button>
+               <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                 <Plus className="h-4 w-4" />
+                 Zusatzbestellung eingeben
+               </h4>
+               <div className="flex flex-wrap gap-4 items-end">
+                  <div className="flex-1 min-w-[200px]">
+                    <Label htmlFor="bestelldatum" className="text-xs text-blue-800">Bestelldatum</Label>
+                    <Input 
+                      id="bestelldatum" 
+                      type="date" 
+                      value={neueBestellungDatum} 
+                      onChange={(e) => setNeueBestellungDatum(e.target.value)}
+                      min={`${konfiguration.planungsjahr - 1}-10-01`}
+                      max={`${konfiguration.planungsjahr}-11-12`}
+                      className="bg-white"
+                    />
+                    {neueBestellungDatum && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        Gewählt: {(() => {
+                          const date = new Date(neueBestellungDatum);
+                          return isNaN(date.getTime()) ? 'Ungültiges Datum' : date.toLocaleDateString('de-DE');
+                        })()}
+                      </p>
+                    )}
                   </div>
-                  {zusatzBestellungen.length > 0 && (
-                    <p className="text-xs text-blue-600 mt-2">
-                      ✓ {zusatzBestellungen.length} Zusatzbestellung(en) hinzugefügt
-                    </p>
-                  )}
-                </div>
+                  <div className="flex-1 min-w-[150px]">
+                     <Label htmlFor="bestellmenge" className="text-xs text-blue-800">Menge (Sättel)</Label>
+                     <Input 
+                       id="bestellmenge" 
+                       type="number" 
+                       value={neueBestellungMenge} 
+                       onChange={(e) => setNeueBestellungMenge(e.target.value)}
+                       min={lieferant.losgroesse}
+                       step={lieferant.losgroesse}
+                       placeholder={`Min. ${lieferant.losgroesse}`}
+                       className="bg-white"
+                     />
+                  </div>
+                  <div className="text-xs text-blue-700 flex-1 min-w-[150px]">
+                    Ankunft: {neueBestellungDatum 
+                      ? addDays(new Date(neueBestellungDatum), gesamtVorlaufzeit).toLocaleDateString('de-DE')
+                      : '-'
+                    }
+                  </div>
+                  <Button 
+                    onClick={handleZusatzbestellung} 
+                    disabled={!neueBestellungDatum || !neueBestellungMenge} 
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Nachbestellen
+                  </Button>
+               </div>
+               {zusatzBestellungen.length > 0 && (
+                 <p className="text-xs text-blue-600 mt-2">
+                   ✓ {zusatzBestellungen.length} Zusatzbestellung(en) hinzugefügt
+                 </p>
+               )}
+            </div>
 
-            {/* ✅ MONATSANSICHT */}
+            {/* TABELLEN LOGIK (Monat/Woche/Tag) */}
             {zeitperiode === 'monat' && (
               <>
-                <div className="mb-2 text-xs text-muted-foreground">
-                  📅 Monatsansicht: Aggregierte Bestellungen pro Monat (Bestellmenge = OEM-Bedarf)
-                </div>
-                <ExcelTable
+                <div className="mb-2 text-xs text-muted-foreground">📅 Monatsansicht: Aggregierte Bestellungen pro Monat</div>
+                <ExcelTable 
                   columns={[
                     { key: 'monatName', label: 'Monat', width: '120px', align: 'left', sumable: false },
                     { key: 'bestellungen', label: 'Bestellungen', width: '100px', align: 'right', sumable: true },
-                    { key: 'gesamtMenge', label: 'Bestellmenge', width: '150px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' }
-                  ]}
-                  data={bestellungenNachMonat}
-                  maxHeight="600px"
+                    { key: 'gesamtMenge', label: 'Bestellmenge', width: '120px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' },
+                    { key: 'oemBedarf', label: 'OEM-Bedarf', width: '120px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' }
+                  ]} 
+                  data={bestellungenNachMonat} 
+                  maxHeight="400px" 
                   showFormulas={false}
                   showSums={true}
                   sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen`}
@@ -898,20 +987,17 @@ export default function InboundPage() {
               </>
             )}
 
-            {/* ✅ WOCHENANSICHT */}
             {zeitperiode === 'woche' && (
               <>
-                <div className="mb-2 text-xs text-muted-foreground">
-                  📅 Wochenansicht: Aggregierte Bestellungen pro Kalenderwoche (Bestellmenge = OEM-Bedarf)
-                </div>
-                <ExcelTable
+                <div className="mb-2 text-xs text-muted-foreground">📅 Wochenansicht: Aggregierte Bestellungen pro Kalenderwoche</div>
+                <ExcelTable 
                   columns={[
                     { key: 'kalenderwoche', label: 'KW', width: '60px', align: 'center', sumable: false, format: (v: number) => `KW ${v}` },
                     { key: 'bestellungen', label: 'Best.', width: '70px', align: 'right', sumable: true },
                     { key: 'gesamtMenge', label: 'Bestellmenge', width: '150px', align: 'right', sumable: true, format: (v: number) => formatNumber(v, 0) + ' Stk' }
                   ]}
-                  data={bestellungenNachWoche}
-                  maxHeight="600px"
+                  data={bestellungenNachWoche} 
+                  maxHeight="500px" 
                   showFormulas={false}
                   showSums={true}
                   sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen`}
@@ -919,408 +1005,212 @@ export default function InboundPage() {
               </>
             )}
 
-            {/* ✅ TAGESANSICHT */}
             {zeitperiode === 'tag' && (
               <>
-                {/* Excel-Tabelle: Tägliche Bestelllogik mit detailliertem Materialfluss */}
-                <div className="mb-2 text-xs text-muted-foreground">
-                  ✅ Zeigt granulare Materialfluss-Stationen (0️⃣-7️⃣) | Vorlaufzeit = {gesamtVorlaufzeit} Tage
-                </div>
-                <ExcelTable
-                  columns={[
-                    {
-                      key: 'bestellungsIds',
-                      label: 'Bestellungs-ID(s)',
-                      width: '140px',
-                      align: 'left',
-                      sumable: false,
-                      format: (v: string) => v || '-'
-                    },
-                    {
-                      key: 'bestelldatumFormatiert',
-                      label: '0️⃣ Bestellung',
-                      width: '110px',
-                      align: 'center',
-                      sumable: false
-                    },
-                    {
-                      key: 'produktionsstart',
-                      label: '1️⃣ Prod. Fertig',
-                      width: '110px',
-                      align: 'center',
-                      sumable: false,
-                      format: (v: string) => v || '-'
-                    },
-                    {
-                      key: 'lkwAbfahrtChina',
-                      label: '2️⃣ LKW ab CN',
-                      width: '110px',
-                      align: 'center',
-                      sumable: false,
-                      format: (v: string) => v || '-'
-                    },
-                    {
-                      key: 'ankunftHafenChina',
-                      label: '3️⃣ Hafen CN',
-                      width: '110px',
-                      align: 'center',
-                      sumable: false,
-                      format: (v: string) => v || '-'
-                    },
-                    {
-                      key: 'schiffAbfahrt',
-                      label: '4️⃣ Schiff ab',
-                      width: '120px',
-                      align: 'center',
-                      sumable: false,
-                      format: (v: string) => v || '-'
-                    },
-                    {
-                      key: 'ankunftHafenDE',
-                      label: '5️⃣ Hafen DE',
-                      width: '110px',
-                      align: 'center',
-                      sumable: false,
-                      format: (v: string) => v || '-'
-                    },
-                    {
-                      key: 'erwarteteAnkunftFormatiert',
-                      label: '6️⃣ Ank. Werk',
-                      width: '110px',
-                      align: 'center',
-                      sumable: false
-                    },
-                    {
-                      key: 'verfuegbarAb',
-                      label: '7️⃣ Verfügbar',
-                      width: '110px',
-                      align: 'center',
-                      sumable: false,
-                      format: (v: string) => v || '-'
-                    },
-                    {
-                      key: 'bestellmenge',
-                      label: 'Bestellmenge',
-                      width: '110px',
-                      align: 'right',
-                      sumable: true,
-                      format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-'
-                    }
-                  ]}
-                  data={nurBestellungen}
-                  maxHeight="600px"
-                  showFormulas={false}
-                  showSums={true}
-                  sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel bestellt`}
-                  dateColumnKey="bedarfsdatum"
-                  highlightRow={(row) => {
-                    // Verspätung = erwarteteAnkunft > bedarfsdatum
-                    if (row.hatBestellung && row.erwarteteAnkunft && row.bedarfsdatum) {
-                      const ankunft = row.erwarteteAnkunft instanceof Date 
-                        ? row.erwarteteAnkunft 
-                        : new Date(row.erwarteteAnkunft)
-                      const bedarf = row.bedarfsdatum instanceof Date 
-                        ? row.bedarfsdatum 
-                        : new Date(row.bedarfsdatum)
-                      
-                      // Berechne Verspätung in Tagen
-                      const verspaetungTage = Math.floor((ankunft.getTime() - bedarf.getTime()) / (1000 * 60 * 60 * 24))
-                      
-                      if (verspaetungTage > 0) {
-                        // Verspätung: Rot/Orange je nach Schwere
-                        if (verspaetungTage > 5) {
-                          return {
-                            color: 'bg-red-100 hover:bg-red-200 border-l-4 border-red-500',
-                            tooltip: `⚠️ KRITISCHE VERSPÄTUNG: ${verspaetungTage} Tage zu spät!`
-                          }
-                        } else {
-                          return {
-                            color: 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500',
-                            tooltip: `⚠️ Verspätung: ${verspaetungTage} Tag(e) zu spät`
-                          }
-                        }
-                      }
-                    }
-                    return null
-                  }}
-                />
+                 <div className="mb-2 text-xs text-muted-foreground">✅ Zeigt granulare Materialfluss-Stationen (0️⃣-7️⃣) wie Referenz-Gruppe | Vorlaufzeit = {gesamtVorlaufzeit} Tage</div>
+                 <ExcelTable 
+                   columns={[
+                    { key: 'bestellungsIds', label: 'Bestellungs-ID(s)', width: '140px', align: 'left', sumable: false, format: (v: string) => v || '-' },
+                    { key: 'bestelldatumFormatiert', label: '0️⃣ Bestellung', width: '130px', align: 'center', sumable: false },
+                    { key: 'produktionsstart', label: '1️⃣ Prod. Fertig', width: '130px', align: 'center', sumable: false, format: (v: string) => v || '-' },
+                    { key: 'lkwAbfahrtChina', label: '2️⃣ LKW ab CN', width: '130px', align: 'center', sumable: false, format: (v: string) => v || '-' },
+                    { key: 'ankunftHafenChina', label: '3️⃣ Hafen CN', width: '130px', align: 'center', sumable: false, format: (v: string) => v || '-' },
+                    { key: 'schiffAbfahrt', label: '4️⃣ Schiff ab', width: '130px', align: 'center', sumable: false, format: (v: string) => v || '-' },
+                    { key: 'ankunftHafenDE', label: '5️⃣ Hafen DE', width: '130px', align: 'center', sumable: false, format: (v: string) => v || '-' },
+                    { key: 'erwarteteAnkunftFormatiert', label: '6️⃣ Ank. Werk', width: '130px', align: 'center', sumable: false },
+                    { key: 'verfuegbarAb', label: '7️⃣ Verfügbar', width: '130px', align: 'center', sumable: false, format: (v: string) => v || '-' },
+                    { key: 'bestellmenge', label: 'Bestellmenge', width: '130px', align: 'right', sumable: true, format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-' }
+                   ]}
+                   data={nurBestellungen} 
+                   maxHeight="500px" 
+                   showFormulas={false}
+                   showSums={true}
+                   sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Bestellungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel bestellt`}
+                   dateColumnKey="bedarfsdatum"
+                   highlightRow={(row) => {
+                     if (row.hatBestellung && row.erwarteteAnkunft && row.bedarfsdatum) {
+                       const ankunft = row.erwarteteAnkunft instanceof Date ? row.erwarteteAnkunft : new Date(row.erwarteteAnkunft)
+                       const bedarf = row.bedarfsdatum instanceof Date ? row.bedarfsdatum : new Date(row.bedarfsdatum)
+                       const verspaetungTage = Math.floor((ankunft.getTime() - bedarf.getTime()) / (1000 * 60 * 60 * 24))
+                       if (verspaetungTage > 0) {
+                         if (verspaetungTage > 5) {
+                           return { color: 'bg-red-100 hover:bg-red-200 border-l-4 border-red-500', tooltip: `⚠️ KRITISCHE VERSPÄTUNG: ${verspaetungTage} Tage zu spät!` }
+                         } else {
+                           return { color: 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500', tooltip: `⚠️ Verspätung: ${verspaetungTage} Tag(e) zu spät` }
+                         }
+                       }
+                     }
+                     return null
+                   }}
+                 />
               </>
             )}
 
-                {/* ✅ NEU: HAFEN & VERSAND LOGISTIK */}
-                <div className="mt-8 bg-blue-50 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                    <Ship className="h-5 w-5 text-blue-600" />
-                    Versand & Hafen Logistik
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Übersicht der Verschiffungen: Losgrößen-Bündelung am Hafen Shanghai, Schiff nur mittwochs, Lieferverlauf nach Dortmund
-                  </p>
-                  
-                  {/* Versand-Statistik */}
-                  <div className="grid gap-4 md:grid-cols-4 mb-4">
-                    <div className="bg-white rounded-lg p-3 border">
-                      <div className="text-xs text-gray-500">Durchschn. Wartezeit Hafen</div>
-                      <div className="text-xl font-bold text-blue-600">
-                        {(() => {
-                          const bestellungenMitWartezeit = taeglicheBestellungen.filter(b => b.wartetageAmHafen !== undefined)
-                          const avg = bestellungenMitWartezeit.length > 0 
-                            ? bestellungenMitWartezeit.reduce((sum, b) => sum + (b.wartetageAmHafen || 0), 0) / bestellungenMitWartezeit.length
-                            : 0
-                          return formatNumber(avg, 1) + ' Tage'
-                        })()}
-                      </div>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 border">
-                      <div className="text-xs text-gray-500">Schiffsabfahrten</div>
-                      <div className="text-xl font-bold text-blue-600">
-                        {(() => {
-                          const uniqueMittwoche = new Set(
-                            taeglicheBestellungen
-                              .filter(b => b.schiffAbfahrtMittwoch)
-                              .map(b => b.schiffAbfahrtMittwoch?.toISOString())
-                          )
-                          return uniqueMittwoche.size
-                        })()} Mittwochs
-                      </div>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 border">
-                      <div className="text-xs text-gray-500">Gesamtmenge verschifft</div>
-                      <div className="text-xl font-bold text-blue-600">
-                        {formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel
-                      </div>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 border">
-                      <div className="text-xs text-gray-500">Durchschn. Losgröße/Schiff</div>
-                      <div className="text-xl font-bold text-blue-600">
-                        {(() => {
-                          const uniqueMittwoche = new Set(
-                            taeglicheBestellungen
-                              .filter(b => b.schiffAbfahrtMittwoch)
-                              .map(b => b.schiffAbfahrtMittwoch?.toISOString())
-                          )
-                          return uniqueMittwoche.size > 0 
-                            ? formatNumber(bestellStatistik.gesamtMenge / uniqueMittwoche.size, 0) + ' Stk'
-                            : '-'
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Shipment Tracking Table mit Bundle-Visualisierung */}
-                  <div className="mb-2 text-xs text-muted-foreground">
-                    ✅ Bestellungen werden am Hafen Shanghai gebündelt | Farbige Markierung zeigt Bundles
-                  </div>
-                  <ExcelTable
-                    columns={[
-                      { key: 'bundleMarker', label: 'Bundle', width: '70px', align: 'center', sumable: false },
-                      { key: 'bestellungId', label: 'Best.-ID', width: '120px', align: 'left', sumable: false },
-                      { key: 'bestelldatumFormatiert', label: 'Bestellung', width: '100px', align: 'center', sumable: false },
-                      { key: 'ankunftHafen', label: 'Hafen CN', width: '100px', align: 'center', sumable: false },
-                      { key: 'menge', label: 'Menge', width: '90px', align: 'right', sumable: true, format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-' },
-                      { key: 'schiffAbfahrt', label: 'Schiff ab', width: '110px', align: 'center', sumable: false },
-                      { key: 'wartetage', label: 'Wait', width: '60px', align: 'center', sumable: false },
-                      { key: 'erwarteteAnkunftFormatiert', label: 'Hamburg', width: '100px', align: 'center', sumable: false },
-                      { key: 'verfuegbarAb', label: 'Verfügbar', width: '100px', align: 'center', sumable: false },
-                      { key: 'hafenBacklog', label: 'Am Hafen', width: '100px', align: 'right', sumable: false }
-                    ]}
-                    data={(() => {
-                      const sorted = taeglicheBestellungen
-                        .filter(b => Object.values(b.komponenten).reduce((sum, m) => sum + m, 0) > 0)
-                        .sort((a, b) => {
-                          const dA = a.schiffAbfahrtMittwoch instanceof Date ? a.schiffAbfahrtMittwoch : new Date(a.schiffAbfahrtMittwoch || a.bestelldatum)
-                          const dB = b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch : new Date(b.schiffAbfahrtMittwoch || b.bestelldatum)
-                          return dA.getTime() - dB.getTime()
-                        })
-                      // Bundle-Farben für visuelle Gruppierung (außerhalb der Schleife für Performance)
-                      const BUNDLE_COLORS = ['bg-blue-50', 'bg-green-50', 'bg-purple-50', 'bg-orange-50', 'bg-pink-50', 'bg-yellow-50']
-                      const bundleMap = new Map<string, number>()
-                      let bundleNr = 1
-                      let akkumuliertAmHafen = 0
-                      return sorted.map((b, idx) => {
-                        const menge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
-                        const key = b.schiffAbfahrtMittwoch ? (b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch.toISOString() : new Date(b.schiffAbfahrtMittwoch).toISOString()) : 'none'
-                        if (!bundleMap.has(key)) bundleMap.set(key, bundleNr++)
-                        const bid = bundleMap.get(key)
-                        akkumuliertAmHafen += menge
-                        const next = sorted[idx + 1]
-                        const nextKey = next?.schiffAbfahrtMittwoch ? (next.schiffAbfahrtMittwoch instanceof Date ? next.schiffAbfahrtMittwoch.toISOString() : new Date(next.schiffAbfahrtMittwoch).toISOString()) : 'x'
-                        const isLast = key !== nextKey
-                        // Zeigt akkumulierte Menge am Hafen: ⏳ = wartet noch, ✈️ = wird verschifft
-                        const hafenAnzeige = isLast ? `✈️ ${formatNumber(akkumuliertAmHafen, 0)}` : `⏳ ${formatNumber(akkumuliertAmHafen, 0)}`
-                        if (isLast) akkumuliertAmHafen = 0
-                        return {
-                          bundleMarker: bid ? `#${bid}` : '-',
-                          bundleColor: BUNDLE_COLORS[(bid || 1) % BUNDLE_COLORS.length],
-                          bestellungId: b.id,
-                          bestelldatumFormatiert: (b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum)).toLocaleDateString('de-DE'),
-                          ankunftHafen: b.materialfluss?.ankunftHafenShanghai ? ((b.materialfluss.ankunftHafenShanghai instanceof Date ? b.materialfluss.ankunftHafenShanghai : new Date(b.materialfluss.ankunftHafenShanghai)).toLocaleDateString('de-DE')) : '-',
-                          menge,
-                          schiffAbfahrt: b.schiffAbfahrtMittwoch ? ((b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch : new Date(b.schiffAbfahrtMittwoch)).toLocaleDateString('de-DE') + ' (Mi)') : '-',
-                          wartetage: b.wartetageAmHafen !== undefined ? b.wartetageAmHafen + 'd' : '-',
-                          erwarteteAnkunftFormatiert: (b.erwarteteAnkunft instanceof Date ? b.erwarteteAnkunft : new Date(b.erwarteteAnkunft)).toLocaleDateString('de-DE'),
-                          verfuegbarAb: b.verfuegbarAb ? ((b.verfuegbarAb instanceof Date ? b.verfuegbarAb : new Date(b.verfuegbarAb)).toLocaleDateString('de-DE')) : '-',
-                          hafenBacklog: hafenAnzeige
-                        }
-                      })
+            {/* ✅ VERSAND & HAFEN LOGISTIK SEKTION */}
+            <div className="mt-8 bg-blue-50 rounded-lg p-4 border border-blue-100">
+              <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                <Ship className="h-5 w-5 text-blue-600" />
+                Versand & Hafen Logistik
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Übersicht der Verschiffungen: Losgrößen-Bündelung am Hafen Shanghai, Schiff nur mittwochs, Lieferverlauf nach Dortmund
+              </p>
+              
+              {/* Versand-Statistik */}
+              <div className="grid gap-4 md:grid-cols-4 mb-4">
+                <div className="bg-white rounded-lg p-3 border">
+                  <div className="text-xs text-gray-500">Durchschn. Wartezeit Hafen</div>
+                  <div className="text-xl font-bold text-blue-600">
+                    {(() => {
+                      const bestellungenMitWartezeit = taeglicheBestellungen.filter(b => b.wartetageAmHafen !== undefined)
+                      const avg = bestellungenMitWartezeit.length > 0 
+                        ? bestellungenMitWartezeit.reduce((sum, b) => sum + (b.wartetageAmHafen || 0), 0) / bestellungenMitWartezeit.length
+                        : 0
+                      return formatNumber(avg, 1) + ' Tage'
                     })()}
-                    maxHeight="600px"
-                    showFormulas={false}
-                    showSums={true}
-                    sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Lieferungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel`}
-                    highlightRow={(row: any) => row.bundleColor ? { color: row.bundleColor + ' border-l-4 border-blue-400', tooltip: `Bundle ${row.bundleMarker}` } : null}
-                  />
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-3 border">
+                  <div className="text-xs text-gray-500">Schiffsabfahrten</div>
+                  <div className="text-xl font-bold text-blue-600">
+                    {(() => {
+                      const uniqueMittwoche = new Set(
+                        taeglicheBestellungen
+                          .filter(b => b.schiffAbfahrtMittwoch)
+                          .map(b => b.schiffAbfahrtMittwoch?.toISOString())
+                      )
+                      return uniqueMittwoche.size
+                    })()} Mittwochs
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-3 border">
+                  <div className="text-xs text-gray-500">Gesamtmenge verschifft</div>
+                  <div className="text-xl font-bold text-blue-600">
+                    {formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-3 border">
+                  <div className="text-xs text-gray-500">Durchschn. Losgröße/Schiff</div>
+                  <div className="text-xl font-bold text-blue-600">
+                    {(() => {
+                      const uniqueMittwoche = new Set(
+                        taeglicheBestellungen
+                          .filter(b => b.schiffAbfahrtMittwoch)
+                          .map(b => b.schiffAbfahrtMittwoch?.toISOString())
+                      )
+                      return uniqueMittwoche.size > 0 
+                        ? formatNumber(bestellStatistik.gesamtMenge / uniqueMittwoche.size, 0) + ' Stk'
+                        : '-'
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* 👇 LEGENDE & EMOJI UPDATES 👇 */}
+              <div className="mb-3 p-3 bg-white border border-blue-200 rounded-md text-sm text-blue-900 shadow-sm">
+                <div className="font-semibold mb-1 flex items-center gap-2">
+                  <Info className="h-4 w-4" /> 
+                  Legende & Logistik-Logik
+                </div>
+                <ul className="list-disc list-inside space-y-1 text-xs text-blue-800 ml-1">
+                  <li>
+                    <strong>Bündelung:</strong> Bestellungen werden am Hafen gesammelt und fahren nur <strong>mittwochs</strong> ab.
+                  </li>
+                  <li>
+                    <strong>⚓ (Anker):</strong> Ware wartet am Hafen. Die Zahl ist die <strong>akkumulierte Menge</strong> (Running Total).
+                  </li>
+                  <li>
+                    <strong>🚢 (Schiff):</strong> Das Schiff legt ab. Diese Zahl ist die <strong>gesamte Ladung</strong>, die auf Reisen geht.
+                  </li>
+                </ul>
+              </div>
+
+              <ExcelTable
+                columns={[
+                  { key: 'bundleMarker', label: 'Bundle', width: '70px', align: 'center', sumable: false },
+                  { key: 'bestellungId', label: 'Best.-ID', width: '120px', align: 'left', sumable: false },
+                  { key: 'bestelldatumFormatiert', label: 'Bestellung', width: '130px', align: 'center', sumable: false },
+                  { key: 'ankunftHafen', label: 'Hafen CN', width: '130px', align: 'center', sumable: false },
+                  { key: 'menge', label: 'Menge', width: '90px', align: 'right', sumable: true, format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-' },
+                  { key: 'schiffAbfahrt', label: 'Schiff ab', width: '180px', align: 'center', sumable: false },
+                  { key: 'wartetage', label: 'Wait', width: '60px', align: 'center', sumable: false },
+                  { key: 'erwarteteAnkunftFormatiert', label: 'Hamburg', width: '130px', align: 'center', sumable: false },
+                  { key: 'verfuegbarAb', label: 'Verfügbar', width: '130px', align: 'center', sumable: false },
+                  { key: 'hafenBacklog', label: 'Am Hafen', width: '160px', align: 'right', sumable: false }
+                ]}
+                data={(() => {
+                  const sorted = taeglicheBestellungen
+                    .filter(b => Object.values(b.komponenten).reduce((sum, m) => sum + m, 0) > 0)
+                    .sort((a, b) => {
+                      const dA = a.schiffAbfahrtMittwoch instanceof Date ? a.schiffAbfahrtMittwoch : new Date(a.schiffAbfahrtMittwoch || a.bestelldatum)
+                      const dB = b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch : new Date(b.schiffAbfahrtMittwoch || b.bestelldatum)
+                      return dA.getTime() - dB.getTime()
+                    })
                   
-                  {/* Chart: Monatliche Liefermengen */}
-                  <div className="mt-4">
-                    <BestellungenChart
-                      daten={taeglicheBestellungen.map(b => ({
-                        bestelldatum: b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum),
-                        menge: Object.values(b.komponenten).reduce((sum, m) => sum + m, 0),
-                        komponenten: b.komponenten,
-                        status: b.status
-                      }))}
-                      aggregation="monat"
-                      height={250}
-                    />
-                  </div>
-                </div>
-
-              {/* Info-Box unter der Tabelle */}
-              <CollapsibleInfo
-                title="Wichtige Konzepte der täglichen Bestelllogik"
-                variant="info"
-                icon={<Calendar className="h-5 w-5" />}
-                defaultOpen={false}
-              >
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold text-blue-900 mb-2">1. Tägliche Bedarfsermittlung</h4>
-                    <p className="text-sm text-blue-800">
-                      Jeden Tag wird der Bedarf aus dem Produktionsplan für den Liefertag (+{gesamtVorlaufzeit} Tage) ermittelt.
-                      Losgröße {lieferant.losgroesse} muss erreicht werden.
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold text-blue-900 mb-2">2. Bestellung bei Losgröße</h4>
-                    <p className="text-sm text-blue-800">
-                      Bestellung erfolgt nur wenn:<br/>
-                      • Akkumulierter Bedarf ≥ {lieferant.losgroesse} Stück<br/>
-                      • Keine Über-Bestellung: Nur benötigte Menge (370.000 = 370.000 Sättel)
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold text-blue-900 mb-2">3. ✅ Bestellzeitraum: Okt 2026 - Nov 2027</h4>
-                    <p className="text-sm text-blue-800 font-bold">
-                      {gesamtVorlaufzeit} Tage Vorlaufzeit → Erste Bestellung: ~Mitte Oktober 2026<br/>
-                      Letzte Bestellung: ~12. November 2027 (31.12.2027 - {gesamtVorlaufzeit} Tage)
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold text-blue-900 mb-2">4. Aggregation über alle 4 Sattel-Varianten</h4>
-                    <p className="text-sm text-blue-800">
-                      Bedarf wird über alle Sattel-Typen summiert (Fizik Tundra, Raceline, Spark, Speedline).
-                    </p>
-                  </div>
-                </div>
-              </CollapsibleInfo>
+                  const BUNDLE_COLORS = ['bg-blue-50', 'bg-green-50', 'bg-purple-50', 'bg-orange-50', 'bg-pink-50', 'bg-yellow-50']
+                  const bundleMap = new Map<string, number>()
+                  let bundleNr = 1
+                  let akkumuliertAmHafen = 0
+                  
+                  return sorted.map((b, idx) => {
+                    const menge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
+                    const key = b.schiffAbfahrtMittwoch ? (b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch.toISOString() : new Date(b.schiffAbfahrtMittwoch).toISOString()) : 'none'
+                    
+                    if (!bundleMap.has(key)) bundleMap.set(key, bundleNr++)
+                    const bid = bundleMap.get(key)
+                    
+                    akkumuliertAmHafen += menge
+                    
+                    const next = sorted[idx + 1]
+                    const nextKey = next?.schiffAbfahrtMittwoch ? (next.schiffAbfahrtMittwoch instanceof Date ? next.schiffAbfahrtMittwoch.toISOString() : new Date(next.schiffAbfahrtMittwoch).toISOString()) : 'x'
+                    const isLast = key !== nextKey
+                    
+                    // ✅ UPDATED ICONS: Anchor for waiting, Ship for departing
+                    const hafenAnzeige = isLast 
+                      ? `🚢 ${formatNumber(akkumuliertAmHafen, 0)}` 
+                      : `⚓ ${formatNumber(akkumuliertAmHafen, 0)}`
+                    
+                    if (isLast) akkumuliertAmHafen = 0
+                    
+                    return {
+                      bundleMarker: bid ? `#${bid}` : '-',
+                      bundleColor: BUNDLE_COLORS[(bid || 1) % BUNDLE_COLORS.length],
+                      bestellungId: b.id,
+                      bestelldatumFormatiert: (b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum)).toLocaleDateString('de-DE'),
+                      ankunftHafen: b.materialfluss?.ankunftHafenShanghai ? ((b.materialfluss.ankunftHafenShanghai instanceof Date ? b.materialfluss.ankunftHafenShanghai : new Date(b.materialfluss.ankunftHafenShanghai)).toLocaleDateString('de-DE')) : '-',
+                      menge,
+                      schiffAbfahrt: b.schiffAbfahrtMittwoch ? ((b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch : new Date(b.schiffAbfahrtMittwoch)).toLocaleDateString('de-DE') + ' (Mi)') : '-',
+                      wartetage: b.wartetageAmHafen !== undefined ? b.wartetageAmHafen + 'd' : '-',
+                      erwarteteAnkunftFormatiert: (b.erwarteteAnkunft instanceof Date ? b.erwarteteAnkunft : new Date(b.erwarteteAnkunft)).toLocaleDateString('de-DE'),
+                      verfuegbarAb: b.verfuegbarAb ? ((b.verfuegbarAb instanceof Date ? b.verfuegbarAb : new Date(b.verfuegbarAb)).toLocaleDateString('de-DE')) : '-',
+                      hafenBacklog: hafenAnzeige
+                    }
+                  })
+                })()}
+                maxHeight="500px"
+                showFormulas={false}
+                showSums={true}
+                sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Lieferungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel`}
+                highlightRow={(row: any) => row.bundleColor ? { color: row.bundleColor + ' border-l-4 border-blue-400', tooltip: `Bundle ${row.bundleMarker}` } : null}
+              />
+              
+              {/* Chart: Monatliche Liefermengen */}
+              <div className="mt-4">
+                <BestellungenChart
+                  daten={taeglicheBestellungen.map(b => ({
+                    bestelldatum: b.bestelldatum instanceof Date ? b.bestelldatum : new Date(b.bestelldatum),
+                    menge: Object.values(b.komponenten).reduce((sum, m) => sum + m, 0),
+                    komponenten: b.komponenten,
+                    status: b.status
+                  }))}
+                  aggregation="monat"
+                  height={250}
+                />
+              </div>
             </div>
+          </div>
         </CardContent>
       </Card>
-
-      {/* ✅ KONSOLIDIERTE INFO-BOXEN: Lieferanten-Details + Bestelllogik */}
-      <CollapsibleInfoGroup
-        groupTitle="Detaillierte Informationen"
-        items={[
-          {
-            id: 'lieferant-details',
-            title: `${lieferant.land === 'China' ? '🇨🇳' : '🏭'} ${lieferant.name} - Lieferanten-Details`,
-            icon: <Ship className="h-4 w-4" />,
-            variant: 'info',
-            content: (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Einziger Lieferant für alle {konfiguration.bauteile.length} Komponenten
-                </p>
-                
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <h4 className="font-semibold mb-2">Transport-Sequenz (Reihenfolge wichtig für Feiertage!):</h4>
-                    <ul className="space-y-1 text-sm">
-                      {lieferant.transportSequenz && lieferant.transportSequenz.map((step, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="font-bold text-blue-600">{step.schritt}.</span>
-                          <span>
-                            <strong>{step.typ}:</strong> {step.dauer} {step.einheit} 
-                            {step.von !== step.nach && ` (${step.von} → ${step.nach})`}
-                            <span className="text-muted-foreground text-xs ml-1">- {step.beschreibung}</span>
-                          </span>
-                        </li>
-                      ))}
-                      <li className="pt-2 border-t">
-                        <strong>Gesamt: {gesamtVorlaufzeit} Tage ({Math.ceil(gesamtVorlaufzeit / 7)} Wochen)</strong>
-                      </li>
-                    </ul>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-semibold mb-2">Besonderheiten:</h4>
-                    <ul className="space-y-1 text-sm">
-                      {lieferant.besonderheiten.map((b, idx) => (
-                        <li key={idx}>✓ {b}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )
-          },
-          {
-            id: 'bedarfsdatum-bestelldatum',
-            title: 'Bedarfsdatum → Bestelldatum (Rückwärtsrechnung)',
-            icon: <Calendar className="h-4 w-4" />,
-            variant: 'info',
-            content: (
-              <ol className="list-decimal list-inside space-y-1 text-sm">
-                <li>Vom Bedarfsdatum <strong>{gesamtVorlaufzeit} Tage</strong> (Gesamtvorlaufzeit) abziehen</li>
-                <li>Detailaufschlüsselung:
-                  <ul className="list-disc list-inside ml-4 mt-1">
-                    <li>2 AT LKW-Transport (Hamburg → Dortmund)</li>
-                    <li>{lieferant.vorlaufzeitKalendertage} KT Seefracht (Shanghai → Hamburg)</li>
-                    <li>2 AT LKW-Transport (China → Hafen Shanghai)</li>
-                    <li>{lieferant.vorlaufzeitArbeitstage} AT Produktion beim Zulieferer</li>
-                  </ul>
-                </li>
-                <li>1 Tag Puffer für Bestellverarbeitung abziehen</li>
-                <li>Sicherstellen dass Bestelldatum ein Arbeitstag ist</li>
-              </ol>
-            )
-          },
-          {
-            id: 'losgroessen-aufrundung',
-            title: 'Losgrößen-Aufrundung',
-            icon: <Package className="h-4 w-4" />,
-            variant: 'success',
-            content: (
-              <div className="space-y-2">
-                <p className="text-sm">
-                  Jede Bestellung wird auf Vielfache von <strong>{formatNumber(lieferant.losgroesse, 0)} Stück</strong> aufgerundet.
-                </p>
-                <p className="text-sm">
-                  Beispiel: Bedarf 3.500 Stück → Bestellung <strong>{formatNumber(Math.ceil(3500 / lieferant.losgroesse) * lieferant.losgroesse, 0)} Stück</strong> ({Math.ceil(3500 / lieferant.losgroesse)}x Losgröße)
-                </p>
-              </div>
-            )
-          }
-        ]}
-        variant="info"
-        icon={<Info className="h-5 w-5" />}
-        defaultOpen={false}
-      />
-
     </div>
   )
 }
