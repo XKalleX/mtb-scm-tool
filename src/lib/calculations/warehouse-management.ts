@@ -487,10 +487,12 @@ export function berechneIntegriertesWarehouse(
       const verfuegbarBestand = endBestand
       
       // Reichweite berechnen
-      const durchschnittVerbrauchProTag = gesamtVerbrauch / Math.max(1, tagIndex)
-      const reichweiteTage = durchschnittVerbrauchProTag > 0 
-        ? endBestand / durchschnittVerbrauchProTag 
-        : 999
+      // Nutze den durchschnittlichen zukünftigen Bedarf (nicht den Verbrauch!)
+      // Grund: Bei JIT-Produktion ist Verbrauch ≈ 0 am Anfang, aber Bedarf ist bekannt
+      const durchschnittBedarf = gesamtBedarf / Math.max(1, tagIndex)
+      const reichweiteTage = durchschnittBedarf > 0 
+        ? endBestand / durchschnittBedarf 
+        : (endBestand > 0 ? 999 : 0)  // 999 nur wenn tatsächlich Bestand vorhanden
       
       // Status bestimmen
       let status: 'ok' | 'niedrig' | 'kritisch' | 'negativ' = 'ok'

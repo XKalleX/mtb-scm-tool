@@ -37,7 +37,7 @@ import {
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport } from '@/lib/calculations/warehouse-management'
 import { berechneBedarfsBacklog } from '@/lib/calculations/bedarfs-backlog-rechnung'
-import { TagesproduktionChart, LagerbestandChart, FertigerzeugnisseChart } from '@/components/ui/table-charts'
+import { TagesproduktionChart, LagerbestandChart, FertigerzeugnisseChart, BacklogChart } from '@/components/ui/table-charts'
 
 /**
  * Produktion Hauptseite
@@ -743,56 +743,23 @@ export default function ProduktionPage() {
               />
             </div>
             
-            {/* Chart 2: Backlog-Entwicklung (monatlich) */}
+            {/* Chart 2: Backlog-Entwicklung (täglich mit Monats-X-Achse) */}
             <div className="bg-white rounded-lg p-4 border">
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-orange-600" />
-                Backlog-Entwicklung (monatlich)
+                Backlog-Entwicklung (täglich)
               </h4>
-              <div className="h-[250px]">
-                {(() => {
-                  // Aggregiere Backlog pro Monat
-                  const backlogProMonat: Record<number, number> = {}
-                  tagesProduktionFormatiert.forEach(t => {
-                    const monat = t.monat
-                    if (!backlogProMonat[monat]) backlogProMonat[monat] = 0
-                    // Nehme den maximalen Backlog-Wert des Monats
-                    if (typeof t.backlog === 'number' && t.backlog > backlogProMonat[monat]) {
-                      backlogProMonat[monat] = t.backlog
-                    }
-                  })
-                  
-                  const monatsnamen = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
-                  const chartData = monatsnamen.map((name, idx) => ({
-                    monat: name,
-                    backlog: backlogProMonat[idx + 1] || 0
-                  }))
-                  
-                  return (
-                    <div className="space-y-2 h-full flex flex-col justify-center">
-                      {chartData.map((d, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <span className="w-10 text-xs text-gray-500">{d.monat}</span>
-                          <div className="flex-1 bg-gray-100 rounded-full h-4 relative">
-                            <div 
-                              className={`h-4 rounded-full ${d.backlog > 1000 ? 'bg-red-400' : d.backlog > 500 ? 'bg-orange-400' : 'bg-green-400'}`}
-                              style={{ 
-                                width: `${Math.min(100, (d.backlog / 3000) * 100)}%`,
-                                minWidth: d.backlog > 0 ? '4px' : '0'
-                              }}
-                            />
-                          </div>
-                          <span className={`w-16 text-xs font-medium text-right ${d.backlog > 1000 ? 'text-red-600' : d.backlog > 500 ? 'text-orange-600' : 'text-green-600'}`}>
-                            {formatNumber(d.backlog, 0)} Stk
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                })()}
-              </div>
+              <BacklogChart
+                daten={tagesProduktionFormatiert.map(t => ({
+                  tag: t.tag,
+                  datum: t.datum,
+                  backlog: typeof t.backlog === 'number' ? t.backlog : 0,
+                  monat: t.monat
+                }))}
+                height={250}
+              />
               <p className="text-xs text-muted-foreground mt-2">
-                Max. Produktions-Backlog pro Monat (nicht produzierte Mengen aufgrund von Materialengpässen)
+                Täglicher Produktions-Backlog (nicht produzierte Mengen aufgrund von Materialengpässen). X-Achse formatiert auf Monatsbasis für bessere Lesbarkeit.
               </p>
             </div>
           </div>

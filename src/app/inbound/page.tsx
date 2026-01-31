@@ -380,8 +380,8 @@ export default function InboundPage() {
           istVorjahr: bestellung.istVorjahr,
           vorlaufzeit: vorlaufzeit,
           vorlaufzeitFormatiert: `${vorlaufzeit} Tage`,
-          menge: gesamtMenge,  // ✅ AGGREGIERTE MENGE!
-          mengeFormatiert: formatNumber(gesamtMenge, 0) + ' Stk',
+          menge: tagesBedarf,  // ✅ TÄGLICHER OEM-BEDARF (nicht Losgröße!)
+          mengeFormatiert: formatNumber(tagesBedarf, 0) + ' Sättel (OEM-Bedarf)',
           // ✅ NEU: Komponenten-Details einzeln
           SAT_FT_bestellt: komponentenAggregiert['SAT_FT'] || 0,
           SAT_RL_bestellt: komponentenAggregiert['SAT_RL'] || 0,

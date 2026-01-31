@@ -1065,3 +1065,106 @@ export function FeiertageChart({ daten, height = 200 }: FeiertageChartProps) {
     </Card>
   )
 }
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * BACKLOG CHART - TAGESGENAU MIT MONATS-X-ACHSE
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+export interface BacklogChartProps {
+  daten: Array<{
+    tag: number
+    datum: Date
+    backlog: number
+    monat: number
+  }>
+  height?: number
+}
+
+export function BacklogChart({ daten, height = 300 }: BacklogChartProps) {
+  const chartData = useMemo(() => {
+    if (daten.length === 0) return []
+
+    // Bereite Daten für tagesgenaues Liniendiagramm auf
+    const monatNamen = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+    
+    return daten.map(d => ({
+      tag: d.tag,
+      datum: d.datum,
+      backlog: d.backlog || 0,
+      monat: d.monat,
+      // Zeige Monatsnamen nur am 1. und 15. des Monats für bessere Lesbarkeit
+      label: d.tag % 15 === 1 || d.tag === 1 ? monatNamen[d.monat - 1] : ''
+    }))
+  }, [daten])
+
+  const maxBacklog = useMemo(() => {
+    return Math.max(...chartData.map(d => d.backlog), 100)
+  }, [chartData])
+
+  if (chartData.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+        Keine Backlog-Daten verfügbar
+      </div>
+    )
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+        <defs>
+          <linearGradient id="backlogGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor={COLORS.danger} stopOpacity={0.3}/>
+            <stop offset="95%" stopColor={COLORS.danger} stopOpacity={0.05}/>
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+        <XAxis 
+          dataKey="tag"
+          tick={{ fontSize: 11 }}
+          interval={14}  // Zeige etwa jeden 15. Tag
+          tickFormatter={(tag) => {
+            const datum = chartData.find(d => d.tag === tag)
+            if (!datum) return ''
+            const monatNamen = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+            return monatNamen[datum.monat - 1] || ''
+          }}
+        />
+        <YAxis 
+          tick={{ fontSize: 11 }}
+          tickFormatter={(value) => {
+            if (value >= 1000) return `${(value / 1000).toFixed(1)}k`
+            return value.toString()
+          }}
+        />
+        <Tooltip 
+          content={({ active, payload }) => {
+            if (!active || !payload || !payload.length) return null
+            const data = payload[0].payload
+            const monatNamen = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+            return (
+              <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+                <p className="text-xs font-semibold text-gray-700">
+                  Tag {data.tag} • {monatNamen[data.monat - 1]}
+                </p>
+                <p className="text-sm font-bold text-red-600 mt-1">
+                  Backlog: {data.backlog.toLocaleString('de-DE')} Stk
+                </p>
+              </div>
+            )
+          }}
+        />
+        <Area 
+          type="monotone" 
+          dataKey="backlog" 
+          stroke={COLORS.danger}
+          strokeWidth={2}
+          fill="url(#backlogGradient)"
+          name="Backlog"
+        />
+      </AreaChart>
+    </ResponsiveContainer>
+  )
+}
