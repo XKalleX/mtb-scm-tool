@@ -736,7 +736,6 @@ export function berechneIntegriertesWarehouse(
       // anfangsBestand = aktueller Bestand MINUS heute's Zugänge
       const anfangsBestand = aktuelleBestaende[bauteilId] - zugang
       
-      // Placeholder - wird in STEP 3b-GLOBAL berechnet
       let verbrauch = 0
       let atpErfuellt = globalAtpErfuellt  // ← Nutze GLOBALEN ATP-Status
       let atpGrund = globalAtpGrund        // ← Nutze GLOBALEN Grund
@@ -766,7 +765,7 @@ export function berechneIntegriertesWarehouse(
         // ✅ KRITISCHER FIX: Backlog zum benötigten Bedarf hinzufügen!
         // Der Backlog von gestern muss heute zusätzlich zum Plan produziert werden.
         // Nur so kann der Backlog abgebaut werden!
-        const benoeligtMitBacklog = benoetigt + backlogVorher
+        const benoetigtMitBacklog = benoetigt + backlogVorher
         
         // ─────────────────────────────────────────────────────────────────────────
         // Wende Verbrauchslogik an: min(Bedarf, Verfügbar)
@@ -801,7 +800,7 @@ export function berechneIntegriertesWarehouse(
         // 1. Limitiere durch Material UND Bedarf (wie bisher)
         // 2. Zusätzlich limitiere durch verbleibende Kapazität (NEU!)
         const maxVerbrauchMoeglich = Math.min(
-          benoeligtMitBacklog, 
+          benoetigtMitBacklog, 
           verfuegbarerBestand,
           verbleibendeKapazitaet  // ✅ NEU: Globale Kapazitätsgrenze beachten!
         )
@@ -814,7 +813,7 @@ export function berechneIntegriertesWarehouse(
         
         // ✅ FIX: Berechne nicht erfüllten Bedarf basierend auf Plan+Backlog!
         // Der nichtErfuellt wird der neue Backlog für morgen
-        const nichtErfuellt = benoeligtMitBacklog - verbrauch
+        const nichtErfuellt = benoetigtMitBacklog - verbrauch
         
         // ✅ BACKLOG-TRACKING: Berechne wie viel produziert wurde
         if (nichtErfuellt > 0) {
@@ -831,22 +830,37 @@ export function berechneIntegriertesWarehouse(
         // Update Backlog: neuer Backlog = nichtErfuellt (was nicht produziert werden konnte)
         produktionsBacklog[bauteilId] = nichtErfuellt > 0 ? nichtErfuellt : 0
         
-        // ✅ KRITISCHER FIX: atpErfuellt basierend auf TATSÄCHLICHER Produktion!
-        // Material OK = true WENN Produktion stattfindet (verbrauch > 0)
-        // Logik: Wenn Bikes produziert werden, war Material verfügbar!
-        // Der GLOBALE Status zeigt nur ob ALLE Anforderungen erfüllt wurden,
-        // aber "Material OK" sollte zeigen ob ÜBERHAUPT produziert werden konnte.
-        if (verbrauch > 0) {
-          atpErfuellt = true  // Material war verfügbar, Produktion fand statt
-          atpGrund = undefined  // Kein Engpass für diesen Verbrauch
-        } else if (benoetigt > 0 || backlogVorher > 0) {
-          // Bedarf vorhanden aber keine Produktion → Material nicht verfügbar
-          atpErfuellt = false
-          if (!atpGrund) {
-            atpGrund = `Kein Material verfügbar (benötigt: ${benoeligtMitBacklog}, verfügbar: ${verfuegbarerBestand})`
+        // ✅ KRITISCHER FIX (Issue #295): atpErfuellt NUR für Arbeitstage relevant!
+        // An Wochenenden/Feiertagen gibt es KEINE Produktion, daher ist "Material OK" = N/A (nicht "Ja")
+        // 
+        // Logik:
+        // - Arbeitstag + verbrauch > 0 → Material OK = true
+        // - Arbeitstag + verbrauch = 0 + Bedarf > 0 → Material OK = false (Material fehlte!)
+        // - Nicht-Arbeitstag → Material OK sollte als N/A angezeigt werden (nicht relevant)
+        
+        if (istArbeitstag) {
+          if (verbrauch > 0) {
+            atpErfuellt = true  // Material war verfügbar, Produktion fand statt
+            atpGrund = undefined  // Kein Engpass für diesen Verbrauch
+          } else if (benoetigt > 0 || backlogVorher > 0) {
+            // Bedarf vorhanden aber keine Produktion → Material nicht verfügbar
+            atpErfuellt = false
+            if (!atpGrund) {
+              atpGrund = `Kein Material verfügbar (benötigt: ${benoetigtMitBacklog}, verfügbar: ${verfuegbarerBestand})`
+            }
+          } else {
+            // Kein Bedarf an einem Arbeitstag → Material OK = true (kein Bedarf = kein Problem)
+            atpErfuellt = true
           }
+        } else {
+          // ✅ NEU: An Wochenenden/Feiertagen bleibt atpErfuellt = false
+          // ABER: atpGrund = undefined (zeigt an dass es N/A ist, nicht "Material fehlt")
+          // Dies ermöglicht der UI zu unterscheiden zwischen:
+          // - false + grund → Material-Engpass (rot)
+          // - false + kein Grund + nicht Arbeitstag → N/A (grau, "-")
+          atpErfuellt = false
+          atpGrund = undefined
         }
-        // Wenn weder Bedarf noch Backlog, bleibt atpErfuellt beim Standardwert
         
         // Buche Verbrauch (jetzt mit Backlog-Abbau)
         aktuelleBestaende[bauteilId] -= verbrauch
@@ -959,14 +973,14 @@ export function berechneIntegriertesWarehouse(
     // NOTE: Der frühere "STEP 3e: TÄGLICHER BACKLOG-ABBAU" wurde entfernt.
     // 
     // GRUND: Der Backlog-Abbau wird bereits im Hauptloop (STEP 3b-3c) behandelt via
-    // benoeligtMitBacklog = benoetigt + backlogVorher. Der zusätzliche Abbau-Code
+    // benoetigtMitBacklog = benoetigt + backlogVorher. Der zusätzliche Abbau-Code
     // hat zu Dateninkonsistenz geführt:
     // - Er modifizierte aktuelleBestaende NACH dem Speichern in tageErgebnisse
     // - Dadurch entstand ein Unterschied zwischen warehouse.verbrauch (Tabelle)
     //   und gesamtProduziertTatsaechlich (Statistik-Kachel)
     // 
     // Die korrekte Lösung ist, den Backlog vollständig im Hauptloop zu behandeln,
-    // was durch benoeligtMitBacklog = benoetigt + backlogVorher bereits geschieht.
+    // was durch benoetigtMitBacklog = benoetigt + backlogVorher bereits geschieht.
     
     // Nächster Tag
     aktuellesDatum = addDays(aktuellesDatum, 1)
@@ -1254,11 +1268,23 @@ export function korrigiereProduktionsplaeneMitWarehouse(
     
     const datumStr = warehouseTag.datumStr
     
+    // ✅ KRITISCHER FIX (Issue #295): Prüfe ob Arbeitstag!
+    // An Wochenenden/Feiertagen darf KEINE Produktion stattfinden
+    const istArbeitstag = warehouseTag.istArbeitstag
+    
     // Für jede Variante
     Object.entries(korrigiertePlaene).forEach(([varianteId, plan]) => {
       // 🔧 FIX: Nutze date-based lookup statt Array-Index
       const produktionsTag = planDateLookup[varianteId][datumStr]
       if (!produktionsTag) return
+      
+      // ✅ KRITISCHER FIX (Issue #295): An Nicht-Arbeitstagen istMenge = 0 setzen
+      if (!istArbeitstag) {
+        produktionsTag.istMenge = 0
+        produktionsTag.abweichung = 0 - produktionsTag.planMenge
+        produktionsTag.materialVerfuegbar = produktionsTag.planMenge === 0
+        return // Keine weitere Verarbeitung an Nicht-Arbeitstagen
+      }
       
       // Finde welches Bauteil diese Variante nutzt (aus Stückliste)
       const stuecklistenPos = konfiguration.stueckliste.find(
