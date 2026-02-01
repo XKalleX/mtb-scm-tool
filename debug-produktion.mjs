@@ -1,84 +1,85 @@
-/**
- * DEBUG SKRIPT: Produktionsproblem analysieren
- * 
- * Problem: 370.000 Teile geliefert, aber nur 307.291 produziert
- * Erwartet: Alle gelieferten Teile müssen produziert werden
- */
+// Debug script to trace production on weekends/holidays
 
-import stammdaten from './src/data/stammdaten.json' assert { type: 'json' }
-import saisonalitaet from './src/data/saisonalitaet.json' assert { type: 'json' }
-import stueckliste from './src/data/stueckliste.json' assert { type: 'json' }
+import { createRequire } from 'module'
+const require = createRequire(import.meta.url)
 
-console.log('═══════════════════════════════════════════════════════════════════')
-console.log('PRODUKTIONS-DEBUG: Analysiere 370k vs 307k Problem')
-console.log('═══════════════════════════════════════════════════════════════════\n')
+// Load the JSON data directly
+const stammdaten = require('./src/data/stammdaten.json')
+const saisonalitaet = require('./src/data/saisonalitaet.json')
+const feiertageDeutschland = require('./src/data/feiertage-deutschland.json')
+const stueckliste = require('./src/data/stueckliste.json')
+const lieferantChina = require('./src/data/lieferant-china.json')
 
-// 1. JAHRESPRODUKTION PRÜFEN
-console.log('1️⃣ JAHRESPRODUKTION:')
-console.log('   Gesamt:', stammdaten.jahresproduktion.gesamt.toLocaleString('de-DE'))
+// Function to check if date is a weekend
+function isWeekend(date) {
+  const day = date.getDay()
+  return day === 0 || day === 6
+}
 
-// 2. VARIANTEN-ANTEILE PRÜFEN
-console.log('\n2️⃣ VARIANTEN-ANTEILE:')
-let summeVarianten = 0
-stammdaten.varianten.forEach(v => {
-  const jahresMenge = Math.round(stammdaten.jahresproduktion.gesamt * v.anteilPrognose)
-  summeVarianten += jahresMenge
-  console.log(`   ${v.name}: ${v.anteilPrognose * 100}% = ${jahresMenge.toLocaleString('de-DE')} Bikes`)
-})
-console.log(`   SUMME: ${summeVarianten.toLocaleString('de-DE')} Bikes`)
-console.log(`   Differenz zur Jahresproduktion: ${(summeVarianten - stammdaten.jahresproduktion.gesamt).toLocaleString('de-DE')}`)
+function toLocalISODateString(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
-// 3. SÄTTEL PRO BIKE PRÜFEN
-console.log('\n3️⃣ SÄTTEL PRO BIKE (Stückliste):')
-const sattelProBike = {}
-stueckliste.stueckliste.forEach(pos => {
-  if (pos.bauteilId.startsWith('SAT_')) {
-    if (!sattelProBike[pos.mtbVariante]) {
-      sattelProBike[pos.mtbVariante] = 0
-    }
-    sattelProBike[pos.mtbVariante] += pos.menge
+// Check if a date is a German holiday
+function isDeutschlandFeiertag(date, feiertage) {
+  const dateStr = toLocalISODateString(date)
+  const feiertage2027 = feiertage.feiertage2027.map(f => f.datum)
+  return feiertage2027.includes(dateStr)
+}
+
+// Check if date is a work day in Germany
+function isArbeitstag_Deutschland(date, feiertage) {
+  if (isWeekend(date)) {
+    return false
   }
+  if (isDeutschlandFeiertag(date, feiertage)) {
+    return false
+  }
+  return true
+}
+
+console.log('========================================')
+console.log('TESTING WEEKEND/HOLIDAY DETECTION')
+console.log('========================================\n')
+
+// Test specific days from screenshots
+const testDates = [
+  { tag: 94, expected: 'So', shouldBeArbeitstag: false },    // 04.04. Sunday
+  { tag: 95, expected: 'Mo', shouldBeArbeitstag: false, holiday: 'Ostermontag' },  // 05.04. Easter Monday (Holiday)
+  { tag: 96, expected: 'Di', shouldBeArbeitstag: true },     // 06.04. Tuesday
+  { tag: 101, expected: 'So', shouldBeArbeitstag: false },   // 11.04. Sunday
+  { tag: 102, expected: 'Mo', shouldBeArbeitstag: true },    // 12.04. Monday
+  { tag: 108, expected: 'So', shouldBeArbeitstag: false },   // 18.04. Sunday
+  { tag: 109, expected: 'Mo', shouldBeArbeitstag: true },    // 19.04. Monday
+]
+
+testDates.forEach(test => {
+  const date = new Date(2027, 0, test.tag)  // tag = day of year
+  const wochentag = date.toLocaleDateString('de-DE', { weekday: 'short' })
+  const isWknd = isWeekend(date)
+  const isHoliday = isDeutschlandFeiertag(date, feiertageDeutschland)
+  const isAT = isArbeitstag_Deutschland(date, feiertageDeutschland)
+  
+  const dateFormatted = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+  
+  console.log(`Tag ${test.tag} (${dateFormatted} ${wochentag}):`)
+  console.log(`  isWeekend: ${isWknd}`)
+  console.log(`  isHoliday: ${isHoliday}${test.holiday ? ` (${test.holiday})` : ''}`)
+  console.log(`  isArbeitstag: ${isAT} (expected: ${test.shouldBeArbeitstag})`)
+  console.log(`  MATCH: ${isAT === test.shouldBeArbeitstag ? '✅' : '❌ MISMATCH!'}`)
+  console.log()
 })
 
-console.log('   Sättel pro Bike:')
-Object.entries(sattelProBike).forEach(([variante, anzahl]) => {
-  console.log(`   - ${variante}: ${anzahl} Sattel`)
+console.log('========================================')
+console.log('GERMAN HOLIDAYS 2027 (from JSON)')
+console.log('========================================\n')
+
+feiertageDeutschland.feiertage2027.forEach(f => {
+  const date = new Date(f.datum)
+  const wochentag = date.toLocaleDateString('de-DE', { weekday: 'long' })
+  console.log(`  ${f.datum} (${wochentag}): ${f.name}`)
 })
 
-// 4. BERECHNE ERWARTETEN SATTEL-BEDARF
-console.log('\n4️⃣ ERWARTETER SATTEL-BEDARF:')
-let gesamtSattelBedarf = 0
-stammdaten.varianten.forEach(v => {
-  const jahresMenge = Math.round(stammdaten.jahresproduktion.gesamt * v.anteilPrognose)
-  const sattel = sattelProBike[v.id] || 1 // 1 Sattel pro Bike als Standard
-  const sattelBedarf = jahresMenge * sattel
-  gesamtSattelBedarf += sattelBedarf
-  console.log(`   ${v.name}: ${jahresMenge.toLocaleString('de-DE')} Bikes × ${sattel} Sattel = ${sattelBedarf.toLocaleString('de-DE')} Sättel`)
-})
-console.log(`   GESAMT-BEDARF: ${gesamtSattelBedarf.toLocaleString('de-DE')} Sättel`)
-
-// 5. SAISONALITÄT PRÜFEN
-console.log('\n5️⃣ SAISONALITÄT:')
-const gesamtArbeitstage = saisonalitaet.monate.reduce((sum, m) => sum + m.arbeitstage, 0)
-const gesamtBikesPrognose = saisonalitaet.monate.reduce((sum, m) => sum + m.bikes, 0)
-console.log(`   Arbeitstage gesamt: ${gesamtArbeitstage}`)
-console.log(`   Bikes gesamt (aus Saisonalität): ${gesamtBikesPrognose.toLocaleString('de-DE')}`)
-console.log(`   Durchschnitt pro Tag: ${Math.round(stammdaten.jahresproduktion.gesamt / gesamtArbeitstage).toLocaleString('de-DE')} Bikes`)
-
-// 6. PROBLEM-HYPOTHESE
-console.log('\n6️⃣ PROBLEM-HYPOTHESE:')
-console.log('   ❌ Aktuell: 370.000 Teile geliefert, aber nur 307.291 produziert')
-console.log('   ❌ Differenz: 62.709 Teile verbleiben im Lager')
-console.log('')
-console.log('   💡 Mögliche Ursachen:')
-console.log('   1. Warehouse-Management bucht Verbrauch nur auf Basis von istMenge')
-console.log('   2. istMenge könnte durch Material-Checks reduziert sein')
-console.log('   3. Bestellungen basieren auf planMenge (370k), aber Verbrauch auf istMenge (<370k)')
-console.log('')
-console.log('   ✅ Lösung: Sicherstellen dass ALLE bestellten Teile auch produziert werden!')
-console.log('      - Entweder: Bestellungen basieren auf istMenge (tatsächlich produziert)')
-console.log('      - Oder: istMenge = planMenge (keine Reduktion durch Material-Checks)')
-
-console.log('\n═══════════════════════════════════════════════════════════════════')
-console.log('ANALYSE ABGESCHLOSSEN')
-console.log('═══════════════════════════════════════════════════════════════════')
