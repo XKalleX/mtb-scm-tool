@@ -37,8 +37,7 @@ import {
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport, korrigiereProduktionsplaeneMitWarehouse } from '@/lib/calculations/warehouse-management'
 import { berechneBedarfsBacklog } from '@/lib/calculations/bedarfs-backlog-rechnung'
-import { TagesproduktionChart, LagerbestandChart, FertigerzeugnisseChart, BacklogChart } from '@/components/ui/table-charts'
-import { FertigerzeugnisseChartV2 } from '@/components/ui/fertigerzeugnisse-chart-v2'
+import { TagesproduktionChart, LagerbestandChart, BacklogChart } from '@/components/ui/table-charts'
 import { 
   aggregiereNachWoche, 
   aggregiereNachMonat
@@ -217,16 +216,31 @@ export default function ProduktionPage() {
     // Erstelle aggregierte Tagesansicht aus korrigierten Varianten-Plänen
     const tagesAggregiert: TagesProduktionEntry[] = []
     
-    // Hole Warehouse-Backlog-Daten für Visualisierung
+    // Hole Warehouse-Daten für exakte Produktions-Zahlen (SSOT!)
     const jahr2027Tage = warehouseResult.tage.filter(t => t.tag >= 1 && t.tag <= 365)
+    
+    // ✅ NEU: Erstelle Lookup für Warehouse-Verbrauch pro Tag
+    // Dies ist die EINZIGE Quelle der Wahrheit für tatsächliche Produktion
+    const warehouseVerbrauchProTag: Record<number, number> = {}
     const backlogProTag: Record<number, number> = {}
+    const hatEngpassProTag: Record<number, boolean> = {}
     
     jahr2027Tage.forEach(warehouseTag => {
+      let tagesVerbrauch = 0
       let tagesBacklog = 0
+      let hatEngpass = false
+      
       warehouseTag.bauteile.forEach(bauteil => {
+        tagesVerbrauch += bauteil.verbrauch
         tagesBacklog += bauteil.produktionsBacklog.backlogNachher
+        if (!bauteil.atpCheck.erfuellt) {
+          hatEngpass = true
+        }
       })
+      
+      warehouseVerbrauchProTag[warehouseTag.tag] = tagesVerbrauch
       backlogProTag[warehouseTag.tag] = tagesBacklog
+      hatEngpassProTag[warehouseTag.tag] = hatEngpass
     })
     
     // Kapazitätsberechnung: 130 Bikes/h * 8h = 1040 Bikes pro Schicht
@@ -242,19 +256,20 @@ export default function ProduktionPage() {
       
       const templateTag = ersterPlan.tage[tag - 1]
       
-      // Aggregiere Plan und Ist über alle Varianten
+      // Aggregiere Plan über alle Varianten (Plan ist immer korrekt, aus OEM mit Error Management)
       let gesamtPlan = 0
-      let gesamtIst = 0
-      let hatMaterialEngpass = false
-      
       Object.values(korrigiertePlaene).forEach(plan => {
         const variantenTag = plan.tage[tag - 1]
         gesamtPlan += variantenTag.planMenge
-        gesamtIst += variantenTag.istMenge
-        if (!variantenTag.materialVerfuegbar) {
-          hatMaterialEngpass = true
-        }
       })
+      
+      // ✅ KRITISCHER FIX: Nutze Warehouse-Verbrauch DIREKT als IST-Menge!
+      // Dies vermeidet Rundungsfehler bei der proportionalen Verteilung auf Varianten.
+      // Da 1 Sattel = 1 Bike, entspricht der Verbrauch exakt der Produktion.
+      const gesamtIst = warehouseVerbrauchProTag[tag] || 0
+      
+      // Material-Engpass aus Warehouse
+      const hatMaterialEngpass = hatEngpassProTag[tag] || false
       
       // ✅ FIX: Berechne Schichten basierend auf tatsächlicher IST-Menge + Backlog
       // Bei Backlog benötigen wir mehr Schichten um aufzuholen
@@ -504,10 +519,13 @@ export default function ProduktionPage() {
   const warehouseStats = warehouseResult.jahresstatistik
   
   // Berechne Produktionsstatistiken dynamisch (szenario-aware)
-  // Nutze warehouseResult für echte Produktionszahlen (mit Material-Check)
+  // ✅ KRITISCHER FIX: Nutze tagesProduktionFormatiert als EINZIGE Quelle für IST-Produktion!
+  // Dadurch zeigt die Statistik-Kachel denselben Wert wie die Tabellen-Summe
   const produktionsStats = useMemo(() => {
-    // ✅ KORREKT: Nutze tatsächliche Produktion aus Warehouse (mit ATP-Check!)
-    const summeIstProduktion = warehouseResult.jahresstatistik.gesamtProduziertTatsaechlich
+    // ✅ FIX: Berechne IST-Summe aus tagesProduktionFormatiert (=korrigierte Pläne, gleiche Datenquelle wie Tabelle!)
+    // Vorher wurde warehouseResult.jahresstatistik.gesamtProduziertTatsaechlich verwendet,
+    // aber das enthielt Double-Counting durch redundanten Backlog-Abbau in Step 3e.
+    const summeIstProduktion = tagesProduktionFormatiert.reduce((sum, tag) => sum + tag.istMenge, 0)
     const geplantMenge = konfiguration.jahresproduktion // 370.000 Bikes
     
     // Materialengpass-Tage aus Warehouse (dort ist es korrekt berechnet)
@@ -543,7 +561,7 @@ export default function ProduktionPage() {
       planerfuellungsgrad: planerfuellungProzent,
       mitMaterialmangel: tageOhneMaterial
     }
-  }, [tagesProduktion, hasSzenarien, statistiken, warehouseResult, konfiguration.jahresproduktion])
+  }, [tagesProduktion, hasSzenarien, statistiken, warehouseResult, konfiguration.jahresproduktion, tagesProduktionFormatiert])
   
   // ✅ Aggregierte Lagerbestandsdaten für Chart (außerhalb JSX)
   const lagerbestandChartDaten = useMemo(() => {
@@ -570,66 +588,6 @@ export default function ProduktionPage() {
       status: 'ok' as const
     }))
   }, [tagesLagerbestaende])
-  
-  // ✅ NEU: Fertigerzeugnisse-Daten (kumulative Bike-Produktion)
-  // Zeigt wie viele Bikes bereits produziert wurden (kumulativ)
-  // Muss am Jahresende exakt 370.000 erreichen!
-  // ✅ KORRIGIERT: Nutze ECHTE Varianten-Produktionspläne mit korrigierten IST-Werten
-  const fertigerzeugnisseDaten = useMemo(() => {
-    // Initialisiere kumulative Werte
-    let kumulativIstGesamt = 0
-    let kumulativPlanGesamt = 0
-    
-    // Kumulative Werte pro Variante (aus korrigierten Produktionsplänen)
-    const variantenKumulativ: Record<string, { plan: number, ist: number }> = {}
-    konfiguration.varianten.forEach(v => {
-      variantenKumulativ[v.id] = { plan: 0, ist: 0 }
-    })
-    
-    const result = tagesProduktionFormatiert.map((tag, tagIndex) => {
-      // Gesamt-Kumulativ (über alle Varianten aggregiert)
-      kumulativPlanGesamt += tag.planMenge
-      kumulativIstGesamt += tag.istMenge
-      
-      // ✅ KORREKT: Pro Variante aus korrigierten Produktionsplänen
-      // Nutze korrigiertePlaene für echte IST-Werte (nach Material-Check)
-      Object.entries(korrigiertePlaene).forEach(([varianteId, plan]) => {
-        if (tagIndex < plan.tage.length) {
-          const varianteTag = plan.tage[tagIndex]
-          // Addiere zu kumulativen Werten dieser Variante
-          variantenKumulativ[varianteId].plan += varianteTag.planMenge
-          variantenKumulativ[varianteId].ist += varianteTag.istMenge
-        }
-      })
-      
-      return {
-        tag: tag.tag,
-        datum: tag.datum,
-        kumulativIst: kumulativIstGesamt,
-        kumulativPlan: kumulativPlanGesamt,
-        monat: tag.monat,
-        // ✅ NEU: Echte Pro-Variante Werte (mit korrigierten IST-Werten!)
-        varianten: Object.entries(variantenKumulativ).reduce((acc, [id, values]) => {
-          acc[id] = { plan: values.plan, ist: values.ist }
-          return acc
-        }, {} as Record<string, { plan: number, ist: number }>)
-      }
-    })
-    
-    // ✅ DEBUG: Log Fertigerzeugnisse-Daten nur in Development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`📊 Fertigerzeugnisse-Daten generiert:`)
-      console.log(`   Anzahl Tage: ${result.length}`)
-      console.log(`   Erster Tag (Tag 1):`, result[0])
-      console.log(`   Erster Tag Varianten:`, result[0]?.varianten)
-      console.log(`   Tag 7 Varianten:`, result[6]?.varianten)
-      console.log(`   Letzter Tag (Tag 365):`, result[result.length - 1])
-      console.log(`   Kumulative IST am Jahresende: ${result[result.length - 1]?.kumulativIst.toLocaleString('de-DE')} Bikes`)
-      console.log(`   Kumulative PLAN am Jahresende: ${result[result.length - 1]?.kumulativPlan.toLocaleString('de-DE')} Bikes`)
-    }
-    
-    return result
-  }, [tagesProduktionFormatiert, konfiguration.varianten, korrigiertePlaene])
   
   // Warte bis Konfiguration geladen ist (nach allen Hooks!)
   if (!isInitialized) {
@@ -1954,15 +1912,6 @@ export default function ProduktionPage() {
                 daten={lagerbestandChartDaten}
                 aggregation="woche"
                 height={300}
-              />
-            </div>
-            
-            {/* ✅ FERTIGERZEUGNISSE-CHART V2 - Working Version */}
-            <div className="mt-6">
-              <FertigerzeugnisseChartV2
-                daten={fertigerzeugnisseDaten}
-                varianten={konfiguration.varianten}
-                jahresproduktion={konfiguration.jahresproduktion}
               />
             </div>
             
