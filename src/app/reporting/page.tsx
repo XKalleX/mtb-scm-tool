@@ -113,13 +113,30 @@ const CHART_COLORS = {
 export default function ReportingPage() {
   const { konfiguration } = useKonfiguration()
   
-  // State für "Aktuelles Datum beachten" Checkbox
-  const [beachteAktuellesDatum, setBeachteAktuellesDatum] = useState(true)
+  // ✅ FIX: State für "Diagramme: Gesamtjahr anzeigen" Checkbox
+  // Default: false (zeigt nur bis heute, realistische Trends)
+  // Persistenz: localStorage für Tab-übergreifende Speicherung
+  const [beachteAktuellesDatum, setBeachteAktuellesDatum] = useState(() => {
+    // Lade gespeicherten Wert aus localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('scor-reporting-zeige-gesamtjahr')
+      return saved === 'true' // Default: false wenn nichts gespeichert
+    }
+    return false
+  })
+
+  // ✅ Speichere State-Änderungen in localStorage
+  const handleCheckboxChange = (checked: boolean) => {
+    setBeachteAktuellesDatum(checked)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('scor-reporting-zeige-gesamtjahr', String(checked))
+    }
+  }
 
   // Berechne SCOR-Metriken (mit Memoization für Performance)
   const { metriken, zeitreihen } = useMemo(() => {
     console.log('🎯 Berechne SCOR-Metriken für Reporting...')
-    console.log(`   Aktuelles Datum beachten: ${beachteAktuellesDatum}`)
+    console.log(`   Diagramme: ${beachteAktuellesDatum ? 'Nur bis heute' : 'Gesamtjahr'} anzeigen`)
     return berechneSCORMetrikenReal(konfiguration, beachteAktuellesDatum)
   }, [konfiguration, beachteAktuellesDatum])
 
@@ -133,18 +150,18 @@ export default function ReportingPage() {
             Supply Chain Operations Reference Model - 6 Kernmetriken aus 4 Kategorien
           </p>
           
-          {/* Checkbox: Aktuelles Datum beachten */}
+          {/* ✅ FIX: Checkbox für Diagramm-Darstellung (beeinflusst NICHT die KPI-Werte!) */}
           <div className="flex items-center space-x-2">
             <Checkbox 
               id="beachte-heute"
               checked={beachteAktuellesDatum}
-              onCheckedChange={(checked) => setBeachteAktuellesDatum(checked as boolean)}
+              onCheckedChange={handleCheckboxChange}
             />
             <Label 
               htmlFor="beachte-heute" 
               className="text-sm font-medium cursor-pointer"
             >
-              Aktuelles Datum beachten ({konfiguration.heuteDatum ? new Date(konfiguration.heuteDatum).toLocaleDateString('de-DE') : '2027-04-15'})
+              📊 Diagramme: Nur bis heute ({konfiguration.heuteDatum ? new Date(konfiguration.heuteDatum).toLocaleDateString('de-DE') : '15.4.2027'})
             </Label>
           </div>
         </div>
