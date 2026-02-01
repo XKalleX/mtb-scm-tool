@@ -186,7 +186,6 @@ function simuliereHafenUndSchiffsversand(
   
   let aktuelleDatum = new Date(startDatum)
   let ankunftsIndex = 0
-  let allOrdersProcessed = false // Track wenn alle Bestellungen am Hafen angekommen sind
   
   while (aktuelleDatum <= endDatum) {
     const datumStr = toLocalISODateString(aktuelleDatum)
@@ -210,12 +209,6 @@ function simuliereHafenUndSchiffsversand(
       }
     }
     
-    // Prüfe ob alle Bestellungen verarbeitet wurden
-    if (!allOrdersProcessed && ankunftsIndex >= hafenAnkunftsTimeline.length) {
-      allOrdersProcessed = true
-      console.log(`✅ Alle Bestellungen am Hafen eingetroffen am ${datumStr}`)
-    }
-    
     // Berechne aktuellen Gesamt-Lagerbestand
     const gesamtLagerbestand = Object.values(hafenLager).reduce((sum, m) => sum + m, 0)
     if (gesamtLagerbestand > maxLagerbestand) {
@@ -226,17 +219,10 @@ function simuliereHafenUndSchiffsversand(
     if (aktuelleDatum.getDay() === 3 && gesamtLagerbestand > 0) {
       // Es ist Mittwoch und es gibt Ware im Hafen
       
-      // ✅ KRITISCHER FIX: Wenn alle Bestellungen angekommen sind und Rest < Losgröße,
-      // dann schicke trotzdem das letzte Schiff mit dem Rest!
-      let ladungMenge: number
-      if (allOrdersProcessed && gesamtLagerbestand < losgroesse) {
-        // Letzte Lieferung: Nimm alles was noch da ist
-        ladungMenge = gesamtLagerbestand
-        console.log(`🚢 LETZTES SCHIFF: Nimmt ${ladungMenge} Sättel (< Losgröße ${losgroesse}) am ${datumStr}`)
-      } else {
-        // Normale Lieferung: Nur volle Losgrößen
-        ladungMenge = Math.floor(gesamtLagerbestand / losgroesse) * losgroesse
-      }
+      // ✅ WICHTIG: Losgröße MUSS immer beachtet werden!
+      // Nur volle Losgrößen (500er-Bündel) können verschifft werden
+      // Rest bleibt am Hafen liegen (Teil der Aufgabenstellung)
+      const ladungMenge = Math.floor(gesamtLagerbestand / losgroesse) * losgroesse
       
       if (ladungMenge > 0) {
         anzahlSchiffe++
