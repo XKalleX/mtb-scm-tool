@@ -400,7 +400,7 @@ export function berechneSCORMetrikenReal(
     zielwert: sollVorlaufzeit, // ✅ DYNAMISCH aus KonfigurationContext
     status: durchlaufzeit_wert <= sollVorlaufzeit + 2 ? 'gut' as const :
             durchlaufzeit_wert <= sollVorlaufzeit + 7 ? 'mittel' as const : 'schlecht' as const,
-    trend: berechneTrend(durchlaufzeitDetails.monatlich)
+    trend: berechneTrend(durchlaufzeitDetails.woechentlich)
   }
   
   // ═══════════════════════════════════════════════════════════════════════════
