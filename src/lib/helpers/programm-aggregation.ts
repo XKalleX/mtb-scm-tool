@@ -87,6 +87,16 @@ export function aggregiereNachWoche(
     const endDatum = tage[tage.length - 1].datum
     const jahr = tage[0].datum.getFullYear()
     
+    // FILTER: Überspringe KW 53 wenn sie nur die ersten Tage im Januar enthält
+    // (ISO 8601 weist Jan 1-3 manchmal der KW 53 des Vorjahres zu)
+    // Da wir nur 2027 planen, ist diese "KW 53" verwirrend und sollte als KW 1 behandelt werden
+    if (kw === 53 && startDatum.getMonth() === 0 && startDatum.getDate() <= 3) {
+      // Diese Tage gehören eigentlich zu KW 1 des Planungsjahres
+      // Sie wurden bereits bei der Berechnung in die Jahressumme einbezogen
+      // und werden in der Tagesansicht korrekt dargestellt
+      return
+    }
+    
     const anzahlTage = tage.length
     const anzahlArbeitstage = tage.filter(t => t.istArbeitstag).length
     
