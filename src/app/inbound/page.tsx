@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Ship, Package, Download, Calendar, CalendarDays, CalendarRange, Zap, Plus, Info } from 'lucide-react'
 import { CollapsibleInfo, CollapsibleInfoGroup, type InfoItem } from '@/components/ui/collapsible-info'
-import { formatNumber, addDays, toLocalISODateString } from '@/lib/utils'
+import { formatNumber, addDays, toLocalISODateString, formatDate } from '@/lib/utils'
 import { exportToJSON, exportToCSV, exportToXLSX, exportToMultiSheetXLSX } from '@/lib/export'
 import ExcelTable from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
@@ -653,11 +653,15 @@ export default function InboundPage() {
       'Verfügbar ab': row.verfuegbarAb || '',
       'Status': row.status,
       'Tagesbedarf': row.tagesBedarf,
-      'Akkumulierter Backlog': row.akkumulierterBacklog,
+      // ❌ ENTFERNT: 'Akkumulierter Backlog': row.akkumulierterBacklog,
       'Bestellungs-IDs': row.bestellungsIds || ''
     }))
     
-    exportToCSV(data, `inbound_bestellungen_${konfiguration.planungsjahr}_vollstaendig`)
+    exportToCSV(
+      data, 
+      `inbound_bestellungen_${konfiguration.planungsjahr}_vollstaendig`,
+      { cleanEmojis: true } // Bereinige Emojis für bessere CSV-Kompatibilität
+    )
   }
   
   /**
@@ -689,8 +693,8 @@ export default function InboundPage() {
         'Ankunft Hafen Hamburg': row.ankunftHafenDE || '',
         'Verfügbar ab OEM': row.verfuegbarAb || '',
         'Status': row.status,
-        'Tagesbedarf': row.tagesBedarf,
-        'Backlog': row.akkumulierterBacklog
+        'Tagesbedarf': row.tagesBedarf
+        // ❌ ENTFERNT: 'Backlog': row.akkumulierterBacklog
       }))
       
       await exportToXLSX(
@@ -779,6 +783,187 @@ export default function InboundPage() {
       )
     } catch (error) {
       console.error('Fehler beim Multi-Sheet Export:', error)
+    }
+  }
+  
+  /**
+   * ✅ NEU: Exportiert Versand & Hafen Logistik als CSV
+   * Zeigt Bündelung am Hafen, Mittwoch-Abfahrten, Wartezeiten
+   */
+  const handleExportHafenlogistikCSV = () => {
+    if (!taeglicheBestellungen || taeglicheBestellungen.length === 0) {
+      console.warn('Keine Hafenlogistik-Daten zum Exportieren')
+      return
+    }
+    
+    // Bereite Hafenlogistik-Daten auf (wie in der Tabelle)
+    const LOSGROESSE = lieferant.losgroesse
+    const sorted = taeglicheBestellungen
+      .filter(b => Object.values(b.komponenten).reduce((sum, m) => sum + m, 0) > 0)
+      .sort((a, b) => {
+        const dA = a.schiffAbfahrtMittwoch instanceof Date ? a.schiffAbfahrtMittwoch : new Date(a.schiffAbfahrtMittwoch || a.bestelldatum)
+        const dB = b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch : new Date(b.schiffAbfahrtMittwoch || b.bestelldatum)
+        return dA.getTime() - dB.getTime()
+      })
+    
+    const bundleMap = new Map<string, number>()
+    let bundleNr = 1
+    let akkumuliertAmHafen = 0
+    let restVonVorherigemBundle = 0
+    
+    const data: any[] = []
+    
+    sorted.forEach((b, idx) => {
+      const menge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
+      const key = b.schiffAbfahrtMittwoch ? (b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch.toISOString() : new Date(b.schiffAbfahrtMittwoch).toISOString()) : 'none'
+      
+      if (!bundleMap.has(key)) {
+        bundleMap.set(key, bundleNr++)
+        akkumuliertAmHafen = restVonVorherigemBundle
+        restVonVorherigemBundle = 0
+      }
+      const bid = bundleMap.get(key)
+      
+      akkumuliertAmHafen += menge
+      
+      const next = sorted[idx + 1]
+      const nextKey = next?.schiffAbfahrtMittwoch ? (next.schiffAbfahrtMittwoch instanceof Date ? next.schiffAbfahrtMittwoch.toISOString() : new Date(next.schiffAbfahrtMittwoch).toISOString()) : 'x'
+      const isLast = key !== nextKey
+      
+      if (isLast) {
+        const verschifft = Math.floor(akkumuliertAmHafen / LOSGROESSE) * LOSGROESSE
+        const amHafen = akkumuliertAmHafen - verschifft
+        restVonVorherigemBundle = amHafen
+        
+        data.push({
+          'Bundle': `#${bid}`,
+          'Bestellungs-ID': b.id,
+          'Bestelldatum': b.bestelldatum instanceof Date ? formatDate(b.bestelldatum) : b.bestelldatum,
+          'Hafen CN Ankunft': b.materialfluss?.ankunftHafenShanghai instanceof Date ? formatDate(b.materialfluss.ankunftHafenShanghai) : b.materialfluss?.ankunftHafenShanghai || '',
+          'Menge': menge,
+          'Schiff Abfahrt': b.schiffAbfahrtMittwoch instanceof Date ? formatDate(b.schiffAbfahrtMittwoch) : '',
+          'Wartetage': b.wartetageAmHafen || 0,
+          'Ankunft Hamburg': b.materialfluss?.schiffAnkunftHamburg instanceof Date ? formatDate(b.materialfluss.schiffAnkunftHamburg) : '',
+          'Verfügbar ab': b.verfuegbarAb instanceof Date ? formatDate(b.verfuegbarAb) : '',
+          'Verschifft': verschifft,
+          'Am Hafen verbleibend': amHafen
+        })
+      } else {
+        data.push({
+          'Bundle': `#${bid}`,
+          'Bestellungs-ID': b.id,
+          'Bestelldatum': b.bestelldatum instanceof Date ? formatDate(b.bestelldatum) : b.bestelldatum,
+          'Hafen CN Ankunft': b.materialfluss?.ankunftHafenShanghai instanceof Date ? formatDate(b.materialfluss.ankunftHafenShanghai) : b.materialfluss?.ankunftHafenShanghai || '',
+          'Menge': menge,
+          'Schiff Abfahrt': '',
+          'Wartetage': b.wartetageAmHafen || 0,
+          'Ankunft Hamburg': '',
+          'Verfügbar ab': '',
+          'Verschifft': 0,
+          'Am Hafen akkumuliert': akkumuliertAmHafen
+        })
+      }
+    })
+    
+    exportToCSV(
+      data,
+      `inbound_hafenlogistik_${konfiguration.planungsjahr}_vollstaendig`,
+      { cleanEmojis: true }
+    )
+  }
+  
+  /**
+   * ✅ NEU: Exportiert Versand & Hafen Logistik als XLSX
+   */
+  const handleExportHafenlogistikXLSX = async () => {
+    if (!taeglicheBestellungen || taeglicheBestellungen.length === 0) {
+      console.warn('Keine Hafenlogistik-Daten zum Exportieren')
+      return
+    }
+    
+    try {
+      // Bereite Hafenlogistik-Daten auf (wie im CSV-Export)
+      const LOSGROESSE = lieferant.losgroesse
+      const sorted = taeglicheBestellungen
+        .filter(b => Object.values(b.komponenten).reduce((sum, m) => sum + m, 0) > 0)
+        .sort((a, b) => {
+          const dA = a.schiffAbfahrtMittwoch instanceof Date ? a.schiffAbfahrtMittwoch : new Date(a.schiffAbfahrtMittwoch || a.bestelldatum)
+          const dB = b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch : new Date(b.schiffAbfahrtMittwoch || b.bestelldatum)
+          return dA.getTime() - dB.getTime()
+        })
+      
+      const bundleMap = new Map<string, number>()
+      let bundleNr = 1
+      let akkumuliertAmHafen = 0
+      let restVonVorherigemBundle = 0
+      
+      const data: any[] = []
+      
+      sorted.forEach((b, idx) => {
+        const menge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
+        const key = b.schiffAbfahrtMittwoch ? (b.schiffAbfahrtMittwoch instanceof Date ? b.schiffAbfahrtMittwoch.toISOString() : new Date(b.schiffAbfahrtMittwoch).toISOString()) : 'none'
+        
+        if (!bundleMap.has(key)) {
+          bundleMap.set(key, bundleNr++)
+          akkumuliertAmHafen = restVonVorherigemBundle
+          restVonVorherigemBundle = 0
+        }
+        const bid = bundleMap.get(key)
+        
+        akkumuliertAmHafen += menge
+        
+        const next = sorted[idx + 1]
+        const nextKey = next?.schiffAbfahrtMittwoch ? (next.schiffAbfahrtMittwoch instanceof Date ? next.schiffAbfahrtMittwoch.toISOString() : new Date(next.schiffAbfahrtMittwoch).toISOString()) : 'x'
+        const isLast = key !== nextKey
+        
+        if (isLast) {
+          const verschifft = Math.floor(akkumuliertAmHafen / LOSGROESSE) * LOSGROESSE
+          const amHafen = akkumuliertAmHafen - verschifft
+          restVonVorherigemBundle = amHafen
+          
+          data.push({
+            'Bundle': `#${bid}`,
+            'Bestellungs-ID': b.id,
+            'Bestelldatum': b.bestelldatum instanceof Date ? formatDate(b.bestelldatum) : b.bestelldatum,
+            'Hafen CN Ankunft': b.materialfluss?.ankunftHafenShanghai instanceof Date ? formatDate(b.materialfluss.ankunftHafenShanghai) : b.materialfluss?.ankunftHafenShanghai || '',
+            'Menge': menge,
+            'Schiff Abfahrt': b.schiffAbfahrtMittwoch instanceof Date ? formatDate(b.schiffAbfahrtMittwoch) : '',
+            'Wartetage': b.wartetageAmHafen || 0,
+            'Ankunft Hamburg': b.materialfluss?.schiffAnkunftHamburg instanceof Date ? formatDate(b.materialfluss.schiffAnkunftHamburg) : '',
+            'Verfügbar ab': b.verfuegbarAb instanceof Date ? formatDate(b.verfuegbarAb) : '',
+            'Verschifft': verschifft,
+            'Am Hafen verbleibend': amHafen
+          })
+        } else {
+          data.push({
+            'Bundle': `#${bid}`,
+            'Bestellungs-ID': b.id,
+            'Bestelldatum': b.bestelldatum instanceof Date ? formatDate(b.bestelldatum) : b.bestelldatum,
+            'Hafen CN Ankunft': b.materialfluss?.ankunftHafenShanghai instanceof Date ? formatDate(b.materialfluss.ankunftHafenShanghai) : b.materialfluss?.ankunftHafenShanghai || '',
+            'Menge': menge,
+            'Schiff Abfahrt': '',
+            'Wartetage': b.wartetageAmHafen || 0,
+            'Ankunft Hamburg': '',
+            'Verfügbar ab': '',
+            'Verschifft': 0,
+            'Am Hafen akkumuliert': akkumuliertAmHafen
+          })
+        }
+      })
+      
+      await exportToXLSX(
+        data,
+        `inbound_hafenlogistik_${konfiguration.planungsjahr}_vollstaendig`,
+        {
+          sheetName: 'Hafenlogistik',
+          title: `Versand & Hafen Logistik ${konfiguration.planungsjahr}`,
+          author: 'MTB SCM Tool - WI3 Team',
+          freezeHeader: true,
+          autoFilter: true
+        }
+      )
+    } catch (error) {
+      console.error('Fehler beim Hafenlogistik XLSX-Export:', error)
     }
   }
   
@@ -1236,10 +1421,23 @@ export default function InboundPage() {
 
             {/* ✅ VERSAND & HAFEN LOGISTIK SEKTION */}
             <div className="mt-8 bg-blue-50 rounded-lg p-4 border border-blue-100">
-              <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                <Ship className="h-5 w-5 text-blue-600" />
-                Versand & Hafen Logistik
-              </h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Ship className="h-5 w-5 text-blue-600" />
+                  Versand & Hafen Logistik
+                </h3>
+                {/* ✅ NEU: Export-Buttons für Hafenlogistik */}
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleExportHafenlogistikCSV}>
+                    <Download className="h-4 w-4 mr-1" />
+                    CSV
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExportHafenlogistikXLSX}>
+                    <Download className="h-4 w-4 mr-1" />
+                    XLSX
+                  </Button>
+                </div>
+              </div>
               <p className="text-sm text-muted-foreground mb-4">
                 Übersicht der Verschiffungen: Losgrößen-Bündelung am Hafen Shanghai, Schiff nur mittwochs, Lieferverlauf nach Dortmund
               </p>

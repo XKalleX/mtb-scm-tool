@@ -26,7 +26,7 @@ import { VariantenPieChart, TagesproduktionChart, KomponentenBarChart, AlleVaria
 import { TrendingUp, AlertCircle, Download, Zap, Info, Calendar, CalendarDays, CalendarRange, Edit2, Check, X } from 'lucide-react'
 import { formatNumber, formatDate, toLocalISODateString } from '@/lib/utils'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
-import { exportToCSV, exportToJSON, exportToXLSX } from '@/lib/export'
+import { exportToCSV, exportToJSON, exportToXLSX, exportToMultiSheetXLSX } from '@/lib/export'
 import { showError, showSuccess } from '@/lib/notifications'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
@@ -132,34 +132,54 @@ export default function OEMProgrammPage() {
    * ✅ VOLLSTÄNDIGER EXPORT: ALLE 365 Tage (nicht nur Tage mit Produktion > 0)
    * ✅ ZUSÄTZLICHE SPALTEN: Wochentag, Feiertag-Info für bessere Analyse
    */
+  /**
+   * Exportiert Produktionsplan als CSV
+   * ✅ ALLE VARIANTEN: Exportiert alle 8 MTB-Varianten in einer Datei
+   * ✅ VOLLSTÄNDIGER EXPORT: ALLE 365 Tage
+   * ✅ ZUSÄTZLICHE SPALTEN: Wochentag, Feiertag-Info für bessere Analyse
+   */
   const handleExportCSV = () => {
-    const plan = produktionsplaene[selectedVariante]
-    if (!plan) {
+    if (!produktionsplaene || Object.keys(produktionsplaene).length === 0) {
       showError('Keine Daten zum Exportieren verfügbar')
       return
     }
     
-    // ✅ KEIN FILTER! Exportiere ALLE 365 Tage für maximalen Datenumfang
-    const data = plan.tage.map(tag => {
-      const datum = tag.datum
-      const wochentag = datum.toLocaleDateString('de-DE', { weekday: 'long' })
-      const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
+    // ✅ FIX: Exportiere ALLE Varianten, nicht nur selectedVariante
+    const alleVariantenData: any[] = []
+    
+    // Iteriere über alle Varianten
+    Object.entries(produktionsplaene).forEach(([varianteId, plan]) => {
+      const varianteName = plan.varianteName || varianteId
       
-      return {
-        Datum: formatDate(tag.datum),
-        Wochentag: wochentag,
-        'Ist Wochenende': istWochenende ? 'Ja' : 'Nein',
-        'Plan-Menge': tag.planMenge,
-        'Ist-Menge': tag.istMenge,
-        'Abweichung': tag.abweichung,
-        'Schichten': tag.schichten,
-        'Auslastung': tag.auslastung + '%',
-        'Fehler (kumulativ)': tag.monatsFehlerNachher?.toFixed(3) || '0.000'
-      }
+      // Füge alle 365 Tage dieser Variante hinzu
+      plan.tage.forEach(tag => {
+        const datum = tag.datum
+        const wochentag = datum.toLocaleDateString('de-DE', { weekday: 'long' })
+        const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
+        
+        alleVariantenData.push({
+          'MTB-Variante': varianteName,
+          'Varianten-ID': varianteId,
+          Datum: formatDate(tag.datum),
+          Wochentag: wochentag,
+          'Ist Wochenende': istWochenende ? 'Ja' : 'Nein',
+          'Plan-Menge': tag.planMenge,
+          'Ist-Menge': tag.istMenge,
+          'Abweichung': tag.abweichung,
+          'Schichten': tag.schichten,
+          'Auslastung': tag.auslastung + '%',
+          'Fehler (kumulativ)': tag.monatsFehlerNachher?.toFixed(3) || '0.000'
+        })
+      })
     })
     
-    exportToCSV(data, `produktionsplan_${selectedVariante}_${konfiguration.planungsjahr}_vollstaendig`)
-    showSuccess(`✅ Produktionsplan exportiert (${data.length} Tage - Vollständig!)`)
+    const variantenCount = Object.keys(produktionsplaene).length
+    exportToCSV(
+      alleVariantenData, 
+      `produktionsplan_alle_varianten_${konfiguration.planungsjahr}_vollstaendig`,
+      { cleanEmojis: true } // Entferne Emojis für bessere CSV-Kompatibilität
+    )
+    showSuccess(`✅ Produktionsplan exportiert (${variantenCount} Varianten × 365 Tage = ${alleVariantenData.length} Zeilen!)`)
   }
   
   /**
@@ -177,45 +197,44 @@ export default function OEMProgrammPage() {
   
   /**
    * Exportiert Produktionsplan als XLSX (Excel-Format mit Formatierung)
-   * ✅ VOLLSTÄNDIGER EXPORT: ALLE 365 Tage
+   * ✅ ALLE VARIANTEN: Multi-Sheet Export mit einem Sheet pro Variante
+   * ✅ VOLLSTÄNDIGER EXPORT: ALLE 365 Tage pro Variante
    * ✅ FORMATIERUNG: Header, Freeze Panes, Auto-Filter
    */
   const handleExportXLSX = async () => {
-    const plan = produktionsplaene[selectedVariante]
-    if (!plan) {
+    if (!produktionsplaene || Object.keys(produktionsplaene).length === 0) {
       showError('Keine Daten zum Exportieren verfügbar')
       return
     }
     
     try {
-      // ✅ KEIN FILTER! Exportiere ALLE 365 Tage
-      const data = plan.tage.map(tag => {
-        const datum = tag.datum
-        const wochentag = datum.toLocaleDateString('de-DE', { weekday: 'long' })
-        const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
+      // ✅ FIX: Erstelle Multi-Sheet XLSX mit allen Varianten
+      const sheets = Object.entries(produktionsplaene).map(([varianteId, plan]) => {
+        const varianteName = plan.varianteName || varianteId
+        
+        // Exportiere alle 365 Tage dieser Variante
+        const data = plan.tage.map(tag => {
+          const datum = tag.datum
+          const wochentag = datum.toLocaleDateString('de-DE', { weekday: 'long' })
+          const istWochenende = datum.getDay() === 0 || datum.getDay() === 6
+          
+          return {
+            Datum: formatDate(tag.datum),
+            Wochentag: wochentag,
+            'Ist Wochenende': istWochenende ? 'Ja' : 'Nein',
+            'Plan-Menge': tag.planMenge,
+            'Ist-Menge': tag.istMenge,
+            'Abweichung': tag.abweichung,
+            'Schichten': tag.schichten,
+            'Auslastung (%)': tag.auslastung,
+            'Fehler (kumulativ)': parseFloat(tag.monatsFehlerNachher?.toFixed(3) || '0')
+          }
+        })
         
         return {
-          Datum: formatDate(tag.datum),
-          Wochentag: wochentag,
-          'Ist Wochenende': istWochenende ? 'Ja' : 'Nein',
-          'Plan-Menge': tag.planMenge,
-          'Ist-Menge': tag.istMenge,
-          'Abweichung': tag.abweichung,
-          'Schichten': tag.schichten,
-          'Auslastung (%)': tag.auslastung,
-          'Fehler (kumulativ)': parseFloat(tag.monatsFehlerNachher?.toFixed(3) || '0')
-        }
-      })
-      
-      await exportToXLSX(
-        data, 
-        `produktionsplan_${selectedVariante}_${konfiguration.planungsjahr}_vollstaendig`,
-        {
-          sheetName: `${selectedVariante} ${konfiguration.planungsjahr}`,
-          title: `Produktionsplan ${selectedVariante} - ${konfiguration.planungsjahr}`,
-          author: 'MTB SCM Tool - WI3 Team',
-          freezeHeader: true,
-          autoFilter: true,
+          name: varianteName.substring(0, 31), // Excel Limit: 31 Zeichen
+          data: data,
+          title: `Produktionsplan ${varianteName} - ${konfiguration.planungsjahr}`,
           columnWidths: {
             'Datum': 12,
             'Wochentag': 12,
@@ -228,9 +247,20 @@ export default function OEMProgrammPage() {
             'Fehler (kumulativ)': 18
           }
         }
+      })
+      
+      await exportToMultiSheetXLSX(
+        sheets,
+        `produktionsplan_alle_varianten_${konfiguration.planungsjahr}_vollstaendig`,
+        {
+          author: 'MTB SCM Tool - WI3 Team',
+          freezeHeader: true,
+          autoFilter: true
+        }
       )
       
-      showSuccess(`✅ Excel-Datei exportiert (${data.length} Tage - Vollständig!)`)
+      const totalRows = sheets.reduce((sum, s) => sum + s.data.length, 0)
+      showSuccess(`✅ Excel-Datei exportiert (${sheets.length} Sheets, ${totalRows} Zeilen gesamt - Vollständig!)`)
     } catch (error) {
       console.error('Fehler beim XLSX-Export:', error)
       showError('Fehler beim Excel-Export')

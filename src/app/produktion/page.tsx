@@ -20,7 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Factory, AlertTriangle, TrendingUp, Package, Download, Zap, Info, Calendar, CalendarDays, CalendarRange } from 'lucide-react'
 import { CollapsibleInfo, CollapsibleInfoGroup, type InfoItem } from '@/components/ui/collapsible-info'
-import { formatNumber } from '@/lib/utils'
+import { formatNumber, formatDate } from '@/lib/utils'
 import { exportToCSV, exportToJSON, exportToXLSX, exportToMultiSheetXLSX } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
@@ -594,7 +594,7 @@ export default function ProduktionPage() {
    */
   const handleExportLager = () => {
     const data = konvertiereWarehouseZuExport(warehouseResult)
-    exportToCSV(data, 'warehouse_2027_integriert_vollstaendig')
+    exportToCSV(data, 'warehouse_2027_integriert_vollstaendig', { cleanEmojis: true })
   }
   
   /**
@@ -602,6 +602,142 @@ export default function ProduktionPage() {
    */
   const handleExportProduktion = () => {
     exportToJSON(produktionsStats, 'produktions_statistik_2027')
+  }
+  
+  /**
+   * ✅ NEU: Exportiert Produktionssteuerung als CSV
+   * Zeigt Plan/Ist-Mengen, Abweichungen, Schichten, Auslastung
+   */
+  const handleExportProduktionssteuerungCSV = () => {
+    if (!tagesProduktionFormatiert || tagesProduktionFormatiert.length === 0) {
+      console.warn('Keine Produktionsdaten zum Exportieren')
+      return
+    }
+    
+    // Wähle Daten basierend auf aktueller Zeitperiode
+    let data: any[] = []
+    
+    if (zeitperiodeProduktion === 'tag') {
+      data = tagesProduktionFormatiert.map(t => ({
+        'Datum': formatDate(t.datum),
+        'Wochentag': t.datum.toLocaleDateString('de-DE', { weekday: 'long' }),
+        'Arbeitstag': t.istArbeitstag ? 'Ja' : 'Nein',
+        'Plan-Menge': t.planMenge,
+        'Ist-Menge': t.istMenge,
+        'Abweichung': t.abweichung,
+        'Schichten': t.schichten,
+        'Auslastung (%)': t.auslastung,
+        'Material Verfügbar': t.materialVerfuegbar ? 'Ja' : 'Nein',
+        'Backlog': t.backlog || 0,
+        'Kumulativ Plan': t.kumulativPlan,
+        'Kumulativ Ist': t.kumulativIst
+      }))
+    } else if (zeitperiodeProduktion === 'woche') {
+      data = wochenProduktion.map(w => ({
+        'KW': w.kalenderwoche,
+        'Jahr': w.jahr,
+        'Start': formatDate(w.startDatum),
+        'Ende': formatDate(w.endDatum),
+        'Plan-Menge': w.planMenge,
+        'Ist-Menge': w.istMenge,
+        'Abweichung': w.istMenge - w.planMenge,
+        'Kumulativ Plan': w.kumulativPlan,
+        'Kumulativ Ist': w.kumulativIst
+      }))
+    } else {
+      data = monatsProduktion.map(m => ({
+        'Monat': m.monatName,
+        'Jahr': m.jahr,
+        'Plan-Menge': m.planMenge,
+        'Ist-Menge': m.istMenge,
+        'Abweichung': m.istMenge - m.planMenge,
+        'Arbeitstage': m.anzahlArbeitstage,
+        'Kumulativ Plan': m.kumulativPlan,
+        'Kumulativ Ist': m.kumulativIst
+      }))
+    }
+    
+    const periodeName = zeitperiodeProduktion === 'tag' ? 'Tagesansicht' : 
+                       zeitperiodeProduktion === 'woche' ? 'Wochenansicht' : 'Monatsansicht'
+    
+    exportToCSV(
+      data,
+      `produktionssteuerung_${periodeName}_${konfiguration.planungsjahr}_vollstaendig`,
+      { cleanEmojis: true }
+    )
+  }
+  
+  /**
+   * ✅ NEU: Exportiert Produktionssteuerung als XLSX
+   */
+  const handleExportProduktionssteuerungXLSX = async () => {
+    if (!tagesProduktionFormatiert || tagesProduktionFormatiert.length === 0) {
+      console.warn('Keine Produktionsdaten zum Exportieren')
+      return
+    }
+    
+    try {
+      // Wähle Daten basierend auf aktueller Zeitperiode
+      let data: any[] = []
+      let sheetName = ''
+      
+      if (zeitperiodeProduktion === 'tag') {
+        sheetName = 'Tagesansicht'
+        data = tagesProduktionFormatiert.map(t => ({
+          'Datum': formatDate(t.datum),
+          'Wochentag': t.datum.toLocaleDateString('de-DE', { weekday: 'long' }),
+          'Arbeitstag': t.istArbeitstag ? 'Ja' : 'Nein',
+          'Plan-Menge': t.planMenge,
+          'Ist-Menge': t.istMenge,
+          'Abweichung': t.abweichung,
+          'Schichten': t.schichten,
+          'Auslastung (%)': t.auslastung,
+          'Material Verfügbar': t.materialVerfuegbar ? 'Ja' : 'Nein',
+          'Backlog': t.backlog || 0,
+          'Kumulativ Plan': t.kumulativPlan,
+          'Kumulativ Ist': t.kumulativIst
+        }))
+      } else if (zeitperiodeProduktion === 'woche') {
+        sheetName = 'Wochenansicht'
+        data = wochenProduktion.map(w => ({
+          'KW': w.kalenderwoche,
+          'Jahr': w.jahr,
+          'Start': formatDate(w.startDatum),
+          'Ende': formatDate(w.endDatum),
+          'Plan-Menge': w.planMenge,
+          'Ist-Menge': w.istMenge,
+          'Abweichung': w.istMenge - w.planMenge,
+          'Kumulativ Plan': w.kumulativPlan,
+          'Kumulativ Ist': w.kumulativIst
+        }))
+      } else {
+        sheetName = 'Monatsansicht'
+        data = monatsProduktion.map(m => ({
+          'Monat': m.monatName,
+          'Jahr': m.jahr,
+          'Plan-Menge': m.planMenge,
+          'Ist-Menge': m.istMenge,
+          'Abweichung': m.istMenge - m.planMenge,
+          'Arbeitstage': m.anzahlArbeitstage,
+          'Kumulativ Plan': m.kumulativPlan,
+          'Kumulativ Ist': m.kumulativIst
+        }))
+      }
+      
+      await exportToXLSX(
+        data,
+        `produktionssteuerung_${sheetName}_${konfiguration.planungsjahr}_vollstaendig`,
+        {
+          sheetName: sheetName,
+          title: `Produktionssteuerung ${sheetName} ${konfiguration.planungsjahr}`,
+          author: 'MTB SCM Tool - WI3 Team',
+          freezeHeader: true,
+          autoFilter: true
+        }
+      )
+    } catch (error) {
+      console.error('Fehler beim Produktionssteuerung XLSX-Export:', error)
+    }
   }
   
   /**
@@ -892,36 +1028,56 @@ export default function ProduktionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* ✅ NEU: Zeitperioden-Schalter */}
+          {/* ✅ NEU: Zeitperioden-Schalter + Export-Buttons */}
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-sm font-semibold text-purple-900">Tagesproduktion über das Jahr</h4>
             <div className="flex gap-2">
-              <Button
-                variant={zeitperiodeProduktion === 'tag' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setZeitperiodeProduktion('tag')}
-                className={zeitperiodeProduktion === 'tag' ? 'bg-purple-600 hover:bg-purple-700' : ''}
-              >
-                <Calendar className="h-4 w-4 mr-1" />
-                Tag
-              </Button>
-              <Button
-                variant={zeitperiodeProduktion === 'woche' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setZeitperiodeProduktion('woche')}
-                className={zeitperiodeProduktion === 'woche' ? 'bg-purple-600 hover:bg-purple-700' : ''}
-              >
-                <CalendarDays className="h-4 w-4 mr-1" />
-                KW
-              </Button>
-              <Button
-                variant={zeitperiodeProduktion === 'monat' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setZeitperiodeProduktion('monat')}
-                className={zeitperiodeProduktion === 'monat' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+              {/* Zeitperioden-Toggle */}
+              <div className="flex gap-1 mr-4">
+                <Button
+                  variant={zeitperiodeProduktion === 'tag' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setZeitperiodeProduktion('tag')}
+                  className={zeitperiodeProduktion === 'tag' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+                >
+                  <Calendar className="h-4 w-4 mr-1" />
+                  Tag
+                </Button>
+                <Button
+                  variant={zeitperiodeProduktion === 'woche' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setZeitperiodeProduktion('woche')}
+                  className={zeitperiodeProduktion === 'woche' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+                >
+                  <CalendarDays className="h-4 w-4 mr-1" />
+                  KW
+                </Button>
+                <Button
+                  variant={zeitperiodeProduktion === 'monat' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setZeitperiodeProduktion('monat')}
+                  className={zeitperiodeProduktion === 'monat' ? 'bg-purple-600 hover:bg-purple-700' : ''}
               >
                 <CalendarRange className="h-4 w-4 mr-1" />
                 Monat
+              </Button>
+              </div>
+              {/* ✅ NEU: Export-Buttons für Produktionssteuerung */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportProduktionssteuerungCSV}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                CSV
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportProduktionssteuerungXLSX}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                XLSX
               </Button>
             </div>
           </div>

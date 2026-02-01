@@ -18,10 +18,20 @@ import ExcelJS from 'exceljs'
 
 /**
  * Exportiert Daten als CSV-Datei
+ * 
+ * ✅ UTF-8 mit BOM: Excel-kompatibel, korrekte Umlaute/Emojis
+ * ✅ Semikolon-getrennt: Deutsche Excel-Standard
+ * ✅ Quoting: Automatisch bei Sonderzeichen
+ * 
  * @param data - Array von Objekten zum Exportieren
  * @param filename - Name der Datei (ohne .csv)
+ * @param options - Optional: cleanEmojis (entfernt Emojis für bessere Kompatibilität)
  */
-export function exportToCSV(data: any[], filename: string) {
+export function exportToCSV(
+  data: any[], 
+  filename: string,
+  options: { cleanEmojis?: boolean } = {}
+) {
   if (!data || data.length === 0) {
     console.warn('Keine Daten zum Exportieren')
     return
@@ -29,24 +39,60 @@ export function exportToCSV(data: any[], filename: string) {
 
   // CSV Header aus dem ersten Objekt erstellen
   const headers = Object.keys(data[0])
+  
+  // Hilfsfunktion: Bereinigt Werte für CSV (optional Emojis entfernen)
+  const cleanValue = (value: any): string => {
+    if (value === null || value === undefined) return ''
+    
+    let strValue = String(value)
+    
+    // Optional: Entferne Emojis und ersetze sie durch Text
+    if (options.cleanEmojis) {
+      strValue = strValue
+        .replace(/🟢/g, 'OK')
+        .replace(/🟡/g, 'Warnung')
+        .replace(/🔴/g, 'Kritisch')
+        .replace(/⚠️/g, 'Achtung')
+        .replace(/✅/g, 'Ja')
+        .replace(/❌/g, 'Nein')
+        .replace(/✓/g, 'Ja')
+        .replace(/✗/g, 'Nein')
+        .replace(/📦/g, 'Paket')
+        .replace(/🚢/g, 'Schiff')
+        .replace(/🚚/g, 'LKW')
+        // Entferne verbleibende Emojis (Unicode ranges)
+        .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // Emoticons
+        .replace(/[\u{1F300}-\u{1F5FF}]/gu, '') // Misc Symbols
+        .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // Transport
+        .replace(/[\u{2600}-\u{26FF}]/gu, '')   // Misc symbols
+        .replace(/[\u{2700}-\u{27BF}]/gu, '')   // Dingbats
+    }
+    
+    // Quote wenn nötig (Semikolon, Newline, Quote)
+    if (strValue.includes(';') || strValue.includes('\n') || strValue.includes('"')) {
+      // Escape existierende Quotes
+      strValue = strValue.replace(/"/g, '""')
+      return `"${strValue}"`
+    }
+    
+    return strValue
+  }
+  
   const csvContent = [
     // Header-Zeile
-    headers.join(';'),
+    headers.map(h => cleanValue(h)).join(';'),
     // Datenzeilen
     ...data.map(row => 
-      headers.map(header => {
-        const value = row[header]
-        // Zahlen und Texte escapen für CSV
-        if (typeof value === 'string' && value.includes(';')) {
-          return `"${value}"`
-        }
-        return value
-      }).join(';')
+      headers.map(header => cleanValue(row[header])).join(';')
     )
   ].join('\n')
 
-  // CSV-Datei herunterladen
-  downloadFile(csvContent, `${filename}.csv`, 'text/csv;charset=utf-8;')
+  // ✅ UTF-8 BOM voranstellen für Excel-Kompatibilität
+  // BOM (Byte Order Mark) = \uFEFF signalisiert Excel, dass UTF-8 verwendet wird
+  const csvWithBOM = '\uFEFF' + csvContent
+
+  // CSV-Datei herunterladen mit korrektem MIME-Type
+  downloadFile(csvWithBOM, `${filename}.csv`, 'text/csv;charset=utf-8;')
 }
 
 /**
