@@ -114,10 +114,10 @@ export interface SCORMetrikenReal {
  * Zeitreihen-Daten für Visualisierungen
  */
 export interface SCORZeitreihen {
-  // Pro Metrik: Monatliche/wöchentliche Aggregate für Charts
-  planerfuellungMonatlich: Array<{
-    monat: number
-    monatName: string
+  // Pro Metrik: Wöchentliche Aggregate für Charts
+  planerfuellungWoechentlich: Array<{
+    kalenderwoche: number
+    jahr: number
     planMenge: number
     istMenge: number
     erfuellungsgrad: number
@@ -143,9 +143,9 @@ export interface SCORZeitreihen {
       typ: 'arbeitstage' | 'kalendertage'
       beschreibung: string
     }>
-    monatlich: Array<{
-      monat: number
-      monatName: string
+    woechentlich: Array<{
+      kalenderwoche: number
+      jahr: number
       min: number
       durchschnitt: number
       max: number
@@ -153,9 +153,9 @@ export interface SCORZeitreihen {
     }>
   }
   
-  planungsgenauigkeitMonatlich: Array<{
-    monat: number
-    monatName: string
+  planungsgenauigkeitWoechentlich: Array<{
+    kalenderwoche: number
+    jahr: number
     planMenge: number
     istMenge: number
     abweichung: number
@@ -274,8 +274,8 @@ export function berechneSCORMetrikenReal(
     ? (tageErfuellt / produktionstage.length) * 100
     : 100
   
-  // Monatliche Aggregate
-  const planerfuellungMonatlich = aggregiereMonatlichePlanerfuellung(alleTagesEintraege)
+  // ✅ KORREKTUR: Wöchentliche statt monatliche Aggregate
+  const planerfuellungWoechentlich = aggregiereWoechentlichePlanerfuellung(alleTagesEintraege)
   
   const planerfuellungsgrad = {
     wert: planerfuellungsgrad_wert,
@@ -286,7 +286,7 @@ export function berechneSCORMetrikenReal(
     zielwert: 95,
     status: planerfuellungsgrad_wert >= 95 ? 'gut' as const : 
             planerfuellungsgrad_wert >= 85 ? 'mittel' as const : 'schlecht' as const,
-    trend: berechneTrend(planerfuellungMonatlich)
+    trend: berechneTrend(planerfuellungWoechentlich)
   }
   
   // ═══════════════════════════════════════════════════════════════════════════
@@ -295,10 +295,10 @@ export function berechneSCORMetrikenReal(
   
   const lieferungenMitAnkunft = alleBestellungen.filter(b => b.verfuegbarAb)
   const puenktlicheLieferungen = lieferungenMitAnkunft.filter(b => {
-    // Pünktlich = verfuegbarAb <= erwarteteAnkunft + 1 Tag (Toleranz für verfuegbarAb)
+    // ✅ KORREKTUR: Pünktlich = verfuegbarAb <= erwarteteAnkunft (OHNE +1 Tag Toleranz!)
+    // Nutze nur die Vorlaufzeit aus KonfigurationContext (Standard: 49 Tage)
     const verfuegbar = new Date(b.verfuegbarAb!)
     const erwartet = new Date(b.erwarteteAnkunft)
-    erwartet.setDate(erwartet.getDate() + 1) // +1 Tag Toleranz
     return verfuegbar <= erwartet
   }).length
   
@@ -306,18 +306,21 @@ export function berechneSCORMetrikenReal(
     ? (puenktlicheLieferungen / lieferungenMitAnkunft.length) * 100
     : 100
   
-  // Timeline-Daten
+  // Timeline-Daten - ALLE Bestellungen anzeigen (nicht nur erste 50!)
   const liefertreueLieferungen = alleBestellungen.map(b => {
     const gesamtMenge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
+    const verfuegbar = b.verfuegbarAb ? new Date(b.verfuegbarAb) : null
+    const erwartet = new Date(b.erwarteteAnkunft)
+    
     return {
       bestellungId: b.id,
       bestelldatum: b.bestelldatum.toISOString().split('T')[0],
       erwarteteAnkunft: b.erwarteteAnkunft.toISOString().split('T')[0],
-      tatsaechlicheAnkunft: b.verfuegbarAb ? new Date(b.verfuegbarAb).toISOString().split('T')[0] : undefined,
+      tatsaechlicheAnkunft: verfuegbar ? verfuegbar.toISOString().split('T')[0] : undefined,
       menge: gesamtMenge,
       vorlaufzeitTage: Math.floor((b.erwarteteAnkunft.getTime() - b.bestelldatum.getTime()) / 86400000),
-      puenktlich: b.verfuegbarAb ? new Date(b.verfuegbarAb) <= new Date(new Date(b.erwarteteAnkunft).getTime() + 86400000) : true,
-      verspaetungTage: b.verfuegbarAb ? Math.max(0, Math.floor((new Date(b.verfuegbarAb).getTime() - new Date(b.erwarteteAnkunft).getTime()) / 86400000) - 1) : undefined
+      puenktlich: verfuegbar ? verfuegbar <= erwartet : true,
+      verspaetungTage: verfuegbar ? Math.max(0, Math.floor((verfuegbar.getTime() - erwartet.getTime()) / 86400000)) : undefined
     }
   })
   
@@ -385,7 +388,7 @@ export function berechneSCORMetrikenReal(
         typ: s.einheit === 'KT' ? 'kalendertage' as const : 'arbeitstage' as const,
         beschreibung: s.beschreibung
       })),
-    monatlich: aggregiereMonatlicheDurchlaufzeit(alleBestellungen)
+    woechentlich: aggregiereWoechentlicheDurchlaufzeit(alleBestellungen)
   }
   
   const durchlaufzeit = {
@@ -412,7 +415,8 @@ export function berechneSCORMetrikenReal(
     ? Math.max(0, 100 - (gesamtAbweichung / gesamtPlan) * 100)
     : 100
   
-  const planungsgenauigkeitMonatlich = aggregiereMonatlichePlanungsgenauigkeit(alleTagesEintraege)
+  // ✅ KORREKTUR: Wöchentliche statt monatliche Aggregate
+  const planungsgenauigkeitWoechentlich = aggregiereWoechentlichePlanungsgenauigkeit(alleTagesEintraege)
   
   const planungsgenauigkeit = {
     wert: planungsgenauigkeit_wert,
@@ -423,7 +427,7 @@ export function berechneSCORMetrikenReal(
     zielwert: 98,
     status: planungsgenauigkeit_wert >= 98 ? 'gut' as const :
             planungsgenauigkeit_wert >= 95 ? 'mittel' as const : 'schlecht' as const,
-    trend: berechneTrend(planungsgenauigkeitMonatlich)
+    trend: berechneTrend(planungsgenauigkeitWoechentlich)
   }
   
   // ═══════════════════════════════════════════════════════════════════════════
@@ -509,10 +513,10 @@ export function berechneSCORMetrikenReal(
       lagerreichweite
     },
     zeitreihen: {
-      planerfuellungMonatlich,
+      planerfuellungWoechentlich,
       liefertreueLieferungen,
       durchlaufzeitDetails,
-      planungsgenauigkeitMonatlich,
+      planungsgenauigkeitWoechentlich,
       materialverfuegbarkeitMonatlich,
       lagerreichweiteMonatlich
     }
@@ -642,6 +646,128 @@ function aggregiereMonatlicheDurchlaufzeit(bestellungen: TaeglicheBestellung[]) 
       anzahlLieferungen: m.anzahlLieferungen
     }
   })
+}
+
+/**
+ * ✅ NEU: Berechnet wöchentliche Planerfüllung
+ */
+function aggregiereWoechentlichePlanerfuellung(eintraege: TagesProduktionEntry[]) {
+  const wochen: Record<number, any> = {}
+  
+  eintraege.forEach(e => {
+    if (!wochen[e.kalenderwoche]) {
+      wochen[e.kalenderwoche] = {
+        kalenderwoche: e.kalenderwoche,
+        jahr: e.datum.getFullYear(),
+        planMenge: 0,
+        istMenge: 0,
+        tageErfuellt: 0,
+        tageGesamt: 0
+      }
+    }
+    
+    if (e.istArbeitstag) {
+      wochen[e.kalenderwoche].planMenge += e.planMenge
+      wochen[e.kalenderwoche].istMenge += e.istMenge
+      wochen[e.kalenderwoche].tageGesamt += 1
+      if (e.istMenge === e.planMenge) {
+        wochen[e.kalenderwoche].tageErfuellt += 1
+      }
+    }
+  })
+  
+  return Object.values(wochen).map(w => ({
+    ...w,
+    erfuellungsgrad: w.tageGesamt > 0 ? (w.tageErfuellt / w.tageGesamt) * 100 : 100
+  }))
+}
+
+/**
+ * Hilfsfunktion: Berechnet ISO Kalenderwoche aus Datum
+ */
+function getWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+}
+
+/**
+ * ✅ NEU: Aggregiert Durchlaufzeiten wöchentlich
+ */
+function aggregiereWoechentlicheDurchlaufzeit(bestellungen: TaeglicheBestellung[]) {
+  // Bestimme alle Kalenderwochen im Jahr
+  const wochen: Record<number, any> = {}
+  for (let kw = 1; kw <= 53; kw++) {
+    wochen[kw] = {
+      kalenderwoche: kw,
+      jahr: 2027,
+      durchlaufzeiten: [],
+      anzahlLieferungen: 0
+    }
+  }
+  
+  // Sammle Durchlaufzeiten pro Ankunftswoche (nicht Bestellwoche!)
+  bestellungen.forEach(b => {
+    if (!b.verfuegbarAb) return
+    
+    const ankunftsDatum = new Date(b.verfuegbarAb)
+    const kw = getWeekNumber(ankunftsDatum)
+    const tage = Math.floor((new Date(b.verfuegbarAb).getTime() - b.bestelldatum.getTime()) / 86400000)
+    
+    if (wochen[kw]) {
+      wochen[kw].durchlaufzeiten.push(tage)
+      wochen[kw].anzahlLieferungen += 1
+    }
+  })
+  
+  // Berechne Statistiken (mit Fallback auf 49 Tage wenn keine Daten)
+  return Object.values(wochen).map(w => {
+    const zeiten = w.durchlaufzeiten as number[]
+    const hatDaten = zeiten.length > 0
+    
+    return {
+      kalenderwoche: w.kalenderwoche,
+      jahr: w.jahr,
+      min: hatDaten ? Math.min(...zeiten) : 49,
+      durchschnitt: hatDaten ? zeiten.reduce((a, b) => a + b, 0) / zeiten.length : 49,
+      max: hatDaten ? Math.max(...zeiten) : 49,
+      anzahlLieferungen: w.anzahlLieferungen
+    }
+  })
+}
+
+/**
+ * ✅ NEU: Aggregiert Planungsgenauigkeit wöchentlich
+ */
+function aggregiereWoechentlichePlanungsgenauigkeit(eintraege: TagesProduktionEntry[]) {
+  const wochen: Record<number, any> = {}
+  
+  eintraege.forEach(e => {
+    if (!wochen[e.kalenderwoche]) {
+      wochen[e.kalenderwoche] = {
+        kalenderwoche: e.kalenderwoche,
+        jahr: e.datum.getFullYear(),
+        planMenge: 0,
+        istMenge: 0,
+        absoluteAbweichung: 0
+      }
+    }
+    
+    wochen[e.kalenderwoche].planMenge += e.planMenge
+    wochen[e.kalenderwoche].istMenge += e.istMenge
+    wochen[e.kalenderwoche].absoluteAbweichung += Math.abs(e.istMenge - e.planMenge)
+  })
+  
+  return Object.values(wochen).map(w => ({
+    kalenderwoche: w.kalenderwoche,
+    jahr: w.jahr,
+    planMenge: w.planMenge,
+    istMenge: w.istMenge,
+    abweichung: w.planMenge - w.istMenge, // Plan - Ist (für Diagramm)
+    genauigkeit: w.planMenge > 0 ? Math.max(0, 100 - (w.absoluteAbweichung / w.planMenge) * 100) : 100
+  }))
 }
 
 /**
