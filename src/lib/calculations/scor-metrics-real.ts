@@ -197,10 +197,12 @@ export interface SCORZeitreihen {
  * 3. Warehouse Management (berechneIntegriertesWarehouse)
  * 
  * @param konfiguration - Konfiguration aus KonfigurationContext
+ * @param beachteAktuellesDatum - Optional: Wenn true, werden IST-Daten nur bis heuteDatum berücksichtigt (Frozen Zone). Wenn false, werden alle Daten des Jahres angezeigt.
  * @returns SCOR-Metriken + Zeitreihen-Daten
  */
 export function berechneSCORMetrikenReal(
-  konfiguration: KonfigurationData
+  konfiguration: KonfigurationData,
+  beachteAktuellesDatum: boolean = true
 ): { metriken: SCORMetrikenReal; zeitreihen: SCORZeitreihen } {
   
   // ═══════════════════════════════════════════════════════════════════════════
@@ -297,15 +299,16 @@ export function berechneSCORMetrikenReal(
   // ✅ NEU: Berücksichtige 'Heute'-Datum (Frozen Zone)!
   // Zähle nur Produktionstage BIS HEUTE, nicht das ganze Jahr.
   // Sonst wird Backlog-Aufholung am Jahresende mitgerechnet → unrealistisch hohe Werte
-  const heuteDatum = new Date(konfiguration.heuteDatum || '2027-04-15')
-  const produktionstage = korrigierteTagesEintraege.filter(t => 
-    t.istArbeitstag && t.datum <= heuteDatum
-  )
+  // ✅ NEU: Nur wenn beachteAktuellesDatum = true!
+  const heuteDatum = beachteAktuellesDatum ? new Date(konfiguration.heuteDatum || '2027-04-15') : undefined
+  const produktionstage = heuteDatum 
+    ? korrigierteTagesEintraege.filter(t => t.istArbeitstag && t.datum <= heuteDatum)
+    : korrigierteTagesEintraege.filter(t => t.istArbeitstag)
   const gesamtPlanMenge = produktionstage.reduce((sum, t) => sum + t.planMenge, 0)
   const gesamtIstMenge = produktionstage.reduce((sum, t) => sum + t.istMenge, 0)
   
-  console.log(`📊 Planerfüllungsgrad-Berechnung (bis ${heuteDatum.toISOString().split('T')[0]}):`)
-  console.log(`  - Produktionstage (Arbeitstage bis heute): ${produktionstage.length}`)
+  console.log(`📊 Planerfüllungsgrad-Berechnung${heuteDatum ? ` (bis ${heuteDatum.toISOString().split('T')[0]})` : ' (gesamtes Jahr)'}:`)
+  console.log(`  - Produktionstage (Arbeitstage${heuteDatum ? ' bis heute' : ''}): ${produktionstage.length}`)
   console.log(`  - Gesamt PLAN-Menge: ${gesamtPlanMenge.toLocaleString()}`)
   console.log(`  - Gesamt IST-Menge: ${gesamtIstMenge.toLocaleString()}`)
   console.log(`  - Differenz (Plan-Ist): ${(gesamtPlanMenge - gesamtIstMenge).toLocaleString()}`)
@@ -467,8 +470,10 @@ export function berechneSCORMetrikenReal(
   // ═══════════════════════════════════════════════════════════════════════════
   
   // ✅ KRITISCH: Nutze korrigierteTagesEintraege statt alleTagesEintraege!
-  // ✅ NEU: Berücksichtige 'Heute'-Datum (Frozen Zone)!
-  const produktionstageGenauigkeit = korrigierteTagesEintraege.filter(t => t.datum <= heuteDatum)
+  // ✅ NEU: Berücksichtige 'Heute'-Datum (Frozen Zone)! Nur wenn beachteAktuellesDatum = true!
+  const produktionstageGenauigkeit = heuteDatum 
+    ? korrigierteTagesEintraege.filter(t => t.datum <= heuteDatum)
+    : korrigierteTagesEintraege
   const gesamtPlan = produktionstageGenauigkeit.reduce((sum, t) => sum + t.planMenge, 0)
   const gesamtIst = produktionstageGenauigkeit.reduce((sum, t) => sum + t.istMenge, 0)
   const gesamtAbweichung = Math.abs(gesamtPlan - gesamtIst)
@@ -736,11 +741,11 @@ function aggregiereWoechentlichePlanerfuellung(eintraege: TagesProduktionEntry[]
     if (wochen[e.kalenderwoche] && e.istArbeitstag) {
       // PLAN-Daten: IMMER addieren (für alle 52 Wochen)
       wochen[e.kalenderwoche].planMenge += e.planMenge
-      wochen[e.kalenderwoche].tageGesamt += 1
       
       // IST-Daten: NUR bis heuteDatum (Frozen Zone)
       if (!heuteDatum || e.datum <= heuteDatum) {
         wochen[e.kalenderwoche].istMenge += e.istMenge
+        wochen[e.kalenderwoche].tageGesamt += 1
         if (e.istMenge === e.planMenge) {
           wochen[e.kalenderwoche].tageErfuellt += 1
         }
@@ -836,7 +841,7 @@ function aggregiereWoechentlichePlanungsgenauigkeit(eintraege: TagesProduktionEn
       // PLAN-Daten: IMMER addieren (für alle 52 Wochen)
       wochen[e.kalenderwoche].planMenge += e.planMenge
       
-      // IST-Daten: NUR bis heuteDatum (Frozen Zone)
+      // IST-Daten und Abweichung: NUR bis heuteDatum (Frozen Zone)
       if (!heuteDatum || e.datum <= heuteDatum) {
         wochen[e.kalenderwoche].istMenge += e.istMenge
         wochen[e.kalenderwoche].absoluteAbweichung += Math.abs(e.istMenge - e.planMenge)
