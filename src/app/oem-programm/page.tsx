@@ -94,6 +94,37 @@ export default function OEMProgrammPage() {
     statistiken
   } = useSzenarioBerechnung()
 
+  /**
+   * Handler: Entferne einzelne Anpassung
+   */
+  const handleEntferneAnpassung = useCallback((key: string) => {
+    setProduktionsAnpassungen(prev => {
+      const neu = { ...prev }
+      delete neu[key]
+      return neu
+    })
+    showSuccess('Anpassung entfernt')
+  }, [])
+  
+  /**
+   * Handler: Setze alle Anpassungen zurück
+   */
+  const handleResetAlleAnpassungen = useCallback(() => {
+    setProduktionsAnpassungen({})
+    showSuccess('Alle Anpassungen wurden zurückgesetzt')
+  }, [])
+  
+  /**
+   * Erstelle Varianten-Namen Map für Anpassungs-Anzeige
+   */
+  const variantenNamenMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    konfiguration.varianten.forEach(v => {
+      map[v.id] = v.name
+    })
+    return map
+  }, [konfiguration.varianten])
+
   // Baseline-Produktionspläne (für Vergleich wenn keine Szenarien aktiv)
   const baselineProduktionsplaene = useMemo(() => 
     generiereAlleVariantenProduktionsplaene(konfiguration),
@@ -280,36 +311,6 @@ export default function OEMProgrammPage() {
     }
   }
   
-  /**
-   * Handler: Entferne einzelne Anpassung
-   */
-  const handleEntferneAnpassung = useCallback((key: string) => {
-    setProduktionsAnpassungen(prev => {
-      const neu = { ...prev }
-      delete neu[key]
-      return neu
-    })
-    showSuccess('Anpassung entfernt')
-  }, [])
-  
-  /**
-   * Handler: Setze alle Anpassungen zurück
-   */
-  const handleResetAlleAnpassungen = useCallback(() => {
-    setProduktionsAnpassungen({})
-    showSuccess('Alle Anpassungen wurden zurückgesetzt')
-  }, [])
-  
-  /**
-   * Erstelle Varianten-Namen Map für Anpassungs-Anzeige
-   */
-  const variantenNamenMap = useMemo(() => {
-    const map: Record<string, string> = {}
-    konfiguration.varianten.forEach(v => {
-      map[v.id] = v.name
-    })
-    return map
-  }, [konfiguration.varianten])
   
   return (
     <div className="space-y-6">
