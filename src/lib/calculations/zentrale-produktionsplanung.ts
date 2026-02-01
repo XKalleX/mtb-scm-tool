@@ -100,12 +100,44 @@ export interface VariantenProduktionsplan {
  * ========================================
  */
 
+/**
+ * Berechnet die Kalenderwoche für ein Datum im Kontext des aktuellen Jahres.
+ * 
+ * Anders als ISO 8601 (das Tage am Jahresanfang der KW 53 des Vorjahres zuweisen kann),
+ * ordnet diese Funktion alle Tage eines Jahres den Wochen desselben Jahres zu (KW 1-52/53).
+ * 
+ * Logik: 
+ * - Jede Woche beginnt am Montag
+ * - KW 1 beginnt mit dem ersten Montag im Jahr (oder umfasst die Tage vor dem ersten Montag)
+ * - Alle 365/366 Tage des Jahres werden lückenlos auf Wochen verteilt
+ */
 function getKalenderWoche(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  const jahr = date.getFullYear()
+  const jahresanfang = new Date(jahr, 0, 1)
+  
+  // Berechne Tag im Jahr (0-364 oder 0-365)
+  const msInDay = 86400000
+  const tageImJahr = Math.floor((date.getTime() - jahresanfang.getTime()) / msInDay)
+  
+  // Wochentag des Jahresanfangs (0=Sonntag, 1=Montag, ..., 6=Samstag)
+  const jahresanfangWochentag = jahresanfang.getDay()
+  
+  // Tage bis zum ersten Montag (wenn Jahr mit Montag beginnt, ist dies 0)
+  // Sonntag (0) wird als 7 behandelt für die Berechnung
+  const tageVorErstemMontag = jahresanfangWochentag === 0 
+    ? 6  // Sonntag: 6 Tage bis Montag
+    : jahresanfangWochentag === 1 
+      ? 0  // Montag: 0 Tage
+      : 8 - jahresanfangWochentag  // Di-Sa: entsprechende Tage
+  
+  // Wenn das Datum vor dem ersten Montag liegt, gehört es zu KW 1
+  if (tageImJahr < tageVorErstemMontag) {
+    return 1
+  }
+  
+  // Berechne KW basierend auf Tagen seit dem ersten Montag
+  const tageNachErstemMontag = tageImJahr - tageVorErstemMontag
+  return Math.floor(tageNachErstemMontag / 7) + 1
 }
 
 /**
