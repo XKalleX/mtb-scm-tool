@@ -341,8 +341,9 @@ export default function ProduktionPage() {
           const bauteil = bauteilMap.get(b.bauteilId)!
           bauteil.zugang += b.zugang
           bauteil.verbrauch += b.verbrauch
-          bauteil.backlogVorher = Math.max(bauteil.backlogVorher, b.backlogVorher)
-          bauteil.backlogNachher = Math.max(bauteil.backlogNachher, b.backlogNachher)
+          // Use last day's backlog values (most accurate for period aggregation)
+          bauteil.backlogVorher = b.backlogVorher
+          bauteil.backlogNachher = b.backlogNachher
           bauteil.nichtProduziert += b.nichtProduziert
           bauteil.nachgeholt += b.nachgeholt
         })
@@ -409,8 +410,9 @@ export default function ProduktionPage() {
           const bauteil = bauteilMap.get(b.bauteilId)!
           bauteil.zugang += b.zugang
           bauteil.verbrauch += b.verbrauch
-          bauteil.backlogVorher = Math.max(bauteil.backlogVorher, b.backlogVorher)
-          bauteil.backlogNachher = Math.max(bauteil.backlogNachher, b.backlogNachher)
+          // Use last day's backlog values (most accurate for period aggregation)
+          bauteil.backlogVorher = b.backlogVorher
+          bauteil.backlogNachher = b.backlogNachher
           bauteil.nichtProduziert += b.nichtProduziert
           bauteil.nachgeholt += b.nachgeholt
         })
