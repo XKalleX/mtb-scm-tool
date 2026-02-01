@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Package, LineChart, Download, Factory, BarChart3, Database } from 'lucide-react'
 import { SzenarienProvider } from '@/contexts/SzenarienContext'
 import { KonfigurationProvider } from '@/contexts/KonfigurationContext'
+import { ProduktionsAnpassungenProvider } from '@/contexts/ProduktionsAnpassungenContext'
 import { SzenarienFloatingButton } from '@/components/SzenarienSidebar'
 import { EinstellungenFloatingButton } from '@/components/EinstellungenSidebar'
 
@@ -22,6 +23,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <KonfigurationProvider>
         <SzenarienProvider>
+        <ProduktionsAnpassungenProvider>
         <div className="min-h-screen flex flex-col">
           {/* Header */}
           <header className="border-b bg-white shadow-sm">
@@ -88,6 +90,7 @@ export default function RootLayout({
           <EinstellungenFloatingButton />
           <SzenarienFloatingButton />
         </div>
+        </ProduktionsAnpassungenProvider>
         </SzenarienProvider>
         </KonfigurationProvider>
       </body>

@@ -5,13 +5,14 @@
  * SZENARIO BERECHNUNG HOOK
  * ========================================
  * 
- * Zentraler Hook der KonfigurationContext und SzenarienContext kombiniert
- * und alle Berechnungen mit Szenario-Unterstützung bereitstellt.
+ * Zentraler Hook der KonfigurationContext, SzenarienContext und ProduktionsAnpassungenContext kombiniert
+ * und alle Berechnungen mit Szenario- und Anpassungs-Unterstützung bereitstellt.
  * 
  * VERWENDUNG:
  * - In allen Seiten (OEM, Produktion, Inbound, Reporting)
  * - Gibt sowohl Baseline- als auch Szenario-Werte zurück
  * - Berechnet automatisch Deltas für Visualisierung
+ * - Integriert manuelle Produktionsanpassungen aus OEM-Seite
  * 
  * WICHTIG: Alle Module MÜSSEN diesen Hook nutzen für konsistente Daten!
  */
@@ -19,6 +20,7 @@
 import { useMemo } from 'react'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { useSzenarien, SzenarioConfig } from '@/contexts/SzenarienContext'
+import { useProduktionsAnpassungen } from '@/contexts/ProduktionsAnpassungenContext'
 import {
   generiereTagesproduktionMitSzenarien,
   generiereAlleVariantenMitSzenarien,
@@ -37,6 +39,12 @@ import {
   DynamicConfig,
   GesamtMetriken
 } from '@/lib/calculations/supply-chain-metrics'
+import {
+  wendeAnpassungenAufAllePlaeneAn
+} from '@/lib/helpers/produktions-anpassungen'
+import {
+  generiereAlleVariantenProduktionsplaene
+} from '@/lib/calculations/zentrale-produktionsplanung'
 
 /**
  * Rückgabewert des useSzenarioBerechnung Hooks
@@ -91,6 +99,7 @@ export interface SzenarioBerechnungResult {
 export function useSzenarioBerechnung(): SzenarioBerechnungResult {
   const { konfiguration, isInitialized, getArbeitstageProJahr } = useKonfiguration()
   const { getAktiveSzenarien } = useSzenarien()
+  const { produktionsAnpassungen, hasAnpassungen } = useProduktionsAnpassungen()
   
   // Aktive Szenarien
   const aktiveSzenarien = useMemo(() => getAktiveSzenarien(), [getAktiveSzenarien])
@@ -108,11 +117,65 @@ export function useSzenarioBerechnung(): SzenarioBerechnungResult {
     return generiereTagesproduktionMitSzenarien(konfiguration, aktiveSzenarien)
   }, [konfiguration, aktiveSzenarien, isInitialized])
   
-  // Varianten-Pläne mit Szenarien
+  // Varianten-Pläne mit Szenarien UND manuellen Anpassungen
   const variantenPlaene = useMemo(() => {
     if (!isInitialized) return {}
-    return generiereAlleVariantenMitSzenarien(konfiguration, aktiveSzenarien)
-  }, [konfiguration, aktiveSzenarien, isInitialized])
+    
+    // 1. Generiere Pläne mit Szenarien
+    let plaene = generiereAlleVariantenMitSzenarien(konfiguration, aktiveSzenarien)
+    
+    // 2. Wende manuelle Anpassungen an (falls vorhanden)
+    if (hasAnpassungen()) {
+      // Konvertiere das Format für wendeAnpassungenAufAllePlaeneAn
+      const plaeneOhneDeltas: Record<string, any> = {}
+      Object.entries(plaene).forEach(([key, value]) => {
+        plaeneOhneDeltas[key] = {
+          varianteId: value.varianteId,
+          varianteName: value.varianteName,
+          jahresProduktion: value.jahresProduktion,
+          jahresProduktionIst: value.jahresProduktionIst,
+          abweichung: value.abweichung,
+          tage: value.tage
+        }
+      })
+      
+      // Wende Anpassungen an
+      const angepasstePlaene = wendeAnpassungenAufAllePlaeneAn(plaeneOhneDeltas, produktionsAnpassungen)
+      
+      // Konvertiere zurück zum Original-Format (behalte Delta-Felder!)
+      Object.entries(angepasstePlaene).forEach(([key, value]) => {
+        // Merge die angepassten Tage mit den originalen Delta-Feldern
+        const originalTage = plaene[key].tage
+        const angepassteTage = value.tage.map((angepassterTag: any, index: number) => {
+          const originalTag = originalTage[index]
+          // Behalte alle Delta-Felder vom Original, update nur die Mengen
+          return {
+            ...originalTag,
+            planMenge: angepassterTag.planMenge,
+            istMenge: angepassterTag.istMenge,
+            sollProduktionDezimal: angepassterTag.sollProduktionDezimal,
+            tagesError: angepassterTag.tagesError,
+            monatsFehlerVorher: angepassterTag.monatsFehlerVorher,
+            monatsFehlerNachher: angepassterTag.monatsFehlerNachher,
+            errorKorrekturAngewendet: angepassterTag.errorKorrekturAngewendet,
+            kumulativPlan: angepassterTag.kumulativPlan,
+            kumulativIst: angepassterTag.kumulativIst,
+            abweichung: angepassterTag.abweichung
+          }
+        })
+        
+        plaene[key] = {
+          ...plaene[key],
+          jahresProduktion: value.jahresProduktion,
+          jahresProduktionIst: value.jahresProduktionIst,
+          abweichung: value.abweichung,
+          tage: angepassteTage as any // TypeScript hint: this is TagesProduktionMitDelta[]
+        }
+      })
+    }
+    
+    return plaene
+  }, [konfiguration, aktiveSzenarien, isInitialized, produktionsAnpassungen, hasAnpassungen])
   
   // Lagerbestände mit Szenarien
   const lagerbestaende = useMemo(() => {
