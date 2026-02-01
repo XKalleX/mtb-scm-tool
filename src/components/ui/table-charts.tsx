@@ -330,7 +330,7 @@ export interface LagerbestandChartProps {
     bestand: number
     zugang: number
     abgang: number
-    status?: 'ok' | 'niedrig' | 'kritisch'
+    status?: 'hoch' | 'ok' | 'niedrig' | 'kritisch'
   }>
   aggregation?: 'tag' | 'woche' | 'monat'
   height?: number

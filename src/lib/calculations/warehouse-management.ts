@@ -73,7 +73,7 @@ export interface TaeglichesLager {
     // STATUS
     verfuegbarBestand: number      // endBestand (verfügbar für Produktion)
     reichweiteTage: number         // Wie lange reicht der Bestand?
-    status: 'ok' | 'niedrig' | 'kritisch' | 'negativ'
+    status: 'hoch' | 'ok' | 'niedrig' | 'kritisch' | 'negativ'
     
     // ATP CHECK
     atpCheck: {
@@ -877,19 +877,26 @@ export function berechneIntegriertesWarehouse(
         ? endBestand / durchschnittBedarf 
         : (endBestand > 0 ? 999 : 0)  // 999 nur wenn tatsächlich Bestand vorhanden
       
-      // Status bestimmen
-      let status: 'ok' | 'niedrig' | 'kritisch' | 'negativ' = 'ok'
+      // Status bestimmen basierend auf Reichweite in Tagen
+      // 0-0.5 Tage → kritisch, 0.5-0.9 → niedrig, 0.9-1.5 → ok, >1.5 → hoch
+      let status: 'hoch' | 'ok' | 'niedrig' | 'kritisch' | 'negativ' = 'ok'
       
       if (endBestand < 0) {
         status = 'negativ'
         tageNegativ++
         warnungen.push(`🔴 ${datumStr} (Tag ${tagImJahr}): NEGATIVER BESTAND für ${bauteil.name}! (${endBestand})`)
-      } else if (endBestand < 500) {
-        // Kritisch wenn weniger als 1 Losgröße
+      } else if (reichweiteTage < 0.5) {
+        // Kritisch wenn weniger als 0,5 Tage Reichweite
         status = 'kritisch'
-      } else if (reichweiteTage < 7) {
-        // Niedrig wenn weniger als 7 Tage Reichweite
+      } else if (reichweiteTage < 0.9) {
+        // Niedrig wenn 0,5 bis 0,9 Tage Reichweite
         status = 'niedrig'
+      } else if (reichweiteTage < 1.5) {
+        // Ok wenn 0,9 bis 1,5 Tage Reichweite
+        status = 'ok'
+      } else {
+        // Hoch wenn mehr als 1,5 Tage Reichweite
+        status = 'hoch'
       }
       
       // Statistik aktualisieren
