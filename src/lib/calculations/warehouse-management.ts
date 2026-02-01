@@ -4,9 +4,10 @@
  * ═══════════════════════════════════════════════════════════════════════════════
  * 
  * Berechnet realistische Lagerbestandsentwicklung mit:
+ * - ✅ EXKLUSIV Hafenlogistik als Materialquelle (generiereInboundLieferplan)
  * - Realistischen Losgrößen-basierten Lieferungen (500 Stück)
  * - NEUER Materialfluss mit Zwischenlagerung:
- *   - Schiffe nur mittwochs
+ *   - Schiffe nur mittwochs ab Shanghai
  *   - LKWs nicht am Wochenende
  *   - Material verfügbar am NÄCHSTEN TAG nach Ankunft
  * - ATP (Available-to-Promise) Checks vor Verbrauch
@@ -16,8 +17,9 @@
  * 
  * KONZEPT:
  * 1. Start mit 0 Lagerbestand
- * 2. Verarbeite Inbound-Lieferungen von generiereTaeglicheBestellungen
+ * 2. ✅ Verarbeite Inbound-Lieferungen von generiereInboundLieferplan (Hafenlogistik!)
  *    → NEU: Lieferungen nutzen verfuegbarAb Datum (nächster Tag nach Ankunft)
+ *    → KRITISCH: Schiffe fahren nur mittwochs, daher gestaffelte Lieferung
  * 3. Für jeden Produktionstag: ATP-Check → Verbrauch falls verfügbar
  *    → NEU: Bei Engpass proportionale Verteilung statt FCFS
  * 4. Sammle Statistiken und Warnungen
@@ -26,7 +28,7 @@
 import type { KonfigurationData, FeiertagConfig } from '@/contexts/KonfigurationContext'
 import type { TagesProduktionEntry } from './zentrale-produktionsplanung'
 import { addDays, toLocalISODateString } from '@/lib/utils'
-import { generiereTaeglicheBestellungen, type TaeglicheBestellung } from './inbound-china'
+import { generiereInboundLieferplan, type TaeglicheBestellung } from './inbound-china'
 import { istArbeitstag_Deutschland, FeiertagsKonfiguration } from '@/lib/kalender'
 
 /**
@@ -206,10 +208,10 @@ export function berechneIntegriertesWarehouse(
   const planungsjahr = konfiguration.planungsjahr
   
   // ═══════════════════════════════════════════════════════════════════════════════
-  // STEP 1: GENERIERE INBOUND BESTELLUNGEN (mit 49 Tage Vorlauf!)
+  // STEP 1: ✅ GENERIERE INBOUND LIEFERUNGEN MIT HAFENLOGISTIK (inkl. Mittwochs-Schiffe!)
   // ═══════════════════════════════════════════════════════════════════════════════
   
-  // Bereite Stücklisten-Map vor (für generiereTaeglicheBestellungen)
+  // Bereite Stücklisten-Map vor (für generiereInboundLieferplan)
   // Transformiere stueckliste[] aus Konfiguration in das erwartete Format
   const stuecklistenMap: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }> = {}
   konfiguration.stueckliste.forEach(s => {
@@ -234,19 +236,40 @@ export function berechneIntegriertesWarehouse(
     }))
   })
   
-  // Generiere Bestellungen (inkl. Vorjahr!)
+  // ✅ KRITISCHER FIX: Nutze generiereInboundLieferplan statt generiereTaeglicheBestellungen!
+  // Dies beinhaltet die komplette Hafenlogistik-Simulation:
+  // - Schiffe fahren nur mittwochs ab Shanghai
+  // - Waren warten am Hafen bis nächster Mittwoch
+  // - Realistische Losgröße-basierte Schiffsbeladung (500er Bündel)
+  console.log(`🚢 Starte Hafenlogistik-Simulation mit generiereInboundLieferplan...`)
+  
+  const inboundResult = generiereInboundLieferplan(
+    produktionsplaeneFormatiert,
+    planungsjahr,
+    konfiguration.lieferant.gesamtVorlaufzeitTage,
+    konfiguration.feiertage,
+    stuecklistenMap,  // Stücklisten aus Konfiguration
+    konfiguration.lieferant.losgroesse,  // Losgröße aus Konfiguration
+    konfiguration.lieferant.lieferintervall  // Lieferintervall aus Konfiguration
+  )
+  
+  // Extrahiere Bestellungen und Lieferungen aus Hafenlogistik
   const bestellungen = [
-    ...generiereTaeglicheBestellungen(
-      produktionsplaeneFormatiert,
-      planungsjahr,
-      konfiguration.lieferant.gesamtVorlaufzeitTage,
-      konfiguration.feiertage,
-      stuecklistenMap,  // Stücklisten aus Konfiguration
-      konfiguration.lieferant.losgroesse,  // Losgröße aus Konfiguration
-      konfiguration.lieferant.lieferintervall  // Lieferintervall aus Konfiguration
-    ),
+    ...inboundResult.bestellungen,
     ...zusatzBestellungen
   ]
+  
+  // ✅ NEU: Nutze lieferungenAmWerk aus Hafenlogistik (nicht aus Bestellungen!)
+  // Die Hafenlogistik bestimmt WANN Material tatsächlich am Werk ankommt
+  // (nach Wartezeit am Hafen + Mittwochs-Schiff + LKW-Transport)
+  const lieferungenAmWerkAusHafenlogistik = inboundResult.lieferungenAmWerk
+  
+  console.log(`✅ Hafenlogistik-Simulation abgeschlossen:`)
+  console.log(`   - Bestellungen: ${bestellungen.length}`)
+  console.log(`   - Liefertage am Werk: ${lieferungenAmWerkAusHafenlogistik.size}`)
+  console.log(`   - Schiffe gesamt: ${inboundResult.hafenStatistik.anzahlSchiffe}`)
+  console.log(`   - Ø Wartezeit Hafen: ${inboundResult.hafenStatistik.durchschnittlicheWartezeit.toFixed(1)} Tage`)
+  console.log(`   - Max Hafenlager: ${inboundResult.hafenStatistik.maxLagerbestand.toLocaleString('de-DE')} Sättel`)
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // GUARD: Prüfe ob Bestellungen vorhanden sind
@@ -302,8 +325,36 @@ export function berechneIntegriertesWarehouse(
   
   console.log(`📊 Gesamt Bedarf (aus Produktionsplänen): ${gesamtBedarf.toLocaleString('de-DE')} Stück`)
   
-  // NEU: Gruppiere Bestellungen nach VERFÜGBARKEITSDATUM (nächster Tag nach Ankunft!)
-  const lieferungenProTag = gruppiereBestellungenNachVerfuegbarkeit(bestellungen)
+  // ✅ KRITISCH: Nutze Lieferungen DIREKT aus Hafenlogistik!
+  // Die Hafenlogistik (generiereInboundLieferplan) hat bereits:
+  // - Hafen-Simulation mit Mittwochs-Schiffen durchgeführt
+  // - Realistische Liefertermine berechnet (verfuegbarAb)
+  // - Losgrößen-basierte Beladung simuliert
+  // 
+  // Daher: KEINE erneute Gruppierung von Bestellungen!
+  // Wir nutzen direkt lieferungenAmWerkAusHafenlogistik
+  
+  // Konvertiere lieferungenAmWerk (Map<string, Record<string, number>>) zu TaeglicheBestellung[] Format
+  // für die bestehende Warehouse-Logik
+  const lieferungenProTag = new Map<string, TaeglicheBestellung[]>()
+  
+  lieferungenAmWerkAusHafenlogistik.forEach((komponenten, datumStr) => {
+    // Erstelle eine "virtuelle" Bestellung für diese Lieferung
+    // Dies ermöglicht es der bestehenden Warehouse-Logik zu funktionieren
+    const virtuelleLieferung: TaeglicheBestellung = {
+      id: `HAFEN-${datumStr}`,
+      bestelldatum: new Date(datumStr), // Dummy
+      bedarfsdatum: new Date(datumStr), // Dummy
+      komponenten: komponenten,
+      erwarteteAnkunft: new Date(datumStr),
+      verfuegbarAb: new Date(datumStr),
+      status: 'geliefert',
+      istVorjahr: false,
+      grund: 'losgroesse'
+    }
+    
+    lieferungenProTag.set(datumStr, [virtuelleLieferung])
+  })
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // STEP 2: INITIALISIERE LAGERBESTÄNDE MIT 0
@@ -506,6 +557,20 @@ export function berechneIntegriertesWarehouse(
       })
       
       // ─────────────────────────────────────────────────────────────────────────────
+      // SCHRITT 1b: ✅ BACKLOG zur Tagesproduktion hinzufügen!
+      // ─────────────────────────────────────────────────────────────────────────────
+      /**
+       * KRITISCH: Backlog muss IN die tägliche Produktion integriert werden!
+       * 
+       * Logik:
+       * 1. Berechne Gesamt-Backlog (Summe aller Komponenten)
+       * 2. Wenn Backlog vorhanden: Addiere zur Tagesproduktion
+       * 3. Begrenzung durch Produktionskapazität erfolgt in Schritt 4
+       */
+      const gesamtBacklogBikes = Object.values(produktionsBacklog).reduce((sum, b) => sum + b, 0)
+      const totaleBikesMitBacklog = totaleBikesPlan + gesamtBacklogBikes
+      
+      // ─────────────────────────────────────────────────────────────────────────────
       // SCHRITT 2: Berechne GLOBALE Produktionskapazität (EINMALIG pro Tag!)
       // ─────────────────────────────────────────────────────────────────────────────
       const kapazitaetProSchicht = 
@@ -540,23 +605,24 @@ export function berechneIntegriertesWarehouse(
       
       // DEBUG: Log für erste 10 Tage
       if (tagImJahr >= 1 && tagImJahr <= 10) {
-        console.log(`📊 TAG ${tagImJahr} (${datumStr}): Plan=${totaleBikesPlan}, Material=${materialLimitBikes}, Kapazität=${maxProduktionKapazitaetBikes}`)
+        console.log(`📊 TAG ${tagImJahr} (${datumStr}): Plan=${totaleBikesPlan}, +Backlog=${gesamtBacklogBikes}, Material=${materialLimitBikes}, Kapazität=${maxProduktionKapazitaetBikes}`)
       }
       
       // ─────────────────────────────────────────────────────────────────────────────
-      // SCHRITT 4: Berechne GLOBALES Limit (Minimum aus Plan, Material, Kapazität)
+      // SCHRITT 4: Berechne GLOBALES Limit (Minimum aus Plan+Backlog, Material, Kapazität)
       // ─────────────────────────────────────────────────────────────────────────────
       const maxMoeglicheBikes = Math.min(
-        totaleBikesPlan,           // Geplante Produktion
-        materialLimitBikes,        // Material-Verfügbarkeit
-        maxProduktionKapazitaetBikes  // Produktionskapazität
+        totaleBikesMitBacklog,         // ✅ Geplante Produktion + Backlog
+        materialLimitBikes,             // Material-Verfügbarkeit
+        maxProduktionKapazitaetBikes   // Produktionskapazität
       )
       
       // ─────────────────────────────────────────────────────────────────────────────
       // SCHRITT 5: Berechne Reduktionsfaktor (falls Engpass)
       // ─────────────────────────────────────────────────────────────────────────────
-      produktionsFaktor = totaleBikesPlan > 0 
-        ? maxMoeglicheBikes / totaleBikesPlan 
+      // ✅ WICHTIG: Faktor basiert auf Plan+Backlog, nicht nur Plan!
+      produktionsFaktor = totaleBikesMitBacklog > 0 
+        ? maxMoeglicheBikes / totaleBikesMitBacklog 
         : 1.0
       
       // ─────────────────────────────────────────────────────────────────────────────
@@ -566,12 +632,12 @@ export function berechneIntegriertesWarehouse(
         globalAtpErfuellt = false
         
         // Bestimme welcher Faktor limitiert
-        if (materialLimitBikes < totaleBikesPlan && materialLimitBikes <= maxProduktionKapazitaetBikes) {
-          globalAtpGrund = `Material-Engpass: Nur ${materialLimitBikes} Sättel verfügbar für ${totaleBikesPlan} geplante Bikes (Faktor: ${(produktionsFaktor * 100).toFixed(1)}%)`
-        } else if (maxProduktionKapazitaetBikes < totaleBikesPlan && maxProduktionKapazitaetBikes < materialLimitBikes) {
-          globalAtpGrund = `Kapazitäts-Engpass: Nur ${maxProduktionKapazitaetBikes} Bikes/Tag möglich, ${totaleBikesPlan} geplant (Faktor: ${(produktionsFaktor * 100).toFixed(1)}%)`
+        if (materialLimitBikes < totaleBikesMitBacklog && materialLimitBikes <= maxProduktionKapazitaetBikes) {
+          globalAtpGrund = `Material-Engpass: Nur ${materialLimitBikes} Sättel verfügbar für ${totaleBikesMitBacklog} benötigte Bikes (Plan+Backlog) (Faktor: ${(produktionsFaktor * 100).toFixed(1)}%)`
+        } else if (maxProduktionKapazitaetBikes < totaleBikesMitBacklog && maxProduktionKapazitaetBikes < materialLimitBikes) {
+          globalAtpGrund = `Kapazitäts-Engpass: Nur ${maxProduktionKapazitaetBikes} Bikes/Tag möglich, ${totaleBikesMitBacklog} benötigt (Plan+Backlog) (Faktor: ${(produktionsFaktor * 100).toFixed(1)}%)`
         } else {
-          globalAtpGrund = `Material UND Kapazität limitiert: max ${maxMoeglicheBikes} von ${totaleBikesPlan} Bikes (Faktor: ${(produktionsFaktor * 100).toFixed(1)}%)`
+          globalAtpGrund = `Material UND Kapazität limitiert: max ${maxMoeglicheBikes} von ${totaleBikesMitBacklog} Bikes (Faktor: ${(produktionsFaktor * 100).toFixed(1)}%)`
         }
         
         console.log(`⚠️ ${datumStr} (Tag ${tagImJahr}): ${globalAtpGrund}`)
@@ -641,14 +707,18 @@ export function berechneIntegriertesWarehouse(
         // Wende GLOBALEN Produktionsfaktor an (proportionale Reduktion!)
         // ─────────────────────────────────────────────────────────────────────────
         /**
-         * KRITISCH: produktionsFaktor wurde GLOBAL berechnet und gilt für ALLE Bauteile!
+         * KRITISCH: produktionsFaktor wurde GLOBAL berechnet basierend auf (Plan+Backlog)!
          * 
-         * Beispiel Tag 4 (04.01.2027):
-         * - Geplant: 740 Bikes
-         * - Material: 500 Sättel verfügbar
-         * - produktionsFaktor = 500 / 740 = 0.676 (67.6%)
-         * - Jede Variante wird um 32.4% reduziert
-         * - IST-Produktion = 500 Bikes ✅
+         * Der Faktor berücksichtigt bereits den Backlog-Abbau:
+         * - Wenn (Plan+Backlog) > Kapazität: Faktor < 1, Backlog wächst
+         * - Wenn (Plan+Backlog) <= Kapazität: Faktor = 1, Backlog wird abgebaut
+         * 
+         * Beispiel mit Backlog:
+         * - Plan: 740, Backlog: 2000, Summe: 2740
+         * - Kapazität: 3120, Material: 5000
+         * - produktionsFaktor = 3120 / 2740 = 1.0 (kann alles produzieren)
+         * - Verbrauch für dieses Bauteil = benoetigt * 1.0
+         * - Backlog wird vollständig abgebaut
          */
         const tatsaechlicherBedarf = Math.floor(benoetigt * produktionsFaktor)
         const nichtErfuellt = benoetigt - tatsaechlicherBedarf
@@ -656,24 +726,72 @@ export function berechneIntegriertesWarehouse(
         // Setze Verbrauch auf das, was tatsächlich möglich ist
         verbrauch = tatsaechlicherBedarf
         
-        // Berechne Backlog-Änderungen
+        // ✅ BACKLOG-TRACKING: Berechne wie viel Backlog abgebaut oder aufgebaut wurde
+        // Der tatsächliche Bedarf (inkl. produktionsFaktor) wird auf Plan + Backlog angewendet
+        // Wir müssen berechnen: Wie viel davon war Plan, wie viel Backlog?
         if (nichtErfuellt > 0) {
+          // Heute konnte nicht alles produziert werden → Backlog wächst
           nichtProduziertHeute = nichtErfuellt
           nachgeholt = 0
         } else {
+          // Heute wurde Plan erfüllt → Prüfe ob Backlog abgebaut wurde
           nichtProduziertHeute = 0
-          nachgeholt = 0  // Kein Backlog-Abbau wenn Faktor < 1
+          
+          // Wenn wir mehr als den Plan produziert haben, wurde Backlog abgebaut
+          // tatsaechlicherBedarf = benoetigt * produktionsFaktor
+          // Wenn produktionsFaktor ≈ 1.0 und backlogVorher > 0, dann wurde Backlog abgebaut
+          
+          // Berechne: Was wurde über den Plan hinaus produziert?
+          // Das ist der Backlog-Abbau
+          // ABER: benoetigt ist nur der PLAN-Bedarf für dieses Bauteil
+          // Der produktionsFaktor wurde aber auf (Plan+Backlog) gesamt berechnet
+          
+          // Einfachere Logik: Wenn produktionsFaktor = 1.0 und backlog > 0,
+          // dann produzieren wir den ganzen Bedarf PLUS wir reduzieren den Backlog
+          // proportional zur Gesamt-Backlog-Reduktion
+          
+          // Die Global-Berechnung hat bereits festgelegt wieviel produziert wird
+          // Wir müssen jetzt nur noch den Backlog entsprechend reduzieren
+          
+          if (backlogVorher > 0) {
+            // Es gibt Backlog der potentiell abgebaut werden kann
+            // Der Gesamt-Produktionsfaktor berücksichtigt bereits Plan+Backlog
+            // Wenn Faktor = 1.0, können wir alles produzieren (inkl. Backlog-Abbau)
+            // Wenn Faktor < 1.0, können wir nicht alles produzieren
+            
+            // Berechne: Wieviel Backlog sollte für dieses Bauteil abgebaut werden?
+            // Das hängt vom globalen Verhältnis ab
+            const gesamtBacklogBikes = Object.values(produktionsBacklog).reduce((sum, b) => sum + b, 0)
+            if (gesamtBacklogBikes > 0) {
+              // Proportionaler Anteil des Backlogs für dieses Bauteil
+              const anteilAmBacklog = backlogVorher / gesamtBacklogBikes
+              
+              // Gesamt-Backlog-Abbau = was über den Plan hinaus produziert wurde
+              // totaleBikesMitBacklog = totaleBikesPlan + gesamtBacklogBikes
+              // maxMoeglicheBikes = was tatsächlich produziert wird
+              // Wenn maxMoeglicheBikes > totaleBikesPlan, dann wurde Backlog abgebaut
+              
+              // ABER: Dieser Kontext hat keinen Zugriff auf diese Variablen!
+              // Wir brauchen einen anderen Ansatz...
+              
+              // Vereinfachung: Wenn produktionsFaktor ≈ 1.0, reduziere Backlog
+              // proportional zur verfügbaren Überkapazität
+              nachgeholt = 0 // Wird separat berechnet nach allen Komponenten
+            } else {
+              nachgeholt = 0
+            }
+          } else {
+            nachgeholt = 0
+          }
         }
         
         // Update Backlog
         produktionsBacklog[bauteilId] = backlogVorher + nichtProduziertHeute - nachgeholt
         
-        // Track tatsächliche Produktion (für Statistiken)
-        gesamtProduziertTatsaechlich += verbrauch
-        
-        // Buche Verbrauch
+        // Buche Verbrauch (jetzt mit Backlog-Abbau)
         aktuelleBestaende[bauteilId] -= verbrauch
         gesamtVerbrauch += verbrauch
+        gesamtProduziertTatsaechlich += verbrauch
         
         // Warnungen (nur wenn nötig, da global bereits geloggt)
         if (nichtProduziertHeute > 0 && globalAtpGrund) {
@@ -765,6 +883,87 @@ export function berechneIntegriertesWarehouse(
       istArbeitstag,
       bauteile: bauteileHeuteDetails
     })
+    
+    // ═════════════════════════════════════════════════════════════════════════════
+    // STEP 3e: TÄGLICHER BACKLOG-ABBAU (wenn Kapazität vorhanden)
+    // ═════════════════════════════════════════════════════════════════════════════
+    /**
+     * ✅ KRITISCH: Backlog muss täglich abgebaut werden bis zur Kapazitätsgrenze!
+     * 
+     * Logik:
+     * 1. Berechne verfügbare Produktionskapazität (Max - heute produziert)
+     * 2. Prüfe ob Backlog existiert
+     * 3. Prüfe verfügbares Material
+     * 4. Produziere Backlog bis Kapazitätsgrenze oder Material erschöpft
+     */
+    if (istArbeitstag && tagImJahr >= 1 && tagImJahr <= 365) {
+      // Berechne Gesamt-Backlog (in Bikes)
+      const gesamtBacklogBikes = Object.values(produktionsBacklog).reduce((sum, b) => sum + b, 0)
+      
+      if (gesamtBacklogBikes > 0) {
+        // Berechne verfügbare Kapazität
+        const kapazitaetProSchicht = 
+          konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
+        const maxSchichten = konfiguration.produktion.maxSchichtenProTag
+        const maxProduktionKapazitaetBikes = kapazitaetProSchicht * maxSchichten
+        
+        // Berechne heute bereits produzierte Menge
+        let heuteProduziertBikes = 0
+        Object.entries(produktionsplanMap).forEach(([varianteId, planMap]) => {
+          heuteProduziertBikes += (planMap[datumStr] || 0)
+        })
+        
+        // Verfügbare Kapazität für Backlog
+        const verfuegbareKapazitaet = Math.max(0, maxProduktionKapazitaetBikes - heuteProduziertBikes)
+        
+        if (verfuegbareKapazitaet > 0) {
+          // Berechne verfügbares Material (SUMME aller Sättel)
+          let verfuegbaresMaterialGesamt = 0
+          bauteile.forEach(bauteil => {
+            verfuegbaresMaterialGesamt += aktuelleBestaende[bauteil.id]
+          })
+          
+          // Maximum was produziert werden kann
+          const maxBacklogAbbau = Math.min(
+            gesamtBacklogBikes,           // Nicht mehr als Backlog vorhanden
+            verfuegbareKapazitaet,         // Nicht mehr als Kapazität erlaubt
+            verfuegbaresMaterialGesamt     // Nicht mehr als Material da ist
+          )
+          
+          if (maxBacklogAbbau > 0) {
+            // Verteile Backlog-Abbau proportional auf alle Bauteile
+            let tatsaechlichAbgebautGesamt = 0
+            
+            bauteile.forEach(bauteil => {
+              const bauteilId = bauteil.id
+              const bauteilBacklog = produktionsBacklog[bauteilId]
+              
+              if (bauteilBacklog > 0) {
+                // Proportionaler Anteil
+                const anteil = bauteilBacklog / gesamtBacklogBikes
+                const abbauFuerBauteil = Math.floor(maxBacklogAbbau * anteil)
+                
+                // Begrenzt durch verfügbares Material
+                const abbauMoeglich = Math.min(abbauFuerBauteil, aktuelleBestaende[bauteilId])
+                
+                if (abbauMoeglich > 0) {
+                  // Buche Backlog-Abbau
+                  produktionsBacklog[bauteilId] -= abbauMoeglich
+                  aktuelleBestaende[bauteilId] -= abbauMoeglich
+                  gesamtVerbrauch += abbauMoeglich
+                  gesamtProduziertTatsaechlich += abbauMoeglich
+                  tatsaechlichAbgebautGesamt += abbauMoeglich
+                }
+              }
+            })
+            
+            if (tatsaechlichAbgebautGesamt > 0 && tagImJahr <= 100) {
+              console.log(`✅ TAG ${tagImJahr}: Backlog-Abbau GESAMT ${tatsaechlichAbgebautGesamt} Bikes`)
+            }
+          }
+        }
+      }
+    }
     
     // Nächster Tag
     aktuellesDatum = addDays(aktuellesDatum, 1)

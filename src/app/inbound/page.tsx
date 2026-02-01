@@ -31,7 +31,7 @@ import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { DeltaCell, DeltaBadge } from '@/components/DeltaCell'
 import { useMemo, useState, useCallback } from 'react'
 import { generiereAlleVariantenProduktionsplaene, type TagesProduktionEntry } from '@/lib/calculations/zentrale-produktionsplanung'
-import { generiereTaeglicheBestellungen, erstelleZusatzbestellung, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
+import { generiereTaeglicheBestellungen, generiereInboundLieferplan, erstelleZusatzbestellung, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
 import { berechneBedarfsBacklog, type BedarfsBacklogErgebnis } from '@/lib/calculations/bedarfs-backlog-rechnung'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { istDeutschlandFeiertag, ladeDeutschlandFeiertage, istChinaFeiertag } from '@/lib/kalender'
@@ -208,9 +208,11 @@ export default function InboundPage() {
     return result
   }, [produktionsplaene])
   
-  // Berechne tägliche Bestellungen mit fixer Vorlaufzeit aus Konfiguration
-  const generierteBestellungen = useMemo(() => {
-    return generiereTaeglicheBestellungen(
+  // ✅ KRITISCH: Generiere Inbound-Lieferplan mit Hafenlogistik-Simulation
+  // Dies ist die EINZIGE Quelle für Materialzugänge
+  const inboundLieferplan = useMemo(() => {
+    console.log('🚢 Starte Hafenlogistik-Simulation für Inbound-Seite...')
+    return generiereInboundLieferplan(
       produktionsplaeneFormatiert, 
       konfiguration.planungsjahr,
       lieferant.gesamtVorlaufzeitTage, // Fixe Vorlaufzeit aus Konfiguration
@@ -221,7 +223,12 @@ export default function InboundPage() {
     )
   }, [produktionsplaeneFormatiert, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage, konfiguration.feiertage, stuecklistenMap, lieferant.losgroesse, lieferant.lieferintervall])
   
-  // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung mit dem neuen System
+  // Extrahiere Bestellungen aus Hafenlogistik-Ergebnis
+  const generierteBestellungen = useMemo(() => {
+    return inboundLieferplan.bestellungen
+  }, [inboundLieferplan])
+  
+  // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung MIT Hafenlogistik-Lieferungen
   // Zeigt für jeden Tag: Bedarf, Backlog, Bestellung, Materialverfügbarkeit
   const backlogErgebnis = useMemo(() => {
     // Konvertiere Produktionspläne zum richtigen Format (TagesProduktionEntry[])
@@ -229,8 +236,14 @@ export default function InboundPage() {
     Object.entries(produktionsplaene).forEach(([varianteId, plan]) => {
       plaeneAlsEntries[varianteId] = plan.tage
     })
-    return berechneBedarfsBacklog(plaeneAlsEntries, konfiguration)
-  }, [produktionsplaene, konfiguration])
+    
+    // ✅ KRITISCH: Übergebe lieferungenAmWerk aus Hafenlogistik!
+    return berechneBedarfsBacklog(
+      plaeneAlsEntries, 
+      konfiguration,
+      inboundLieferplan.lieferungenAmWerk // ✅ Hafenlogistik-Lieferungen als PFLICHT-Parameter
+    )
+  }, [produktionsplaene, konfiguration, inboundLieferplan])
   
   // ✅ Kombiniere generierte + Zusatzbestellungen
   const taeglicheBestellungen = useMemo(() => {

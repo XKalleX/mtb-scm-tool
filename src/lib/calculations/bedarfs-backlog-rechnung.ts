@@ -265,12 +265,12 @@ function konvertiereFeiertagsKonfiguration(konfiguration: KonfigurationData): Fe
  * 
  * Diese Funktion implementiert die Produktionssimulation basierend auf Material-Verfügbarkeit:
  * 
- * NEUE LOGIK (mit Inbound-Integration):
+ * NEUE LOGIK (mit Inbound-Integration - EXKLUSIV HAFENLOGISTIK):
  * 1. Berechne täglichen Bedarf aus OEM-Produktionsplänen
- * 2. Nutze Material-Lieferungen aus Inbound-Modul (wenn verfügbar)
+ * 2. ✅ PFLICHT: Nutze Material-Lieferungen aus Hafenlogistik (lieferungenAmWerk)
  * 3. Für jeden Tag und jede Komponente:
  *    a) Akkumuliere Bedarf (heutiger + Backlog)
- *    b) Prüfe Material-Ankunft
+ *    b) Prüfe Material-Ankunft (NUR aus Hafenlogistik!)
  *    c) Berechne tatsächliche Produktion (min(Bedarf, verfügbar))
  *    d) Aktualisiere Lagerbestand und Backlog
  * 4. Berechne Statistiken und Kennzahlen
@@ -278,7 +278,8 @@ function konvertiereFeiertagsKonfiguration(konfiguration: KonfigurationData): Fe
  * WICHTIG: 
  * - Bestellung wird NICHT hier durchgeführt (das macht Inbound!)
  * - Diese Funktion fokussiert auf Produktions-Simulation
- * - Material-Lieferungen kommen aus generiereInboundLieferplan()
+ * - ✅ KRITISCH: Material-Lieferungen MÜSSEN aus generiereInboundLieferplan() kommen!
+ * - KEINE anderen Materialquellen erlaubt (keine simulierten Bestände)
  * 
  * ANFORDERUNG A13: Proportionale Allokation
  * - Bei Engpass faire prozentuale Verteilung auf alle Varianten
@@ -286,13 +287,13 @@ function konvertiereFeiertagsKonfiguration(konfiguration: KonfigurationData): Fe
  * 
  * @param produktionsplaene - Produktionspläne aller Varianten (aus zentrale-produktionsplanung)
  * @param konfiguration - Konfigurationsdaten (aus KonfigurationContext)
- * @param inboundLieferungen - Optionale Material-Lieferungen aus Inbound-Modul (Date → Component → Amount)
+ * @param lieferungenAmWerk - ✅ PFLICHTPARAMETER: Material-Lieferungen aus Hafenlogistik (Date → Component → Amount)
  * @returns BedarfsBacklogErgebnis mit allen Details
  */
 export function berechneBedarfsBacklog(
   produktionsplaene: Record<string, TagesProduktionEntry[]>,
   konfiguration: KonfigurationData,
-  inboundLieferungen?: Map<string, Record<string, number>>
+  lieferungenAmWerk: Map<string, Record<string, number>>
 ): BedarfsBacklogErgebnis {
   // Reset Counter für neue Berechnung
   bestellungsCounter = 1
@@ -377,14 +378,11 @@ export function berechneBedarfsBacklog(
     tagesDetails.forEach(detail => {
       const datumStr = toLocalISODateString(detail.datum)
       
-      // 1. Material-Ankunft
-      let materialAnkunft = 0
-      
-      if (inboundLieferungen) {
-        // Nutze Material-Lieferungen aus Inbound-Modul
-        const lieferungAmTag = inboundLieferungen.get(datumStr)
-        materialAnkunft = lieferungAmTag?.[komponentenId] || 0
-      }
+      // 1. Material-Ankunft (✅ EXKLUSIV AUS HAFENLOGISTIK!)
+      // KRITISCH: Keine anderen Materialquellen erlaubt!
+      // Nur was die Hafenlogistik (generiereInboundLieferplan) liefert, ist verfügbar
+      const lieferungAmTag = lieferungenAmWerk.get(datumStr)
+      const materialAnkunft = lieferungAmTag?.[komponentenId] || 0
       
       detail.materialAnkunft = materialAnkunft
       
@@ -428,17 +426,12 @@ export function berechneBedarfsBacklog(
     const gesamtProduziert = tagesDetails.reduce((sum, t) => sum + t.tatsaechlicheProduktion, 0)
     const gesamtFehlmenge = gesamtBedarf - gesamtProduziert
     
-    // Bestellt-Summe: Entweder aus Inbound oder aus lokalen Bestellungen
+    // Bestellt-Summe: ✅ EXKLUSIV aus Hafenlogistik (lieferungenAmWerk)
+    // Summiere alle tatsächlichen Lieferungen für diese Komponente aus der Hafenlogistik
     let gesamtBestellt = 0
-    if (inboundLieferungen) {
-      // Nutze Material aus Inbound (summiere alle Lieferungen für diese Komponente)
-      inboundLieferungen.forEach(komponenten => {
-        gesamtBestellt += komponenten[komponentenId] || 0
-      })
-    } else {
-      // Fallback: Nutze lokale Bestellungen
-      gesamtBestellt = bestellungen.reduce((sum, b) => sum + b.bestellmenge, 0)
-    }
+    lieferungenAmWerk.forEach(komponenten => {
+      gesamtBestellt += komponenten[komponentenId] || 0
+    })
     
     const tageMitBestellung = tagesDetails.filter(t => t.bestellungAusgeloest).length
     const tageOhneBestellung = 365 - tageMitBestellung
