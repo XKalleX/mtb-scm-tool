@@ -6,7 +6,6 @@
  * ========================================
  * 
  * Kompakte Übersichtsseite mit:
- * - Wichtige KPIs auf einen Blick
  * - Schnellzugriff auf alle Module
  * - Aktuelle Warnungen und Hinweise
  * - Aktive Szenarien Status
@@ -21,55 +20,21 @@ import {
   Download, 
   Factory,
   BarChart3,
-  Package,
-  TrendingUp,
-  Calendar,
-  ArrowRight,
-  Zap
+  Zap,
+  ArrowRight
 } from 'lucide-react'
-import { useSzenarien, berechneGlobaleAuswirkungen, BASELINE_WERTE } from '@/contexts/SzenarienContext'
-import { useKonfiguration, STANDARD_KONFIGURATION } from '@/contexts/KonfigurationContext'
-import { useMemo } from 'react'
-import { formatNumber } from '@/lib/utils'
+import { useSzenarien } from '@/contexts/SzenarienContext'
+import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { CollapsibleInfo } from '@/components/ui/collapsible-info'
-
-/**
- * Fallback-Wert für Arbeitstage wenn Konfiguration noch nicht geladen ist
- * Entspricht durchschnittlicher Anzahl Arbeitstage pro Jahr in Deutschland
- */
-const DEFAULT_ARBEITSTAGE_FALLBACK = 252
 
 /**
  * Dashboard Hauptkomponente mit Szenarien-Integration und Live-Berechnungen
  */
 export default function Dashboard() {
   const { getAktiveSzenarien } = useSzenarien()
-  const { konfiguration, isInitialized, getArbeitstageProJahr } = useKonfiguration()
+  const { isInitialized } = useKonfiguration()
   const aktiveSzenarien = getAktiveSzenarien()
-  
-  // Berechne Auswirkungen der aktiven Szenarien in Echtzeit
-  const auswirkungen = useMemo(() => {
-    return berechneGlobaleAuswirkungen(aktiveSzenarien)
-  }, [aktiveSzenarien])
-
-  // Berechne Änderungen gegenüber Baseline
-  // Nutze Konfiguration statt hardcodierter Werte
-  const jahresproduktion = konfiguration.jahresproduktion
-  
-  // Berechne Produktionsmenge mit Szenarien-Effekten
-  // Wenn Szenarien aktiv sind, skaliere den Effekt proportional zur konfigurierten Jahresproduktion
-  const produktionsmenge = aktiveSzenarien.length > 0 
-    ? Math.round(jahresproduktion * (auswirkungen.produktionsmenge / STANDARD_KONFIGURATION.jahresproduktion))
-    : jahresproduktion
-
-  const produktionsDiff = produktionsmenge - jahresproduktion
-  const produktionsProzent = ((produktionsDiff / jahresproduktion) * 100).toFixed(1)
-  const liefertreueDiff = auswirkungen.liefertreue - BASELINE_WERTE.liefertreue
-  const liefertreueProzent = (liefertreueDiff).toFixed(1)
-
-  // Arbeitstage aus Konfiguration berechnen
-  const arbeitstage = isInitialized ? getArbeitstageProJahr() : DEFAULT_ARBEITSTAGE_FALLBACK
   
   if (!isInitialized) {
     return <div className="text-center py-8">Lade Dashboard...</div>
@@ -81,49 +46,13 @@ export default function Dashboard() {
       <div>
         <h1 className="text-3xl font-bold">Supply Chain Dashboard</h1>
         <p className="text-muted-foreground mt-1">
-          Übersicht über alle wichtigen Kennzahlen und Funktionen
+          Übersicht über alle Funktionen
           {aktiveSzenarien.length > 0 && ' - Live-Berechnung mit aktiven Szenarien'}
         </p>
       </div>
 
       {/* Aktive Szenarien Banner */}
       <ActiveScenarioBanner showDetails={false} />
-
-      {/* KPI Cards - Wichtigste Kennzahlen mit Live-Updates */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <KPICard
-          title="Jahresproduktion"
-          value={formatNumber(produktionsmenge, 0)}
-          unit="Bikes"
-          icon={Factory}
-          trend={aktiveSzenarien.length > 0 ? `${parseFloat(produktionsProzent) > 0 ? '+' : ''}${produktionsProzent}%` : undefined}
-          trendUp={produktionsDiff >= 0}
-        />
-        <KPICard
-          title="Produktionstage"
-          value={arbeitstage.toString()}
-          unit="Tage"
-          icon={Calendar}
-          trend="von 365"
-          trendUp={true}
-        />
-        <KPICard
-          title="Liefertreue"
-          value={`${auswirkungen.liefertreue.toFixed(1)}%`}
-          unit=""
-          icon={TrendingUp}
-          trend={aktiveSzenarien.length > 0 ? `${liefertreueDiff > 0 ? '+' : ''}${liefertreueProzent}%` : undefined}
-          trendUp={liefertreueDiff >= 0}
-        />
-        <KPICard
-          title="Materialverfügbarkeit"
-          value={`${auswirkungen.materialverfuegbarkeit.toFixed(1)}%`}
-          unit=""
-          icon={Package}
-          trend={aktiveSzenarien.length > 0 ? 'Live' : 'Baseline'}
-          trendUp={auswirkungen.materialverfuegbarkeit >= 95}
-        />
-      </div>
 
       {/* Aktive Szenarien Status - COLLAPSIBLE */}
       {aktiveSzenarien.length > 0 && (
@@ -204,46 +133,6 @@ export default function Dashboard() {
 }
 
 import { LucideIcon } from 'lucide-react'
-
-/**
- * KPI Card Komponente
- * Zeigt eine einzelne Kennzahl mit Trend-Indikator
- */
-function KPICard({ 
-  title, 
-  value, 
-  unit, 
-  icon: Icon, 
-  trend, 
-  trendUp 
-}: { 
-  title: string
-  value: string
-  unit: string
-  icon: LucideIcon
-  trend?: string
-  trendUp: boolean
-}) {
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">{title}</CardTitle>
-          <Icon className="h-4 w-4 text-muted-foreground" />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground">{unit}</p>
-        {trend && (
-          <p className={`text-xs mt-2 ${trendUp ? 'text-green-600' : 'text-gray-600'}`}>
-            {trend}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
 
 /**
  * Modul Card Komponente
