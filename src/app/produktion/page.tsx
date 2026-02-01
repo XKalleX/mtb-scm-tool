@@ -136,6 +136,8 @@ export default function ProduktionPage() {
   const variantenProduktionsplaeneForWarehouse = useMemo(() => {
     // Wenn Szenarien aktiv: Nutze szenario-aware Pläne direkt aus Hook
     // Das Format ist bereits Record<string, VariantenProduktionsplan>
+    // NOTE: Type-Cast ist sicher weil TagesProduktionMitDelta extends TagesProduktionEntry
+    // (hat alle benötigten Felder plus zusätzliche Delta-Felder)
     if (hasSzenarien && variantenPlaeneMitSzenarien) {
       return variantenPlaeneMitSzenarien as Record<string, VariantenProduktionsplan>
     }

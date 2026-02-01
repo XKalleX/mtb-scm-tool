@@ -37,15 +37,19 @@ const istJahresProduktion = plan.jahresProduktionIst
 const delta = istJahresProduktion - baselineJahresProduktion
 const hatDelta = Math.abs(delta) > 10
 
-// Visuell: Blauer Rand wenn Szenarien aktiv, grün wenn OK
+// Visuelle Klassifizierung:
+// - BLAU:   Szenarien aktiv & signifikantes Delta
+// - GRÜN:   Keine Szenarien & Abweichung OK (≤1 Bike)
+// - ORANGE: Abweichung zu groß (>1 Bike)
 <DeltaBadge delta={delta} suffix="" className="text-[10px]" />
 ```
 
 **Ergebnis:**
 - ✅ Kacheln zeigen jetzt echte Ist-Werte (mit Szenarien)
 - ✅ Delta wird als `+X` oder `-X` Badge angezeigt
-- ✅ Blauer Rand bei aktiven Szenarien
-- ✅ Grüner Rand bei OK (ohne Szenarien)
+- ✅ Blauer Rand bei aktiven Szenarien (signifikantes Delta)
+- ✅ Grüner Rand bei OK (keine Szenarien, Abweichung ≤1)
+- ✅ Oranger Rand bei Abweichung >1 Bike
 
 ---
 
