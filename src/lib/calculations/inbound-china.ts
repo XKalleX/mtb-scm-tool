@@ -643,3 +643,121 @@ export function erstelleZusatzbestellung(
     wartetageAmHafen: materialfluss.wartetageHafen
   }
 }
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SZENARIO-MODIFIKATION: Wendet Szenarien auf Lieferungen an
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * Diese Funktion modifiziert die Lieferungen basierend auf aktiven Szenarien:
+ * - wasserschaden: Reduziert oder entfernt Lieferungen
+ * - schiffsverspaetung: Verschiebt Ankunftsdatum von Lieferungen
+ * 
+ * @param lieferungenAmWerk - Original-Lieferungen aus Hafenlogistik-Simulation
+ * @param szenarien - Aktive Szenarien aus SzenarienContext
+ * @returns Modifizierte Lieferungen-Map
+ */
+export interface SzenarioConfig {
+  id: string
+  typ: string
+  parameter: Record<string, any>
+  aktiv: boolean
+}
+
+export function wendeSzenarienAufLieferungenAn(
+  lieferungenAmWerk: Map<string, Record<string, number>>,
+  szenarien: SzenarioConfig[]
+): Map<string, Record<string, number>> {
+  // Erstelle eine Kopie der Lieferungen
+  const modifizierteLieferungen = new Map<string, Record<string, number>>()
+  lieferungenAmWerk.forEach((komponenten, datum) => {
+    modifizierteLieferungen.set(datum, { ...komponenten })
+  })
+  
+  // Filtere aktive Szenarien
+  const aktiveSzenarien = szenarien.filter(s => s.aktiv)
+  
+  aktiveSzenarien.forEach(szenario => {
+    switch (szenario.typ) {
+      case 'wasserschaden': {
+        /**
+         * TRANSPORT-SCHADEN SZENARIO
+         * Reduziert oder entfernt ausgewählte Lieferungen
+         */
+        const betroffeneLieferungen = szenario.parameter.betroffeneLieferungen || []
+        const schadenTyp = szenario.parameter.schadenTyp || 'teilweise'
+        const reduktionProzent = szenario.parameter.reduktionProzent || 50
+        
+        betroffeneLieferungen.forEach((lieferDatum: string) => {
+          if (modifizierteLieferungen.has(lieferDatum)) {
+            if (schadenTyp === 'komplett') {
+              // Lieferung komplett verloren
+              modifizierteLieferungen.delete(lieferDatum)
+              console.log(`🚨 TRANSPORT-SCHADEN: Lieferung am ${lieferDatum} komplett verloren!`)
+            } else {
+              // Teilweise Reduktion
+              const komponenten = modifizierteLieferungen.get(lieferDatum)!
+              const faktor = 1 - (reduktionProzent / 100)
+              const reduzierteKomponenten: Record<string, number> = {}
+              
+              Object.entries(komponenten).forEach(([kompId, menge]) => {
+                reduzierteKomponenten[kompId] = Math.floor(menge * faktor)
+              })
+              
+              modifizierteLieferungen.set(lieferDatum, reduzierteKomponenten)
+              console.log(`⚠️ TRANSPORT-SCHADEN: Lieferung am ${lieferDatum} um ${reduktionProzent}% reduziert`)
+            }
+          }
+        })
+        break
+      }
+      
+      case 'schiffsverspaetung': {
+        /**
+         * SCHIFFSVERSPÄTUNG SZENARIO
+         * Verschiebt Ankunftsdatum ausgewählter Lieferungen
+         */
+        const betroffeneLieferungen = szenario.parameter.betroffeneLieferungen || []
+        const verspaetungTage = szenario.parameter.verspaetungTage || 7
+        
+        betroffeneLieferungen.forEach((originalDatum: string) => {
+          if (modifizierteLieferungen.has(originalDatum)) {
+            // Berechne neues Datum
+            const altesD = new Date(originalDatum)
+            const neuesDatum = addDays(altesD, verspaetungTage)
+            const neuesDatumStr = toLocalISODateString(neuesDatum)
+            
+            // Verschiebe Lieferung
+            const komponenten = modifizierteLieferungen.get(originalDatum)!
+            modifizierteLieferungen.delete(originalDatum)
+            
+            // Falls am neuen Datum schon eine Lieferung existiert, addiere Mengen
+            if (modifizierteLieferungen.has(neuesDatumStr)) {
+              const existierende = modifizierteLieferungen.get(neuesDatumStr)!
+              Object.entries(komponenten).forEach(([kompId, menge]) => {
+                existierende[kompId] = (existierende[kompId] || 0) + menge
+              })
+            } else {
+              modifizierteLieferungen.set(neuesDatumStr, komponenten)
+            }
+            
+            console.log(`🚢 SCHIFFSVERSPÄTUNG: Lieferung von ${originalDatum} → ${neuesDatumStr} (+${verspaetungTage} Tage)`)
+          }
+        })
+        break
+      }
+      
+      case 'maschinenausfall': {
+        /**
+         * CHINA AUSFALL SZENARIO
+         * Bereits in der Produktionsplanung berücksichtigt
+         * Hier keine zusätzliche Aktion nötig, da Bestellungen bereits reduziert werden
+         */
+        console.log(`🔧 CHINA-AUSFALL: Szenario aktiv - wirkt auf Produktionsplanung`)
+        break
+      }
+    }
+  })
+  
+  return modifizierteLieferungen
+}
