@@ -114,7 +114,7 @@ export interface TaeglicheBestellung {
  * @returns Map: Lieferdatum am Werk → Menge + Statistiken
  */
 interface HafenSimulationErgebnis {
-  lieferungenAmWerk: Map<string, number>  // Date-String → Menge
+  lieferungenAmWerk: Map<string, Record<string, number>>  // Date-String → Component → Amount
   hafenStatistik: {
     maxLagerbestand: number
     durchschnittlicheWartezeit: number
@@ -293,11 +293,16 @@ function simuliereHafenUndSchiffsversand(
     aktuelleDatum = addDays(aktuelleDatum, 1)
   }
   
-  // Konvertiere zu flacher Map (String → Gesamtmenge)
-  const flatLieferungen = new Map<string, number>()
+  // ✅ KRITISCH: Behalte detaillierte Komponenten-Informationen!
+  // Konvertiere Map<string, Map<string, number>> zu Map<string, Record<string, number>>
+  // für Kompatibilität mit Rückgabetyp
+  const lieferungenAmWerkRecord = new Map<string, Record<string, number>>()
   lieferungenAmWerk.forEach((komponenten, datum) => {
-    const gesamtMenge = Array.from(komponenten.values()).reduce((sum, m) => sum + m, 0)
-    flatLieferungen.set(datum, gesamtMenge)
+    const record: Record<string, number> = {}
+    komponenten.forEach((menge, kompId) => {
+      record[kompId] = menge
+    })
+    lieferungenAmWerkRecord.set(datum, record)
   })
   
   // Berechne durchschnittliche Wartezeit
@@ -306,7 +311,7 @@ function simuliereHafenUndSchiffsversand(
     : 0
   
   return {
-    lieferungenAmWerk: flatLieferungen,
+    lieferungenAmWerk: lieferungenAmWerkRecord,
     hafenStatistik: {
       maxLagerbestand,
       durchschnittlicheWartezeit,
@@ -372,22 +377,15 @@ export function generiereInboundLieferplan(
   // 2. Simuliere Hafen und Schiffsversand
   const hafenSimulation = simuliereHafenUndSchiffsversand(bestellungen, customFeiertage, losgroesse)
   
-  // 3. Konvertiere zu detaillierter Lieferungs-Map (Date → Component → Amount)
-  const lieferungenAmWerk = new Map<string, Record<string, number>>()
-  
-  // Gruppiere Bestellungen nach Verfügbarkeitsdatum
-  bestellungen.forEach(bestellung => {
-    const verfuegbarStr = toLocalISODateString(bestellung.verfuegbarAb)
-    
-    if (!lieferungenAmWerk.has(verfuegbarStr)) {
-      lieferungenAmWerk.set(verfuegbarStr, {})
-    }
-    
-    const tagesLieferung = lieferungenAmWerk.get(verfuegbarStr)!
-    Object.entries(bestellung.komponenten).forEach(([kompId, menge]) => {
-      tagesLieferung[kompId] = (tagesLieferung[kompId] || 0) + menge
-    })
-  })
+  // ✅ KRITISCH: Nutze lieferungenAmWerk DIREKT aus Hafenlogistik-Simulation!
+  // Die Simulation hat bereits:
+  // - Mittwochs-Schiffe berücksichtigt
+  // - Wartezeiten am Hafen berechnet
+  // - Losgrößen-basierte Beladung durchgeführt
+  // - Proportionale Verteilung auf Komponenten vorgenommen
+  //
+  // NICHT neu berechnen oder aus Bestellungen ableiten!
+  const lieferungenAmWerk = hafenSimulation.lieferungenAmWerk
   
   console.log(`
     ═══════════════════════════════════════════════════════════════════════════════
@@ -396,6 +394,7 @@ export function generiereInboundLieferplan(
     Max. Lagerbestand am Hafen:   ${hafenSimulation.hafenStatistik.maxLagerbestand.toLocaleString('de-DE')} Sättel
     Anzahl Schiffe:                ${hafenSimulation.hafenStatistik.anzahlSchiffe}
     Ø Wartezeit am Hafen:          ${hafenSimulation.hafenStatistik.durchschnittlicheWartezeit.toFixed(1)} Tage
+    Liefertage am Werk:            ${lieferungenAmWerk.size}
     
     Schiffe fahren NUR mittwochs!
     Losgröße pro Schiff: ${losgroesse} Sättel (Vielfaches)
