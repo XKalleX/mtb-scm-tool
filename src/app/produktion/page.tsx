@@ -331,7 +331,7 @@ export default function ProduktionPage() {
     
     // Konvertiere zu altem Format für UI-Kompatibilität
     // Mappe 'negativ' Status zu 'kritisch' für UI (zeigt explizit kritische Bestände an)
-    const mapStatus = (status: 'ok' | 'niedrig' | 'kritisch' | 'negativ'): 'ok' | 'niedrig' | 'kritisch' => {
+    const mapStatus = (status: 'hoch' | 'ok' | 'niedrig' | 'kritisch' | 'negativ'): 'hoch' | 'ok' | 'niedrig' | 'kritisch' => {
       if (status === 'negativ') {
         // Negative Bestände sollten nicht auftreten (ATP-Check verhindert), aber falls doch: kritisch
         console.warn('⚠️ Negative inventory detected! ATP check may have failed.')
@@ -1698,6 +1698,7 @@ export default function ProduktionPage() {
                   format: (val) => {
                     if (val === 'kritisch') return '🔴 Kritisch'
                     if (val === 'niedrig') return '🟡 Niedrig'
+                    if (val === 'hoch') return '🔵 Hoch'
                     return '🟢 OK'
                   },
                   sumable: false
@@ -1800,6 +1801,7 @@ export default function ProduktionPage() {
                   format: (val) => {
                     if (val === 'kritisch') return '🔴 Kritisch'
                     if (val === 'niedrig') return '🟡 Niedrig'
+                    if (val === 'hoch') return '🔵 Hoch'
                     return '🟢 OK'
                   },
                   sumable: false
@@ -1884,6 +1886,7 @@ export default function ProduktionPage() {
                   format: (val) => {
                     if (val === 'kritisch') return '🔴 Kritisch'
                     if (val === 'niedrig') return '🟡 Niedrig'
+                    if (val === 'hoch') return '🔵 Hoch'
                     return '🟢 OK'
                   },
                   sumable: false
