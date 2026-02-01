@@ -730,18 +730,20 @@ function aggregiereWoechentlichePlanerfuellung(eintraege: TagesProduktionEntry[]
     }
   }
   
-  // Filter auf heute-Datum falls angegeben (nur für IST-Daten)
-  const gefiltert = heuteDatum 
-    ? eintraege.filter(e => e.datum <= heuteDatum)
-    : eintraege
-  
-  gefiltert.forEach(e => {
+  // ✅ KRITISCHER FIX: Verarbeite ALLE Einträge für PLAN-Daten (nicht filtern!)
+  // Nur IST-Daten werden nach heuteDatum gefiltert
+  eintraege.forEach(e => {
     if (wochen[e.kalenderwoche] && e.istArbeitstag) {
+      // PLAN-Daten: IMMER addieren (für alle 52 Wochen)
       wochen[e.kalenderwoche].planMenge += e.planMenge
-      wochen[e.kalenderwoche].istMenge += e.istMenge
       wochen[e.kalenderwoche].tageGesamt += 1
-      if (e.istMenge === e.planMenge) {
-        wochen[e.kalenderwoche].tageErfuellt += 1
+      
+      // IST-Daten: NUR bis heuteDatum (Frozen Zone)
+      if (!heuteDatum || e.datum <= heuteDatum) {
+        wochen[e.kalenderwoche].istMenge += e.istMenge
+        if (e.istMenge === e.planMenge) {
+          wochen[e.kalenderwoche].tageErfuellt += 1
+        }
       }
     }
   })
@@ -827,16 +829,18 @@ function aggregiereWoechentlichePlanungsgenauigkeit(eintraege: TagesProduktionEn
     }
   }
   
-  // Filter auf heute-Datum falls angegeben (nur für IST-Daten)
-  const gefiltert = heuteDatum 
-    ? eintraege.filter(e => e.datum <= heuteDatum)
-    : eintraege
-  
-  gefiltert.forEach(e => {
+  // ✅ KRITISCHER FIX: Verarbeite ALLE Einträge für PLAN-Daten (nicht filtern!)
+  // Nur IST-Daten werden nach heuteDatum gefiltert
+  eintraege.forEach(e => {
     if (wochen[e.kalenderwoche]) {
+      // PLAN-Daten: IMMER addieren (für alle 52 Wochen)
       wochen[e.kalenderwoche].planMenge += e.planMenge
-      wochen[e.kalenderwoche].istMenge += e.istMenge
-      wochen[e.kalenderwoche].absoluteAbweichung += Math.abs(e.istMenge - e.planMenge)
+      
+      // IST-Daten: NUR bis heuteDatum (Frozen Zone)
+      if (!heuteDatum || e.datum <= heuteDatum) {
+        wochen[e.kalenderwoche].istMenge += e.istMenge
+        wochen[e.kalenderwoche].absoluteAbweichung += Math.abs(e.istMenge - e.planMenge)
+      }
     }
   })
   
