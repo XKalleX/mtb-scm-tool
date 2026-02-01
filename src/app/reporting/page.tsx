@@ -194,10 +194,9 @@ export default function ReportingPage() {
                 label="Erfüllungsgrad (%)"
                 zielwert={95}
               />,
-              <WoechentlicheHeatmap
-                key="heatmap"
+              <PlanerfuellungMonatlichChart
+                key="balken"
                 data={zeitreihen.planerfuellungMonatlich}
-                title="Erfüllungsgrad pro Monat"
               />
             ]}
             exportData={{
@@ -544,7 +543,33 @@ function MonatlicherVerlaufChart({ data, dataKey, label, zielwert }: any) {
   )
 }
 
-// Chart 2: Heatmap (BarChart mit color-coding)
+// Chart 2: Planerfüllung Monatlich (Bar Chart mit Plan/Ist)
+function PlanerfuellungMonatlichChart({ data }: any) {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium">Plan vs. Ist pro Monat</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+          <XAxis 
+            dataKey="monatName" 
+            tick={{ fontSize: 12 }}
+            angle={-45}
+            textAnchor="end"
+            height={80}
+          />
+          <YAxis tick={{ fontSize: 12 }} />
+          <Tooltip />
+          <Legend />
+          <Bar dataKey="planMenge" name="Plan" fill={CHART_COLORS.primary} opacity={0.6} />
+          <Bar dataKey="istMenge" name="Ist" fill={CHART_COLORS.secondary} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+// Chart 2b: Heatmap (BarChart mit color-coding)
 function WoechentlicheHeatmap({ data, title }: any) {
   return (
     <div className="space-y-2">
@@ -637,22 +662,32 @@ function LiefertreueLieferungenScatter({ data }: any) {
 
 // Chart 4: Monatliche Liefertreue (Bars)
 function MonatlicheLiefertreueBars({ data }: any) {
-  // Aggregiere monatlich
-  const monatlich = data.reduce((acc: any, lieferung: any) => {
+  // Initialisiere alle 12 Monate
+  const monatlich: Record<number, any> = {}
+  for (let m = 1; m <= 12; m++) {
+    monatlich[m] = { 
+      monat: m, 
+      monatName: ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][m - 1],
+      puenktlich: 0, 
+      gesamt: 0 
+    }
+  }
+  
+  // Aggregiere Lieferungen nach Bestellmonat
+  data.forEach((lieferung: any) => {
     const monat = new Date(lieferung.bestelldatum).getMonth() + 1
-    if (!acc[monat]) {
-      acc[monat] = { monat, puenktlich: 0, gesamt: 0 }
+    if (monatlich[monat]) {
+      monatlich[monat].gesamt += 1
+      if (lieferung.puenktlich) {
+        monatlich[monat].puenktlich += 1
+      }
     }
-    acc[monat].gesamt += 1
-    if (lieferung.puenktlich) {
-      acc[monat].puenktlich += 1
-    }
-    return acc
-  }, {})
+  })
 
   const chartData = Object.values(monatlich).map((m: any) => ({
-    monat: ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][m.monat - 1],
-    liefertreue: m.gesamt > 0 ? (m.puenktlich / m.gesamt) * 100 : 0
+    monat: m.monatName,
+    liefertreue: m.gesamt > 0 ? (m.puenktlich / m.gesamt) * 100 : 100,
+    anzahl: m.gesamt
   }))
 
   return (
@@ -663,7 +698,21 @@ function MonatlicheLiefertreueBars({ data }: any) {
           <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
           <XAxis dataKey="monat" tick={{ fontSize: 12 }} />
           <YAxis tick={{ fontSize: 12 }} domain={[0, 100]} />
-          <Tooltip />
+          <Tooltip 
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                const data = payload[0].payload
+                return (
+                  <div className="bg-white p-2 border rounded shadow">
+                    <p className="font-medium">{data.monat}</p>
+                    <p className="text-sm">Liefertreue: {data.liefertreue.toFixed(1)}%</p>
+                    <p className="text-sm">Lieferungen: {data.anzahl}</p>
+                  </div>
+                )
+              }
+              return null
+            }}
+          />
           <ReferenceLine y={95} stroke={CHART_COLORS.quaternary} strokeDasharray="5 5" label="Ziel: 95%" />
           <Bar dataKey="liefertreue" name="Liefertreue (%)">
             {chartData.map((entry: any, index: number) => (
@@ -739,8 +788,24 @@ function MonatlicheDurchlaufzeitChart({ data }: any) {
             textAnchor="end"
             height={80}
           />
-          <YAxis tick={{ fontSize: 12 }} />
-          <Tooltip />
+          <YAxis tick={{ fontSize: 12 }} label={{ value: 'Tage', angle: -90, position: 'insideLeft' }} />
+          <Tooltip 
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                const data = payload[0].payload
+                return (
+                  <div className="bg-white p-2 border rounded shadow">
+                    <p className="font-medium">{data.monatName}</p>
+                    <p className="text-sm">Min: {data.min.toFixed(1)} Tage</p>
+                    <p className="text-sm">Ø: {data.durchschnitt.toFixed(1)} Tage</p>
+                    <p className="text-sm">Max: {data.max.toFixed(1)} Tage</p>
+                    <p className="text-sm">Lieferungen: {data.anzahlLieferungen}</p>
+                  </div>
+                )
+              }
+              return null
+            }}
+          />
           <Legend />
           <Line 
             type="monotone" 
@@ -754,7 +819,7 @@ function MonatlicheDurchlaufzeitChart({ data }: any) {
             dataKey="durchschnitt" 
             name="Durchschnitt"
             stroke={CHART_COLORS.primary}
-            strokeWidth={2}
+            strokeWidth={3}
           />
           <Line 
             type="monotone" 
@@ -845,14 +910,30 @@ function MonatlicheAbweichungChart({ data }: any) {
             textAnchor="end"
             height={80}
           />
-          <YAxis tick={{ fontSize: 12 }} />
-          <Tooltip />
+          <YAxis tick={{ fontSize: 12 }} label={{ value: 'Abweichung (Stück)', angle: -90, position: 'insideLeft' }} />
+          <Tooltip 
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                const data = payload[0].payload
+                return (
+                  <div className="bg-white p-2 border rounded shadow">
+                    <p className="font-medium">{data.monatName}</p>
+                    <p className="text-sm">Plan: {data.planMenge.toLocaleString()}</p>
+                    <p className="text-sm">Ist: {data.istMenge.toLocaleString()}</p>
+                    <p className="text-sm font-bold">Abweichung: {data.abweichung.toLocaleString()} Stück</p>
+                    <p className="text-sm">Genauigkeit: {data.genauigkeit.toFixed(1)}%</p>
+                  </div>
+                )
+              }
+              return null
+            }}
+          />
           <ReferenceLine y={0} stroke="#000" />
-          <Bar dataKey="abweichung" name="Abweichung">
+          <Bar dataKey="abweichung" name="Abweichung (Plan - Ist)">
             {data.map((entry: any, index: number) => (
               <Cell 
                 key={`cell-${index}`}
-                fill={entry.abweichung < 1000 ? '#10b981' : entry.abweichung < 3000 ? '#f59e0b' : '#ef4444'}
+                fill={Math.abs(entry.abweichung) < 1000 ? '#10b981' : Math.abs(entry.abweichung) < 3000 ? '#f59e0b' : '#ef4444'}
               />
             ))}
           </Bar>
@@ -877,8 +958,23 @@ function MonatlicheVerfuegbarkeitAreaChart({ data }: any) {
             textAnchor="end"
             height={80}
           />
-          <YAxis tick={{ fontSize: 12 }} domain={[0, 100]} />
-          <Tooltip />
+          <YAxis tick={{ fontSize: 12 }} domain={[0, 100]} label={{ value: 'Verfügbarkeit (%)', angle: -90, position: 'insideLeft' }} />
+          <Tooltip 
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                const data = payload[0].payload
+                return (
+                  <div className="bg-white p-2 border rounded shadow">
+                    <p className="font-medium">{data.monatName}</p>
+                    <p className="text-sm">Verfügbarkeit: {data.erfuellungsrate.toFixed(1)}%</p>
+                    <p className="text-sm">Tage erfüllt: {data.tageErfuellt}/{data.tageGesamt}</p>
+                    <p className="text-sm text-red-600">Kritische Tage: {data.kritischeTage}</p>
+                  </div>
+                )
+              }
+              return null
+            }}
+          />
           <Legend />
           <ReferenceLine 
             y={95} 
@@ -992,8 +1088,23 @@ function ReichweiteHeatmapChart({ data }: any) {
             textAnchor="end"
             height={80}
           />
-          <YAxis tick={{ fontSize: 12 }} />
-          <Tooltip />
+          <YAxis tick={{ fontSize: 12 }} label={{ value: 'Reichweite (Tage)', angle: -90, position: 'insideLeft' }} />
+          <Tooltip 
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                const data = payload[0].payload
+                return (
+                  <div className="bg-white p-2 border rounded shadow">
+                    <p className="font-medium">{data.monatName}</p>
+                    <p className="text-sm">Reichweite: {data.reichweiteTage.toFixed(1)} Tage</p>
+                    <p className="text-sm">Ø Bestand: {data.durchschnittBestand.toFixed(0)}</p>
+                    <p className="text-sm">Ø Verbrauch: {data.durchschnittVerbrauch.toFixed(0)}/Tag</p>
+                  </div>
+                )
+              }
+              return null
+            }}
+          />
           <ReferenceLine 
             y={5} 
             stroke={CHART_COLORS.quaternary}
