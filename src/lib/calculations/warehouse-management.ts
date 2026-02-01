@@ -923,11 +923,11 @@ export function korrigiereProduktionsplaeneMitWarehouse(
   
   // Für jeden Tag im Warehouse
   warehouseResult.tage.forEach(warehouseTag => {
-    const datumStr = warehouseTag.datumStr
-    
     // Nur Tage im Planungsjahr (1-365)
     const tagImJahr = warehouseTag.tag
     if (tagImJahr < 1 || tagImJahr > 365) return
+    
+    const datumStr = warehouseTag.datumStr
     
     // Für jede Variante
     Object.entries(korrigiertePlaene).forEach(([varianteId, plan]) => {
