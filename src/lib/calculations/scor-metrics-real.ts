@@ -717,26 +717,26 @@ function aggregiereMonatlicheDurchlaufzeit(bestellungen: TaeglicheBestellung[]) 
  * @param heuteDatum - Optional: Nur Tage bis zu diesem Datum berücksichtigen (Frozen Zone)
  */
 function aggregiereWoechentlichePlanerfuellung(eintraege: TagesProduktionEntry[], heuteDatum?: Date) {
+  // ✅ FIX: Initialisiere ALLE 52 Wochen, damit sie im Chart angezeigt werden
   const wochen: Record<number, any> = {}
+  for (let kw = 1; kw <= 52; kw++) {
+    wochen[kw] = {
+      kalenderwoche: kw,
+      jahr: 2027,
+      planMenge: 0,
+      istMenge: 0,
+      tageErfuellt: 0,
+      tageGesamt: 0
+    }
+  }
   
-  // Filter auf heute-Datum falls angegeben
+  // Filter auf heute-Datum falls angegeben (nur für IST-Daten)
   const gefiltert = heuteDatum 
     ? eintraege.filter(e => e.datum <= heuteDatum)
     : eintraege
   
   gefiltert.forEach(e => {
-    if (!wochen[e.kalenderwoche]) {
-      wochen[e.kalenderwoche] = {
-        kalenderwoche: e.kalenderwoche,
-        jahr: e.datum.getFullYear(),
-        planMenge: 0,
-        istMenge: 0,
-        tageErfuellt: 0,
-        tageGesamt: 0
-      }
-    }
-    
-    if (e.istArbeitstag) {
+    if (wochen[e.kalenderwoche] && e.istArbeitstag) {
       wochen[e.kalenderwoche].planMenge += e.planMenge
       wochen[e.kalenderwoche].istMenge += e.istMenge
       wochen[e.kalenderwoche].tageGesamt += 1
@@ -815,27 +815,29 @@ function aggregiereWoechentlicheDurchlaufzeit(bestellungen: TaeglicheBestellung[
  * @param heuteDatum - Optional: Nur Tage bis zu diesem Datum berücksichtigen (Frozen Zone)
  */
 function aggregiereWoechentlichePlanungsgenauigkeit(eintraege: TagesProduktionEntry[], heuteDatum?: Date) {
+  // ✅ FIX: Initialisiere ALLE 52 Wochen, damit sie im Chart angezeigt werden
   const wochen: Record<number, any> = {}
+  for (let kw = 1; kw <= 52; kw++) {
+    wochen[kw] = {
+      kalenderwoche: kw,
+      jahr: 2027,
+      planMenge: 0,
+      istMenge: 0,
+      absoluteAbweichung: 0
+    }
+  }
   
-  // Filter auf heute-Datum falls angegeben
+  // Filter auf heute-Datum falls angegeben (nur für IST-Daten)
   const gefiltert = heuteDatum 
     ? eintraege.filter(e => e.datum <= heuteDatum)
     : eintraege
   
   gefiltert.forEach(e => {
-    if (!wochen[e.kalenderwoche]) {
-      wochen[e.kalenderwoche] = {
-        kalenderwoche: e.kalenderwoche,
-        jahr: e.datum.getFullYear(),
-        planMenge: 0,
-        istMenge: 0,
-        absoluteAbweichung: 0
-      }
+    if (wochen[e.kalenderwoche]) {
+      wochen[e.kalenderwoche].planMenge += e.planMenge
+      wochen[e.kalenderwoche].istMenge += e.istMenge
+      wochen[e.kalenderwoche].absoluteAbweichung += Math.abs(e.istMenge - e.planMenge)
     }
-    
-    wochen[e.kalenderwoche].planMenge += e.planMenge
-    wochen[e.kalenderwoche].istMenge += e.istMenge
-    wochen[e.kalenderwoche].absoluteAbweichung += Math.abs(e.istMenge - e.planMenge)
   })
   
   return Object.values(wochen).map(w => ({

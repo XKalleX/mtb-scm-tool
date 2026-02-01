@@ -1173,7 +1173,9 @@ function WoechentlicherVerlaufChart({ data, dataKey, label, zielwert }: any) {
           <XAxis 
             dataKey="kalenderwoche" 
             label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5 }}
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 10 }}
+            interval="preserveStartEnd"
+            minTickGap={10}
           />
           <YAxis tick={{ fontSize: 12 }} />
           <Tooltip 
@@ -1222,7 +1224,9 @@ function PlanerfuellungWoechentlichChart({ data }: any) {
           <XAxis 
             dataKey="kalenderwoche" 
             label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5 }}
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 10 }}
+            interval="preserveStartEnd"
+            minTickGap={10}
           />
           <YAxis tick={{ fontSize: 12 }} />
           <Tooltip />
@@ -1314,7 +1318,9 @@ function PlanVsIstWoechentlichChart({ data }: any) {
           <XAxis 
             dataKey="kalenderwoche" 
             label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5 }}
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 10 }}
+            interval="preserveStartEnd"
+            minTickGap={10}
           />
           <YAxis 
             yAxisId="left"
@@ -1367,7 +1373,9 @@ function WoechentlicheAbweichungChart({ data }: any) {
           <XAxis 
             dataKey="kalenderwoche" 
             label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5 }}
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 10 }}
+            interval="preserveStartEnd"
+            minTickGap={10}
           />
           <YAxis tick={{ fontSize: 12 }} label={{ value: 'Abweichung (Stück)', angle: -90, position: 'insideLeft' }} />
           <Tooltip 
