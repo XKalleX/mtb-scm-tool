@@ -490,13 +490,6 @@ export function berechneIntegriertesWarehouse(
     produktionsBacklog[bauteil.id] = 0
   })
   
-  // ✅ NEU: Error-Tracker pro Bauteil für faire Verteilung bei Engpass
-  // Akkumuliert Rundungsfehler und korrigiert diese über die Zeit
-  const errorTrackerProBauteil: Record<string, number> = {}
-  bauteile.forEach(bauteil => {
-    errorTrackerProBauteil[bauteil.id] = 0
-  })
-  
   // NEU: Tracking für Statistiken
   // HINWEIS: gesamtBedarf wird bereits oben nach STEP 1.5 berechnet (aus Produktionsplänen)
   let gesamtProduziertTatsaechlich = 0
@@ -770,59 +763,37 @@ export function berechneIntegriertesWarehouse(
         const benoeligtMitBacklog = benoetigt + backlogVorher
         
         // ─────────────────────────────────────────────────────────────────────────
-        // Wende GLOBALEN Produktionsfaktor an UND begrenze durch lokalen Bestand!
+        // Wende Verbrauchslogik an: min(Bedarf, Verfügbar)
         // ─────────────────────────────────────────────────────────────────────────
         /**
-         * 🎯 ERROR MANAGEMENT FÜR FAIRE VERTEILUNG
+         * 🎯 VEREINFACHTE VERBRAUCHSLOGIK (FIX für Issue #276)
          * 
-         * KONZEPT:
-         * Bei Materialengpass müssen wir das verfügbare Material fair auf die Komponenten
-         * verteilen. Dabei entstehen Rundungsfehler, die über Error Management korrigiert werden.
+         * PROBLEM VORHER:
+         * Der alte Code berechnete produktionsFaktor = Material/Plan und wendete diesen
+         * auf JEDE Komponente an. Das führte zu Rundungsfehlern:
+         * - SAT_RL: sollMenge = 104.73 → floor = 104, aber 125 verfügbar (21 ungenutzt!)
+         * - Ergebnis: 500 Material verfügbar, aber nur 479-499 genutzt
          * 
-         * REGELN:
-         * 1. Bei KEINEM Engpass (produktionsFaktor = 1.0): Exakt die OEM-Plan-Menge produzieren
-         *    → Keine Rundung nötig, da benoetigt bereits ganzzahlig aus OEM-Planung kommt
+         * LÖSUNG:
+         * Die Hafenlogistik verteilt bereits FAIR nach Bedarf! Die Materialien die ankommen
+         * sind bereits optimal proportional verteilt. Daher:
          * 
-         * 2. Bei Engpass (produktionsFaktor < 1.0): Error Management anwenden
-         *    → Kumulierten Fehler pro Bauteil tracken und korrigieren
-         *    → Sicherstellen, dass SUMME aller Bauteile = verfügbares Material
+         * 1. Wenn benoetigt <= verfuegbar: Produziere benoetigt (Plan erfüllt!)
+         * 2. Wenn benoetigt > verfuegbar: Produziere verfuegbar (alles was da ist!)
+         * 
+         * Das ist einfach: verbrauch = min(benoetigt, verfuegbar)
+         * 
+         * Der produktionsFaktor bleibt für Logging/Warnungen erhalten, aber beeinflusst
+         * nicht mehr die Berechnung.
          */
         
-        // ✅ FIX: Nutze benoeligtMitBacklog für die Berechnung (inkl. Backlog von gestern)
-        let globalerBedarf: number
-        
-        if (produktionsFaktor >= 1.0) {
-          // ✅ KEIN ENGPASS: Produziere exakt die OEM-Plan-Menge (+ Backlog wenn möglich)
-          // Die OEM-Planung nutzt bereits Error Management, daher ist benoetigt ganzzahlig
-          globalerBedarf = benoeligtMitBacklog
-        } else {
-          // ⚠️ ENGPASS: Error Management für faire Verteilung
-          // Der Fehler wird pro Bauteil über die Tage akkumuliert
-          const sollMenge = benoeligtMitBacklog * produktionsFaktor
-          
-          // Error Management: Tracke kumulierten Fehler pro Bauteil
-          if (!errorTrackerProBauteil[bauteilId]) {
-            errorTrackerProBauteil[bauteilId] = 0
-          }
-          
-          const basisMenge = Math.floor(sollMenge)
-          const tagesError = sollMenge - basisMenge
-          errorTrackerProBauteil[bauteilId] += tagesError
-          
-          // Wenn akkumulierter Fehler >= 1.0, korrigiere durch Aufrunden
-          if (errorTrackerProBauteil[bauteilId] >= 1.0) {
-            globalerBedarf = basisMenge + 1
-            errorTrackerProBauteil[bauteilId] -= 1.0
-          } else {
-            globalerBedarf = basisMenge
-          }
-        }
-        
-        // ✅ KRITISCH: Begrenze Verbrauch durch den VERFÜGBAREN BESTAND dieses Bauteils!
         const verfuegbarerBestand = aktuelleBestaende[bauteilId]
-        const maxVerbrauchMoeglich = Math.min(globalerBedarf, verfuegbarerBestand)
         
-        // Setze Verbrauch auf das, was WIRKLICH möglich ist (begrenzt durch lokalen Bestand)
+        // ✅ SIMPLE & KORREKT: Nutze alles was verfügbar UND benötigt wird
+        // Keine Rundungsfehler, da beide Werte bereits ganzzahlig sind!
+        const maxVerbrauchMoeglich = Math.min(benoeligtMitBacklog, verfuegbarerBestand)
+        
+        // Setze Verbrauch auf das, was WIRKLICH möglich ist
         verbrauch = maxVerbrauchMoeglich
         
         // ✅ FIX: Berechne nicht erfüllten Bedarf basierend auf Plan+Backlog!
