@@ -244,14 +244,14 @@ Mehr dazu: [04-Zeitparameter.md](./04-Zeitparameter.md)
 
 #### Kritisches Problem: Spring Festival
 
-**Chinesisches Neujahr 2027: 28. Januar - 4. Februar (8 Tage)**
+**Chinesisches Neujahr 2027: 6. Februar - 11. Februar (6 Tage)**
 
 ```
 ┌────────────────────────────────────────────────────────────┐
 │  SPRING FESTIVAL - PRODUKTIONSSTOPP IN CHINA              │
 └────────────────────────────────────────────────────────────┘
 
-28. Januar - 4. Februar 2027 (8 Tage)
+6. Februar - 11. Februar 2027 (6 Tage)
 
 Was passiert:
 🚫 Keine Produktion beim Zulieferer

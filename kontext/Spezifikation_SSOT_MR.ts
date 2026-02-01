@@ -683,9 +683,9 @@ export const ZULIEFERER: Zulieferer[] = [
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Spring Festival 2027: 28. Januar - 4. Februar
+ * Spring Festival 2027: 6. Februar - 11. Februar
  * 
- * 8 Tage kompletter Shutdown des Zulieferers!
+ * 6 Tage kompletter Shutdown des Zulieferers!
  * Keine Produktion, keine Annahme von Bestellungen.
  * 
  * Planung muss dies berücksichtigen:
@@ -913,59 +913,45 @@ export const FEIERTAGE_DEUTSCHLAND: Feiertag[] = [
  */
 
 export const FEIERTAGE_CHINA: Feiertag[] = [
-  // Spring Festival 2027: 28. Januar - 4. Februar (8 Tage!)
+  // Spring Festival 2027: 6. Februar - 11. Februar (6 Tage!)
   {
-    datum: "2027-01-28",
+    datum: "2027-02-06",
     name: "Spring Festival Tag 1",
     land: "China",
     typ: "Festival",
     betroffeneStandorte: ["ZL_CN"]
   },
   {
-    datum: "2027-01-29",
+    datum: "2027-02-07",
     name: "Spring Festival Tag 2",
     land: "China",
     typ: "Festival",
     betroffeneStandorte: ["ZL_CN"]
   },
   {
-    datum: "2027-01-30",
+    datum: "2027-02-08",
     name: "Spring Festival Tag 3",
     land: "China",
     typ: "Festival",
     betroffeneStandorte: ["ZL_CN"]
   },
   {
-    datum: "2027-01-31",
+    datum: "2027-02-09",
     name: "Spring Festival Tag 4",
     land: "China",
     typ: "Festival",
     betroffeneStandorte: ["ZL_CN"]
   },
   {
-    datum: "2027-02-01",
+    datum: "2027-02-10",
     name: "Spring Festival Tag 5",
     land: "China",
     typ: "Festival",
     betroffeneStandorte: ["ZL_CN"]
   },
   {
-    datum: "2027-02-02",
+    datum: "2027-02-11",
     name: "Spring Festival Tag 6",
-    land: "China",
-    typ: "Festival",
-    betroffeneStandorte: ["ZL_CN"]
-  },
-  {
-    datum: "2027-02-03",
-    name: "Spring Festival Tag 7",
-    land: "China",
-    typ: "Festival",
-    betroffeneStandorte: ["ZL_CN"]
-  },
-  {
-    datum: "2027-02-04",
-    name: "Spring Festival Tag 8",
     land: "China",
     typ: "Festival",
     betroffeneStandorte: ["ZL_CN"]

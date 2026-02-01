@@ -293,17 +293,16 @@ Real:   59.200 Bikes / 20 AT = 2.960 Bikes/Tag (+10% Druck!)
 ### 4.2 Spring Festival 2027 - Die exakten Daten
 
 **Original-Angabe (PROJEKTERKLAERUNG.md):**
-- 28. Januar - 4. Februar 2027 = **8 Tage**
+- 6. Februar - 11. Februar 2027 = **6 Tage**
 
 **Reale Kalenderdaten (China-Feiertage JSON):**
-- **05.02. - 11.02.2027 = 7 Tage** (offizielle Feiertage)
+- **06.02. - 11.02.2027 = 6 Tage** (offizielle Feiertage)
 
 **Wichtig:** In der Praxis nutzen wir die **JSON-Daten** als Single Source of Truth:
 
 ```json
 {
-  "datum": "2027-02-05", "name": "Spring Festival (Vorabend)"
-  "datum": "2027-02-06", "name": "Spring Festival - Chinesischer Neujahrstag"
+  "datum": "2027-02-06", "name": "Spring Festival Tag 1"
   "datum": "2027-02-07", "name": "Spring Festival (Tag 2)"
   "datum": "2027-02-08", "name": "Spring Festival (Tag 3)"
   "datum": "2027-02-09", "name": "Spring Festival (Tag 4)"
@@ -318,7 +317,7 @@ Real:   59.200 Bikes / 20 AT = 2.960 Bikes/Tag (+10% Druck!)
 
 **Im Gegensatz zu deutschen Feiertagen:**
 
-- ❌ **8 Tage AM STÜCK** (nicht einzelne Tage)
+- ❌ **6 Tage AM STÜCK** (nicht einzelne Tage)
 - ❌ **Kompletter Produktionsstopp** beim Zulieferer
 - ❌ **Keine neuen Bestellungen** angenommen
 - ❌ **Laufende Bestellungen pausiert** (5 AT Produktion unterbrochen!)
@@ -329,16 +328,16 @@ Real:   59.200 Bikes / 20 AT = 2.960 Bikes/Tag (+10% Druck!)
 │           SPRING FESTIVAL 2027: DIE KRITISCHE PHASE         │
 └────────────────────────────────────────────────────────────┘
 
-28.01.   29.01.   30.01.   31.01.   01.02.   02.02.   03.02.   04.02.
-  🚫       🚫       🚫       🚫       🚫       🚫       🚫       🚫
-  Tag 1    Tag 2    Tag 3    Tag 4    Tag 5    Tag 6    Tag 7    Tag 8
-    └────────────── Dengwong Werk: GESCHLOSSEN ──────────────┘
+06.02.   07.02.   08.02.   09.02.   10.02.   11.02.
+  🚫       🚫       🚫       🚫       🚫       🚫
+  Tag 1    Tag 2    Tag 3    Tag 4    Tag 5    Tag 6
+    └────────── Dengwong Werk: GESCHLOSSEN ──────────┘
 
 Auswirkungen:
 ─────────────────────────────────────────────────────────────
 ❌ Produktion: STOPP (keine neuen Sättel gefertigt)
-❌ Bestellungen: NICHT bearbeitet (erst ab 05.02. wieder)
-⏸️ Laufende Produktion: PAUSIERT (Fortsetzung ab 05.02.)
+❌ Bestellungen: NICHT bearbeitet (erst ab 12.02. wieder)
+⏸️ Laufende Produktion: PAUSIERT (Fortsetzung ab 12.02.)
 ✅ Schiffe auf See: Fahren normal weiter
 ```
 
@@ -350,8 +349,8 @@ Auswirkungen:
 Ohne Spring Festival Planung:
 ──────────────────────────────────────────────────────────
 25. Januar: Bestellung für März-Produktion aufgegeben
-28. Jan - 04. Feb: Spring Festival → Produktion STOPPT
-05. Februar: Produktion wird fortgesetzt
+06. Feb - 11. Feb: Spring Festival → Produktion STOPPT
+12. Februar: Produktion wird fortgesetzt
 + 5 AT Produktion
 + 2 AT LKW China
 + 30 KT Seefracht
@@ -371,7 +370,7 @@ Mit Spring Festival Planung:
              ↓
 15. Januar: Produktion abgeschlossen (VOR Spring Festival!)
              ↓
-28. Jan - 04. Feb: Spring Festival (Ware bereits auf dem Schiff!)
+06. Feb - 11. Feb: Spring Festival (Ware bereits auf dem Schiff!)
              ↓
 01. März: Ware trifft pünktlich in Dortmund ein
 
