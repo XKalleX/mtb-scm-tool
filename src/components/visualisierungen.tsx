@@ -433,7 +433,7 @@ function OverviewDashboard({
       </div>
 
       {/* Charts */}
-      <div className={timeRange === 'day' ? 'space-y-6' : 'grid grid-cols-2 gap-6'}>
+      <div className="space-y-6">
         {/* Produktionsverlauf */}
         <Card>
           <CardHeader>
@@ -727,7 +727,7 @@ function ProductionDashboard({
         </Card>
       </div>
 
-      <div className={timeRange === 'day' ? 'space-y-6' : 'grid grid-cols-2 gap-6'}>
+      <div className="space-y-6">
         {/* Auslastung über Jahr */}
         <Card>
           <CardHeader>
@@ -1201,7 +1201,7 @@ function SCORDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-6">
               {kategorie.metriken.map((metrik, midx) => {
                 const erreichung = (metrik.wert / metrik.ziel) * 100
                 const status = erreichung >= 100 ? 'success' :
@@ -1405,7 +1405,7 @@ function SCORDashboard({
       </Card>
       
       {/* NEU: SCOR-Metriken Entwicklung über Zeit */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Lagerreichweite-Trend</CardTitle>
