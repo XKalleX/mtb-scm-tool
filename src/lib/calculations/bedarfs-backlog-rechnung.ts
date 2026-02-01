@@ -378,6 +378,11 @@ export function berechneBedarfsBacklog(
     tagesDetails.forEach(detail => {
       const datumStr = toLocalISODateString(detail.datum)
       
+      // ✅ KRITISCHER FIX (Issue #295): Prüfe ob es ein Arbeitstag ist
+      // An Wochenenden und Feiertagen darf KEINE Produktion stattfinden!
+      // Daher darf der Backlog an diesen Tagen NICHT abgebaut werden.
+      const istArbeitstag = istArbeitstag_Deutschland(detail.datum, feiertagsConfig)
+      
       // 1. Material-Ankunft (✅ EXKLUSIV AUS HAFENLOGISTIK!)
       // KRITISCH: Keine anderen Materialquellen erlaubt!
       // Nur was die Hafenlogistik (generiereInboundLieferplan) liefert, ist verfügbar
@@ -393,26 +398,44 @@ export function berechneBedarfsBacklog(
       const verfuegbaresMaterial = lagerbestand
       detail.verfuegbaresMaterial = verfuegbaresMaterial
       
-      // 4. Berechne Gesamt-Bedarf (heutiger Bedarf + akkumulierter Produktions-Backlog)
-      const gesamtBedarf = detail.bedarf + produktionsBacklog
+      // ✅ FIX: Backlog für Visualisierung VOR Produktion speichern
+      detail.backlogVorher = produktionsBacklog
       
-      // 5. Tatsächliche Produktion (min(Gesamt-Bedarf, verfügbar))
-      // Versuche sowohl heutigen Bedarf als auch Backlog zu decken
-      const tatsaechlicheProduktion = Math.min(gesamtBedarf, verfuegbaresMaterial)
-      detail.tatsaechlicheProduktion = tatsaechlicheProduktion
+      // 4. ✅ FIX: Produktion NUR an Arbeitstagen!
+      if (istArbeitstag) {
+        // 4a. Berechne Gesamt-Bedarf (heutiger Bedarf + akkumulierter Produktions-Backlog)
+        const gesamtBedarf = detail.bedarf + produktionsBacklog
+        
+        // 5. Tatsächliche Produktion (min(Gesamt-Bedarf, verfügbar))
+        // Versuche sowohl heutigen Bedarf als auch Backlog zu decken
+        const tatsaechlicheProduktion = Math.min(gesamtBedarf, verfuegbaresMaterial)
+        detail.tatsaechlicheProduktion = tatsaechlicheProduktion
+        
+        // 6. Aktualisiere Produktions-Backlog
+        // Backlog = was wir produzieren wollten - was wir tatsächlich produziert haben
+        produktionsBacklog = gesamtBedarf - tatsaechlicheProduktion
+        
+        // 7. Material-Engpass? (wenn wir nicht alles produzieren konnten)
+        detail.materialEngpass = gesamtBedarf > verfuegbaresMaterial
+        
+        // 8. Abweichung (negativ = Fehlmenge gegenüber heutigem Bedarf)
+        detail.abweichung = tatsaechlicheProduktion - detail.bedarf
+        
+        // 9. Lagerbestand aktualisieren (Verbrauch)
+        lagerbestand -= tatsaechlicheProduktion
+      } else {
+        // ✅ FIX: An Nicht-Arbeitstagen:
+        // - Keine Produktion (tatsaechlicheProduktion = 0)
+        // - Backlog bleibt unverändert
+        // - Kein Material-Verbrauch
+        // - Kein Engpass (da keine Produktion erwartet wird)
+        detail.tatsaechlicheProduktion = 0
+        detail.materialEngpass = false
+        detail.abweichung = 0 - detail.bedarf // Sollte 0 sein, da bedarf = 0 an Nicht-Arbeitstagen
+        // produktionsBacklog bleibt unverändert (kein Update)
+        // lagerbestand bleibt unverändert (kein Verbrauch)
+      }
       
-      // 6. Aktualisiere Produktions-Backlog
-      // Backlog = was wir produzieren wollten - was wir tatsächlich produziert haben
-      produktionsBacklog = gesamtBedarf - tatsaechlicheProduktion
-      
-      // 7. Material-Engpass? (wenn wir nicht alles produzieren konnten)
-      detail.materialEngpass = gesamtBedarf > verfuegbaresMaterial
-      
-      // 8. Abweichung (negativ = Fehlmenge gegenüber heutigem Bedarf)
-      detail.abweichung = tatsaechlicheProduktion - detail.bedarf
-      
-      // 9. Lagerbestand aktualisieren (Verbrauch)
-      lagerbestand -= tatsaechlicheProduktion
       detail.lagerbestand = lagerbestand
       
       // 10. Aktualisiere Backlog-Felder (für Visualisierung)
