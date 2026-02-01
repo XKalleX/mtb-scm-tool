@@ -360,14 +360,27 @@ export function berechneSCORMetrikenReal(
   // Lade Durchlaufzeit-Komponenten aus der transportSequenz, um Konfigurierbarkeit zu ermöglichen
   const transportSequenz = konfiguration.lieferant?.transportSequenz || []
   
+  /**
+   * Generiert einen lesbaren Namen für einen Transport-Schritt
+   */
+  const generiereSchrittName = (schritt: typeof transportSequenz[0]): string => {
+    switch (schritt.typ) {
+      case 'Seefracht':
+        return `${schritt.von} → ${schritt.nach}`
+      case 'LKW':
+        return `LKW-Transport ${schritt.von} → ${schritt.nach}`
+      case 'Produktion':
+        return 'Auftragsverarbeitung China'
+      default:
+        return `${schritt.typ} ${schritt.von}`
+    }
+  }
+  
   const durchlaufzeitDetails = {
     komponenten: transportSequenz
       .filter(s => s.dauer > 0) // Nur Schritte mit Dauer
       .map(s => ({
-        name: s.typ === 'Seefracht' ? `${s.von} → ${s.nach}` : 
-              s.typ === 'LKW' ? `LKW-Transport ${s.von} → ${s.nach}` :
-              s.typ === 'Produktion' ? 'Auftragsverarbeitung China' :
-              `${s.typ} ${s.von}`,
+        name: generiereSchrittName(s),
         tage: s.dauer,
         typ: s.einheit === 'KT' ? 'kalendertage' as const : 'arbeitstage' as const,
         beschreibung: s.beschreibung
