@@ -312,17 +312,28 @@ export function KonfigurationProvider({ children }: { children: ReactNode }) {
       if (gespeicherteKonfiguration) {
         const parsed = JSON.parse(gespeicherteKonfiguration) as KonfigurationData
         
-        // ✅ WICHTIG: Feiertage IMMER aus aktuellen JSON-Dateien laden!
-        // Dies verhindert, dass alte/fehlende Feiertage aus dem localStorage 
+        // ✅ WICHTIG: Kritische Daten IMMER aus aktuellen JSON-Dateien laden!
+        // Dies verhindert, dass alte/falsche Daten aus dem localStorage 
         // die Produktionsplanung verfälschen.
-        // Feiertage werden NICHT aus localStorage übernommen, sondern immer
-        // aus STANDARD_FEIERTAGE (JSON-Dateien = Single Source of Truth)
-        const konfigurationMitAktuellenFeiertagen: KonfigurationData = {
+        // 
+        // SINGLE SOURCE OF TRUTH (SSOT) Prinzip:
+        // - Feiertage: Müssen korrekt sein für Arbeitstage-Berechnung
+        // - Stueckliste: KRITISCH! Mappt MTB-Varianten zu Sattel-Typen
+        //   → Alte Mappings führen zu falscher Sattel-Produktion!
+        // - Bauteile: Definiert die verfügbaren Sattel-Typen
+        //
+        // Diese werden NICHT aus localStorage übernommen, sondern immer
+        // aus den JSON-Dateien geladen (= Single Source of Truth)
+        console.log('📋 KonfigurationContext: Lade SSOT-Daten (Feiertage, Stückliste, Bauteile) aus JSON-Dateien')
+        
+        const konfigurationMitAktuellenDaten: KonfigurationData = {
           ...parsed,
-          feiertage: STANDARD_FEIERTAGE // IMMER aktuelle Feiertage aus JSON!
+          feiertage: STANDARD_FEIERTAGE,     // IMMER aktuelle Feiertage aus JSON!
+          stueckliste: STANDARD_STUECKLISTE, // IMMER aktuelle Stückliste aus JSON!
+          bauteile: STANDARD_BAUTEILE        // IMMER aktuelle Bauteile aus JSON!
         }
         
-        setKonfiguration(konfigurationMitAktuellenFeiertagen)
+        setKonfiguration(konfigurationMitAktuellenDaten)
       }
     } catch (error) {
       console.error('Fehler beim Laden der Konfiguration:', error)
