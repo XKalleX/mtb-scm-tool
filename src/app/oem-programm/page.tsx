@@ -663,21 +663,48 @@ export default function OEMProgrammPage() {
               {/* Kompakte Varianten-Statistik (8 Kacheln in einer Zeile) */}
               <div className="grid grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
                 {Object.entries(produktionsplaene).map(([varianteId, plan]) => {
-                  const stats = berechneProduktionsStatistiken(plan.tage)
                   const variante = konfiguration.varianten.find(v => v.id === varianteId)
+                  
+                  // ✅ SZENARIO-AWARE: Berechne Baseline-Wert (ohne Szenarien/Anpassungen)
+                  const baselineJahresProduktion = Math.round(konfiguration.jahresproduktion * (variante?.anteilPrognose || 0))
+                  const istJahresProduktion = plan.jahresProduktionIst
+                  
+                  // ✅ DELTA: Differenz zwischen Ist (mit Szenarien) und Baseline (ohne Szenarien)
+                  const delta = istJahresProduktion - baselineJahresProduktion
+                  const hatDelta = Math.abs(delta) > 10 // Signifikanz-Schwelle
+                  
+                  // ✅ GRÜNER RAND: Zeige grünen Rand wenn Szenarien aktiv UND Abweichung OK
+                  const istAbweichungOK = Math.abs(plan.abweichung) <= 1
+                  const hatSzenarioEffekt = hasSzenarien && hatDelta
                   
                   return (
                     <div 
                       key={varianteId} 
-                      className={`border rounded-lg p-2 text-center ${Math.abs(plan.abweichung) <= 1 ? 'border-green-300 bg-green-50' : 'border-orange-300 bg-orange-50'}`}
+                      className={`border-2 rounded-lg p-2 text-center transition-all ${
+                        hatSzenarioEffekt 
+                          ? 'border-blue-400 bg-blue-50' 
+                          : istAbweichungOK 
+                            ? 'border-green-300 bg-green-50' 
+                            : 'border-orange-300 bg-orange-50'
+                      }`}
                     >
                       <div className="text-xs font-medium truncate" title={variante?.name}>
                         {variante?.name.replace('MTB ', '')}
                       </div>
-                      <div className="text-sm font-bold">{formatNumber(stats.produziert, 0)}</div>
-                      <div className={`text-[10px] ${Math.abs(plan.abweichung) <= 1 ? 'text-green-600' : 'text-orange-600'}`}>
-                        {Math.abs(plan.abweichung) <= 1 ? '✓ OK' : `Δ ${plan.abweichung}`}
-                      </div>
+                      <div className="text-sm font-bold">{formatNumber(istJahresProduktion, 0)}</div>
+                      
+                      {/* Zeige Delta oder Abweichungs-Status */}
+                      {hatSzenarioEffekt ? (
+                        <DeltaBadge 
+                          delta={delta} 
+                          suffix="" 
+                          className="text-[10px]"
+                        />
+                      ) : (
+                        <div className={`text-[10px] ${istAbweichungOK ? 'text-green-600' : 'text-orange-600'}`}>
+                          {istAbweichungOK ? '✓ OK' : `Δ ${plan.abweichung}`}
+                        </div>
+                      )}
                     </div>
                   )
                 })}

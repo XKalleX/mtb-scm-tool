@@ -69,6 +69,7 @@ export default function ProduktionPage() {
     aktiveSzenarien,
     tagesProduktion: tagesProduktionMitSzenarien,
     lagerbestaende: lagerbestaendeMitSzenarien,
+    variantenPlaene: variantenPlaeneMitSzenarien, // ✅ NEU: Für Warehouse-Berechnungen
     statistiken,
     formatDelta,
     getDeltaColorClass
@@ -130,9 +131,27 @@ export default function ProduktionPage() {
   // - Full OEM-Inbound-Warehouse Integration
   
   // Generiere Varianten-Produktionspläne für Warehouse
+  // ✅ SZENARIO-AWARE: Nutze variantenPlaene aus Hook wenn Szenarien aktiv!
   const variantenProduktionsplaeneForWarehouse = useMemo(() => {
+    if (hasSzenarien && variantenPlaeneMitSzenarien) {
+      // Konvertiere variantenPlaene zu Record<string, VariantenProduktionsplan> Format
+      const result: Record<string, any> = {}
+      Object.entries(variantenPlaeneMitSzenarien).forEach(([varianteId, plan]) => {
+        result[varianteId] = {
+          varianteId: plan.varianteId,
+          varianteName: plan.varianteName,
+          jahresProduktion: plan.jahresProduktion,
+          jahresProduktionIst: plan.jahresProduktionIst,
+          abweichung: plan.abweichung,
+          tage: plan.tage
+        }
+      })
+      return result
+    }
+    
+    // Baseline: Ohne Szenarien
     return generiereAlleVariantenProduktionsplaene(konfiguration)
-  }, [konfiguration])
+  }, [konfiguration, hasSzenarien, variantenPlaeneMitSzenarien])
   
   // ✅ KRITISCH: Generiere Hafenlogistik-Lieferplan ZUERST!
   // Dies ist die EINZIGE Quelle für Materialzugänge im System
@@ -153,7 +172,7 @@ export default function ProduktionPage() {
     // Konvertiere Produktionspläne zu Format für Inbound
     const produktionsplaeneFormatiert: Record<string, Array<{datum: Date; varianteId: string; istMenge: number; planMenge: number}>> = {}
     Object.entries(variantenProduktionsplaeneForWarehouse).forEach(([varianteId, plan]) => {
-      produktionsplaeneFormatiert[varianteId] = plan.tage.map(tag => ({
+      produktionsplaeneFormatiert[varianteId] = plan.tage.map((tag: any) => ({
         datum: tag.datum,
         varianteId: varianteId,
         istMenge: tag.istMenge,
