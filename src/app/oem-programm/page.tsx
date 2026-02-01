@@ -469,11 +469,6 @@ export default function OEMProgrammPage() {
                             <span className="text-xs text-white font-medium">{s.anteil}%</span>
                             <span className="text-xs text-white">{formatNumber(bikes, 0)} Bikes</span>
                           </div>
-                          {isPeak && (
-                            <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-bold text-green-600">
-                              🏔️ PEAK
-                            </div>
-                          )}
                         </div>
                       </div>
                     )
