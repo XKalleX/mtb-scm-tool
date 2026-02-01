@@ -296,10 +296,11 @@ export default function ProduktionPage() {
         schichten: schichten,
         auslastung: Math.round(auslastung * 10) / 10,
         // ✅ KRITISCHER FIX (Issue #295): materialVerfuegbar Logik
-        // An Wochenenden/Feiertagen: true (kein Bedarf, kein Problem)
-        // An Arbeitstagen: basierend auf tatsächlichem Material-Engpass
+        // HINWEIS: Der Wert ist für Nicht-Arbeitstage irrelevant, da die UI-Anzeige (Zeile 1173-1174)
+        // immer "-" zeigt wenn istArbeitstag === false. Der true-Fallback ist nur für Konsistenz.
+        // An Arbeitstagen: basierend auf tatsächlichem Material-Engpass aus Warehouse
         materialVerfuegbar: !templateTag.istArbeitstag 
-          ? true  // ✅ An Nicht-Arbeitstagen: true (damit UI "-" zeigt, nicht "Nein")
+          ? true  // Fallback-Wert (UI zeigt "-" basierend auf istArbeitstag)
           : !hatMaterialEngpass,
         backlog: tagesBacklog
       })
@@ -1131,7 +1132,12 @@ export default function ProduktionPage() {
                 width: '80px',
                 align: 'center',
                 formula: '⌈Plan / 1.040⌉',
-                format: (val) => val > 0 ? val + ' Schicht(en)' : '-',
+                format: (val, row) => {
+                  // An Nicht-Arbeitstagen: "-" anzeigen
+                  if (row && row.istArbeitstag === false) return '-'
+                  // An Arbeitstagen: Schichten anzeigen (auch 0)
+                  return val > 0 ? val + ' Schicht(en)' : '0'
+                },
                 sumable: true
               },
               {
@@ -1139,7 +1145,12 @@ export default function ProduktionPage() {
                 label: 'Plan-Menge',
                 width: '110px',
                 align: 'right',
-                format: (val) => val > 0 ? formatNumber(val, 0) + ' Bikes' : '-',
+                format: (val, row) => {
+                  // An Nicht-Arbeitstagen: "-" anzeigen
+                  if (row && row.istArbeitstag === false) return '-'
+                  // An Arbeitstagen: Menge anzeigen (auch 0)
+                  return formatNumber(val, 0) + ' Bikes'
+                },
                 sumable: true
               },
               {
@@ -1147,7 +1158,12 @@ export default function ProduktionPage() {
                 label: 'Ist-Menge',
                 width: '110px',
                 align: 'right',
-                format: (val) => val > 0 ? formatNumber(val, 0) + ' Bikes' : '-',
+                format: (val, row) => {
+                  // An Nicht-Arbeitstagen: "-" anzeigen
+                  if (row && row.istArbeitstag === false) return '-'
+                  // An Arbeitstagen: Menge anzeigen (auch 0)
+                  return formatNumber(val, 0) + ' Bikes'
+                },
                 sumable: true
               },
               {
@@ -1156,7 +1172,10 @@ export default function ProduktionPage() {
                 width: '100px',
                 align: 'right',
                 formula: 'Ist - Plan',
-                format: (val) => {
+                format: (val, row) => {
+                  // An Nicht-Arbeitstagen: "-" anzeigen
+                  if (row && row.istArbeitstag === false) return '-'
+                  // An Arbeitstagen: Abweichung anzeigen
                   if (val === 0) return '±0'
                   const sign = val > 0 ? '+' : ''
                   return sign + formatNumber(val, 0)
@@ -1194,7 +1213,12 @@ export default function ProduktionPage() {
                 width: '100px',
                 align: 'right',
                 formula: '(Ist / Plan) × 100',
-                format: (val) => val > 0 ? formatNumber(val, 1) + ' %' : '-',
+                format: (val, row) => {
+                  // An Nicht-Arbeitstagen: "-" anzeigen
+                  if (row && row.istArbeitstag === false) return '-'
+                  // An Arbeitstagen: Auslastung anzeigen (auch 0%)
+                  return formatNumber(val, 1) + ' %'
+                },
                 sumable: false
               },
               {
