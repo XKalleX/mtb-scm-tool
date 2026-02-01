@@ -151,7 +151,7 @@ export default function InboundPage() {
     setZusatzBestellungen(prev => [...prev, neueBestellung])
     // Datum NICHT zurücksetzen, damit weitere Bestellungen mit ähnlichem Datum einfacher sind
     setNeueBestellungMenge('100')  // ✅ ÄNDERUNG: Setze auf kleinere Standardmenge (100)
-  }, [neueBestellungDatum, neueBestellungMenge, konfiguration.lieferant.gesamtVorlaufzeitTage, konfiguration.feiertage, konfiguration.lieferant.losgroesse])
+  }, [neueBestellungDatum, neueBestellungMenge, konfiguration.lieferant.gesamtVorlaufzeitTage, konfiguration.feiertage])
   
   // Lieferant aus Konfiguration
   const lieferant = konfiguration.lieferant
