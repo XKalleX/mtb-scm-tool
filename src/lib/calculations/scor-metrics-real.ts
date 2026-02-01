@@ -306,6 +306,9 @@ export function berechneSCORMetrikenReal(
     }
   })
   
+  // Berechne monatliche Liefertreue für Trend
+  const monatlicheLiefertreue = berechneMonatlicheLiefertreue(liefertreueLieferungen)
+
   const liefertreueChina = {
     wert: liefertreue_wert,
     kategorie: 'RELIABILITY' as const,
@@ -315,7 +318,7 @@ export function berechneSCORMetrikenReal(
     zielwert: 95,
     status: liefertreue_wert >= 95 ? 'gut' as const :
             liefertreue_wert >= 85 ? 'mittel' as const : 'schlecht' as const,
-    trend: 0 // Wird aus monatlichen Daten berechnet
+    trend: berechneTrend(monatlicheLiefertreue)
   }
   
   // ═══════════════════════════════════════════════════════════════════════════
@@ -384,7 +387,7 @@ export function berechneSCORMetrikenReal(
     zielwert: 49,
     status: durchlaufzeit_wert <= 51 ? 'gut' as const :
             durchlaufzeit_wert <= 56 ? 'mittel' as const : 'schlecht' as const,
-    trend: 0
+    trend: berechneTrend(durchlaufzeitDetails.monatlich)
   }
   
   // ═══════════════════════════════════════════════════════════════════════════
@@ -474,7 +477,7 @@ export function berechneSCORMetrikenReal(
     label: 'Lagerreichweite',
     beschreibung: 'Durchschnittliche Anzahl Tage, für die der aktuelle Lagerbestand bei normalem Verbrauch ausreicht',
     einheit: 'Tage',
-    zielwert: 5,
+    zielwert: 5, // 5 Tage Ziel für Just-in-Time Produktion
     status: lagerreichweite_wert >= 4 && lagerreichweite_wert <= 7 ? 'gut' as const :
             lagerreichweite_wert >= 2 && lagerreichweite_wert <= 10 ? 'mittel' as const : 'schlecht' as const,
     trend: berechneTrend(lagerreichweiteMonatlich)
@@ -517,6 +520,42 @@ const MONATSNAMEN = [
   'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
 ]
 
+/**
+ * Berechnet monatliche Liefertreue für Trend-Berechnung
+ */
+function berechneMonatlicheLiefertreue(lieferungen: any[]) {
+  const monate: Record<number, any> = {}
+  
+  // Initialisiere alle 12 Monate
+  for (let m = 1; m <= 12; m++) {
+    monate[m] = {
+      monat: m,
+      monatName: MONATSNAMEN[m - 1],
+      erfuellungsgrad: 100 // Default 100% wenn keine Lieferungen
+    }
+  }
+  
+  // Aggregiere Lieferungen nach Bestellmonat
+  lieferungen.forEach(l => {
+    const monat = new Date(l.bestelldatum).getMonth() + 1
+    if (!monate[monat].gesamt) {
+      monate[monat].gesamt = 0
+      monate[monat].puenktlich = 0
+    }
+    monate[monat].gesamt += 1
+    if (l.puenktlich) {
+      monate[monat].puenktlich += 1
+    }
+  })
+  
+  // Berechne Erfüllungsgrad
+  return Object.values(monate).map((m: any) => ({
+    monat: m.monat,
+    monatName: m.monatName,
+    erfuellungsgrad: m.gesamt ? (m.puenktlich / m.gesamt) * 100 : 100
+  }))
+}
+
 function aggregiereMonatlichePlanerfuellung(eintraege: TagesProduktionEntry[]) {
   const monate: Record<number, any> = {}
   
@@ -548,41 +587,62 @@ function aggregiereMonatlichePlanerfuellung(eintraege: TagesProduktionEntry[]) {
   }))
 }
 
+/**
+ * Aggregiert Durchlaufzeiten monatlich
+ * 
+ * WICHTIG: Berücksichtigt sowohl Bestellmonat als auch Ankunftsmonat
+ * für vollständige Jahresabdeckung (alle 12 Monate müssen Werte haben)
+ */
 function aggregiereMonatlicheDurchlaufzeit(bestellungen: TaeglicheBestellung[]) {
+  // Initialisiere alle 12 Monate mit Standardwerten
   const monate: Record<number, any> = {}
+  for (let m = 1; m <= 12; m++) {
+    monate[m] = {
+      monat: m,
+      monatName: MONATSNAMEN[m - 1],
+      durchlaufzeiten: [],
+      anzahlLieferungen: 0
+    }
+  }
   
+  // Sammle Durchlaufzeiten pro Ankunftsmonat (nicht Bestellmonat!)
   bestellungen.forEach(b => {
     if (!b.verfuegbarAb) return
     
-    const monat = b.bestelldatum.getMonth() + 1
+    const ankunftsmonat = new Date(b.verfuegbarAb).getMonth() + 1
     const tage = Math.floor((new Date(b.verfuegbarAb).getTime() - b.bestelldatum.getTime()) / 86400000)
     
-    if (!monate[monat]) {
-      monate[monat] = {
-        monat,
-        monatName: MONATSNAMEN[monat - 1],
-        durchlaufzeiten: [],
-        anzahlLieferungen: 0
-      }
+    if (monate[ankunftsmonat]) {
+      monate[ankunftsmonat].durchlaufzeiten.push(tage)
+      monate[ankunftsmonat].anzahlLieferungen += 1
     }
-    
-    monate[monat].durchlaufzeiten.push(tage)
-    monate[monat].anzahlLieferungen += 1
   })
   
+  // Berechne Statistiken (mit Fallback auf 49 Tage wenn keine Daten)
   return Object.values(monate).map(m => {
     const zeiten = m.durchlaufzeiten as number[]
+    const hatDaten = zeiten.length > 0
+    
     return {
       monat: m.monat,
       monatName: m.monatName,
-      min: zeiten.length > 0 ? Math.min(...zeiten) : 0,
-      durchschnitt: zeiten.length > 0 ? zeiten.reduce((a, b) => a + b, 0) / zeiten.length : 0,
-      max: zeiten.length > 0 ? Math.max(...zeiten) : 0,
+      min: hatDaten ? Math.min(...zeiten) : 49,
+      durchschnitt: hatDaten ? zeiten.reduce((a, b) => a + b, 0) / zeiten.length : 49,
+      max: hatDaten ? Math.max(...zeiten) : 49,
       anzahlLieferungen: m.anzahlLieferungen
     }
   })
 }
 
+/**
+ * Aggregiert Planungsgenauigkeit monatlich
+ * 
+ * Berechnet für jeden Monat:
+ * - Summe Plan-Menge (Soll-Produktion)
+ * - Summe Ist-Menge (tatsächliche Produktion nach ATP-Check)
+ * - Abweichung = Plan - Ist (kann positiv oder negativ sein)
+ * - Genauigkeit = 100% - (|Abweichung| / Plan * 100%)
+ */
 function aggregiereMonatlichePlanungsgenauigkeit(eintraege: TagesProduktionEntry[]) {
   const monate: Record<number, any> = {}
   
@@ -593,18 +653,22 @@ function aggregiereMonatlichePlanungsgenauigkeit(eintraege: TagesProduktionEntry
         monatName: MONATSNAMEN[e.monat - 1],
         planMenge: 0,
         istMenge: 0,
-        abweichung: 0
+        abweichungAbsolut: 0
       }
     }
     
     monate[e.monat].planMenge += e.planMenge
     monate[e.monat].istMenge += e.istMenge
-    monate[e.monat].abweichung += Math.abs(e.istMenge - e.planMenge)
+    monate[e.monat].abweichungAbsolut += Math.abs(e.istMenge - e.planMenge)
   })
   
   return Object.values(monate).map(m => ({
-    ...m,
-    genauigkeit: m.planMenge > 0 ? Math.max(0, 100 - (m.abweichung / m.planMenge) * 100) : 100
+    monat: m.monat,
+    monatName: m.monatName,
+    planMenge: m.planMenge,
+    istMenge: m.istMenge,
+    abweichung: m.planMenge - m.istMenge, // Plan - Ist (für Diagramm)
+    genauigkeit: m.planMenge > 0 ? Math.max(0, 100 - (m.abweichungAbsolut / m.planMenge) * 100) : 100
   }))
 }
 
