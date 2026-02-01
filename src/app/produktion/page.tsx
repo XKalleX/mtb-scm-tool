@@ -43,7 +43,7 @@ import {
   aggregiereNachWoche, 
   aggregiereNachMonat
 } from '@/lib/helpers/programm-aggregation'
-import { generiereInboundLieferplan } from '@/lib/calculations/inbound-china'
+import { generiereInboundLieferplan, wendeSzenarienAufLieferungenAn } from '@/lib/calculations/inbound-china'
 
 /**
  * Zeitperioden für die Ansichtswahl
@@ -185,7 +185,20 @@ export default function ProduktionPage() {
     )
   }, [variantenProduktionsplaeneForWarehouse, konfiguration])
   
-  // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung MIT Hafenlogistik-Lieferungen
+  // ✅ NEU: Wende Szenarien auf Lieferungen an (Transport-Schaden, Schiffsverspätung)
+  const lieferungenMitSzenarien = useMemo(() => {
+    if (!hasSzenarien || aktiveSzenarien.length === 0) {
+      return inboundLieferplan.lieferungenAmWerk
+    }
+    
+    console.log('⚡ Produktion: Wende Szenarien auf Lieferungen an...')
+    return wendeSzenarienAufLieferungenAn(
+      inboundLieferplan.lieferungenAmWerk,
+      aktiveSzenarien
+    )
+  }, [inboundLieferplan.lieferungenAmWerk, hasSzenarien, aktiveSzenarien])
+  
+  // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung MIT Szenario-modifizierten Lieferungen
   // Zeigt die tatsächliche Produktion basierend auf REALER Materialverfügbarkeit aus Hafenlogistik
   const backlogErgebnis = useMemo(() => {
     const plaeneAlsEntries: Record<string, TagesProduktionEntry[]> = {}
@@ -193,14 +206,13 @@ export default function ProduktionPage() {
       plaeneAlsEntries[varianteId] = plan.tage
     })
     
-    // ✅ KRITISCH: Übergebe lieferungenAmWerk aus Hafenlogistik!
-    // Dies ist die EINZIGE Quelle für Materialzugänge
+    // ✅ KRITISCH: Nutze Szenario-modifizierte Lieferungen!
     return berechneBedarfsBacklog(
       plaeneAlsEntries, 
       konfiguration,
-      inboundLieferplan.lieferungenAmWerk // ✅ Hafenlogistik-Lieferungen als PFLICHT-Parameter
+      lieferungenMitSzenarien // ✅ Szenarien bereits angewendet
     )
-  }, [variantenProduktionsplaeneForWarehouse, konfiguration, inboundLieferplan])
+  }, [variantenProduktionsplaeneForWarehouse, konfiguration, lieferungenMitSzenarien])
   
   // ✅ INTEGRIERTES WAREHOUSE: Realistische Bestandsführung
   const warehouseResult = useMemo(() => {

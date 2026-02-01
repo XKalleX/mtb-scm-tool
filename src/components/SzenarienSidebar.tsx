@@ -37,9 +37,11 @@ import {
   Edit2,
   CheckCircle2,
   X,
-  Info
+  Info,
+  Package
 } from 'lucide-react'
 import { useSzenarien, SzenarioTyp, SzenarioConfig } from '@/contexts/SzenarienContext'
+import { useLieferungen, LieferungBundle } from '@/lib/hooks/useLieferungen'
 import szenarioDefaults from '@/data/szenario-defaults.json'
 import stammdaten from '@/data/stammdaten.json'
 
@@ -226,10 +228,31 @@ function getSzenarioSummary(szenario: SzenarioConfig): string {
     }
     case 'maschinenausfall':
       return `-${szenario.parameter.reduktionProzent}% für ${szenario.parameter.dauerTage} Tage`
-    case 'wasserschaden':
-      return `${szenario.parameter.verlustMenge} Teile verloren`
-    case 'schiffsverspaetung':
-      return `+${szenario.parameter.verspaetungTage} Tage Verzögerung`
+    case 'wasserschaden': {
+      // NEU: Zeige ausgewählte Lieferungen
+      const betroffeneLieferungen = szenario.parameter.betroffeneLieferungen || []
+      const schadenTyp = szenario.parameter.schadenTyp || 'teilweise'
+      const reduktion = szenario.parameter.reduktionProzent || 50
+      
+      if (betroffeneLieferungen.length === 0) {
+        return 'Keine Lieferungen ausgewählt'
+      }
+      
+      return schadenTyp === 'komplett' 
+        ? `${betroffeneLieferungen.length} Lieferung(en) verloren`
+        : `${betroffeneLieferungen.length} Lieferung(en) -${reduktion}%`
+    }
+    case 'schiffsverspaetung': {
+      // NEU: Zeige ausgewählte Lieferungen
+      const betroffeneLieferungen = szenario.parameter.betroffeneLieferungen || []
+      const verspaetungTage = szenario.parameter.verspaetungTage || 7
+      
+      if (betroffeneLieferungen.length === 0) {
+        return 'Keine Lieferungen ausgewählt'
+      }
+      
+      return `${betroffeneLieferungen.length} Lieferung(en) +${verspaetungTage} Tage`
+    }
     default:
       return ''
   }
@@ -300,13 +323,17 @@ function SzenarioForm({
   }
 
   const [parameter, setParameter] = useState<Record<string, any>>(getDefaultParameter(szenarioTyp))
+  
+  // Hole verfügbare Lieferungen für lieferungSelect Felder
+  const { lieferungen, isLoading: lieferungenLoading } = useLieferungen()
 
   type FieldDef = {
     key: string
     label: string
-    type: 'number' | 'date' | 'text' | 'multiselect'
+    type: 'number' | 'date' | 'text' | 'multiselect' | 'lieferungSelect' | 'select'
     min?: number | string
     max?: number | string
+    optionen?: string[]
   }
 
   /**
@@ -321,9 +348,10 @@ function SzenarioForm({
     return Object.entries(paramDefs).map(([key, def]: [string, any]) => ({
       key,
       label: def.label,
-      type: def.typ as 'number' | 'date' | 'text' | 'multiselect',
+      type: def.typ as 'number' | 'date' | 'text' | 'multiselect' | 'lieferungSelect' | 'select',
       min: def.min,
-      max: def.max
+      max: def.max,
+      optionen: def.optionen
     }))
   }
 
@@ -429,6 +457,90 @@ function SzenarioForm({
                   {(parameter[field.key] as string[] || []).length === 0 
                     ? '✓ Alle Varianten ausgewählt' 
                     : `${(parameter[field.key] as string[] || []).length} Variante(n) ausgewählt`}
+                </div>
+              </div>
+            )}
+            
+            {/* NEU: Lieferungs-Auswahl für Transport-Schaden und Schiffsverspätung */}
+            {field.type === 'lieferungSelect' && (
+              <div className="space-y-2">
+                {lieferungenLoading ? (
+                  <div className="text-xs text-gray-500">Lade Lieferungen...</div>
+                ) : (
+                  <>
+                    <div className="text-xs text-gray-500 mb-2">
+                      Wählen Sie die betroffenen Lieferungen aus (mind. 1):
+                    </div>
+                    <div className="max-h-64 overflow-y-auto border rounded p-2 space-y-1">
+                      {lieferungen.slice(0, 100).map((lieferung) => {
+                        const isSelected = (parameter[field.key] as string[] || []).includes(lieferung.id)
+                        const handleToggle = () => {
+                          const current = (parameter[field.key] as string[]) || []
+                          const updated = isSelected
+                            ? current.filter((id: string) => id !== lieferung.id)
+                            : [...current, lieferung.id]
+                          setParameter({...parameter, [field.key]: updated})
+                        }
+                        return (
+                          <label 
+                            key={lieferung.id} 
+                            className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
+                              isSelected ? 'bg-blue-100 border border-blue-300' : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={handleToggle}
+                              />
+                              <div className="flex flex-col">
+                                <span className="text-xs font-medium">{lieferung.verfuegbarAbFormatiert}</span>
+                                <span className="text-xs text-gray-500">
+                                  {lieferung.gesamtMenge.toLocaleString('de-DE')} Teile
+                                </span>
+                              </div>
+                            </div>
+                            <Package className="h-4 w-4 text-gray-400" />
+                          </label>
+                        )
+                      })}
+                      {lieferungen.length === 0 && (
+                        <div className="text-xs text-gray-500 text-center py-4">
+                          Keine Lieferungen gefunden
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {(parameter[field.key] as string[] || []).length === 0 
+                        ? '⚠️ Bitte mindestens eine Lieferung auswählen' 
+                        : `✓ ${(parameter[field.key] as string[] || []).length} Lieferung(en) ausgewählt`}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            
+            {/* NEU: Dropdown-Auswahl für schadenTyp */}
+            {field.type === 'select' && (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  {(field.optionen || []).map((option) => {
+                    const isSelected = parameter[field.key] === option
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setParameter({...parameter, [field.key]: option})}
+                        className={`flex-1 py-2 px-3 text-xs rounded border transition-colors ${
+                          isSelected 
+                            ? 'bg-blue-100 border-blue-300 text-blue-800' 
+                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {option === 'komplett' ? '🚫 Komplett verloren' : '⚠️ Teilweise verloren'}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             )}

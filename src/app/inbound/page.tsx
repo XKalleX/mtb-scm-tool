@@ -31,7 +31,7 @@ import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { DeltaCell, DeltaBadge } from '@/components/DeltaCell'
 import { useMemo, useState, useCallback } from 'react'
 import { generiereAlleVariantenProduktionsplaene, type TagesProduktionEntry } from '@/lib/calculations/zentrale-produktionsplanung'
-import { generiereTaeglicheBestellungen, generiereInboundLieferplan, erstelleZusatzbestellung, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
+import { generiereTaeglicheBestellungen, generiereInboundLieferplan, erstelleZusatzbestellung, wendeSzenarienAufLieferungenAn, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
 import { berechneBedarfsBacklog, type BedarfsBacklogErgebnis } from '@/lib/calculations/bedarfs-backlog-rechnung'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { istDeutschlandFeiertag, ladeDeutschlandFeiertage, istChinaFeiertag } from '@/lib/kalender'
@@ -222,12 +222,25 @@ export default function InboundPage() {
     )
   }, [produktionsplaeneFormatiert, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage, konfiguration.feiertage, stuecklistenMap, lieferant.losgroesse])
   
+  // ✅ NEU: Wende Szenarien auf Lieferungen an (Transport-Schaden, Schiffsverspätung)
+  const lieferungenMitSzenarien = useMemo(() => {
+    if (!hasSzenarien || aktiveSzenarien.length === 0) {
+      return inboundLieferplan.lieferungenAmWerk
+    }
+    
+    console.log('⚡ Wende Szenarien auf Lieferungen an...')
+    return wendeSzenarienAufLieferungenAn(
+      inboundLieferplan.lieferungenAmWerk,
+      aktiveSzenarien
+    )
+  }, [inboundLieferplan.lieferungenAmWerk, hasSzenarien, aktiveSzenarien])
+  
   // Extrahiere Bestellungen aus Hafenlogistik-Ergebnis
   const generierteBestellungen = useMemo(() => {
     return inboundLieferplan.bestellungen
   }, [inboundLieferplan])
   
-  // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung MIT Hafenlogistik-Lieferungen
+  // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung MIT Szenario-modifizierten Lieferungen
   // Zeigt für jeden Tag: Bedarf, Backlog, Bestellung, Materialverfügbarkeit
   const backlogErgebnis = useMemo(() => {
     // Konvertiere Produktionspläne zum richtigen Format (TagesProduktionEntry[])
@@ -236,13 +249,13 @@ export default function InboundPage() {
       plaeneAlsEntries[varianteId] = plan.tage
     })
     
-    // ✅ KRITISCH: Übergebe lieferungenAmWerk aus Hafenlogistik!
+    // ✅ KRITISCH: Nutze Szenario-modifizierte Lieferungen!
     return berechneBedarfsBacklog(
       plaeneAlsEntries, 
       konfiguration,
-      inboundLieferplan.lieferungenAmWerk // ✅ Hafenlogistik-Lieferungen als PFLICHT-Parameter
+      lieferungenMitSzenarien // ✅ Szenarien bereits angewendet
     )
-  }, [produktionsplaene, konfiguration, inboundLieferplan])
+  }, [produktionsplaene, konfiguration, lieferungenMitSzenarien])
   
   // ✅ Kombiniere generierte + Zusatzbestellungen
   const taeglicheBestellungen = useMemo(() => {
@@ -267,9 +280,9 @@ export default function InboundPage() {
       return sum + Object.values(b.komponenten).reduce((s, m) => s + m, 0)
     }, 0)
     
-    // ✅ VERSCHIFFT: Tatsächlich verschiffte Menge aus Hafenlogistik
-    // Dies berücksichtigt Losgrößen-Rundung (z.B. 25 Teile bleiben am Hafen bei Losgröße 75)
-    const gesamtMengeVerschifft = Array.from(inboundLieferplan.lieferungenAmWerk.values()).reduce((sum, komponenten) => {
+    // ✅ VERSCHIFFT: Tatsächlich verschiffte Menge MIT Szenario-Anpassungen
+    // Dies berücksichtigt Transport-Schäden und Verspätungen
+    const gesamtMengeVerschifft = Array.from(lieferungenMitSzenarien.values()).reduce((sum, komponenten) => {
       return sum + Object.values(komponenten).reduce((s, m) => s + m, 0)
     }, 0)
     
@@ -279,10 +292,10 @@ export default function InboundPage() {
       planungsjahr,
       zusatzBestellungenCount,
       gesamtMenge: gesamtMengeBestellt, // Gesamt bestellt (für Bestellübersicht)
-      gesamtMengeVerschifft, // ✅ NEU: Tatsächlich verschifft (für Hafenlogistik)
+      gesamtMengeVerschifft, // ✅ NEU: Tatsächlich geliefert (nach Szenarien)
       durchschnittProBestellung: gesamt > 0 ? gesamtMengeBestellt / gesamt : 0
     }
-  }, [taeglicheBestellungen, inboundLieferplan.lieferungenAmWerk])
+  }, [taeglicheBestellungen, lieferungenMitSzenarien])
   
   /**
    * Bestelllogik iteriert durch BEDARFSDATUM:

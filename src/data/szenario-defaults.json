@@ -88,34 +88,40 @@
     "wasserschaden": {
       "id": "wasserschaden",
       "name": "Transport-Schaden",
-      "beschreibung": "Container-Verlust auf Seefracht von China nach Deutschland",
+      "beschreibung": "Container-Verlust oder Schaden auf Seefracht - wählen Sie spezifische Lieferungen aus",
       "standardParameter": {
-        "datum": "2027-02-20",
-        "verlustMenge": 1000,
-        "betroffeneTeile": "Gemischte Komponenten aus China"
+        "betroffeneLieferungen": [],
+        "schadenTyp": "teilweise",
+        "reduktionProzent": 50,
+        "beschreibung": "Container-Schaden auf Seefracht"
       },
       "parameterDefinitionen": {
-        "datum": {
-          "label": "Datum des Ereignisses",
-          "typ": "date",
-          "einheit": "Datum",
-          "min": "2027-01-01",
-          "max": "2027-12-31",
-          "beschreibung": "Datum an dem der Transport-Schaden auftritt"
+        "betroffeneLieferungen": {
+          "label": "Betroffene Lieferungen",
+          "typ": "lieferungSelect",
+          "einheit": "",
+          "beschreibung": "Wählen Sie die betroffenen Schiffs-Lieferungen aus (Datum = Ankunft am Werk)"
         },
-        "verlustMenge": {
-          "label": "Verlorene Menge (Stück)",
+        "schadenTyp": {
+          "label": "Schaden-Typ",
+          "typ": "select",
+          "optionen": ["komplett", "teilweise"],
+          "einheit": "",
+          "beschreibung": "Komplett = Lieferung vollständig verloren, Teilweise = nur Prozentsatz verloren"
+        },
+        "reduktionProzent": {
+          "label": "Verlust-Anteil (%)",
           "typ": "number",
-          "einheit": "Stück",
-          "min": 100,
-          "max": 10000,
-          "beschreibung": "Anzahl der verlorenen Komponenten"
+          "einheit": "%",
+          "min": 10,
+          "max": 100,
+          "beschreibung": "Nur bei teilweisem Schaden: Wie viel Prozent der Lieferung sind verloren"
         },
-        "betroffeneTeile": {
-          "label": "Betroffene Teile",
+        "beschreibung": {
+          "label": "Beschreibung",
           "typ": "text",
           "einheit": "",
-          "beschreibung": "Beschreibung welche Teile betroffen sind"
+          "beschreibung": "Kurze Beschreibung des Schadensereignisses"
         }
       },
       "beispiel": "Sturm auf See - Container geht auf Seefracht China → Deutschland verloren"
@@ -123,39 +129,35 @@
     "schiffsverspaetung": {
       "id": "schiffsverspaetung",
       "name": "Schiffsverspätung",
-      "beschreibung": "Verzögerung der Seefracht China → Hamburg/Bremerhaven",
+      "beschreibung": "Verzögerung der Seefracht - wählen Sie spezifische Lieferungs-Bundles aus",
       "standardParameter": {
-        "ursprungAnkunft": "2027-02-16",
-        "verspaetungTage": 4,
-        "neueAnkunft": "2027-02-20"
+        "betroffeneLieferungen": [],
+        "verspaetungTage": 7,
+        "beschreibung": "Schiff hat Verspätung wegen schlechten Wetters"
       },
       "parameterDefinitionen": {
-        "ursprungAnkunft": {
-          "label": "Geplante Ankunft",
-          "typ": "date",
-          "einheit": "Datum",
-          "min": "2027-01-01",
-          "max": "2027-12-31",
-          "beschreibung": "Original geplantes Ankunftsdatum des Schiffs"
+        "betroffeneLieferungen": {
+          "label": "Betroffene Lieferungen",
+          "typ": "lieferungSelect",
+          "einheit": "",
+          "beschreibung": "Wählen Sie die verspäteten Schiffs-Lieferungen aus (Datum = geplante Ankunft am Werk)"
         },
         "verspaetungTage": {
           "label": "Verspätung (Tage)",
           "typ": "number",
           "einheit": "Tage",
           "min": 1,
-          "max": 14,
-          "beschreibung": "Anzahl der Tage Verspätung"
+          "max": 30,
+          "beschreibung": "Anzahl der Tage Verspätung für die ausgewählten Lieferungen"
         },
-        "neueAnkunft": {
-          "label": "Neue Ankunft",
-          "typ": "date",
-          "einheit": "Datum",
-          "min": "2027-01-01",
-          "max": "2027-12-31",
-          "beschreibung": "Neues geschätztes Ankunftsdatum"
+        "beschreibung": {
+          "label": "Beschreibung",
+          "typ": "text",
+          "einheit": "",
+          "beschreibung": "Kurze Beschreibung des Verspätungsgrunds"
         }
       },
-      "beispiel": "Schiff verspätet sich um 4 Tage - Seefracht von China nach Hamburg/Bremerhaven"
+      "beispiel": "Schiff verspätet sich um 7 Tage - Seefracht von China nach Hamburg/Bremerhaven"
     }
   },
   "meta": {
