@@ -359,6 +359,33 @@ export function berechneIntegriertesWarehouse(
   console.log(`   Ende: ${simulationEnde.toLocaleDateString('de-DE')}`)
   console.log(`   Letzte Lieferung verfügbar: ${letzteLieferung.toLocaleDateString('de-DE')}`)
   
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // STEP 2.5: CREATE DATE-BASED LOOKUP MAP FOR PRODUCTION PLANS
+  // ═══════════════════════════════════════════════════════════════════════════════
+  
+  /**
+   * 🔧 FIX: Date-based lookup statt Array-Index
+   * 
+   * Problem: Array-Index (tagImJahr - 1) kann zu Fehlern führen wenn das Array
+   * nur Arbeitstage enthält oder unterschiedliche Längen hat.
+   * 
+   * Lösung: Erstelle eine Map die direkt über Datum zugreift:
+   * produktionsplanMap[varianteId][dateString] = planMenge
+   * 
+   * Vorteil: Robuster, expliziter, kein Index-Mismatch möglich
+   */
+  const produktionsplanMap: Record<string, Record<string, number>> = {}
+  
+  Object.entries(variantenProduktionsplaene).forEach(([varianteId, plan]) => {
+    produktionsplanMap[varianteId] = {}
+    plan.tage.forEach(tag => {
+      const dateKey = toLocalISODateString(tag.datum)
+      produktionsplanMap[varianteId][dateKey] = tag.planMenge
+    })
+  })
+  
+  console.log(`📋 Produktionsplan-Lookup erstellt für ${Object.keys(produktionsplanMap).length} Varianten`)
+  
   let aktuellesDatum = new Date(simulationStart)
   let tagIndex = 0
   
@@ -443,13 +470,14 @@ export function berechneIntegriertesWarehouse(
       
       if (istArbeitstag && tagImJahr >= 1 && tagImJahr <= 365) {
         // Summiere PLAN-Verbrauch über alle Varianten (was produziert werden SOLLTE)
-        Object.entries(variantenProduktionsplaene).forEach(([varianteId, plan]) => {
-          const tagesIndex = tagImJahr - 1 // Array ist 0-basiert
-          if (tagesIndex >= 0 && tagesIndex < plan.tage.length) {
-            const tagesProduktion = plan.tage[tagesIndex]
+        // 🔧 FIX: Nutze date-based lookup statt Array-Index
+        Object.entries(produktionsplanMap).forEach(([varianteId, planMap]) => {
+          const geplanteMenge = planMap[datumStr] || 0
+          
+          if (geplanteMenge > 0) {
             // Nutze planMenge für Bedarfsermittlung (was eigentlich geplant war)
             const verbrauchVariante = berechneVerbrauchProBauteil(
-              tagesProduktion.planMenge, // WICHTIG: Nutze PLAN, nicht IST
+              geplanteMenge, // WICHTIG: Nutze PLAN, nicht IST
               varianteId,
               bauteilId,
               konfiguration
@@ -883,19 +911,29 @@ export function korrigiereProduktionsplaeneMitWarehouse(
     }
   })
   
+  // 🔧 FIX: Erstelle date-based lookup für schnelleren Zugriff
+  const planDateLookup: Record<string, Record<string, TagesProduktionEntry>> = {}
+  Object.entries(korrigiertePlaene).forEach(([varianteId, plan]) => {
+    planDateLookup[varianteId] = {}
+    plan.tage.forEach(tag => {
+      const dateKey = toLocalISODateString(tag.datum)
+      planDateLookup[varianteId][dateKey] = tag
+    })
+  })
+  
   // Für jeden Tag im Warehouse
   warehouseResult.tage.forEach(warehouseTag => {
-    const tagImJahr = warehouseTag.tag
+    const datumStr = warehouseTag.datumStr
     
     // Nur Tage im Planungsjahr (1-365)
+    const tagImJahr = warehouseTag.tag
     if (tagImJahr < 1 || tagImJahr > 365) return
     
     // Für jede Variante
     Object.entries(korrigiertePlaene).forEach(([varianteId, plan]) => {
-      const tagesIndex = tagImJahr - 1 // Array ist 0-basiert
-      if (tagesIndex < 0 || tagesIndex >= plan.tage.length) return
-      
-      const produktionsTag = plan.tage[tagesIndex]
+      // 🔧 FIX: Nutze date-based lookup statt Array-Index
+      const produktionsTag = planDateLookup[varianteId][datumStr]
+      if (!produktionsTag) return
       
       // Finde welches Bauteil diese Variante nutzt (aus Stückliste)
       const stuecklistenPos = konfiguration.stueckliste.find(
@@ -932,9 +970,12 @@ export function korrigiereProduktionsplaeneMitWarehouse(
         const variantenPlaene: Record<string, number> = {}
         
         variantenMitBauteil.forEach(vId => {
-          const vPlan = korrigiertePlaene[vId].tage[tagesIndex]
-          variantenPlaene[vId] = vPlan.planMenge
-          gesamtPlan += vPlan.planMenge
+          // 🔧 FIX: Nutze date-based lookup statt Array-Index
+          const vPlan = planDateLookup[vId][datumStr]
+          if (vPlan) {
+            variantenPlaene[vId] = vPlan.planMenge
+            gesamtPlan += vPlan.planMenge
+          }
         })
         
         // Verteile tatsächliche Produktion proportional
