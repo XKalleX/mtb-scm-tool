@@ -106,26 +106,38 @@ export interface VariantenProduktionsplan {
  * Anders als ISO 8601 (das Tage am Jahresanfang der KW 53 des Vorjahres zuweisen kann),
  * ordnet diese Funktion alle Tage eines Jahres den Wochen desselben Jahres zu (KW 1-52/53).
  * 
- * Dies ist wichtig für eine jahresbezogene Planung, bei der KW 53 des Vorjahres
- * verwirrend wäre.
+ * Logik: 
+ * - Jede Woche beginnt am Montag
+ * - KW 1 beginnt mit dem ersten Montag im Jahr (oder umfasst die Tage vor dem ersten Montag)
+ * - Alle 365/366 Tage des Jahres werden lückenlos auf Wochen verteilt
  */
 function getKalenderWoche(date: Date): number {
-  // Verwende das Jahr des Datums, nicht das ISO-Jahr
   const jahr = date.getFullYear()
   const jahresanfang = new Date(jahr, 0, 1)
   
-  // Berechne Wochennummer basierend auf dem ersten Montag des Jahres
-  // Tage vor dem ersten Montag gehören zu KW 1
-  const tageImJahr = Math.floor((date.getTime() - jahresanfang.getTime()) / 86400000)
-  const ersterMontagOffset = (8 - jahresanfang.getDay()) % 7 // Tage bis zum ersten Montag
+  // Berechne Tag im Jahr (0-364 oder 0-365)
+  const msInDay = 86400000
+  const tageImJahr = Math.floor((date.getTime() - jahresanfang.getTime()) / msInDay)
   
-  if (tageImJahr < ersterMontagOffset) {
-    // Tage vor dem ersten Montag gehören zu KW 1
+  // Wochentag des Jahresanfangs (0=Sonntag, 1=Montag, ..., 6=Samstag)
+  const jahresanfangWochentag = jahresanfang.getDay()
+  
+  // Tage bis zum ersten Montag (wenn Jahr mit Montag beginnt, ist dies 0)
+  // Sonntag (0) wird als 7 behandelt für die Berechnung
+  const tageVorErstemMontag = jahresanfangWochentag === 0 
+    ? 6  // Sonntag: 6 Tage bis Montag
+    : jahresanfangWochentag === 1 
+      ? 0  // Montag: 0 Tage
+      : 8 - jahresanfangWochentag  // Di-Sa: entsprechende Tage
+  
+  // Wenn das Datum vor dem ersten Montag liegt, gehört es zu KW 1
+  if (tageImJahr < tageVorErstemMontag) {
     return 1
   }
   
   // Berechne KW basierend auf Tagen seit dem ersten Montag
-  return Math.floor((tageImJahr - ersterMontagOffset) / 7) + 1
+  const tageNachErstemMontag = tageImJahr - tageVorErstemMontag
+  return Math.floor(tageNachErstemMontag / 7) + 1
 }
 
 /**
