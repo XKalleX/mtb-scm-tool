@@ -430,6 +430,7 @@ export function berechneBedarfsBacklog(
     // PHASE 2: MATERIAL-VERFÜGBARKEIT & PRODUKTION
     // ========================================
     lagerbestand = 0 // Reset Lagerbestand
+    let produktionsBacklog = 0 // Akkumulierter unerfüllter Produktionsbedarf
     
     tagesDetails.forEach(detail => {
       const datumStr = toLocalISODateString(detail.datum)
@@ -445,17 +446,25 @@ export function berechneBedarfsBacklog(
       const verfuegbaresMaterial = lagerbestand
       detail.verfuegbaresMaterial = verfuegbaresMaterial
       
-      // 4. Tatsächliche Produktion (min(Bedarf, verfügbar))
-      const tatsaechlicheProduktion = Math.min(detail.bedarf, verfuegbaresMaterial)
+      // 4. Berechne Gesamt-Bedarf (heutiger Bedarf + akkumulierter Produktions-Backlog)
+      const gesamtBedarf = detail.bedarf + produktionsBacklog
+      
+      // 5. Tatsächliche Produktion (min(Gesamt-Bedarf, verfügbar))
+      // Versuche sowohl heutigen Bedarf als auch Backlog zu decken
+      const tatsaechlicheProduktion = Math.min(gesamtBedarf, verfuegbaresMaterial)
       detail.tatsaechlicheProduktion = tatsaechlicheProduktion
       
-      // 5. Material-Engpass?
-      detail.materialEngpass = detail.bedarf > verfuegbaresMaterial
+      // 6. Aktualisiere Produktions-Backlog
+      // Backlog = was wir produzieren wollten - was wir tatsächlich produziert haben
+      produktionsBacklog = gesamtBedarf - tatsaechlicheProduktion
       
-      // 6. Abweichung (negativ = Fehlmenge)
+      // 7. Material-Engpass? (wenn wir nicht alles produzieren konnten)
+      detail.materialEngpass = gesamtBedarf > verfuegbaresMaterial
+      
+      // 8. Abweichung (negativ = Fehlmenge gegenüber heutigem Bedarf)
       detail.abweichung = tatsaechlicheProduktion - detail.bedarf
       
-      // 7. Lagerbestand aktualisieren (Verbrauch)
+      // 9. Lagerbestand aktualisieren (Verbrauch)
       lagerbestand -= tatsaechlicheProduktion
       detail.lagerbestand = lagerbestand
     })
