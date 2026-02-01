@@ -271,6 +271,23 @@ export function berechneIntegriertesWarehouse(
   console.log(`   - Ø Wartezeit Hafen: ${inboundResult.hafenStatistik.durchschnittlicheWartezeit.toFixed(1)} Tage`)
   console.log(`   - Max Hafenlager: ${inboundResult.hafenStatistik.maxLagerbestand.toLocaleString('de-DE')} Sättel`)
   
+  // DEBUG: Zeige alle Liefertermine im Januar
+  console.log(`\n📅 LIEFERTERMINE (Dezember 2026 - März 2027):`)
+  let totalGelieferteSaettel = 0
+  const lieferungenSortiert: {datum: string, menge: number}[] = []
+  lieferungenAmWerkAusHafenlogistik.forEach((komponenten, datumStr) => {
+    const gesamtMenge = Object.values(komponenten).reduce((a, b) => a + b, 0)
+    totalGelieferteSaettel += gesamtMenge
+    lieferungenSortiert.push({datum: datumStr, menge: gesamtMenge})
+  })
+  // Sortiere und zeige die ersten 15
+  lieferungenSortiert.sort((a, b) => a.datum.localeCompare(b.datum))
+  lieferungenSortiert.slice(0, 15).forEach(l => {
+    console.log(`   🚚 ${l.datum} → ${l.menge} Sättel`)
+  })
+  console.log(`   ... (${lieferungenSortiert.length} Liefertage insgesamt)`)
+  console.log(`\n📊 GESAMT AM WERK GELIEFERT: ${totalGelieferteSaettel.toLocaleString('de-DE')} Sättel (Soll: 370.000)`)
+  
   // ═══════════════════════════════════════════════════════════════════════════════
   // GUARD: Prüfe ob Bestellungen vorhanden sind
   // ═══════════════════════════════════════════════════════════════════════════════
@@ -338,6 +355,9 @@ export function berechneIntegriertesWarehouse(
   // für die bestehende Warehouse-Logik
   const lieferungenProTag = new Map<string, TaeglicheBestellung[]>()
   
+  // DEBUG: Zeige Größe vor Konvertierung
+  console.log(`\n🔄 Konvertiere ${lieferungenAmWerkAusHafenlogistik.size} Hafenlogistik-Lieferungen zu Warehouse-Format...`)
+  
   lieferungenAmWerkAusHafenlogistik.forEach((komponenten, datumStr) => {
     // Erstelle eine "virtuelle" Bestellung für diese Lieferung
     // Dies ermöglicht es der bestehenden Warehouse-Logik zu funktionieren
@@ -355,6 +375,14 @@ export function berechneIntegriertesWarehouse(
     
     lieferungenProTag.set(datumStr, [virtuelleLieferung])
   })
+  
+  console.log(`✅ Konvertiert: ${lieferungenProTag.size} Liefertermine in lieferungenProTag Map`)
+  
+  // DEBUG: Prüfe ob bestimmte Daten drin sind
+  const testDatum1 = '2027-01-12'
+  const testDatum2 = '2027-01-19'
+  console.log(`   Test '${testDatum1}': ${lieferungenProTag.has(testDatum1) ? 'JA' : 'NEIN'}`)
+  console.log(`   Test '${testDatum2}': ${lieferungenProTag.has(testDatum2) ? 'JA' : 'NEIN'}`)
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // STEP 2: INITIALISIERE LAGERBESTÄNDE MIT 0
@@ -492,16 +520,24 @@ export function berechneIntegriertesWarehouse(
     const heutigeLieferungen = lieferungenProTag.get(datumStr) || []
     const bauteileHeuteDetails: TaeglichesLager['bauteile'] = []
     
-    // DEBUG: Log Lieferungen für erste Tage
-    if (tagImJahr >= 1 && tagImJahr <= 10 && heutigeLieferungen.length > 0) {
-      const totalSaettel = heutigeLieferungen.reduce((sum, lief) => {
-        return sum + Object.values(lief.komponenten).reduce((a,b) => a+(b||0), 0)
-      }, 0)
-      console.log(`📦 TAG ${tagImJahr} (${datumStr}): ${heutigeLieferungen.length} Lieferung(en), TOTAL: ${totalSaettel} Sättel`)
-      heutigeLieferungen.forEach(lief => {
-        const total = Object.values(lief.komponenten).reduce((a,b) => a+(b||0), 0)
-        console.log(`    ID: ${lief.id}, Menge: ${total}, Bestelldatum: ${lief.bestelldatum.toISOString().split('T')[0]}`)
-      })
+    // DEBUG: Log Lieferungen für bestimmte Tage (Analyse)
+    // Erweitert um Prüfung ob Datum in Map existiert
+    if ((tagImJahr >= 1 && tagImJahr <= 15) || (tagImJahr >= 75 && tagImJahr <= 85)) {
+      const hatMapEintrag = lieferungenProTag.has(datumStr)
+      if (heutigeLieferungen.length > 0) {
+        const totalSaettel = heutigeLieferungen.reduce((sum, lief) => {
+          return sum + Object.values(lief.komponenten).reduce((a,b) => a+(b||0), 0)
+        }, 0)
+        console.log(`📦 TAG ${tagImJahr} (${datumStr}): ${heutigeLieferungen.length} Lieferung(en), TOTAL: ${totalSaettel} Sättel`)
+        // Zeige Bauteil-Details
+        heutigeLieferungen.forEach(lief => {
+          Object.entries(lief.komponenten).forEach(([kompId, menge]) => {
+            console.log(`    ${kompId}: ${menge} Stück`)
+          })
+        })
+      } else {
+        console.log(`📦 TAG ${tagImJahr} (${datumStr}): KEINE Lieferung (Map-Eintrag: ${hatMapEintrag})`)
+      }
     }
     
     // Erst alle Lieferungen buchen (für alle Bauteile)
@@ -603,9 +639,13 @@ export function berechneIntegriertesWarehouse(
         materialLimitBikes += verfuegbar
       })
       
-      // DEBUG: Log für erste 10 Tage
-      if (tagImJahr >= 1 && tagImJahr <= 10) {
+      // DEBUG: Log für erste 10 Tage und kritische Tage 75-80
+      if ((tagImJahr >= 1 && tagImJahr <= 10) || (tagImJahr >= 75 && tagImJahr <= 82)) {
         console.log(`📊 TAG ${tagImJahr} (${datumStr}): Plan=${totaleBikesPlan}, +Backlog=${gesamtBacklogBikes}, Material=${materialLimitBikes}, Kapazität=${maxProduktionKapazitaetBikes}`)
+        // Zeige auch den Bestand pro Bauteil
+        bauteile.forEach(b => {
+          console.log(`   ${b.id}: ${aktuelleBestaende[b.id]} Stück`)
+        })
       }
       
       // ─────────────────────────────────────────────────────────────────────────────
@@ -704,27 +744,32 @@ export function berechneIntegriertesWarehouse(
         })
         
         // ─────────────────────────────────────────────────────────────────────────
-        // Wende GLOBALEN Produktionsfaktor an (proportionale Reduktion!)
+        // Wende GLOBALEN Produktionsfaktor an UND begrenze durch lokalen Bestand!
         // ─────────────────────────────────────────────────────────────────────────
         /**
-         * KRITISCH: produktionsFaktor wurde GLOBAL berechnet basierend auf (Plan+Backlog)!
+         * 🔧 KRITISCHER FIX: Der Verbrauch muss ZUSÄTZLICH durch den lokalen Bestand begrenzt werden!
          * 
-         * Der Faktor berücksichtigt bereits den Backlog-Abbau:
-         * - Wenn (Plan+Backlog) > Kapazität: Faktor < 1, Backlog wächst
-         * - Wenn (Plan+Backlog) <= Kapazität: Faktor = 1, Backlog wird abgebaut
+         * Problem vorher:
+         * - produktionsFaktor basiert auf SUMME aller Sättel
+         * - Wenn SAT_FT viel hat (500) und SAT_SL wenig (50), ist der globale Faktor OK
+         * - ABER: Varianten die SAT_SL brauchen können nur 50 produzieren, nicht mehr!
          * 
-         * Beispiel mit Backlog:
-         * - Plan: 740, Backlog: 2000, Summe: 2740
-         * - Kapazität: 3120, Material: 5000
-         * - produktionsFaktor = 3120 / 2740 = 1.0 (kann alles produzieren)
-         * - Verbrauch für dieses Bauteil = benoetigt * 1.0
-         * - Backlog wird vollständig abgebaut
+         * Lösung:
+         * - Berechne erst den globalen Faktor-basierten Verbrauch
+         * - Dann begrenze durch den TATSÄCHLICH verfügbaren Bestand dieses Bauteils
+         * - Der Unterschied geht in den Backlog
          */
-        const tatsaechlicherBedarf = Math.floor(benoetigt * produktionsFaktor)
-        const nichtErfuellt = benoetigt - tatsaechlicherBedarf
+        const globalerBedarf = Math.floor(benoetigt * produktionsFaktor)
         
-        // Setze Verbrauch auf das, was tatsächlich möglich ist
-        verbrauch = tatsaechlicherBedarf
+        // ✅ KRITISCH: Begrenze Verbrauch durch den VERFÜGBAREN BESTAND dieses Bauteils!
+        const verfuegbarerBestand = aktuelleBestaende[bauteilId]
+        const maxVerbrauchMoeglich = Math.min(globalerBedarf, verfuegbarerBestand)
+        
+        // Setze Verbrauch auf das, was WIRKLICH möglich ist (begrenzt durch lokalen Bestand)
+        verbrauch = maxVerbrauchMoeglich
+        
+        // Berechne nicht erfüllten Bedarf (geht in Backlog)
+        const nichtErfuellt = benoetigt - verbrauch
         
         // ✅ BACKLOG-TRACKING: Berechne wie viel Backlog abgebaut oder aufgebaut wurde
         // Der tatsächliche Bedarf (inkl. produktionsFaktor) wird auf Plan + Backlog angewendet

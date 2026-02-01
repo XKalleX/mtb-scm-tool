@@ -190,22 +190,25 @@ function simuliereHafenUndSchiffsversand(
   while (aktuelleDatum <= endDatum) {
     const datumStr = toLocalISODateString(aktuelleDatum)
     
-    // 1. ANKUNFT: Füge Ware die heute ankommt zum Hafen-Lager hinzu
+    // 1. ANKUNFT: Füge Ware die heute (oder früher) ankommt zum Hafen-Lager hinzu
+    // ✅ FIX: Verarbeite ALLE Bestellungen die am oder vor dem aktuellen Datum ankommen
+    // Dies verhindert, dass Bestellungen durch Zeitzonen-/Rundungsfehler übersprungen werden
     while (ankunftsIndex < hafenAnkunftsTimeline.length) {
       const ankunft = hafenAnkunftsTimeline[ankunftsIndex]
       const ankunftStr = toLocalISODateString(ankunft.datum)
       
-      if (ankunftStr === datumStr) {
-        // Ware kommt heute am Hafen an
+      // ✅ FIX: Verwende String-Vergleich statt Date-Objekt-Vergleich
+      // um Zeitzonen-Probleme zu vermeiden
+      if (ankunftStr <= datumStr) {
+        // Ware kommt heute oder ist bereits früher angekommen → ins Lager buchen
         Object.entries(ankunft.komponenten).forEach(([kompId, menge]) => {
           hafenLager[kompId] = (hafenLager[kompId] || 0) + menge
         })
         
         ankunftsIndex++
-      } else if (ankunft.datum > aktuelleDatum) {
-        break
       } else {
-        ankunftsIndex++
+        // Ankunft liegt in der Zukunft → abbrechen
+        break
       }
     }
     
@@ -244,20 +247,42 @@ function simuliereHafenUndSchiffsversand(
         })
         
         // Entnehme proportional aus allen Komponenten
+        // ✅ FIX: Korrigiere Rundungsfehler durch zweistufige Verteilung
         const verladeneKomponenten: Record<string, number> = {}
         let verbleibendeKapazitaet = ladungMenge
         
-        // Berechne Proportionen
-        Object.entries(hafenLager).forEach(([kompId, menge]) => {
-          if (menge > 0 && verbleibendeKapazitaet > 0) {
+        // SCHRITT 1: Berechne initiale proportionale Verteilung (mit Math.floor)
+        const komponentenListe = Object.entries(hafenLager).filter(([, menge]) => menge > 0)
+        
+        komponentenListe.forEach(([kompId, menge]) => {
+          if (verbleibendeKapazitaet > 0) {
             const anteil = menge / gesamtLagerbestand
-            const zuVerladen = Math.floor(anteil * ladungMenge)
+            // Runde nach unten, um sicherzustellen dass wir nicht zu viel nehmen
+            const zuVerladen = Math.min(
+              Math.floor(anteil * ladungMenge),
+              menge,  // Nicht mehr als im Lager
+              verbleibendeKapazitaet  // Nicht mehr als Kapazität
+            )
             
             verladeneKomponenten[kompId] = zuVerladen
             hafenLager[kompId] -= zuVerladen
             verbleibendeKapazitaet -= zuVerladen
           }
         })
+        
+        // SCHRITT 2: Verteile verbleibende Kapazität (Rundungsfehler-Korrektur)
+        // Wenn noch Kapazität übrig ist, fülle mit verfügbaren Sätteln auf
+        if (verbleibendeKapazitaet > 0) {
+          for (const [kompId] of komponentenListe) {
+            const verfuegbar = hafenLager[kompId]
+            if (verfuegbar > 0 && verbleibendeKapazitaet > 0) {
+              const zusatz = Math.min(verfuegbar, verbleibendeKapazitaet)
+              verladeneKomponenten[kompId] = (verladeneKomponenten[kompId] || 0) + zusatz
+              hafenLager[kompId] -= zusatz
+              verbleibendeKapazitaet -= zusatz
+            }
+          }
+        }
         
         // Berechne Ankunftsdatum am Werk
         // Schiff fährt 30 Tage
