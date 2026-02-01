@@ -293,13 +293,21 @@ export function berechneSCORMetrikenReal(
   // STEP 3: METRIK 2 - LIEFERTREUE CHINA (RELIABILITY)
   // ═══════════════════════════════════════════════════════════════════════════
   
+  // ✅ KORREKTE BERECHNUNG: 
+  // verfuegbarAb ist +1 Tag nach erwarteteAnkunft (Materialverarbeitung)
+  // Daher müssen wir erwartete Verfügbarkeit berechnen: Bestelldatum + Vorlaufzeit + 1 Tag
+  const vorlaufzeitTage = konfiguration.lieferant?.gesamtVorlaufzeitTage || 49
+  
   const lieferungenMitAnkunft = alleBestellungen.filter(b => b.verfuegbarAb)
   const puenktlicheLieferungen = lieferungenMitAnkunft.filter(b => {
-    // ✅ KORREKTUR: Pünktlich = verfuegbarAb <= erwarteteAnkunft (OHNE +1 Tag Toleranz!)
-    // Nutze nur die Vorlaufzeit aus KonfigurationContext (Standard: 49 Tage)
+    // Berechne erwartete Verfügbarkeit: Bestelldatum + Vorlaufzeit (49 Tage)
+    // erwarteteAnkunft ist bereits die Ankunft am Werk, verfuegbarAb sollte 1 Tag später sein
+    // Pünktlich wenn verfuegbarAb <= erwarteteAnkunft + 1 Tag
     const verfuegbar = new Date(b.verfuegbarAb!)
-    const erwartet = new Date(b.erwarteteAnkunft)
-    return verfuegbar <= erwartet
+    const erwarteteVerfuegbarkeit = new Date(b.erwarteteAnkunft)
+    erwarteteVerfuegbarkeit.setDate(erwarteteVerfuegbarkeit.getDate() + 1) // +1 Tag für Materialverarbeitung
+    
+    return verfuegbar <= erwarteteVerfuegbarkeit
   }).length
   
   const liefertreue_wert = lieferungenMitAnkunft.length > 0
@@ -310,7 +318,8 @@ export function berechneSCORMetrikenReal(
   const liefertreueLieferungen = alleBestellungen.map(b => {
     const gesamtMenge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
     const verfuegbar = b.verfuegbarAb ? new Date(b.verfuegbarAb) : null
-    const erwartet = new Date(b.erwarteteAnkunft)
+    const erwarteteVerfuegbarkeit = new Date(b.erwarteteAnkunft)
+    erwarteteVerfuegbarkeit.setDate(erwarteteVerfuegbarkeit.getDate() + 1) // +1 Tag für Materialverarbeitung
     
     return {
       bestellungId: b.id,
@@ -318,9 +327,9 @@ export function berechneSCORMetrikenReal(
       erwarteteAnkunft: b.erwarteteAnkunft.toISOString().split('T')[0],
       tatsaechlicheAnkunft: verfuegbar ? verfuegbar.toISOString().split('T')[0] : undefined,
       menge: gesamtMenge,
-      vorlaufzeitTage: Math.floor((b.erwarteteAnkunft.getTime() - b.bestelldatum.getTime()) / 86400000),
-      puenktlich: verfuegbar ? verfuegbar <= erwartet : true,
-      verspaetungTage: verfuegbar ? Math.max(0, Math.floor((verfuegbar.getTime() - erwartet.getTime()) / 86400000)) : undefined
+      vorlaufzeitTage: vorlaufzeitTage,
+      puenktlich: verfuegbar ? verfuegbar <= erwarteteVerfuegbarkeit : true,
+      verspaetungTage: verfuegbar ? Math.max(0, Math.floor((verfuegbar.getTime() - erwarteteVerfuegbarkeit.getTime()) / 86400000)) : undefined
     }
   })
   
@@ -331,7 +340,7 @@ export function berechneSCORMetrikenReal(
     wert: liefertreue_wert,
     kategorie: 'RELIABILITY' as const,
     label: 'Liefertreue China',
-    beschreibung: 'Prozentsatz der Lieferungen, die pünktlich (innerhalb Vorlaufzeit + 1 Tag) ankamen',
+    beschreibung: 'Prozentsatz der Lieferungen, die pünktlich ankamen (verfügbar innerhalb erwarteter Zeit)',
     einheit: '%',
     zielwert: 95,
     status: liefertreue_wert >= 95 ? 'gut' as const :
