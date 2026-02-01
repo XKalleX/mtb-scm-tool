@@ -425,17 +425,171 @@ export function berechneIntegriertesWarehouse(
     const tagImJahr = Math.floor((aktuellesDatum.getTime() - jahresAnfang.getTime()) / (1000 * 60 * 60 * 24)) + 1
     
     // ═════════════════════════════════════════════════════════════════════════════
-    // STEP 3a: BUCHE EINGEHENDE LIEFERUNGEN (LOT-BASED!)
+    // STEP 3a: BUCHE EINGEHENDE LIEFERUNGEN (LOT-BASED!) - VOR ATP-CHECK!
     // ═════════════════════════════════════════════════════════════════════════════
+    /**
+     * ⚠️ WICHTIG: Lieferungen werden ZUERST gebucht, DANN Material-Check!
+     * 
+     * Realistischer Tagesablauf:
+     * 1. Früh morgens: LKWs kommen an, Material wird eingelagert
+     * 2. Dann: Produktionsplanung prüft Materialverfügbarkeit
+     * 3. Dann: Produktion läuft
+     * 
+     * Daher: aktuelleBestaende += Zugänge BEVOR ATP-Check!
+     */
     
     const heutigeLieferungen = lieferungenProTag.get(datumStr) || []
     const bauteileHeuteDetails: TaeglichesLager['bauteile'] = []
     
+    // DEBUG: Log Lieferungen für erste Tage
+    if (tagImJahr >= 1 && tagImJahr <= 10 && heutigeLieferungen.length > 0) {
+      const totalSaettel = heutigeLieferungen.reduce((sum, lief) => {
+        return sum + Object.values(lief.komponenten).reduce((a,b) => a+(b||0), 0)
+      }, 0)
+      console.log(`📦 TAG ${tagImJahr} (${datumStr}): ${heutigeLieferungen.length} Lieferung(en), TOTAL: ${totalSaettel} Sättel`)
+      heutigeLieferungen.forEach(lief => {
+        const total = Object.values(lief.komponenten).reduce((a,b) => a+(b||0), 0)
+        console.log(`    ID: ${lief.id}, Menge: ${total}, Bestelldatum: ${lief.bestelldatum.toISOString().split('T')[0]}`)
+      })
+    }
+    
+    // Erst alle Lieferungen buchen (für alle Bauteile)
     bauteile.forEach(bauteil => {
       const bauteilId = bauteil.id
-      const anfangsBestand = aktuelleBestaende[bauteilId]
       
       // Summiere Zugänge von allen Lieferungen heute
+      let zugang = 0
+      heutigeLieferungen.forEach(bestellung => {
+        const menge = bestellung.komponenten[bauteilId] || 0
+        if (menge > 0) {
+          zugang += menge
+          gesamtLieferungen += menge
+        }
+      })
+      
+      // Buche Zugang SOFORT
+      aktuelleBestaende[bauteilId] += zugang
+    })
+    
+    // ═════════════════════════════════════════════════════════════════════════════
+    // STEP 3b-GLOBAL: GLOBALE KAPAZITÄTS- UND MATERIAL-PRÜFUNG (NACH LIEFERUNGEN!)
+    // ═════════════════════════════════════════════════════════════════════════════
+    /**
+     * 🔧 KRITISCHER FIX: Produktionskapazität ist GLOBAL, nicht pro Bauteil!
+     * 
+     * FALSCH (Alt): Jeder Sattel-Typ bekommt maxProduktionKapazitaet = 3.120
+     *               → 4 Sättel × 3.120 = 12.480 Bikes/Tag möglich (UNMÖGLICH!)
+     * 
+     * RICHTIG (Neu): 1 Produktionslinie = 3.120 Bikes/Tag TOTAL über ALLE Varianten
+     *                → Berechne Reduktionsfaktor und wende ihn proportional auf alle Varianten an
+     * 
+     * Logik:
+     * 1. Berechne TOTALE Bike-Produktion (geplant) über alle Varianten
+     * 2. Prüfe Material-Limit (welcher Sattel ist Engpass?)
+     * 3. Prüfe Produktionskapazität (3.120 Bikes TOTAL)
+     * 4. maxMoeglicheBikes = min(Plan, Material, Kapazität)
+     * 5. produktionsFaktor = maxMoeglicheBikes / totaleBikesPlan
+     * 6. Wende Faktor proportional auf alle Varianten an (proportionale Allokation)
+     */
+    let produktionsFaktor = 1.0  // 1.0 = keine Reduktion
+    let globalAtpErfuellt = true
+    let globalAtpGrund: string | undefined
+    
+    if (istArbeitstag && tagImJahr >= 1 && tagImJahr <= 365) {
+      // ─────────────────────────────────────────────────────────────────────────────
+      // SCHRITT 1: Berechne TOTALEN geplanten Bedarf (Bikes) über alle Varianten
+      // ─────────────────────────────────────────────────────────────────────────────
+      let totaleBikesPlan = 0
+      Object.entries(produktionsplanMap).forEach(([varianteId, planMap]) => {
+        const geplanteMenge = planMap[datumStr] || 0
+        totaleBikesPlan += geplanteMenge
+      })
+      
+      // ─────────────────────────────────────────────────────────────────────────────
+      // SCHRITT 2: Berechne GLOBALE Produktionskapazität (EINMALIG pro Tag!)
+      // ─────────────────────────────────────────────────────────────────────────────
+      const kapazitaetProSchicht = 
+        konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
+      const maxSchichten = konfiguration.produktion.maxSchichtenProTag
+      const maxProduktionKapazitaetBikes = kapazitaetProSchicht * maxSchichten  // z.B. 3.120 Bikes
+      
+      // ─────────────────────────────────────────────────────────────────────────────
+      // SCHRITT 3: Berechne verfügbares Material (SUMME aller Sättel)
+      // ─────────────────────────────────────────────────────────────────────────────
+      /**
+       * ANNAHME: 1 Bike = 1 Sattel (aus Stückliste)
+       * Da jedes Bike genau 1 Sattel benötigt und wir 4 verschiedene Sattel-Typen haben,
+       * ist die SUMME aller verfügbaren Sättel die maximale Bike-Produktion!
+       * 
+       * Beispiel Tag 4:
+       * - SAT_FT: 125, SAT_RL: 125, SAT_SP: 125, SAT_SL: 125
+       * - TOTAL: 500 Sättel → max 500 Bikes ✅
+       * 
+       * WICHTIG: Dies ist eine Vereinfachung! In Realität müsste man prüfen,
+       * welche Varianten welche Sättel brauchen. Da aber jede Variante 1 Sattel
+       * benötigt und wir proportionale Allokation nutzen, ist die Gesamtsumme
+       * die korrekte Obergrenze.
+       */
+      let materialLimitBikes = 0
+      
+      // Summiere ALLE verfügbaren Sättel
+      bauteile.forEach(bauteil => {
+        const verfuegbar = aktuelleBestaende[bauteil.id]
+        materialLimitBikes += verfuegbar
+      })
+      
+      // DEBUG: Log für erste 10 Tage
+      if (tagImJahr >= 1 && tagImJahr <= 10) {
+        console.log(`📊 TAG ${tagImJahr} (${datumStr}): Plan=${totaleBikesPlan}, Material=${materialLimitBikes}, Kapazität=${maxProduktionKapazitaetBikes}`)
+      }
+      
+      // ─────────────────────────────────────────────────────────────────────────────
+      // SCHRITT 4: Berechne GLOBALES Limit (Minimum aus Plan, Material, Kapazität)
+      // ─────────────────────────────────────────────────────────────────────────────
+      const maxMoeglicheBikes = Math.min(
+        totaleBikesPlan,           // Geplante Produktion
+        materialLimitBikes,        // Material-Verfügbarkeit
+        maxProduktionKapazitaetBikes  // Produktionskapazität
+      )
+      
+      // ─────────────────────────────────────────────────────────────────────────────
+      // SCHRITT 5: Berechne Reduktionsfaktor (falls Engpass)
+      // ─────────────────────────────────────────────────────────────────────────────
+      produktionsFaktor = totaleBikesPlan > 0 
+        ? maxMoeglicheBikes / totaleBikesPlan 
+        : 1.0
+      
+      // ─────────────────────────────────────────────────────────────────────────────
+      // SCHRITT 6: Bestimme Engpass-Grund (für Logging/Warnungen)
+      // ─────────────────────────────────────────────────────────────────────────────
+      if (produktionsFaktor < 1.0) {
+        globalAtpErfuellt = false
+        
+        // Bestimme welcher Faktor limitiert
+        if (materialLimitBikes < totaleBikesPlan && materialLimitBikes <= maxProduktionKapazitaetBikes) {
+          globalAtpGrund = `Material-Engpass: Nur ${materialLimitBikes} Sättel verfügbar für ${totaleBikesPlan} geplante Bikes (Faktor: ${(produktionsFaktor * 100).toFixed(1)}%)`
+        } else if (maxProduktionKapazitaetBikes < totaleBikesPlan && maxProduktionKapazitaetBikes < materialLimitBikes) {
+          globalAtpGrund = `Kapazitäts-Engpass: Nur ${maxProduktionKapazitaetBikes} Bikes/Tag möglich, ${totaleBikesPlan} geplant (Faktor: ${(produktionsFaktor * 100).toFixed(1)}%)`
+        } else {
+          globalAtpGrund = `Material UND Kapazität limitiert: max ${maxMoeglicheBikes} von ${totaleBikesPlan} Bikes (Faktor: ${(produktionsFaktor * 100).toFixed(1)}%)`
+        }
+        
+        console.log(`⚠️ ${datumStr} (Tag ${tagImJahr}): ${globalAtpGrund}`)
+      }
+    }
+    
+    // ═════════════════════════════════════════════════════════════════════════════
+    // STEP 3c: BAUTEIL-LOOP - Berechne Details und Verbrauch pro Bauteil
+    // ═════════════════════════════════════════════════════════════════════════════
+    
+    bauteile.forEach(bauteil => {
+      const bauteilId = bauteil.id
+      
+      // ─────────────────────────────────────────────────────────────────────────────
+      // Anfangsbestand ist der Bestand VOR heutigen Zugängen (für Reporting)
+      // ─────────────────────────────────────────────────────────────────────────────
+      // WICHTIG: aktuelleBestaende[bauteilId] enthält BEREITS die heutigen Zugänge!
+      // Daher müssen wir für anfangsBestand die Zugänge wieder abziehen:
       let zugang = 0
       const lieferungsDetails: TaeglichesLager['bauteile'][0]['lieferungen'] = []
       
@@ -443,7 +597,7 @@ export function berechneIntegriertesWarehouse(
         const menge = bestellung.komponenten[bauteilId] || 0
         if (menge > 0) {
           zugang += menge
-          gesamtLieferungen += menge
+          // gesamtLieferungen wurde bereits in STEP 3a gezählt!
           
           lieferungsDetails.push({
             bestellungId: bestellung.id,
@@ -453,31 +607,28 @@ export function berechneIntegriertesWarehouse(
         }
       })
       
-      // Buche Zugang
-      aktuelleBestaende[bauteilId] += zugang
+      // anfangsBestand = aktueller Bestand MINUS heute's Zugänge
+      const anfangsBestand = aktuelleBestaende[bauteilId] - zugang
       
-      // ═══════════════════════════════════════════════════════════════════════════
-      // STEP 3b: BERECHNE VERBRAUCH (nur an Arbeitstagen mit Produktion)
-      // ═══════════════════════════════════════════════════════════════════════════
-      
+      // Placeholder - wird in STEP 3b-GLOBAL berechnet
       let verbrauch = 0
-      let atpErfuellt = true
-      let atpGrund: string | undefined
+      let atpErfuellt = globalAtpErfuellt  // ← Nutze GLOBALEN ATP-Status
+      let atpGrund = globalAtpGrund        // ← Nutze GLOBALEN Grund
       let benoetigt = 0
       const backlogVorher = produktionsBacklog[bauteilId]
       let nichtProduziertHeute = 0
       let nachgeholt = 0
       
       if (istArbeitstag && tagImJahr >= 1 && tagImJahr <= 365) {
-        // Summiere PLAN-Verbrauch über alle Varianten (was produziert werden SOLLTE)
-        // 🔧 FIX: Nutze date-based lookup statt Array-Index
+        // ─────────────────────────────────────────────────────────────────────────
+        // Berechne PLAN-Verbrauch (was benötigt WÜRDE ohne Engpass)
+        // ─────────────────────────────────────────────────────────────────────────
         Object.entries(produktionsplanMap).forEach(([varianteId, planMap]) => {
           const geplanteMenge = planMap[datumStr] || 0
           
           if (geplanteMenge > 0) {
-            // Nutze planMenge für Bedarfsermittlung (was eigentlich geplant war)
             const verbrauchVariante = berechneVerbrauchProBauteil(
-              geplanteMenge, // WICHTIG: Nutze PLAN, nicht IST
+              geplanteMenge,
               varianteId,
               bauteilId,
               konfiguration
@@ -486,72 +637,32 @@ export function berechneIntegriertesWarehouse(
           }
         })
         
-        // ═════════════════════════════════════════════════════════════════════════
-        // STEP 3c: ATP-CHECK MIT BACKLOG MANAGEMENT & KAPAZITÄTSPRÜFUNG
-        // ═════════════════════════════════════════════════════════════════════════
+        // ─────────────────────────────────────────────────────────────────────────
+        // Wende GLOBALEN Produktionsfaktor an (proportionale Reduktion!)
+        // ─────────────────────────────────────────────────────────────────────────
+        /**
+         * KRITISCH: produktionsFaktor wurde GLOBAL berechnet und gilt für ALLE Bauteile!
+         * 
+         * Beispiel Tag 4 (04.01.2027):
+         * - Geplant: 740 Bikes
+         * - Material: 500 Sättel verfügbar
+         * - produktionsFaktor = 500 / 740 = 0.676 (67.6%)
+         * - Jede Variante wird um 32.4% reduziert
+         * - IST-Produktion = 500 Bikes ✅
+         */
+        const tatsaechlicherBedarf = Math.floor(benoetigt * produktionsFaktor)
+        const nichtErfuellt = benoetigt - tatsaechlicherBedarf
         
-        // Berechne maximale Produktionskapazität für heute (nur an Arbeitstagen)
-        // Produktionskapazität aus KonfigurationContext
-        const kapazitaetProSchicht = 
-          konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
+        // Setze Verbrauch auf das, was tatsächlich möglich ist
+        verbrauch = tatsaechlicherBedarf
         
-        // WICHTIG: Wir produzieren an Arbeitstagen IMMER mindestens 1 Schicht
-        // Für Backlog-Abbau können wir bis zu 3 Schichten fahren
-        const maxSchichten = 3
-        const maxProduktionKapazitaet = istArbeitstag ? kapazitaetProSchicht * maxSchichten : 0
-        
-        // Gesamtbedarf = heutiger Bedarf + offener Backlog
-        const gesamtBedarfHeute = benoetigt + backlogVorher
-        const verfuegbarFuerProduktion = aktuelleBestaende[bauteilId]
-        
-        // TRIPLE-CHECK: Material UND Kapazität berücksichtigen!
-        // 1. Material-Check: Haben wir genug Rohstoffe?
-        // 2. Kapazitäts-Check: Können wir das produzieren?
-        // 3. Kombination: Was ist möglich?
-        const maxMoeglich = Math.min(verfuegbarFuerProduktion, maxProduktionKapazitaet)
-        
-        if (gesamtBedarfHeute > maxMoeglich) {
-          // NICHT GENUG MATERIAL ODER KAPAZITÄT für alles!
-          atpErfuellt = false
-          
-          // Produziere was möglich ist (limitiert durch Material UND Kapazität)
-          verbrauch = Math.max(0, maxMoeglich)
-          
-          // Berechne wie viel vom Backlog nachgeholt wurde
-          if (verbrauch > benoetigt) {
-            // Mehr als heute benötigt → Backlog wird teilweise abgebaut
-            nachgeholt = verbrauch - benoetigt
-            nichtProduziertHeute = 0
-          } else if (verbrauch < benoetigt) {
-            // Weniger als heute benötigt → Backlog wächst
-            nichtProduziertHeute = benoetigt - verbrauch
-            nachgeholt = 0
-          } else {
-            // Genau so viel wie heute benötigt → Backlog bleibt gleich
-            nichtProduziertHeute = 0
-            nachgeholt = 0
-          }
-          
-          // Bestimme Grund für ATP-Fehler
-          if (verfuegbarFuerProduktion < gesamtBedarfHeute && maxProduktionKapazitaet >= gesamtBedarfHeute) {
-            atpGrund = `Nicht genug Material (Bedarf: ${gesamtBedarfHeute}, Verfügbar: ${verfuegbarFuerProduktion}, Kapazität: ${maxProduktionKapazitaet})`
-          } else if (maxProduktionKapazitaet < gesamtBedarfHeute && verfuegbarFuerProduktion >= gesamtBedarfHeute) {
-            atpGrund = `Nicht genug Kapazität (Bedarf: ${gesamtBedarfHeute}, Material: ${verfuegbarFuerProduktion}, Kapazität: ${maxProduktionKapazitaet})`
-          } else {
-            atpGrund = `Material UND Kapazität limitiert (Bedarf: ${gesamtBedarfHeute}, Material: ${verfuegbarFuerProduktion}, Kapazität: ${maxProduktionKapazitaet})`
-          }
-          
-          if (nichtProduziertHeute > 0) {
-            warnungen.push(
-              `⚠️ ${datumStr} (Tag ${tagImJahr}): ATP-Check fehlgeschlagen für ${bauteil.name}! ${atpGrund}, Fehlmenge: ${nichtProduziertHeute}`
-            )
-          }
+        // Berechne Backlog-Änderungen
+        if (nichtErfuellt > 0) {
+          nichtProduziertHeute = nichtErfuellt
+          nachgeholt = 0
         } else {
-          // GENUG MATERIAL - volle Produktion + Backlog-Abbau möglich
-          verbrauch = gesamtBedarfHeute
-          atpErfuellt = true
-          nachgeholt = backlogVorher // Kompletter Backlog wird abgebaut
           nichtProduziertHeute = 0
+          nachgeholt = 0  // Kein Backlog-Abbau wenn Faktor < 1
         }
         
         // Update Backlog
@@ -563,6 +674,13 @@ export function berechneIntegriertesWarehouse(
         // Buche Verbrauch
         aktuelleBestaende[bauteilId] -= verbrauch
         gesamtVerbrauch += verbrauch
+        
+        // Warnungen (nur wenn nötig, da global bereits geloggt)
+        if (nichtProduziertHeute > 0 && globalAtpGrund) {
+          warnungen.push(
+            `⚠️ ${datumStr} (Tag ${tagImJahr}): ${bauteil.name} - ${globalAtpGrund}, nicht produziert: ${nichtProduziertHeute}`
+          )
+        }
       }
       
       // ═══════════════════════════════════════════════════════════════════════════
@@ -707,12 +825,12 @@ export function berechneIntegriertesWarehouse(
       // An Arbeitstagen verbrauchen wir so viel Material wie möglich
       let verbrauch = 0
       if (istHeuteArbeitstag && anfangsBestand > 0) {
-        // Maximale Tageskapazität aus Schichtsystem:
+        // ✅ FIX: Maximale Tageskapazität aus Konfiguration (SSOT!)
         // kapazitaetProStunde * stundenProSchicht * maxSchichtenProTag
         const maxTageskapazitaet = 
           konfiguration.produktion.kapazitaetProStunde * 
           konfiguration.produktion.stundenProSchicht * 
-          (konfiguration.produktion.maxSchichtenProTag || 3)
+          konfiguration.produktion.maxSchichtenProTag
         verbrauch = Math.min(anfangsBestand, maxTageskapazitaet)
         aktuelleBestaende[bauteilId] -= verbrauch
         gesamtVerbrauch += verbrauch
