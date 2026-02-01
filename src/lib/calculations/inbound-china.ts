@@ -16,7 +16,7 @@
  */
 
 import { TagesProduktionsplan } from '@/types'
-import { addDays, generateId, isWeekend } from '@/lib/utils'
+import { addDays, generateId, isWeekend, toLocalISODateString, daysBetween } from '@/lib/utils'
 import { 
   berechneAnkunftsdatum, 
   istChinaFeiertag,
@@ -24,6 +24,7 @@ import {
   naechsterArbeitstag_Deutschland,
   FeiertagsKonfiguration,
   berechneMaterialflussDetails,
+  naechsterMittwoch,
   type MaterialflussDetails
 } from '@/lib/kalender'
 import lieferantChinaData from '@/data/lieferant-china.json' 
@@ -98,8 +99,323 @@ export interface TaeglicheBestellung {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * HAUPTFUNKTION: Generiert Bestellungen basierend auf OEM-Produktionsplänen
+ * HAFEN-SIMULATION MIT MITTWOCHS-SCHIFFEN
  * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * Simuliert die Zwischenlagerung am Hafen Shanghai:
+ * - Bestellungen kommen täglich am Hafen an (nach Produktion + LKW)
+ * - Schiffe fahren NUR mittwochs ab
+ * - Schiffe nehmen floor(lagerbestand / 500) * 500 Sättel mit
+ * - Rest wartet auf nächsten Mittwoch
+ * 
+ * @param bestellungen - Alle Bestellungen mit Materialfluss-Details
+ * @param customFeiertage - Optionale Feiertage für Berechnungen
+ * @param losgroesse - Losgröße für Schiffsbeladung (Standard: 500)
+ * @returns Map: Lieferdatum am Werk → Menge + Statistiken
+ */
+interface HafenSimulationErgebnis {
+  lieferungenAmWerk: Map<string, number>  // Date-String → Menge
+  hafenStatistik: {
+    maxLagerbestand: number
+    durchschnittlicheWartezeit: number
+    anzahlSchiffe: number
+  }
+}
+
+function simuliereHafenUndSchiffsversand(
+  bestellungen: TaeglicheBestellung[],
+  customFeiertage?: FeiertagsKonfiguration[],
+  losgroesse: number = lieferantChinaData.lieferant.losgroesse
+): HafenSimulationErgebnis {
+  // Hafen-Lagerbestand (kumulativ pro Komponente)
+  const hafenLager: Record<string, number> = {}
+  
+  // Lieferungen am Werk (Datum → Komponente → Menge)
+  const lieferungenAmWerk = new Map<string, Map<string, number>>()
+  
+  // Statistik
+  let maxLagerbestand = 0
+  const wartezeiten: number[] = []
+  let anzahlSchiffe = 0
+  
+  // Track when each order arrives at harbor and when it ships out
+  const orderHarborTracking = new Map<string, { ankunftDatum: Date, abfahrtDatum?: Date }>()
+  
+  // Erstelle Timeline: Wann kommt was am Hafen an
+  interface HafenAnkunft {
+    datum: Date
+    komponenten: Record<string, number>
+    bestellungId: string
+    bestelldatum: Date
+  }
+  
+  const hafenAnkunftsTimeline: HafenAnkunft[] = []
+  
+  bestellungen.forEach(bestellung => {
+    if (!bestellung.materialfluss) return
+    
+    hafenAnkunftsTimeline.push({
+      datum: bestellung.materialfluss.ankunftHafenShanghai,
+      komponenten: bestellung.komponenten,
+      bestellungId: bestellung.id,
+      bestelldatum: bestellung.bestelldatum
+    })
+    
+    // Track harbor arrival
+    orderHarborTracking.set(bestellung.id, {
+      ankunftDatum: bestellung.materialfluss.ankunftHafenShanghai
+    })
+  })
+  
+  // Sortiere nach Ankunftsdatum
+  hafenAnkunftsTimeline.sort((a, b) => a.datum.getTime() - b.datum.getTime())
+  
+  // Initialisiere Hafen-Lager
+  Object.keys(lieferantChinaData.komponentenDetails).forEach(kompId => {
+    hafenLager[kompId] = 0
+  })
+  
+  // Simuliere jeden Tag von erster Ankunft bis letzte + 60 Tage
+  const startDatum = hafenAnkunftsTimeline.length > 0 
+    ? hafenAnkunftsTimeline[0].datum 
+    : new Date(2026, 10, 1) // Fallback: 01.11.2026
+  
+  const endDatum = hafenAnkunftsTimeline.length > 0
+    ? addDays(hafenAnkunftsTimeline[hafenAnkunftsTimeline.length - 1].datum, 60)
+    : addDays(startDatum, 365)
+  
+  let aktuelleDatum = new Date(startDatum)
+  let ankunftsIndex = 0
+  
+  while (aktuelleDatum <= endDatum) {
+    const datumStr = toLocalISODateString(aktuelleDatum)
+    
+    // 1. ANKUNFT: Füge Ware die heute ankommt zum Hafen-Lager hinzu
+    while (ankunftsIndex < hafenAnkunftsTimeline.length) {
+      const ankunft = hafenAnkunftsTimeline[ankunftsIndex]
+      const ankunftStr = toLocalISODateString(ankunft.datum)
+      
+      if (ankunftStr === datumStr) {
+        // Ware kommt heute am Hafen an
+        Object.entries(ankunft.komponenten).forEach(([kompId, menge]) => {
+          hafenLager[kompId] = (hafenLager[kompId] || 0) + menge
+        })
+        
+        ankunftsIndex++
+      } else if (ankunft.datum > aktuelleDatum) {
+        break
+      } else {
+        ankunftsIndex++
+      }
+    }
+    
+    // Berechne aktuellen Gesamt-Lagerbestand
+    const gesamtLagerbestand = Object.values(hafenLager).reduce((sum, m) => sum + m, 0)
+    if (gesamtLagerbestand > maxLagerbestand) {
+      maxLagerbestand = gesamtLagerbestand
+    }
+    
+    // 2. SCHIFFSABFAHRT: Nur mittwochs!
+    if (aktuelleDatum.getDay() === 3 && gesamtLagerbestand > 0) {
+      // Es ist Mittwoch und es gibt Ware im Hafen
+      
+      // Berechne wie viel aufs Schiff passt (in Losgrößen)
+      const ladungMenge = Math.floor(gesamtLagerbestand / losgroesse) * losgroesse
+      
+      if (ladungMenge > 0) {
+        anzahlSchiffe++
+        
+        // Track ship departure for wait time calculation
+        // Mark all orders in harbor as shipped and calculate wait times
+        hafenAnkunftsTimeline.forEach((ankunft, index) => {
+          if (index < ankunftsIndex) { // Only processed arrivals
+            const tracking = orderHarborTracking.get(ankunft.bestellungId)
+            if (tracking && !tracking.abfahrtDatum) {
+              // Order is shipping out now
+              tracking.abfahrtDatum = new Date(aktuelleDatum)
+              const warteTage = daysBetween(tracking.ankunftDatum, aktuelleDatum)
+              if (warteTage >= 0) {
+                wartezeiten.push(warteTage)
+              }
+            }
+          }
+        })
+        
+        // Entnehme proportional aus allen Komponenten
+        const verladeneKomponenten: Record<string, number> = {}
+        let verbleibendeKapazitaet = ladungMenge
+        
+        // Berechne Proportionen
+        Object.entries(hafenLager).forEach(([kompId, menge]) => {
+          if (menge > 0 && verbleibendeKapazitaet > 0) {
+            const anteil = menge / gesamtLagerbestand
+            const zuVerladen = Math.floor(anteil * ladungMenge)
+            
+            verladeneKomponenten[kompId] = zuVerladen
+            hafenLager[kompId] -= zuVerladen
+            verbleibendeKapazitaet -= zuVerladen
+          }
+        })
+        
+        // Berechne Ankunftsdatum am Werk
+        // Schiff fährt 30 Tage
+        const schiffAnkunftHamburg = addDays(aktuelleDatum, lieferantChinaData.lieferant.vorlaufzeitKalendertage)
+        
+        // LKW Hamburg → Werk (+2 AT, aber nur +1 Tag wegen "Ankunft am 2. Tag")
+        let lkwAbfahrt = new Date(schiffAnkunftHamburg)
+        while (isWeekend(lkwAbfahrt)) {
+          lkwAbfahrt = addDays(lkwAbfahrt, 1)
+        }
+        
+        let werkAnkunft = addDays(lkwAbfahrt, lieferantChinaData.lieferant.lkwTransportDeutschlandArbeitstage - 1)
+        while (isWeekend(werkAnkunft)) {
+          werkAnkunft = addDays(werkAnkunft, 1)
+        }
+        
+        // Material verfügbar am nächsten Tag
+        const verfuegbarAb = addDays(werkAnkunft, 1)
+        const verfuegbarStr = toLocalISODateString(verfuegbarAb)
+        
+        // Registriere Lieferung am Werk
+        if (!lieferungenAmWerk.has(verfuegbarStr)) {
+          lieferungenAmWerk.set(verfuegbarStr, new Map())
+        }
+        
+        const tagesLieferung = lieferungenAmWerk.get(verfuegbarStr)!
+        Object.entries(verladeneKomponenten).forEach(([kompId, menge]) => {
+          const bisherigeMenge = tagesLieferung.get(kompId) || 0
+          tagesLieferung.set(kompId, bisherigeMenge + menge)
+        })
+      }
+    }
+    
+    // Nächster Tag
+    aktuelleDatum = addDays(aktuelleDatum, 1)
+  }
+  
+  // Konvertiere zu flacher Map (String → Gesamtmenge)
+  const flatLieferungen = new Map<string, number>()
+  lieferungenAmWerk.forEach((komponenten, datum) => {
+    const gesamtMenge = Array.from(komponenten.values()).reduce((sum, m) => sum + m, 0)
+    flatLieferungen.set(datum, gesamtMenge)
+  })
+  
+  // Berechne durchschnittliche Wartezeit
+  const durchschnittlicheWartezeit = wartezeiten.length > 0
+    ? wartezeiten.reduce((sum, w) => sum + w, 0) / wartezeiten.length
+    : 0
+  
+  return {
+    lieferungenAmWerk: flatLieferungen,
+    hafenStatistik: {
+      maxLagerbestand,
+      durchschnittlicheWartezeit,
+      anzahlSchiffe
+    }
+  }
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * HAUPTFUNKTION: Generiert Inbound-Lieferplan mit Hafen-Simulation
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * NEUE LOGIK mit echter Hafen-Simulation:
+ * 1. Berechne täglichen Bedarf aus OEM-Produktionsplänen
+ * 2. Erstelle Bestellungen (49 Tage Lookahead)
+ * 3. Simuliere Hafen Shanghai:
+ *    - Bestellungen kommen täglich am Hafen an
+ *    - Schiffe fahren nur mittwochs
+ *    - Schiffe nehmen floor(lager / 500) * 500 Einheiten
+ * 4. Berechne Ankunftsdaten am Werk
+ * 5. Returne Liefer-Schedule
+ * 
+ * @param alleProduktionsplaene - Produktionspläne aller MTB-Varianten (OEM)
+ * @param planungsjahr - Jahr für Planung (z.B. 2027)
+ * @param vorlaufzeitTage - Planungs-Vorlaufzeit in Tagen (Standard: 49)
+ * @param customFeiertage - Optionale Feiertage (China + Deutschland)
+ * @param stuecklisten - Stücklisten-Map (Variante → Komponenten)
+ * @param losgroesse - Losgröße für Schiffsbeladung (Standard: 500)
+ * @param lieferintervall - Lieferintervall in Tagen (aktuell nicht verwendet)
+ * @returns InboundLieferplanErgebnis mit Bestellungen, Lieferungen und Statistiken
+ */
+export interface InboundLieferplanErgebnis {
+  bestellungen: TaeglicheBestellung[]
+  lieferungenAmWerk: Map<string, Record<string, number>>  // Date → Component → Amount
+  hafenStatistik: {
+    maxLagerbestand: number
+    durchschnittlicheWartezeit: number
+    anzahlSchiffe: number
+  }
+}
+
+export function generiereInboundLieferplan(
+  alleProduktionsplaene: Record<string, any[]>,
+  planungsjahr: number,
+  vorlaufzeitTage: number,
+  customFeiertage?: FeiertagsKonfiguration[],
+  stuecklisten?: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }>,
+  losgroesse: number = lieferantChinaData.lieferant.losgroesse,
+  lieferintervall: number = lieferantChinaData.lieferant.lieferintervall
+): InboundLieferplanErgebnis {
+  // 1. Erstelle Bestellungen (wie vorher)
+  const bestellungen = generiereTaeglicheBestellungen(
+    alleProduktionsplaene,
+    planungsjahr,
+    vorlaufzeitTage,
+    customFeiertage,
+    stuecklisten,
+    losgroesse,
+    lieferintervall
+  )
+  
+  // 2. Simuliere Hafen und Schiffsversand
+  const hafenSimulation = simuliereHafenUndSchiffsversand(bestellungen, customFeiertage, losgroesse)
+  
+  // 3. Konvertiere zu detaillierter Lieferungs-Map (Date → Component → Amount)
+  const lieferungenAmWerk = new Map<string, Record<string, number>>()
+  
+  // Gruppiere Bestellungen nach Verfügbarkeitsdatum
+  bestellungen.forEach(bestellung => {
+    const verfuegbarStr = toLocalISODateString(bestellung.verfuegbarAb)
+    
+    if (!lieferungenAmWerk.has(verfuegbarStr)) {
+      lieferungenAmWerk.set(verfuegbarStr, {})
+    }
+    
+    const tagesLieferung = lieferungenAmWerk.get(verfuegbarStr)!
+    Object.entries(bestellung.komponenten).forEach(([kompId, menge]) => {
+      tagesLieferung[kompId] = (tagesLieferung[kompId] || 0) + menge
+    })
+  })
+  
+  console.log(`
+    ═══════════════════════════════════════════════════════════════════════════════
+    HAFEN-SIMULATION SHANGHAI (Mittwochs-Schiffe)
+    ═══════════════════════════════════════════════════════════════════════════════
+    Max. Lagerbestand am Hafen:   ${hafenSimulation.hafenStatistik.maxLagerbestand.toLocaleString('de-DE')} Sättel
+    Anzahl Schiffe:                ${hafenSimulation.hafenStatistik.anzahlSchiffe}
+    Ø Wartezeit am Hafen:          ${hafenSimulation.hafenStatistik.durchschnittlicheWartezeit.toFixed(1)} Tage
+    
+    Schiffe fahren NUR mittwochs!
+    Losgröße pro Schiff: ${losgroesse} Sättel (Vielfaches)
+    ═══════════════════════════════════════════════════════════════════════════════
+  `)
+  
+  return {
+    bestellungen,
+    lieferungenAmWerk,
+    hafenStatistik: hafenSimulation.hafenStatistik
+  }
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * LEGACY-FUNKTION: Generiert Bestellungen basierend auf OEM-Produktionsplänen
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * HINWEIS: Diese Funktion ist jetzt nur noch für interne Verwendung.
+ * Externe Aufrufer sollten generiereInboundLieferplan() verwenden!
  * 
  * LOGIK:
  * 1. Für jeden Tag im Planungsjahr (1-365):

@@ -263,25 +263,22 @@ function konvertiereFeiertagsKonfiguration(konfiguration: KonfigurationData): Fe
 /**
  * 🎯 KERNFUNKTION: Berechnet Bedarfs-Backlog-Rechnung für alle Sattel-Komponenten
  * 
- * Diese Funktion implementiert die vollständige Losgrößen-Logik mit Backlog-Tracking:
+ * Diese Funktion implementiert die Produktionssimulation basierend auf Material-Verfügbarkeit:
  * 
- * ABLAUF:
+ * NEUE LOGIK (mit Inbound-Integration):
  * 1. Berechne täglichen Bedarf aus OEM-Produktionsplänen
- * 2. Für jeden Tag und jede Komponente:
- *    a) Akkumuliere Backlog (nicht erfüllter Bedarf)
- *    b) Prüfe ob Losgröße erreicht → Bestellung auslösen
- *    c) Berechne Material-Ankunft (nach 49 Tagen Vorlaufzeit)
- *    d) Berechne tatsächliche Produktion (min(Bedarf, verfügbar))
- * 3. Erstelle Bestellungs-Tracking
+ * 2. Nutze Material-Lieferungen aus Inbound-Modul (wenn verfügbar)
+ * 3. Für jeden Tag und jede Komponente:
+ *    a) Akkumuliere Bedarf (heutiger + Backlog)
+ *    b) Prüfe Material-Ankunft
+ *    c) Berechne tatsächliche Produktion (min(Bedarf, verfügbar))
+ *    d) Aktualisiere Lagerbestand und Backlog
  * 4. Berechne Statistiken und Kennzahlen
  * 
- * ANFORDERUNG A7: Losgröße 500 Sättel
- * - Bestellungen nur in Vielfachen von 500
- * - Backlog akkumuliert wenn Losgröße nicht erreicht
- * 
- * ANFORDERUNG A6: Planungs-Vorlaufzeit 49 Tage (fix)
- * - Der Planungswert ist fix im KonfigurationContext definiert (Standard: 49 Tage)
- * - Die tatsächliche Lieferzeit kann abweichen (abhängig von Mittwochs-Schiff, Feiertagen, etc.)
+ * WICHTIG: 
+ * - Bestellung wird NICHT hier durchgeführt (das macht Inbound!)
+ * - Diese Funktion fokussiert auf Produktions-Simulation
+ * - Material-Lieferungen kommen aus generiereInboundLieferplan()
  * 
  * ANFORDERUNG A13: Proportionale Allokation
  * - Bei Engpass faire prozentuale Verteilung auf alle Varianten
@@ -289,11 +286,13 @@ function konvertiereFeiertagsKonfiguration(konfiguration: KonfigurationData): Fe
  * 
  * @param produktionsplaene - Produktionspläne aller Varianten (aus zentrale-produktionsplanung)
  * @param konfiguration - Konfigurationsdaten (aus KonfigurationContext)
+ * @param inboundLieferungen - Optionale Material-Lieferungen aus Inbound-Modul (Date → Component → Amount)
  * @returns BedarfsBacklogErgebnis mit allen Details
  */
 export function berechneBedarfsBacklog(
   produktionsplaene: Record<string, TagesProduktionEntry[]>,
-  konfiguration: KonfigurationData
+  konfiguration: KonfigurationData,
+  inboundLieferungen?: Map<string, Record<string, number>>
 ): BedarfsBacklogErgebnis {
   // Reset Counter für neue Berechnung
   bestellungsCounter = 1
@@ -306,14 +305,6 @@ export function berechneBedarfsBacklog(
   
   // Konvertiere Feiertage für Kalender-Funktionen
   const feiertagsConfig = konvertiereFeiertagsKonfiguration(konfiguration)
-  
-  // Losgröße aus Lieferant-Konfiguration
-  const LOSGROESSE = konfiguration.lieferant.losgroesse // 500 Sättel
-  
-  // Validierung: Losgröße muss > 0 sein (verhindert Division by Zero)
-  if (LOSGROESSE <= 0) {
-    throw new Error(`Ungültige Losgröße: ${LOSGROESSE}. Muss größer als 0 sein.`)
-  }
   
   // Ergebnis-Struktur
   const ergebnis: BedarfsBacklogErgebnis = {
@@ -339,16 +330,13 @@ export function berechneBedarfsBacklog(
     const bestellungen: BestellungsEntry[] = []
     
     // State-Variablen für diese Komponente
-    let backlog = 0
+    let produktionsBacklog = 0 // Akkumulierter unerfüllter Produktionsbedarf
     let lagerbestand = 0
     
-    // Map: Ankunftsdatum → Bestellmenge (für Material-Tracking)
-    const materialAnkunftsMap = new Map<string, number>()
-    
     // ========================================
-    // PHASE 1: BEDARFSPLANUNG & BESTELLUNGEN
+    // PHASE 1: BEDARFSPLANUNG (ohne Bestellungen)
     // ========================================
-    // Durchlaufe alle 365 Tage
+    // Durchlaufe alle 365 Tage und erfasse nur den Bedarf
     const startDatum = new Date(konfiguration.planungsjahr, 0, 1)
     
     for (let tagImJahr = 1; tagImJahr <= 365; tagImJahr++) {
@@ -358,63 +346,17 @@ export function berechneBedarfsBacklog(
       // Hole Bedarf für diesen Tag
       const bedarfAmTag = tagesbedarfMap.get(datumStr)?.[komponentenId] || 0
       
-      // Backlog zu Beginn des Tages
-      const backlogVorher = backlog
-      
-      // Addiere heutigen Bedarf zum Backlog
-      backlog += bedarfAmTag
-      
-      // Prüfe ob Bestellung ausgelöst werden soll
-      let bestellungAusgeloest = false
-      let bestellmenge = 0
-      let bestellungId: string | undefined
-      
-      // Regel: Bestelle wenn akkumulierter Backlog ≥ Losgröße
-      if (backlog >= LOSGROESSE) {
-        // Berechne Bestellmenge (nächstes Vielfaches der Losgröße)
-        bestellmenge = Math.floor(backlog / LOSGROESSE) * LOSGROESSE
-        
-        // Reduziere Backlog um bestellte Menge
-        backlog -= bestellmenge
-        
-        bestellungAusgeloest = true
-        bestellungId = generiereBestellungsId(komponentenId, datum)
-        
-        // Berechne Ankunftsdatum (49 Tage Vorlaufzeit)
-        const ankunftsdatum = berechneAnkunftsdatum(datum, feiertagsConfig)
-        const ankunftsDatumStr = toLocalISODateString(ankunftsdatum)
-        
-        // Registriere Material-Ankunft
-        const bisherAnkunft = materialAnkunftsMap.get(ankunftsDatumStr) || 0
-        materialAnkunftsMap.set(ankunftsDatumStr, bisherAnkunft + bestellmenge)
-        
-        // Erstelle Bestellungs-Entry
-        bestellungen.push({
-          id: bestellungId,
-          komponentenId,
-          bestelldatum: datum,
-          bestellmenge,
-          ankunftsdatum,
-          status: 'geplant',
-          backlogBeimBestellen: backlogVorher + bedarfAmTag,
-          ausloeser: `Backlog ${backlogVorher + bedarfAmTag} ≥ Losgröße ${LOSGROESSE}`
-        })
-      }
-      
-      // Backlog nach Bestellung
-      const backlogNachher = backlog
-      
-      // Speichere Tages-Details (Phase 1: nur Bedarfsplanung)
+      // Speichere Tages-Details (Phase 1: nur Bedarfserfassung)
       tagesDetails.push({
         datum,
         tag: tagImJahr,
         komponentenId,
         bedarf: bedarfAmTag,
-        backlogVorher,
-        backlogNachher,
-        bestellungAusgeloest,
-        bestellmenge,
-        bestellungId,
+        backlogVorher: 0,
+        backlogNachher: 0,
+        bestellungAusgeloest: false,
+        bestellmenge: 0,
+        bestellungId: undefined,
         
         // Material & Produktion werden in Phase 2 berechnet
         materialAnkunft: 0,
@@ -430,13 +372,20 @@ export function berechneBedarfsBacklog(
     // PHASE 2: MATERIAL-VERFÜGBARKEIT & PRODUKTION
     // ========================================
     lagerbestand = 0 // Reset Lagerbestand
-    let produktionsBacklog = 0 // Akkumulierter unerfüllter Produktionsbedarf
+    produktionsBacklog = 0 // Akkumulierter unerfüllter Produktionsbedarf
     
     tagesDetails.forEach(detail => {
       const datumStr = toLocalISODateString(detail.datum)
       
-      // 1. Material-Ankunft (Bestellungen treffen ein)
-      const materialAnkunft = materialAnkunftsMap.get(datumStr) || 0
+      // 1. Material-Ankunft
+      let materialAnkunft = 0
+      
+      if (inboundLieferungen) {
+        // Nutze Material-Lieferungen aus Inbound-Modul
+        const lieferungAmTag = inboundLieferungen.get(datumStr)
+        materialAnkunft = lieferungAmTag?.[komponentenId] || 0
+      }
+      
       detail.materialAnkunft = materialAnkunft
       
       // 2. Lagerbestand aktualisieren (Ankunft)
@@ -467,15 +416,29 @@ export function berechneBedarfsBacklog(
       // 9. Lagerbestand aktualisieren (Verbrauch)
       lagerbestand -= tatsaechlicheProduktion
       detail.lagerbestand = lagerbestand
+      
+      // 10. Aktualisiere Backlog-Felder (für Visualisierung)
+      detail.backlogNachher = produktionsBacklog
     })
     
     // ========================================
     // PHASE 3: STATISTIKEN BERECHNEN
     // ========================================
     const gesamtBedarf = tagesDetails.reduce((sum, t) => sum + t.bedarf, 0)
-    const gesamtBestellt = bestellungen.reduce((sum, b) => sum + b.bestellmenge, 0)
     const gesamtProduziert = tagesDetails.reduce((sum, t) => sum + t.tatsaechlicheProduktion, 0)
     const gesamtFehlmenge = gesamtBedarf - gesamtProduziert
+    
+    // Bestellt-Summe: Entweder aus Inbound oder aus lokalen Bestellungen
+    let gesamtBestellt = 0
+    if (inboundLieferungen) {
+      // Nutze Material aus Inbound (summiere alle Lieferungen für diese Komponente)
+      inboundLieferungen.forEach(komponenten => {
+        gesamtBestellt += komponenten[komponentenId] || 0
+      })
+    } else {
+      // Fallback: Nutze lokale Bestellungen
+      gesamtBestellt = bestellungen.reduce((sum, b) => sum + b.bestellmenge, 0)
+    }
     
     const tageMitBestellung = tagesDetails.filter(t => t.bestellungAusgeloest).length
     const tageOhneBestellung = 365 - tageMitBestellung
@@ -483,14 +446,14 @@ export function berechneBedarfsBacklog(
       ? gesamtBestellt / bestellungen.length 
       : 0
     
-    const maxBacklog = Math.max(...tagesDetails.map(t => t.backlogNachher))
+    const maxBacklog = tagesDetails.reduce((max, t) => Math.max(max, t.backlogNachher), 0)
     const durchschnittlicherBacklog = tagesDetails.reduce((sum, t) => sum + t.backlogNachher, 0) / 365
     
     const tageMitEngpass = tagesDetails.filter(t => t.materialEngpass).length
     const engpassQuote = (tageMitEngpass / 365) * 100
     
     const durchschnittlicherLagerbestand = tagesDetails.reduce((sum, t) => sum + t.lagerbestand, 0) / 365
-    const maxLagerbestand = Math.max(...tagesDetails.map(t => t.lagerbestand))
+    const maxLagerbestand = tagesDetails.reduce((max, t) => Math.max(max, t.lagerbestand), 0)
     
     // Speichere Komponenten-Übersicht
     ergebnis.komponenten[komponentenId] = {
