@@ -38,7 +38,6 @@ import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport, korrigiereProduktionsplaeneMitWarehouse } from '@/lib/calculations/warehouse-management'
 import { berechneBedarfsBacklog } from '@/lib/calculations/bedarfs-backlog-rechnung'
 import { TagesproduktionChart, LagerbestandChart, FertigerzeugnisseChart, BacklogChart } from '@/components/ui/table-charts'
-import { TestFertigerzeugnisseChart } from '@/components/ui/test-chart'
 import { FertigerzeugnisseChartV2 } from '@/components/ui/fertigerzeugnisse-chart-v2'
 
 /**

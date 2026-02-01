@@ -281,6 +281,27 @@ export function berechneIntegriertesWarehouse(
   const zeitraumEnde = bestellungen[bestellungen.length - 1].bestelldatum.toLocaleDateString('de-DE')
   console.log(`   Zeitraum: ${zeitraumStart} - ${zeitraumEnde}`)
   
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // STEP 1.5: BERECHNE GESAMT-BEDARF AUS PRODUKTIONSPLÄNEN
+  // ═══════════════════════════════════════════════════════════════════════════════
+  
+  /**
+   * WICHTIG: gesamtBedarf repräsentiert die PLAN-Menge, also was produziert werden
+   * SOLLTE nach der OEM-Planung. Dies ist unabhängig von Wochenenden/Feiertagen,
+   * da es die Jahresgesamtproduktion widerspiegelt (370.000 Bikes).
+   * 
+   * Die Berechnung erfolgt direkt aus den Produktionsplänen VOR der Simulation,
+   * um sicherzustellen, dass ALLE geplanten Bikes gezählt werden.
+   * 
+   * Da 1 Bike = 1 Sattel in der Stückliste, entspricht die Summe aller planMenge-Werte
+   * dem Gesamtbedarf an Sätteln (keine Umrechnung nötig).
+   */
+  const gesamtBedarf = Object.values(variantenProduktionsplaene)
+    .flatMap(plan => plan.tage)
+    .reduce((sum, tag) => sum + tag.planMenge, 0)
+  
+  console.log(`📊 Gesamt Bedarf (aus Produktionsplänen): ${gesamtBedarf.toLocaleString('de-DE')} Stück`)
+  
   // NEU: Gruppiere Bestellungen nach VERFÜGBARKEITSDATUM (nächster Tag nach Ankunft!)
   const lieferungenProTag = gruppiereBestellungenNachVerfuegbarkeit(bestellungen)
   
@@ -356,7 +377,7 @@ export function berechneIntegriertesWarehouse(
   })
   
   // NEU: Tracking für Statistiken
-  let gesamtBedarf = 0
+  // HINWEIS: gesamtBedarf wird bereits oben nach STEP 1.5 berechnet (aus Produktionsplänen)
   let gesamtProduziertTatsaechlich = 0
   let maximalerBacklog = 0
   let tageMitBacklog = 0
@@ -436,9 +457,6 @@ export function berechneIntegriertesWarehouse(
             benoetigt += verbrauchVariante
           }
         })
-        
-        // Track für Statistiken
-        gesamtBedarf += benoetigt
         
         // ═════════════════════════════════════════════════════════════════════════
         // STEP 3c: ATP-CHECK MIT BACKLOG MANAGEMENT & KAPAZITÄTSPRÜFUNG
