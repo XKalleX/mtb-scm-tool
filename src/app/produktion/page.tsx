@@ -2017,7 +2017,7 @@ export default function ProduktionPage() {
               <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg font-semibold">
                 Bestellung China
               </div>
-              <div className="text-xs text-muted-foreground mt-1">21 AT + 35 KT</div>
+              <div className="text-xs text-muted-foreground mt-1">9 AT + 30 KT</div>
             </div>
             
             <div className="text-2xl">→</div>
