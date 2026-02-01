@@ -474,34 +474,34 @@ function SzenarioForm({
                     <div className="max-h-64 overflow-y-auto border rounded p-2 space-y-1">
                       {lieferungen.slice(0, 100).map((lieferung) => {
                         const isSelected = (parameter[field.key] as string[] || []).includes(lieferung.id)
+                        const handleToggle = () => {
+                          const current = (parameter[field.key] as string[]) || []
+                          const updated = isSelected
+                            ? current.filter((id: string) => id !== lieferung.id)
+                            : [...current, lieferung.id]
+                          setParameter({...parameter, [field.key]: updated})
+                        }
                         return (
-                          <div 
+                          <label 
                             key={lieferung.id} 
                             className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
                               isSelected ? 'bg-blue-100 border border-blue-300' : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
                             }`}
-                            onClick={() => {
-                              const current = (parameter[field.key] as string[]) || []
-                              const updated = isSelected
-                                ? current.filter((id: string) => id !== lieferung.id)
-                                : [...current, lieferung.id]
-                              setParameter({...parameter, [field.key]: updated})
-                            }}
                           >
                             <div className="flex items-center gap-2">
                               <Checkbox
                                 checked={isSelected}
-                                onCheckedChange={() => {}} // Handled by parent div
+                                onCheckedChange={handleToggle}
                               />
                               <div className="flex flex-col">
                                 <span className="text-xs font-medium">{lieferung.verfuegbarAbFormatiert}</span>
                                 <span className="text-xs text-gray-500">
-                                  {lieferung.gesamtMenge.toLocaleString('de-DE')} Sättel
+                                  {lieferung.gesamtMenge.toLocaleString('de-DE')} Teile
                                 </span>
                               </div>
                             </div>
                             <Package className="h-4 w-4 text-gray-400" />
-                          </div>
+                          </label>
                         )
                       })}
                       {lieferungen.length === 0 && (

@@ -701,7 +701,9 @@ export function wendeSzenarienAufLieferungenAn(
               const reduzierteKomponenten: Record<string, number> = {}
               
               Object.entries(komponenten).forEach(([kompId, menge]) => {
-                reduzierteKomponenten[kompId] = Math.floor(menge * faktor)
+                // Verwende Math.round statt Math.floor, damit bei kleinen Mengen 
+                // nicht alles auf 0 gerundet wird (außer bei 100% Reduktion)
+                reduzierteKomponenten[kompId] = Math.round(menge * faktor)
               })
               
               modifizierteLieferungen.set(lieferDatum, reduzierteKomponenten)

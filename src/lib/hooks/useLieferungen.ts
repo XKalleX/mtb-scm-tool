@@ -31,6 +31,33 @@ export interface LieferungBundle {
 }
 
 /**
+ * Interface für formatierte Produktionsplaene für Inbound-Berechnung
+ */
+interface ProduktionsPlanEintrag {
+  datum: Date
+  varianteId: string
+  sollMenge: number
+  istMenge: number
+  kumulierterError: number
+  istMarketing: boolean
+}
+
+/**
+ * Interface für Stücklisten-Map
+ */
+interface StuecklistenMap {
+  [varianteId: string]: {
+    komponenten: {
+      [bauteilId: string]: {
+        name: string
+        menge: number
+        einheit: string
+      }
+    }
+  }
+}
+
+/**
  * Hook zur Bereitstellung von Lieferungs-Bundles für Szenario-Auswahl
  */
 export function useLieferungen(): {
@@ -47,7 +74,7 @@ export function useLieferungen(): {
       const produktionsplaene = generiereAlleVariantenProduktionsplaene(konfiguration)
       
       // Konvertiere zu Format für Inbound-Berechnung
-      const produktionsplaeneFormatiert: Record<string, any[]> = {}
+      const produktionsplaeneFormatiert: Record<string, ProduktionsPlanEintrag[]> = {}
       Object.entries(produktionsplaene).forEach(([varianteId, plan]) => {
         produktionsplaeneFormatiert[varianteId] = plan.tage.map(tag => ({
           datum: tag.datum,
@@ -60,7 +87,7 @@ export function useLieferungen(): {
       })
       
       // Bereite Stücklisten-Map vor
-      const stuecklistenMap: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }> = {}
+      const stuecklistenMap: StuecklistenMap = {}
       konfiguration.stueckliste.forEach(s => {
         if (!stuecklistenMap[s.mtbVariante]) {
           stuecklistenMap[s.mtbVariante] = { komponenten: {} }
