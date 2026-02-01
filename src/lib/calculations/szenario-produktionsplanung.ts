@@ -458,6 +458,35 @@ export function generiereAlleVariantenMitSzenarien(
   szenarien: SzenarioConfig[]
 ): Record<string, VariantenProduktionsplan & { tage: TagesProduktionMitDelta[] }> {
   const aktiveSzenarien = szenarien.filter(s => s.aktiv)
+  
+  // ✅ FAST-PATH: Wenn KEINE Szenarien aktiv, nutze Baseline direkt!
+  // Verhindert doppelte Error-Management-Anwendung und unnötige Berechnungen
+  if (aktiveSzenarien.length === 0) {
+    const baselinePlaene = generiereAlleVariantenProduktionsplaene(konfiguration)
+    const result: Record<string, VariantenProduktionsplan & { tage: TagesProduktionMitDelta[] }> = {}
+    
+    Object.entries(baselinePlaene).forEach(([varianteId, plan]) => {
+      // Konvertiere zu Delta-Format (alle Deltas = 0, da keine Szenarien)
+      const tageMitDeltas: TagesProduktionMitDelta[] = plan.tage.map(tag => ({
+        ...tag,
+        baselinePlanMenge: tag.planMenge,
+        baselineIstMenge: tag.istMenge,
+        deltaPlanMenge: 0,
+        deltaIstMenge: 0,
+        istVonSzenarioBetroffen: false,
+        szenarioTyp: undefined,
+        szenarioNotiz: undefined
+      }))
+      
+      result[varianteId] = {
+        ...plan,
+        tage: tageMitDeltas
+      }
+    })
+    
+    return result
+  }
+  
   const modifikation = berechneSzenarioModifikation(aktiveSzenarien, konfiguration.planungsjahr)
   
   const result: Record<string, VariantenProduktionsplan & { tage: TagesProduktionMitDelta[] }> = {}
@@ -522,25 +551,34 @@ export function generiereAlleVariantenMitSzenarien(
       let planMenge = baselineTag.planMenge * marketingFaktor
       let istMenge = baselineTag.istMenge * marketingFaktor
       
-      // Error-Management anwenden (nur auf Arbeitstagen)
-      if (baselineTag.istArbeitstag) {
-        const sollMenge = planMenge
-        const fehlerVorher = kumulierterErrorSzenario
-        kumulierterErrorSzenario += (sollMenge - Math.round(sollMenge))
-        
-        if (kumulierterErrorSzenario >= 0.5) {
-          istMenge = Math.ceil(sollMenge)
-          kumulierterErrorSzenario -= 1.0
-        } else if (kumulierterErrorSzenario <= -0.5) {
-          istMenge = Math.floor(sollMenge)
-          kumulierterErrorSzenario += 1.0
+      // ✅ FIX: Error-Management NUR anwenden wenn Marketing-Faktor ≠ 1.0
+      // Ansonsten nutzen wir die bereits error-korrigierten Baseline-Werte
+      // Verhindert doppelte Error-Management-Anwendung!
+      if (marketingFaktor !== 1.0) {
+        // Error-Management anwenden (nur auf Arbeitstagen)
+        if (baselineTag.istArbeitstag) {
+          const sollMenge = planMenge
+          const fehlerVorher = kumulierterErrorSzenario
+          kumulierterErrorSzenario += (sollMenge - Math.round(sollMenge))
+          
+          if (kumulierterErrorSzenario >= 0.5) {
+            istMenge = Math.ceil(sollMenge)
+            kumulierterErrorSzenario -= 1.0
+          } else if (kumulierterErrorSzenario <= -0.5) {
+            istMenge = Math.floor(sollMenge)
+            kumulierterErrorSzenario += 1.0
+          } else {
+            istMenge = Math.round(sollMenge)
+          }
         } else {
-          istMenge = Math.round(sollMenge)
+          // Kein Arbeitstag
+          planMenge = 0
+          istMenge = 0
         }
       } else {
-        // Kein Arbeitstag
-        planMenge = 0
-        istMenge = 0
+        // Keine Marketing-Anpassung: Nutze Baseline-Werte direkt (bereits error-korrigiert!)
+        planMenge = baselineTag.planMenge
+        istMenge = baselineTag.istMenge
       }
       
       // Prüfe Produktionsausfall
