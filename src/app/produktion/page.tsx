@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Factory, AlertTriangle, TrendingUp, Package, Download, Zap, Info } from 'lucide-react'
 import { CollapsibleInfo, CollapsibleInfoGroup, type InfoItem } from '@/components/ui/collapsible-info'
 import { formatNumber } from '@/lib/utils'
-import { exportToCSV, exportToJSON } from '@/lib/export'
+import { exportToCSV, exportToJSON, exportToXLSX, exportToMultiSheetXLSX } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
@@ -421,7 +421,7 @@ export default function ProduktionPage() {
    */
   const handleExportLager = () => {
     const data = konvertiereWarehouseZuExport(warehouseResult)
-    exportToCSV(data, 'warehouse_2027_integriert')
+    exportToCSV(data, 'warehouse_2027_integriert_vollstaendig')
   }
   
   /**
@@ -429,6 +429,77 @@ export default function ProduktionPage() {
    */
   const handleExportProduktion = () => {
     exportToJSON(produktionsStats, 'produktions_statistik_2027')
+  }
+  
+  /**
+   * ✅ NEU: Exportiert Warehouse als XLSX mit Formatierung
+   */
+  const handleExportWarehouseXLSX = async () => {
+    try {
+      const data = konvertiereWarehouseZuExport(warehouseResult)
+      
+      await exportToXLSX(
+        data,
+        'warehouse_2027_integriert_vollstaendig',
+        {
+          sheetName: 'Warehouse',
+          title: 'Warehouse Management 2027 - Integriert',
+          author: 'MTB SCM Tool - WI3 Team',
+          freezeHeader: true,
+          autoFilter: true
+        }
+      )
+    } catch (error) {
+      console.error('Fehler beim Warehouse XLSX-Export:', error)
+    }
+  }
+  
+  /**
+   * ✅ NEU: Exportiert ALLES als Multi-Sheet XLSX
+   * Sheets: Warehouse, Produktion, Statistiken, Backlog
+   */
+  const handleExportAlles = async () => {
+    try {
+      const sheets = [
+        // Sheet 1: Warehouse
+        {
+          name: 'Warehouse',
+          data: konvertiereWarehouseZuExport(warehouseResult),
+          title: 'Warehouse Management 2027'
+        },
+        // Sheet 2: Tagesproduktion
+        {
+          name: 'Tagesproduktion',
+          data: tagesProduktion.map(t => ({
+            'Datum': t.datum.toISOString().split('T')[0],
+            'Plan-Menge': t.planMenge,
+            'Ist-Menge': t.istMenge,
+            'Abweichung': t.abweichung,
+            'Schichten': t.schichten,
+            'Auslastung': t.auslastung
+          })),
+          title: 'Tagesproduktion 2027'
+        },
+        // Sheet 3: Statistiken
+        {
+          name: 'Statistiken',
+          data: [produktionsStats],
+          title: 'Produktionsstatistiken 2027'
+        }
+      ]
+      
+      await exportToMultiSheetXLSX(
+        sheets,
+        `produktion_komplett_${konfiguration.planungsjahr}`,
+        {
+          author: 'MTB SCM Tool - WI3 Team',
+          freezeHeader: true,
+          autoFilter: true
+        }
+      )
+    } catch (error) {
+      console.error('Fehler beim Multi-Sheet Export:', error)
+    }
   }
 
   return (
@@ -444,11 +515,19 @@ export default function ProduktionPage() {
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExportLager}>
             <Download className="h-4 w-4 mr-2" />
-            Export Lager
+            CSV Export
+          </Button>
+          <Button variant="outline" onClick={handleExportWarehouseXLSX}>
+            <Download className="h-4 w-4 mr-2" />
+            Excel Export
+          </Button>
+          <Button variant="outline" onClick={handleExportAlles}>
+            <Download className="h-4 w-4 mr-2" />
+            Alles (XLSX)
           </Button>
           <Button variant="outline" onClick={handleExportProduktion}>
             <Download className="h-4 w-4 mr-2" />
-            Export Produktion
+            Statistik (JSON)
           </Button>
         </div>
       </div>
