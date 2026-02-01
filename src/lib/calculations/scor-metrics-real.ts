@@ -653,13 +653,13 @@ function aggregiereMonatlichePlanungsgenauigkeit(eintraege: TagesProduktionEntry
         monatName: MONATSNAMEN[e.monat - 1],
         planMenge: 0,
         istMenge: 0,
-        abweichungAbsolut: 0
+        absoluteAbweichung: 0
       }
     }
     
     monate[e.monat].planMenge += e.planMenge
     monate[e.monat].istMenge += e.istMenge
-    monate[e.monat].abweichungAbsolut += Math.abs(e.istMenge - e.planMenge)
+    monate[e.monat].absoluteAbweichung += Math.abs(e.istMenge - e.planMenge)
   })
   
   return Object.values(monate).map(m => ({
@@ -668,7 +668,7 @@ function aggregiereMonatlichePlanungsgenauigkeit(eintraege: TagesProduktionEntry
     planMenge: m.planMenge,
     istMenge: m.istMenge,
     abweichung: m.planMenge - m.istMenge, // Plan - Ist (für Diagramm)
-    genauigkeit: m.planMenge > 0 ? Math.max(0, 100 - (m.abweichungAbsolut / m.planMenge) * 100) : 100
+    genauigkeit: m.planMenge > 0 ? Math.max(0, 100 - (m.absoluteAbweichung / m.planMenge) * 100) : 100
   }))
 }
 
