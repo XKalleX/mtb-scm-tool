@@ -631,10 +631,12 @@ function LiefertreueLieferungenScatter({ data }: any) {
                   <div className="bg-white p-3 border rounded shadow-lg">
                     <p className="font-medium">{data.bestellungId}</p>
                     <p className="text-sm">Bestellt: {data.bestelldatum}</p>
+                    <p className="text-sm">Bedarfsdatum: {data.bedarfsdatum}</p>
                     <p className="text-sm">Erwartet: {data.erwarteteAnkunft}</p>
                     {data.tatsaechlicheAnkunft && (
-                      <p className="text-sm">Angekommen: {data.tatsaechlicheAnkunft}</p>
+                      <p className="text-sm">Verfügbar ab: {data.tatsaechlicheAnkunft}</p>
                     )}
+                    <p className="text-sm">Vorlaufzeit: {data.vorlaufzeitTage} Tage</p>
                     {data.verspaetungTage !== undefined && data.verspaetungTage > 0 && (
                       <p className="text-sm text-red-600">Verspätung: {data.verspaetungTage} Tage</p>
                     )}

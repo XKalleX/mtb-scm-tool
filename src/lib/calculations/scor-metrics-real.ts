@@ -128,6 +128,7 @@ export interface SCORZeitreihen {
   liefertreueLieferungen: Array<{
     bestellungId: string
     bestelldatum: string
+    bedarfsdatum: string
     erwarteteAnkunft: string
     tatsaechlicheAnkunft?: string
     menge: number
@@ -294,20 +295,15 @@ export function berechneSCORMetrikenReal(
   // ═══════════════════════════════════════════════════════════════════════════
   
   // ✅ KORREKTE BERECHNUNG: 
-  // verfuegbarAb ist +1 Tag nach erwarteteAnkunft (Materialverarbeitung)
-  // Daher müssen wir erwartete Verfügbarkeit berechnen: Bestelldatum + Vorlaufzeit + 1 Tag
-  const vorlaufzeitTage = konfiguration.lieferant?.gesamtVorlaufzeitTage || 49
+  // Vergleiche verfuegbarAb (wann Material verfügbar) mit bedarfsdatum (wann benötigt)
+  // Pünktlich = Material ist verfügbar bis zum Bedarfsdatum
+  // Nutzt automatisch die 49 Tage Vorlaufzeit (Bestellung erfolgt 49 Tage vor Bedarf)
   
   const lieferungenMitAnkunft = alleBestellungen.filter(b => b.verfuegbarAb)
   const puenktlicheLieferungen = lieferungenMitAnkunft.filter(b => {
-    // Berechne erwartete Verfügbarkeit: Bestelldatum + Vorlaufzeit (49 Tage)
-    // erwarteteAnkunft ist bereits die Ankunft am Werk, verfuegbarAb sollte 1 Tag später sein
-    // Pünktlich wenn verfuegbarAb <= erwarteteAnkunft + 1 Tag
     const verfuegbar = new Date(b.verfuegbarAb!)
-    const erwarteteVerfuegbarkeit = new Date(b.erwarteteAnkunft)
-    erwarteteVerfuegbarkeit.setDate(erwarteteVerfuegbarkeit.getDate() + 1) // +1 Tag für Materialverarbeitung
-    
-    return verfuegbar <= erwarteteVerfuegbarkeit
+    const bedarf = new Date(b.bedarfsdatum)
+    return verfuegbar <= bedarf
   }).length
   
   const liefertreue_wert = lieferungenMitAnkunft.length > 0
@@ -318,18 +314,18 @@ export function berechneSCORMetrikenReal(
   const liefertreueLieferungen = alleBestellungen.map(b => {
     const gesamtMenge = Object.values(b.komponenten).reduce((sum, m) => sum + m, 0)
     const verfuegbar = b.verfuegbarAb ? new Date(b.verfuegbarAb) : null
-    const erwarteteVerfuegbarkeit = new Date(b.erwarteteAnkunft)
-    erwarteteVerfuegbarkeit.setDate(erwarteteVerfuegbarkeit.getDate() + 1) // +1 Tag für Materialverarbeitung
+    const bedarf = new Date(b.bedarfsdatum)
     
     return {
       bestellungId: b.id,
       bestelldatum: b.bestelldatum.toISOString().split('T')[0],
+      bedarfsdatum: b.bedarfsdatum.toISOString().split('T')[0],
       erwarteteAnkunft: b.erwarteteAnkunft.toISOString().split('T')[0],
       tatsaechlicheAnkunft: verfuegbar ? verfuegbar.toISOString().split('T')[0] : undefined,
       menge: gesamtMenge,
-      vorlaufzeitTage: vorlaufzeitTage,
-      puenktlich: verfuegbar ? verfuegbar <= erwarteteVerfuegbarkeit : true,
-      verspaetungTage: verfuegbar ? Math.max(0, Math.floor((verfuegbar.getTime() - erwarteteVerfuegbarkeit.getTime()) / 86400000)) : undefined
+      vorlaufzeitTage: Math.floor((b.bedarfsdatum.getTime() - b.bestelldatum.getTime()) / 86400000),
+      puenktlich: verfuegbar ? verfuegbar <= bedarf : true,
+      verspaetungTage: verfuegbar ? Math.max(0, Math.floor((verfuegbar.getTime() - bedarf.getTime()) / 86400000)) : undefined
     }
   })
   
