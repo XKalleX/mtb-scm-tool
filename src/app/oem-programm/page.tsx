@@ -49,6 +49,7 @@ import {
   ProduktionsAnpassungen
 } from '@/lib/helpers/produktions-anpassungen'
 import ProduktionsAnpassungenAnzeige from '@/components/ProduktionsAnpassungenAnzeige'
+import { useProduktionsAnpassungen } from '@/contexts/ProduktionsAnpassungenContext'
 
 /**
  * Zeitperioden für die Ansichtswahl
@@ -75,9 +76,15 @@ export default function OEMProgrammPage() {
   const [selectedVariante, setSelectedVariante] = useState('MTBAllrounder')
   // State für Zeitperiodenansicht (Tag/Woche/Monat)
   const [zeitperiode, setZeitperiode] = useState<ZeitperiodeTyp>('tag')
-  // State für manuelle Produktionsanpassungen (Wochen- oder Monatsbasis)
-  // Key: "<zeitperiode>_<periode>_<varianteId>", Value: Anpassungsmenge (+ oder -)
-  const [produktionsAnpassungen, setProduktionsAnpassungen] = useState<Record<string, number>>({})
+  
+  // ✅ GLOBAL: Nutze ProduktionsAnpassungen Context statt lokalem State
+  const { 
+    produktionsAnpassungen, 
+    setProduktionsAnpassung,
+    removeAnpassung,
+    clearAll
+  } = useProduktionsAnpassungen()
+  
   // Editing State
   const [editingCell, setEditingCell] = useState<{row: number, varianteId: string} | null>(null)
   const [editValue, setEditValue] = useState<string>('')
@@ -85,7 +92,7 @@ export default function OEMProgrammPage() {
   // Hole Konfiguration aus Context
   const { konfiguration, isInitialized, getArbeitstageProJahr, getJahresproduktionProVariante } = useKonfiguration()
   
-  // ✅ NEUER HOOK: Nutze szenario-aware Berechnungen
+  // ✅ NEUER HOOK: Nutze szenario-aware Berechnungen (inkludiert jetzt auch Anpassungen!)
   const {
     hasSzenarien,
     aktiveSzenarienCount,
@@ -98,21 +105,17 @@ export default function OEMProgrammPage() {
    * Handler: Entferne einzelne Anpassung
    */
   const handleEntferneAnpassung = useCallback((key: string) => {
-    setProduktionsAnpassungen(prev => {
-      const neu = { ...prev }
-      delete neu[key]
-      return neu
-    })
+    removeAnpassung(key)
     showSuccess('Anpassung entfernt')
-  }, [])
+  }, [removeAnpassung])
   
   /**
    * Handler: Setze alle Anpassungen zurück
    */
   const handleResetAlleAnpassungen = useCallback(() => {
-    setProduktionsAnpassungen({})
+    clearAll()
     showSuccess('Alle Anpassungen wurden zurückgesetzt')
-  }, [])
+  }, [clearAll])
   
   /**
    * Erstelle Varianten-Namen Map für Anpassungs-Anzeige
@@ -125,28 +128,9 @@ export default function OEMProgrammPage() {
     return map
   }, [konfiguration.varianten])
 
-  // Baseline-Produktionspläne (für Vergleich wenn keine Szenarien aktiv)
-  const baselineProduktionsplaene = useMemo(() => 
-    generiereAlleVariantenProduktionsplaene(konfiguration),
-    [konfiguration]
-  )
-  
-  // ✅ WICHTIG: Nutze Szenario-Pläne wenn Szenarien aktiv, sonst Baseline
-  // Dann wende manuelle Anpassungen an (falls vorhanden)
-  const produktionsplaene = useMemo(() => {
-    // 1. Wähle Basis-Pläne (mit oder ohne Szenarien)
-    let basePlaene = baselineProduktionsplaene
-    if (hasSzenarien && Object.keys(variantenPlaene).length > 0) {
-      basePlaene = variantenPlaene
-    }
-    
-    // 2. Wende manuelle Anpassungen an (falls vorhanden)
-    if (Object.keys(produktionsAnpassungen).length > 0) {
-      return wendeAnpassungenAufAllePlaeneAn(basePlaene, produktionsAnpassungen)
-    }
-    
-    return basePlaene
-  }, [hasSzenarien, variantenPlaene, baselineProduktionsplaene, produktionsAnpassungen])
+  // ✅ WICHTIG: variantenPlaene kommt jetzt direkt aus useSzenarioBerechnung
+  // und enthält bereits Szenarien UND manuelle Anpassungen!
+  const produktionsplaene = variantenPlaene
 
   // Berechne Statistiken aus Konfiguration
   const arbeitstage = isInitialized ? getArbeitstageProJahr() : 252
@@ -801,10 +785,9 @@ export default function OEMProgrammPage() {
                                                   const newValue = parseInt(editValue) || 0
                                                   const delta = newValue - menge
                                                   if (delta !== 0) {
-                                                    setProduktionsAnpassungen(prev => ({
-                                                      ...prev,
-                                                      [`woche_${kw}_${v.id}`]: (prev[`woche_${kw}_${v.id}`] || 0) + delta
-                                                    }))
+                                                    const key = `woche_${kw}_${v.id}`
+                                                    const currentDelta = produktionsAnpassungen[key] || 0
+                                                    setProduktionsAnpassung(key, currentDelta + delta)
                                                     showSuccess(`KW ${kw}, ${v.name}: ${delta > 0 ? '+' : ''}${delta} Bikes angepasst`)
                                                   }
                                                   setEditingCell(null)
@@ -936,10 +919,9 @@ export default function OEMProgrammPage() {
                                                   const newValue = parseInt(editValue) || 0
                                                   const delta = newValue - menge
                                                   if (delta !== 0) {
-                                                    setProduktionsAnpassungen(prev => ({
-                                                      ...prev,
-                                                      [`monat_${monat.monat}_${v.id}`]: (prev[`monat_${monat.monat}_${v.id}`] || 0) + delta
-                                                    }))
+                                                    const key = `monat_${monat.monat}_${v.id}`
+                                                    const currentDelta = produktionsAnpassungen[key] || 0
+                                                    setProduktionsAnpassung(key, currentDelta + delta)
                                                     showSuccess(`${monat.monatName}, ${v.name}: ${delta > 0 ? '+' : ''}${delta} Bikes angepasst`)
                                                   }
                                                   setEditingCell(null)
