@@ -142,14 +142,34 @@ export function useSzenarioBerechnung(): SzenarioBerechnungResult {
       // Wende Anpassungen an
       const angepasstePlaene = wendeAnpassungenAufAllePlaeneAn(plaeneOhneDeltas, produktionsAnpassungen)
       
-      // Konvertiere zurück zum Original-Format (mit den Anpassungen)
+      // Konvertiere zurück zum Original-Format (behalte Delta-Felder!)
       Object.entries(angepasstePlaene).forEach(([key, value]) => {
+        // Merge die angepassten Tage mit den originalen Delta-Feldern
+        const originalTage = plaene[key].tage
+        const angepassteTage = value.tage.map((angepassterTag: any, index: number) => {
+          const originalTag = originalTage[index]
+          // Behalte alle Delta-Felder vom Original, update nur die Mengen
+          return {
+            ...originalTag,
+            planMenge: angepassterTag.planMenge,
+            istMenge: angepassterTag.istMenge,
+            sollProduktionDezimal: angepassterTag.sollProduktionDezimal,
+            tagesError: angepassterTag.tagesError,
+            monatsFehlerVorher: angepassterTag.monatsFehlerVorher,
+            monatsFehlerNachher: angepassterTag.monatsFehlerNachher,
+            errorKorrekturAngewendet: angepassterTag.errorKorrekturAngewendet,
+            kumulativPlan: angepassterTag.kumulativPlan,
+            kumulativIst: angepassterTag.kumulativIst,
+            abweichung: angepassterTag.abweichung
+          }
+        })
+        
         plaene[key] = {
           ...plaene[key],
           jahresProduktion: value.jahresProduktion,
           jahresProduktionIst: value.jahresProduktionIst,
           abweichung: value.abweichung,
-          tage: value.tage
+          tage: angepassteTage as any // TypeScript hint: this is TagesProduktionMitDelta[]
         }
       })
     }
