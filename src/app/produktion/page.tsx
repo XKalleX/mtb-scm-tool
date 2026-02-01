@@ -32,7 +32,8 @@ import {
   berechneLagerbestaende,
   berechneProduktionsStatistiken,
   generiereAlleVariantenProduktionsplaene,
-  type TagesProduktionEntry
+  type TagesProduktionEntry,
+  type VariantenProduktionsplan
 } from '@/lib/calculations/zentrale-produktionsplanung'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport, korrigiereProduktionsplaeneMitWarehouse } from '@/lib/calculations/warehouse-management'
@@ -69,6 +70,7 @@ export default function ProduktionPage() {
     aktiveSzenarien,
     tagesProduktion: tagesProduktionMitSzenarien,
     lagerbestaende: lagerbestaendeMitSzenarien,
+    variantenPlaene: variantenPlaeneMitSzenarien, // ✅ NEU: Für Warehouse-Berechnungen
     statistiken,
     formatDelta,
     getDeltaColorClass
@@ -130,9 +132,19 @@ export default function ProduktionPage() {
   // - Full OEM-Inbound-Warehouse Integration
   
   // Generiere Varianten-Produktionspläne für Warehouse
+  // ✅ SZENARIO-AWARE: Nutze variantenPlaene aus Hook wenn Szenarien aktiv!
   const variantenProduktionsplaeneForWarehouse = useMemo(() => {
+    // Wenn Szenarien aktiv: Nutze szenario-aware Pläne direkt aus Hook
+    // Das Format ist bereits Record<string, VariantenProduktionsplan>
+    // NOTE: Type-Cast ist sicher weil TagesProduktionMitDelta extends TagesProduktionEntry
+    // (hat alle benötigten Felder plus zusätzliche Delta-Felder)
+    if (hasSzenarien && variantenPlaeneMitSzenarien) {
+      return variantenPlaeneMitSzenarien as Record<string, VariantenProduktionsplan>
+    }
+    
+    // Baseline: Ohne Szenarien
     return generiereAlleVariantenProduktionsplaene(konfiguration)
-  }, [konfiguration])
+  }, [konfiguration, hasSzenarien, variantenPlaeneMitSzenarien])
   
   // ✅ KRITISCH: Generiere Hafenlogistik-Lieferplan ZUERST!
   // Dies ist die EINZIGE Quelle für Materialzugänge im System
@@ -153,7 +165,7 @@ export default function ProduktionPage() {
     // Konvertiere Produktionspläne zu Format für Inbound
     const produktionsplaeneFormatiert: Record<string, Array<{datum: Date; varianteId: string; istMenge: number; planMenge: number}>> = {}
     Object.entries(variantenProduktionsplaeneForWarehouse).forEach(([varianteId, plan]) => {
-      produktionsplaeneFormatiert[varianteId] = plan.tage.map(tag => ({
+      produktionsplaeneFormatiert[varianteId] = plan.tage.map((tag: TagesProduktionEntry) => ({
         datum: tag.datum,
         varianteId: varianteId,
         istMenge: tag.istMenge,
@@ -531,7 +543,12 @@ export default function ProduktionPage() {
     // Vorher wurde warehouseResult.jahresstatistik.gesamtProduziertTatsaechlich verwendet,
     // aber das enthielt Double-Counting durch redundanten Backlog-Abbau in Step 3e.
     const summeIstProduktion = tagesProduktionFormatiert.reduce((sum, tag) => sum + tag.istMenge, 0)
-    const geplantMenge = konfiguration.jahresproduktion // 370.000 Bikes
+    
+    // ✅ KORREKTUR: Nutze Summe der szenario-aware Varianten-Pläne statt hardcoded 370.000
+    // Bei Szenarien muss geplantMenge die angepasste Jahresproduktion widerspiegeln!
+    const geplantMenge = hasSzenarien && variantenPlaeneMitSzenarien
+      ? Object.values(variantenPlaeneMitSzenarien).reduce((sum, plan) => sum + plan.jahresProduktion, 0)
+      : konfiguration.jahresproduktion // Fallback: Baseline (370.000)
     
     // Materialengpass-Tage aus Warehouse (dort ist es korrekt berechnet)
     const tageOhneMaterial = warehouseResult.jahresstatistik.tageMitBacklog
@@ -566,7 +583,7 @@ export default function ProduktionPage() {
       planerfuellungsgrad: planerfuellungProzent,
       mitMaterialmangel: tageOhneMaterial
     }
-  }, [tagesProduktion, hasSzenarien, statistiken, warehouseResult, konfiguration.jahresproduktion, tagesProduktionFormatiert])
+  }, [tagesProduktion, hasSzenarien, statistiken, warehouseResult, konfiguration.jahresproduktion, tagesProduktionFormatiert, variantenPlaeneMitSzenarien])
   
   // ✅ Aggregierte Lagerbestandsdaten für Chart (außerhalb JSX)
   const lagerbestandChartDaten = useMemo(() => {

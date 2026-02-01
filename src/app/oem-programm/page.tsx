@@ -52,6 +52,22 @@ import ProduktionsAnpassungenAnzeige from '@/components/ProduktionsAnpassungenAn
 import { useProduktionsAnpassungen } from '@/contexts/ProduktionsAnpassungenContext'
 
 /**
+ * ========================================
+ * KONSTANTEN
+ * ========================================
+ */
+
+/**
+ * Signifikanz-Schwelle für Delta-Anzeige in Varianten-Kacheln
+ * Deltas unter diesem Wert werden als "nicht signifikant" betrachtet
+ * und nicht visuell hervorgehoben.
+ * 
+ * Begründung: 10 Bikes = ca. 0.003% der Jahresproduktion (370.000)
+ * Unter dieser Schwelle handelt es sich um Rundungsdifferenzen.
+ */
+const DELTA_SIGNIFICANCE_THRESHOLD = 10
+
+/**
  * Zeitperioden für die Ansichtswahl
  */
 type ZeitperiodeTyp = 'tag' | 'woche' | 'monat'
@@ -135,6 +151,19 @@ export default function OEMProgrammPage() {
   // Berechne Statistiken aus Konfiguration
   const arbeitstage = isInitialized ? getArbeitstageProJahr() : 252
   const jahresproduktionProVariante = isInitialized ? getJahresproduktionProVariante() : {}
+  
+  // ✅ KORREKTUR: Berechne Gesamtproduktion als Summe aller Varianten-Pläne
+  // Dies ist die einzig korrekte Quelle für die Jahresproduktion-Kachel
+  const gesamtJahresproduktionPlan = useMemo(() => {
+    return Object.values(produktionsplaene).reduce((sum, plan) => sum + plan.jahresProduktion, 0)
+  }, [produktionsplaene])
+  
+  const gesamtJahresproduktionIst = useMemo(() => {
+    return Object.values(produktionsplaene).reduce((sum, plan) => sum + plan.jahresProduktionIst, 0)
+  }, [produktionsplaene])
+  
+  // ✅ KORREKTUR: Delta zwischen Szenario-Summe und Baseline
+  const gesamtDelta = gesamtJahresproduktionPlan - konfiguration.jahresproduktion
   
   // Erstelle stueckliste basierend auf Konfiguration
   const stuecklistenMap = useMemo(() => {
@@ -381,9 +410,10 @@ export default function OEMProgrammPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* ✅ KORREKTUR: Nutze Summe der Varianten-Pläne, nicht statistiken.geplant */}
             <DeltaCell 
-              value={hasSzenarien ? statistiken.geplant : konfiguration.jahresproduktion}
-              delta={statistiken.deltaGeplant}
+              value={gesamtJahresproduktionPlan}
+              delta={gesamtDelta}
               format={{ suffix: '' }}
             />
             <p className="text-xs text-muted-foreground">MTBs gesamt</p>
@@ -408,9 +438,10 @@ export default function OEMProgrammPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* ✅ KORREKTUR: Basiert auf Summe der Varianten-Pläne */}
             <DeltaCell 
-              value={hasSzenarien ? Math.round(statistiken.produziert / arbeitstage) : Math.round(konfiguration.jahresproduktion / arbeitstage)}
-              delta={hasSzenarien ? Math.round(statistiken.deltaProduziert / arbeitstage) : 0}
+              value={Math.round(gesamtJahresproduktionIst / arbeitstage)}
+              delta={Math.round(gesamtDelta / arbeitstage)}
               format={{ suffix: '' }}
             />
             <p className="text-xs text-muted-foreground">Bikes pro Arbeitstag</p>
@@ -663,21 +694,54 @@ export default function OEMProgrammPage() {
               {/* Kompakte Varianten-Statistik (8 Kacheln in einer Zeile) */}
               <div className="grid grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
                 {Object.entries(produktionsplaene).map(([varianteId, plan]) => {
-                  const stats = berechneProduktionsStatistiken(plan.tage)
                   const variante = konfiguration.varianten.find(v => v.id === varianteId)
+                  
+                  // ✅ SZENARIO-AWARE: Berechne Baseline-Wert (ohne Szenarien/Anpassungen)
+                  const baselineJahresProduktion = Math.round(konfiguration.jahresproduktion * (variante?.anteilPrognose || 0))
+                  // ✅ KORREKTUR: Verwende PLAN, nicht IST für Delta-Berechnung
+                  // IST wird durch ATP-Checks/Materialengpässe reduziert → führt zu falschen negativen Deltas
+                  const szenarioJahresProduktion = plan.jahresProduktion
+                  
+                  // ✅ DELTA: Differenz zwischen Szenario-Plan und Baseline
+                  const delta = szenarioJahresProduktion - baselineJahresProduktion
+                  const hatDelta = Math.abs(delta) > DELTA_SIGNIFICANCE_THRESHOLD
+                  
+                  // Visuelle Klassifizierung:
+                  // - BLAU:   Szenarien aktiv & signifikantes Delta
+                  // - GRÜN:   Keine Szenarien & Abweichung OK (≤1 Bike)
+                  // - ORANGE: Abweichung zu groß (>1 Bike)
+                  const istAbweichungOK = Math.abs(plan.abweichung) <= 1
+                  const hatSzenarioEffekt = hasSzenarien && hatDelta
                   
                   return (
                     <div 
                       key={varianteId} 
-                      className={`border rounded-lg p-2 text-center ${Math.abs(plan.abweichung) <= 1 ? 'border-green-300 bg-green-50' : 'border-orange-300 bg-orange-50'}`}
+                      className={`border-2 rounded-lg p-2 text-center transition-all ${
+                        hatSzenarioEffekt 
+                          ? 'border-blue-400 bg-blue-50' 
+                          : istAbweichungOK 
+                            ? 'border-green-300 bg-green-50' 
+                            : 'border-orange-300 bg-orange-50'
+                      }`}
                     >
                       <div className="text-xs font-medium truncate" title={variante?.name}>
                         {variante?.name.replace('MTB ', '')}
                       </div>
-                      <div className="text-sm font-bold">{formatNumber(stats.produziert, 0)}</div>
-                      <div className={`text-[10px] ${Math.abs(plan.abweichung) <= 1 ? 'text-green-600' : 'text-orange-600'}`}>
-                        {Math.abs(plan.abweichung) <= 1 ? '✓ OK' : `Δ ${plan.abweichung}`}
-                      </div>
+                      {/* ✅ KORREKTUR: Zeige Szenario-Plan-Wert, nicht Ist */}
+                      <div className="text-sm font-bold">{formatNumber(szenarioJahresProduktion, 0)}</div>
+                      
+                      {/* Zeige Delta oder Abweichungs-Status */}
+                      {hatSzenarioEffekt ? (
+                        <DeltaBadge 
+                          delta={delta} 
+                          suffix="" 
+                          className="text-[10px]"
+                        />
+                      ) : (
+                        <div className={`text-[10px] ${istAbweichungOK ? 'text-green-600' : 'text-orange-600'}`}>
+                          {istAbweichungOK ? '✓ OK' : `Δ ${plan.abweichung}`}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
