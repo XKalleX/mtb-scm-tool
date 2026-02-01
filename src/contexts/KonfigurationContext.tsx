@@ -51,7 +51,6 @@ export interface MTBVarianteConfig {
   id: string
   name: string
   kategorie: string
-  gewicht: number
   farben: string[]
   anteilPrognose: number // 0.0 - 1.0
   beschreibung: string
