@@ -382,7 +382,15 @@ export function generiereTagesproduktion(
       
       monatsFehlerNachher = monatlicheFehlerTracker[monat]
       tagesError = sollProduktionDezimal - planMenge
+      // ✅ FIX: istMenge wird später durch Warehouse-Integration gesetzt
+      // Initial = planMenge für Arbeitstage, wird dann korrigiert basierend auf Material-Verfügbarkeit
       istMenge = planMenge
+    } else {
+      // ✅ KRITISCHER FIX (Issue #295): An Wochenenden und Feiertagen KEINE Produktion!
+      // istMenge muss 0 sein, da keine Produktion stattfindet
+      // planMenge bleibt 0 (bereits gesetzt oben)
+      // sollProduktionDezimal bleibt 0 (bereits gesetzt oben)
+      istMenge = 0
     }
     
     const abweichung = istMenge - planMenge

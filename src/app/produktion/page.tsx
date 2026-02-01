@@ -295,8 +295,11 @@ export default function ProduktionPage() {
         // ✅ FIX: schichten und auslastung korrekt berechnet
         schichten: schichten,
         auslastung: Math.round(auslastung * 10) / 10,
+        // ✅ KRITISCHER FIX (Issue #295): materialVerfuegbar Logik
+        // An Wochenenden/Feiertagen: true (kein Bedarf, kein Problem)
+        // An Arbeitstagen: basierend auf tatsächlichem Material-Engpass
         materialVerfuegbar: !templateTag.istArbeitstag 
-          ? false  // An Wochenenden/Feiertagen: false
+          ? true  // ✅ An Nicht-Arbeitstagen: true (damit UI "-" zeigt, nicht "Nein")
           : !hatMaterialEngpass,
         backlog: tagesBacklog
       })
