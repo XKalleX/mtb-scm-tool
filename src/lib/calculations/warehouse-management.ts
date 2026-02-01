@@ -1264,10 +1264,12 @@ export function korrigiereProduktionsplaeneMitWarehouse(
       if (!bauteil) return
       
       // Berechne tatsächliche Bike-Produktion aus Bauteil-Verbrauch
-      // Verbrauch = Anzahl verbrauchter Sättel
+      // Verbrauch = Anzahl verbrauchter Sättel (immer ganzzahlig)
       // Bikes = Verbrauch / mengeFaktor (z.B. 740 Sättel / 1 = 740 Bikes)
+      // ✅ FIX: Kein Math.floor nötig, da verbrauch bereits ganzzahlig ist
+      // Math.floor kann zu Verlusten führen bei Rundungsfehlern
       const tatsaechlichProduzierteBikes = mengeFaktor > 0 
-        ? Math.floor(bauteil.verbrauch / mengeFaktor)
+        ? Math.round(bauteil.verbrauch / mengeFaktor)
         : 0
       
       // WICHTIG: Verteilung auf Varianten bei gemeinsamen Bauteilen!
