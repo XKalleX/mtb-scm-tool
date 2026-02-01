@@ -884,11 +884,11 @@ export function berechneIntegriertesWarehouse(
         status = 'negativ'
         tageNegativ++
         warnungen.push(`🔴 ${datumStr} (Tag ${tagImJahr}): NEGATIVER BESTAND für ${bauteil.name}! (${endBestand})`)
-      } else if (endBestand < 500) {
-        // Kritisch wenn weniger als 1 Losgröße
+      } else if (reichweiteTage < 1) {
+        // Kritisch wenn weniger als 1 Tag Reichweite (Zielwert)
         status = 'kritisch'
-      } else if (reichweiteTage < 7) {
-        // Niedrig wenn weniger als 7 Tage Reichweite
+      } else if (reichweiteTage < 2) {
+        // Niedrig wenn weniger als 2 Tage Reichweite
         status = 'niedrig'
       }
       
