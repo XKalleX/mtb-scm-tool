@@ -18,7 +18,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Factory, AlertTriangle, TrendingUp, Package, Download, Zap, Info } from 'lucide-react'
+import { Factory, AlertTriangle, TrendingUp, Package, Download, Zap, Info, Calendar, CalendarDays, CalendarRange } from 'lucide-react'
 import { CollapsibleInfo, CollapsibleInfoGroup, type InfoItem } from '@/components/ui/collapsible-info'
 import { formatNumber } from '@/lib/utils'
 import { exportToCSV, exportToJSON } from '@/lib/export'
@@ -26,7 +26,7 @@ import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { DeltaCell, DeltaBadge } from '@/components/DeltaCell'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { 
   generiereTagesproduktion, 
   berechneLagerbestaende,
@@ -39,6 +39,15 @@ import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport, korrigiere
 import { berechneBedarfsBacklog } from '@/lib/calculations/bedarfs-backlog-rechnung'
 import { TagesproduktionChart, LagerbestandChart, FertigerzeugnisseChart, BacklogChart } from '@/components/ui/table-charts'
 import { FertigerzeugnisseChartV2 } from '@/components/ui/fertigerzeugnisse-chart-v2'
+import { 
+  aggregiereNachWoche, 
+  aggregiereNachMonat
+} from '@/lib/helpers/programm-aggregation'
+
+/**
+ * Zeitperioden für die Ansichtswahl
+ */
+type ZeitperiodeTyp = 'tag' | 'woche' | 'monat'
 
 /**
  * Produktion Hauptseite
@@ -46,6 +55,10 @@ import { FertigerzeugnisseChartV2 } from '@/components/ui/fertigerzeugnisse-char
  * ✅ Nutzt szenario-aware Berechnungen aus useSzenarioBerechnung Hook
  */
 export default function ProduktionPage() {
+  // State für Zeitperiodenansicht (Tag/Woche/Monat)
+  const [zeitperiodeProduktion, setZeitperiodeProduktion] = useState<ZeitperiodeTyp>('tag')
+  const [zeitperiodeWarehouse, setZeitperiodeWarehouse] = useState<ZeitperiodeTyp>('tag')
+  
   // Hole Konfiguration aus Context
   const { konfiguration, isInitialized, getArbeitstageProJahr } = useKonfiguration()
   
@@ -240,6 +253,15 @@ export default function ProduktionPage() {
     return tagesAggregiert
   }, [korrigiertePlaene, warehouseResult, konfiguration.produktion])
   
+  // ✅ NEU: Aggregierte Ansichten für Produktionssteuerung
+  const wochenProduktion = useMemo(() => {
+    return aggregiereNachWoche(tagesProduktionFormatiert)
+  }, [tagesProduktionFormatiert])
+  
+  const monatsProduktion = useMemo(() => {
+    return aggregiereNachMonat(tagesProduktionFormatiert)
+  }, [tagesProduktionFormatiert])
+  
   // Konvertiere für Darstellung (nur 2027 Tage)
   const tagesLagerbestaende = useMemo(() => {
     // Filter nur 2027 Tage (Tag 1-365)
@@ -279,6 +301,155 @@ export default function ProduktionPage() {
       }))
     }))
   }, [warehouseResult])
+  
+  // ✅ NEU: Aggregierte Ansichten für Warehouse (Woche/Monat)
+  const wochenLagerbestaende = useMemo(() => {
+    // Gruppiere nach Woche und aggregiere Bauteile
+    const wochenMap = new Map<number, typeof tagesLagerbestaende[0][]>()
+    
+    tagesLagerbestaende.forEach(tag => {
+      const kw = getKalenderWoche(tag.datum)
+      if (!wochenMap.has(kw)) {
+        wochenMap.set(kw, [])
+      }
+      wochenMap.get(kw)!.push(tag)
+    })
+    
+    return Array.from(wochenMap.entries()).map(([kw, tage]) => {
+      // Aggregiere Bauteile
+      const bauteilMap = new Map<string, any>()
+      
+      tage.forEach(tag => {
+        tag.bauteile.forEach(b => {
+          if (!bauteilMap.has(b.bauteilId)) {
+            bauteilMap.set(b.bauteilId, {
+              bauteilId: b.bauteilId,
+              bauteilName: b.bauteilName,
+              anfangsBestand: 0,
+              zugang: 0,
+              verbrauch: 0,
+              endBestand: 0,
+              reichweite: 0,
+              status: 'ok' as const,
+              backlogVorher: 0,
+              backlogNachher: 0,
+              nichtProduziert: 0,
+              nachgeholt: 0
+            })
+          }
+          
+          const bauteil = bauteilMap.get(b.bauteilId)!
+          bauteil.zugang += b.zugang
+          bauteil.verbrauch += b.verbrauch
+          bauteil.backlogVorher = Math.max(bauteil.backlogVorher, b.backlogVorher)
+          bauteil.backlogNachher = Math.max(bauteil.backlogNachher, b.backlogNachher)
+          bauteil.nichtProduziert += b.nichtProduziert
+          bauteil.nachgeholt += b.nachgeholt
+        })
+      })
+      
+      // Berechne Durchschnittswerte
+      Array.from(bauteilMap.values()).forEach(b => {
+        const letzterTag = tage[tage.length - 1]
+        const bauteilLetzterTag = letzterTag.bauteile.find(bt => bt.bauteilId === b.bauteilId)
+        if (bauteilLetzterTag) {
+          b.endBestand = bauteilLetzterTag.endBestand
+          b.reichweite = bauteilLetzterTag.reichweite
+          b.status = bauteilLetzterTag.status
+        }
+      })
+      
+      return {
+        woche: kw,
+        jahr: 2027,
+        startDatum: tage[0].datum,
+        endDatum: tage[tage.length - 1].datum,
+        tageInWoche: tage.length,
+        istArbeitstag: tage.some(t => t.istArbeitstag),
+        bauteile: Array.from(bauteilMap.values())
+      }
+    })
+  }, [tagesLagerbestaende])
+  
+  const monatsLagerbestaende = useMemo(() => {
+    // Gruppiere nach Monat und aggregiere Bauteile
+    const monatsMap = new Map<number, typeof tagesLagerbestaende[0][]>()
+    
+    tagesLagerbestaende.forEach(tag => {
+      const monat = tag.monat
+      if (!monatsMap.has(monat)) {
+        monatsMap.set(monat, [])
+      }
+      monatsMap.get(monat)!.push(tag)
+    })
+    
+    return Array.from(monatsMap.entries()).map(([monat, tage]) => {
+      // Aggregiere Bauteile
+      const bauteilMap = new Map<string, any>()
+      
+      tage.forEach(tag => {
+        tag.bauteile.forEach(b => {
+          if (!bauteilMap.has(b.bauteilId)) {
+            bauteilMap.set(b.bauteilId, {
+              bauteilId: b.bauteilId,
+              bauteilName: b.bauteilName,
+              anfangsBestand: 0,
+              zugang: 0,
+              verbrauch: 0,
+              endBestand: 0,
+              reichweite: 0,
+              status: 'ok' as const,
+              backlogVorher: 0,
+              backlogNachher: 0,
+              nichtProduziert: 0,
+              nachgeholt: 0
+            })
+          }
+          
+          const bauteil = bauteilMap.get(b.bauteilId)!
+          bauteil.zugang += b.zugang
+          bauteil.verbrauch += b.verbrauch
+          bauteil.backlogVorher = Math.max(bauteil.backlogVorher, b.backlogVorher)
+          bauteil.backlogNachher = Math.max(bauteil.backlogNachher, b.backlogNachher)
+          bauteil.nichtProduziert += b.nichtProduziert
+          bauteil.nachgeholt += b.nachgeholt
+        })
+      })
+      
+      // Berechne Durchschnittswerte
+      Array.from(bauteilMap.values()).forEach(b => {
+        const letzterTag = tage[tage.length - 1]
+        const bauteilLetzterTag = letzterTag.bauteile.find(bt => bt.bauteilId === b.bauteilId)
+        if (bauteilLetzterTag) {
+          b.endBestand = bauteilLetzterTag.endBestand
+          b.reichweite = bauteilLetzterTag.reichweite
+          b.status = bauteilLetzterTag.status
+        }
+      })
+      
+      const monatName = new Date(2027, monat - 1, 1).toLocaleDateString('de-DE', { month: 'long' })
+      
+      return {
+        monat: monat,
+        monatName: monatName,
+        jahr: 2027,
+        startDatum: tage[0].datum,
+        endDatum: tage[tage.length - 1].datum,
+        tageInMonat: tage.length,
+        istArbeitstag: tage.some(t => t.istArbeitstag),
+        bauteile: Array.from(bauteilMap.values())
+      }
+    })
+  }, [tagesLagerbestaende])
+  
+  // Helper für Kalenderwoche
+  function getKalenderWoche(date: Date): number {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  }
   
   // Warehouse-Statistiken für Anzeige
   const warehouseStats = warehouseResult.jahresstatistik
@@ -640,7 +811,43 @@ export default function ProduktionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* ✅ NEU: Zeitperioden-Schalter */}
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-sm font-semibold text-purple-900">Tagesproduktion über das Jahr</h4>
+            <div className="flex gap-2">
+              <Button
+                variant={zeitperiodeProduktion === 'tag' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setZeitperiodeProduktion('tag')}
+                className={zeitperiodeProduktion === 'tag' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+              >
+                <Calendar className="h-4 w-4 mr-1" />
+                Tag
+              </Button>
+              <Button
+                variant={zeitperiodeProduktion === 'woche' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setZeitperiodeProduktion('woche')}
+                className={zeitperiodeProduktion === 'woche' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+              >
+                <CalendarDays className="h-4 w-4 mr-1" />
+                KW
+              </Button>
+              <Button
+                variant={zeitperiodeProduktion === 'monat' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setZeitperiodeProduktion('monat')}
+                className={zeitperiodeProduktion === 'monat' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+              >
+                <CalendarRange className="h-4 w-4 mr-1" />
+                Monat
+              </Button>
+            </div>
+          </div>
+          
           {/* ✅ TABELLE ZUERST (User-Anforderung: Tabellen vor Erklärungen) */}
+          {/* ✅ DYNAMISCHE ANZEIGE: Tag / Woche / Monat */}
+          {zeitperiodeProduktion === 'tag' && (
           <ExcelTable
             columns={[
               {
@@ -764,12 +971,236 @@ export default function ProduktionPage() {
               }
             ]}
             data={tagesProduktionFormatiert}
-            maxHeight="500px"
+            maxHeight="600px"
             showFormulas={true}
             showSums={true}
             sumRowLabel={`SUMME (365 Tage, ${getArbeitstageProJahr()} Arbeitstage)`}
             dateColumnKey="datum"
           />
+          )}
+          
+          {/* ✅ WOCHEN-ANSICHT */}
+          {zeitperiodeProduktion === 'woche' && (
+          <ExcelTable
+            columns={[
+              {
+                key: 'kalenderwoche',
+                label: 'KW',
+                width: '60px',
+                align: 'center',
+                sumable: false
+              },
+              {
+                key: 'startDatum',
+                label: 'Von',
+                width: '80px',
+                align: 'center',
+                format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : val,
+                sumable: false
+              },
+              {
+                key: 'endDatum',
+                label: 'Bis',
+                width: '80px',
+                align: 'center',
+                format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : val,
+                sumable: false
+              },
+              {
+                key: 'anzahlArbeitstage',
+                label: 'AT',
+                width: '50px',
+                align: 'center',
+                sumable: true
+              },
+              {
+                key: 'schichten',
+                label: 'Schichten',
+                width: '80px',
+                align: 'center',
+                format: (val, row) => {
+                  // Berechne Schichten basierend auf istMenge
+                  if (!row) return '-'
+                  const kapProSchicht = konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
+                  const schichten = Math.ceil(row.istMenge / kapProSchicht)
+                  return schichten > 0 ? schichten.toString() : '-'
+                },
+                sumable: true
+              },
+              {
+                key: 'planMenge',
+                label: 'Plan-Menge',
+                width: '110px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0) + ' Bikes',
+                sumable: true
+              },
+              {
+                key: 'istMenge',
+                label: 'Ist-Menge',
+                width: '110px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0) + ' Bikes',
+                sumable: true
+              },
+              {
+                key: 'abweichung',
+                label: 'Abweichung',
+                width: '100px',
+                align: 'right',
+                formula: 'Ist - Plan',
+                format: (val, row) => {
+                  if (!row) return '-'
+                  const abw = row.istMenge - row.planMenge
+                  if (abw === 0) return '±0'
+                  const sign = abw > 0 ? '+' : ''
+                  return sign + formatNumber(abw, 0)
+                },
+                sumable: true
+              },
+              {
+                key: 'auslastung',
+                label: 'Auslastung',
+                width: '100px',
+                align: 'right',
+                format: (val, row) => {
+                  // Berechne Auslastung
+                  if (!row) return '-'
+                  const kapProSchicht = konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
+                  const maxKap = Math.ceil(row.istMenge / kapProSchicht) * kapProSchicht
+                  const ausl = maxKap > 0 ? (row.istMenge / maxKap) * 100 : 0
+                  return formatNumber(ausl, 1) + ' %'
+                },
+                sumable: false
+              },
+              {
+                key: 'kumulativPlan',
+                label: 'Σ Plan',
+                width: '110px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0),
+                sumable: false
+              },
+              {
+                key: 'kumulativIst',
+                label: 'Σ Ist',
+                width: '110px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0),
+                sumable: false
+              }
+            ]}
+            data={wochenProduktion}
+            maxHeight="600px"
+            showFormulas={true}
+            showSums={true}
+            sumRowLabel={`SUMME (${wochenProduktion.length} Wochen)`}
+          />
+          )}
+          
+          {/* ✅ MONATS-ANSICHT */}
+          {zeitperiodeProduktion === 'monat' && (
+          <ExcelTable
+            columns={[
+              {
+                key: 'monatName',
+                label: 'Monat',
+                width: '100px',
+                align: 'center',
+                format: (val) => val,
+                sumable: false
+              },
+              {
+                key: 'anzahlArbeitstage',
+                label: 'AT',
+                width: '50px',
+                align: 'center',
+                sumable: true
+              },
+              {
+                key: 'schichten',
+                label: 'Schichten',
+                width: '80px',
+                align: 'center',
+                format: (val, row) => {
+                  // Berechne Schichten basierend auf istMenge
+                  if (!row) return '-'
+                  const kapProSchicht = konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
+                  const schichten = Math.ceil(row.istMenge / kapProSchicht)
+                  return schichten > 0 ? schichten.toString() : '-'
+                },
+                sumable: true
+              },
+              {
+                key: 'planMenge',
+                label: 'Plan-Menge',
+                width: '110px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0) + ' Bikes',
+                sumable: true
+              },
+              {
+                key: 'istMenge',
+                label: 'Ist-Menge',
+                width: '110px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0) + ' Bikes',
+                sumable: true
+              },
+              {
+                key: 'abweichung',
+                label: 'Abweichung',
+                width: '100px',
+                align: 'right',
+                formula: 'Ist - Plan',
+                format: (val, row) => {
+                  if (!row) return '-'
+                  const abw = row.istMenge - row.planMenge
+                  if (abw === 0) return '±0'
+                  const sign = abw > 0 ? '+' : ''
+                  return sign + formatNumber(abw, 0)
+                },
+                sumable: true
+              },
+              {
+                key: 'auslastung',
+                label: 'Auslastung',
+                width: '100px',
+                align: 'right',
+                format: (val, row) => {
+                  // Berechne Auslastung
+                  if (!row) return '-'
+                  const kapProSchicht = konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
+                  const maxKap = Math.ceil(row.istMenge / kapProSchicht) * kapProSchicht
+                  const ausl = maxKap > 0 ? (row.istMenge / maxKap) * 100 : 0
+                  return formatNumber(ausl, 1) + ' %'
+                },
+                sumable: false
+              },
+              {
+                key: 'kumulativPlan',
+                label: 'Σ Plan',
+                width: '110px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0),
+                sumable: false
+              },
+              {
+                key: 'kumulativIst',
+                label: 'Σ Ist',
+                width: '110px',
+                align: 'right',
+                format: (val) => formatNumber(val, 0),
+                sumable: false
+              }
+            ]}
+            data={monatsProduktion}
+            maxHeight="600px"
+            showFormulas={true}
+            showSums={true}
+            sumRowLabel={`SUMME (12 Monate)`}
+          />
+          )}
           
           {/* ✅ VISUALISIERUNGEN: Plan vs Ist + Backlog-Entwicklung */}
           <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -898,15 +1329,49 @@ export default function ProduktionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* ✅ NEU: Zeitperioden-Schalter */}
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold text-green-900">Lagerbestandsentwicklung über das Jahr</h4>
+            <div className="flex gap-2">
+              <Button
+                variant={zeitperiodeWarehouse === 'tag' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setZeitperiodeWarehouse('tag')}
+                className={zeitperiodeWarehouse === 'tag' ? 'bg-green-600 hover:bg-green-700' : ''}
+              >
+                <Calendar className="h-4 w-4 mr-1" />
+                Tag
+              </Button>
+              <Button
+                variant={zeitperiodeWarehouse === 'woche' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setZeitperiodeWarehouse('woche')}
+                className={zeitperiodeWarehouse === 'woche' ? 'bg-green-600 hover:bg-green-700' : ''}
+              >
+                <CalendarDays className="h-4 w-4 mr-1" />
+                KW
+              </Button>
+              <Button
+                variant={zeitperiodeWarehouse === 'monat' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setZeitperiodeWarehouse('monat')}
+                className={zeitperiodeWarehouse === 'monat' ? 'bg-green-600 hover:bg-green-700' : ''}
+              >
+                <CalendarRange className="h-4 w-4 mr-1" />
+                Monat
+              </Button>
+            </div>
+          </div>
+          
           {/* ✅ TABELLE ZUERST (User-Anforderung: Tabellen vor Erklärungen) */}
           <div className="mb-6">
-            <h4 className="font-semibold text-green-900 mb-3">🔍 Tägliche Lagerbestandsentwicklung (365 Tage × 4 Sattel-Varianten)</h4>
             <p className="text-sm text-green-700 mb-4">
-              <strong>Detaillierte Lagerbewegungen pro Tag:</strong> Anfangsbestand + Zugang - Verbrauch = Endbestand. 
-              Zeigt Reichweite und Status für alle 4 Sattel-Varianten über das gesamte Jahr 2027.
+              <strong>Detaillierte Lagerbewegungen:</strong> Anfangsbestand + Zugang - Verbrauch = Endbestand. 
+              Zeigt Reichweite und Status für alle 4 Sattel-Varianten.
             </p>
             
             {/* Detaillierte Tabelle: Pro Komponente alle Bewegungen */}
+            {zeitperiodeWarehouse === 'tag' && (
             <ExcelTable
               columns={[
                 {
@@ -1015,6 +1480,189 @@ export default function ProduktionPage() {
               showSums={false}
               dateColumnKey="datum"
             />
+            )}
+            
+            {/* ✅ WOCHEN-ANSICHT */}
+            {zeitperiodeWarehouse === 'woche' && (
+            <ExcelTable
+              columns={[
+                {
+                  key: 'woche',
+                  label: 'KW',
+                  width: '60px',
+                  align: 'center',
+                  sumable: false
+                },
+                {
+                  key: 'startDatum',
+                  label: 'Von',
+                  width: '80px',
+                  align: 'center',
+                  format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : val,
+                  sumable: false
+                },
+                {
+                  key: 'endDatum',
+                  label: 'Bis',
+                  width: '80px',
+                  align: 'center',
+                  format: (val) => val instanceof Date ? val.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : val,
+                  sumable: false
+                },
+                {
+                  key: 'komponente',
+                  label: 'Komponente',
+                  width: '110px',
+                  align: 'left',
+                  sumable: false
+                },
+                {
+                  key: 'zugang',
+                  label: 'Zugang',
+                  width: '90px',
+                  align: 'right',
+                  formula: 'Σ Lieferungen',
+                  format: (val) => val > 0 ? '+' + formatNumber(val, 0) : '-',
+                  sumable: false
+                },
+                {
+                  key: 'verbrauch',
+                  label: 'Verbrauch',
+                  width: '100px',
+                  align: 'right',
+                  formula: 'Σ Produktion',
+                  format: (val) => val > 0 ? '-' + formatNumber(val, 0) : '-',
+                  sumable: false
+                },
+                {
+                  key: 'endBestand',
+                  label: 'Endbestand',
+                  width: '110px',
+                  align: 'right',
+                  format: (val) => formatNumber(val, 0),
+                  sumable: false
+                },
+                {
+                  key: 'reichweite',
+                  label: 'Reichweite',
+                  width: '100px',
+                  align: 'right',
+                  format: (val) => formatNumber(val, 1) + ' Tage',
+                  sumable: false
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  width: '90px',
+                  align: 'center',
+                  format: (val) => {
+                    if (val === 'kritisch') return '🔴 Kritisch'
+                    if (val === 'niedrig') return '🟡 Niedrig'
+                    return '🟢 OK'
+                  },
+                  sumable: false
+                }
+              ]}
+              data={wochenLagerbestaende.flatMap(woche => {
+                return woche.bauteile.map(bauteil => ({
+                  woche: woche.woche,
+                  startDatum: woche.startDatum,
+                  endDatum: woche.endDatum,
+                  komponente: bauteil.bauteilName,
+                  zugang: bauteil.zugang,
+                  verbrauch: bauteil.verbrauch,
+                  endBestand: bauteil.endBestand,
+                  reichweite: bauteil.reichweite,
+                  status: bauteil.status
+                }))
+              })}
+              maxHeight="600px"
+              showFormulas={true}
+              showSums={false}
+            />
+            )}
+            
+            {/* ✅ MONATS-ANSICHT */}
+            {zeitperiodeWarehouse === 'monat' && (
+            <ExcelTable
+              columns={[
+                {
+                  key: 'monatName',
+                  label: 'Monat',
+                  width: '100px',
+                  align: 'center',
+                  sumable: false
+                },
+                {
+                  key: 'komponente',
+                  label: 'Komponente',
+                  width: '110px',
+                  align: 'left',
+                  sumable: false
+                },
+                {
+                  key: 'zugang',
+                  label: 'Zugang',
+                  width: '100px',
+                  align: 'right',
+                  formula: 'Σ Lieferungen',
+                  format: (val) => val > 0 ? '+' + formatNumber(val, 0) : '-',
+                  sumable: false
+                },
+                {
+                  key: 'verbrauch',
+                  label: 'Verbrauch',
+                  width: '110px',
+                  align: 'right',
+                  formula: 'Σ Produktion',
+                  format: (val) => val > 0 ? '-' + formatNumber(val, 0) : '-',
+                  sumable: false
+                },
+                {
+                  key: 'endBestand',
+                  label: 'Endbestand',
+                  width: '120px',
+                  align: 'right',
+                  format: (val) => formatNumber(val, 0),
+                  sumable: false
+                },
+                {
+                  key: 'reichweite',
+                  label: 'Reichweite',
+                  width: '110px',
+                  align: 'right',
+                  format: (val) => formatNumber(val, 1) + ' Tage',
+                  sumable: false
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  width: '100px',
+                  align: 'center',
+                  format: (val) => {
+                    if (val === 'kritisch') return '🔴 Kritisch'
+                    if (val === 'niedrig') return '🟡 Niedrig'
+                    return '🟢 OK'
+                  },
+                  sumable: false
+                }
+              ]}
+              data={monatsLagerbestaende.flatMap(monat => {
+                return monat.bauteile.map(bauteil => ({
+                  monatName: monat.monatName,
+                  komponente: bauteil.bauteilName,
+                  zugang: bauteil.zugang,
+                  verbrauch: bauteil.verbrauch,
+                  endBestand: bauteil.endBestand,
+                  reichweite: bauteil.reichweite,
+                  status: bauteil.status
+                }))
+              })}
+              maxHeight="600px"
+              showFormulas={true}
+              showSums={false}
+            />
+            )}
             
             {/* ✅ VISUALISIERUNG: Lagerbestandsentwicklung */}
             <div className="mt-6">
@@ -1035,7 +1683,7 @@ export default function ProduktionPage() {
             </div>
             
             <p className="text-xs text-green-600 mt-3">
-              💡 <strong>Hinweis:</strong> Zeigt alle 365 Tage × 4 Komponenten = 1.460 Zeilen. 
+              💡 <strong>Hinweis:</strong> Je nach gewählter Ansicht (Tag/KW/Monat) werden die Daten entsprechend aggregiert. 
               <strong>✅ Realistische Bestandsführung:</strong> Losgröße 500 Stück, 49 Tage Vorlaufzeit, Anfangsbestand = 0.
               Code-Referenz: src/lib/calculations/warehouse-management.ts → Funktion berechneIntegriertesWarehouse()
             </p>

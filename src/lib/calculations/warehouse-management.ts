@@ -490,21 +490,20 @@ export function berechneIntegriertesWarehouse(
         // STEP 3c: ATP-CHECK MIT BACKLOG MANAGEMENT & KAPAZITÄTSPRÜFUNG
         // ═════════════════════════════════════════════════════════════════════════
         
-        // Berechne maximale Produktionskapazität für heute (nur an Arbeitstagen)
-        // Produktionskapazität aus KonfigurationContext
+        // ✅ FIX: Berechne maximale Produktionskapazität für heute korrekt
+        // Produktionskapazität aus KonfigurationContext (SSOT!)
         const kapazitaetProSchicht = 
           konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
         
-        // WICHTIG: Wir produzieren an Arbeitstagen IMMER mindestens 1 Schicht
-        // Für Backlog-Abbau können wir bis zu 3 Schichten fahren
-        const maxSchichten = 3
+        // ✅ FIX: Nutze maxSchichtenProTag aus Konfiguration (nicht hardcoded 3!)
+        const maxSchichten = konfiguration.produktion.maxSchichtenProTag
         const maxProduktionKapazitaet = istArbeitstag ? kapazitaetProSchicht * maxSchichten : 0
         
         // Gesamtbedarf = heutiger Bedarf + offener Backlog
         const gesamtBedarfHeute = benoetigt + backlogVorher
         const verfuegbarFuerProduktion = aktuelleBestaende[bauteilId]
         
-        // TRIPLE-CHECK: Material UND Kapazität berücksichtigen!
+        // ✅ TRIPLE-CHECK: Material UND Kapazität berücksichtigen!
         // 1. Material-Check: Haben wir genug Rohstoffe?
         // 2. Kapazitäts-Check: Können wir das produzieren?
         // 3. Kombination: Was ist möglich?
@@ -547,7 +546,7 @@ export function berechneIntegriertesWarehouse(
             )
           }
         } else {
-          // GENUG MATERIAL - volle Produktion + Backlog-Abbau möglich
+          // GENUG MATERIAL UND KAPAZITÄT - volle Produktion + Backlog-Abbau möglich
           verbrauch = gesamtBedarfHeute
           atpErfuellt = true
           nachgeholt = backlogVorher // Kompletter Backlog wird abgebaut
@@ -707,12 +706,12 @@ export function berechneIntegriertesWarehouse(
       // An Arbeitstagen verbrauchen wir so viel Material wie möglich
       let verbrauch = 0
       if (istHeuteArbeitstag && anfangsBestand > 0) {
-        // Maximale Tageskapazität aus Schichtsystem:
+        // ✅ FIX: Maximale Tageskapazität aus Konfiguration (SSOT!)
         // kapazitaetProStunde * stundenProSchicht * maxSchichtenProTag
         const maxTageskapazitaet = 
           konfiguration.produktion.kapazitaetProStunde * 
           konfiguration.produktion.stundenProSchicht * 
-          (konfiguration.produktion.maxSchichtenProTag || 3)
+          konfiguration.produktion.maxSchichtenProTag
         verbrauch = Math.min(anfangsBestand, maxTageskapazitaet)
         aktuelleBestaende[bauteilId] -= verbrauch
         gesamtVerbrauch += verbrauch
