@@ -1446,7 +1446,7 @@ export default function ProduktionPage() {
           )}
           
           {/* ✅ VISUALISIERUNGEN: Plan vs Ist + Backlog-Entwicklung */}
-          <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <div className="mt-6 space-y-6">
             {/* Chart 1: Plan vs Ist Produktion (monatlich) */}
             <div className="bg-white rounded-lg p-4 border">
               <h4 className="text-sm font-semibold mb-3">
