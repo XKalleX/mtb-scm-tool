@@ -67,7 +67,6 @@
     ],
     "losgroesse": 500,
     "kapazitaet": 50000,
-    "lieferintervall": 14,
     "schifffahrplan": {
       "abfahrtstag": "Mittwoch",
       "frequenz": "wöchentlich",

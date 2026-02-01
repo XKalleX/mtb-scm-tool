@@ -538,11 +538,10 @@ function LieferantChinaCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Lieferant Basisinfo */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <InfoItem label="Name" value={lieferant.name} />
           <InfoItem label="Land" value={lieferant.land} />
           <InfoItem label="Losgröße" value={lieferant.losgroesse + ' Stück'} highlight={true} />
-          <InfoItem label="Lieferintervall" value={lieferant.lieferintervall + ' Tage'} />
         </div>
 
         {/* Vorlaufzeiten */}

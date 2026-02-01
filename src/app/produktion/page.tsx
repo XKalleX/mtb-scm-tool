@@ -170,8 +170,7 @@ export default function ProduktionPage() {
       konfiguration.lieferant.gesamtVorlaufzeitTage,
       konfiguration.feiertage,
       stuecklistenMap,
-      konfiguration.lieferant.losgroesse,
-      konfiguration.lieferant.lieferintervall
+      konfiguration.lieferant.losgroesse
     )
   }, [variantenProduktionsplaeneForWarehouse, konfiguration])
   

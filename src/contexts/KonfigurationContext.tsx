@@ -94,7 +94,6 @@ export interface LieferantConfig {
   transportSequenz: TransportSequenzConfig[]  // Sequenz der Transportschritte
   losgroesse: number
   kapazitaet: number
-  lieferintervall: number
   besonderheiten: string[]
 }
 

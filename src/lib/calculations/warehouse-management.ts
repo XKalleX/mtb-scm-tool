@@ -249,8 +249,7 @@ export function berechneIntegriertesWarehouse(
     konfiguration.lieferant.gesamtVorlaufzeitTage,
     konfiguration.feiertage,
     stuecklistenMap,  // Stücklisten aus Konfiguration
-    konfiguration.lieferant.losgroesse,  // Losgröße aus Konfiguration
-    konfiguration.lieferant.lieferintervall  // Lieferintervall aus Konfiguration
+    konfiguration.lieferant.losgroesse  // Losgröße aus Konfiguration
   )
   
   // Extrahiere Bestellungen und Lieferungen aus Hafenlogistik

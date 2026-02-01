@@ -236,8 +236,7 @@ export function berechneSCORMetrikenReal(
     konfiguration.lieferant?.gesamtVorlaufzeitTage || 49,
     undefined, // customFeiertage - nutzt Standard
     undefined, // stueckliste - nutzt Standard aus JSON
-    konfiguration.lieferant?.losgroesse || 500,
-    konfiguration.lieferant?.lieferintervall || 1
+    konfiguration.lieferant?.losgroesse || 500
   )
   
   // 1.3 Warehouse Management (basierend auf OEM + Inbound)
