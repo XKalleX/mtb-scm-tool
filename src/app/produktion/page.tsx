@@ -296,7 +296,7 @@ export default function ProduktionPage() {
         schichten: schichten,
         auslastung: Math.round(auslastung * 10) / 10,
         // ✅ KRITISCHER FIX (Issue #295): materialVerfuegbar Logik
-        // HINWEIS: Der Wert ist für Nicht-Arbeitstage irrelevant, da die UI-Anzeige (Zeile 1173-1174)
+        // HINWEIS: Der Wert ist für Nicht-Arbeitstage irrelevant, da die UI-Anzeige
         // immer "-" zeigt wenn istArbeitstag === false. Der true-Fallback ist nur für Konsistenz.
         // An Arbeitstagen: basierend auf tatsächlichem Material-Engpass aus Warehouse
         materialVerfuegbar: !templateTag.istArbeitstag 
