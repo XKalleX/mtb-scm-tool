@@ -18,6 +18,7 @@
  * QUELLE: Alle Daten werden dynamisch aus JSON-Dateien geladen
  * 
  * ✅ NEU: Export-Funktionalität für alle Stammdaten
+ * ✅ WICHTIG: Produktionszahlen werden DYNAMISCH berechnet aus Gesamtproduktion × anteilPrognose
  */
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -34,6 +35,7 @@ import {
   KomponentenBarChart, 
   FeiertageChart 
 } from '@/components/ui/table-charts'
+import { useKonfiguration } from '@/contexts/KonfigurationContext'
 
 // Import aller JSON-Dateien
 import stammdatenData from '@/data/stammdaten.json'
@@ -45,6 +47,14 @@ import feiertageDeutschland from '@/data/feiertage-deutschland.json'
 import szenarioDefaults from '@/data/szenario-defaults.json'
 
 export default function StammdatenPage() {
+  /**
+   * ✅ Verwende KonfigurationContext für dynamische Berechnung der Produktionszahlen
+   * WICHTIG: Produktionszahlen werden NICHT mehr hardcoded aus JSON gelesen,
+   * sondern DYNAMISCH berechnet aus: Gesamtproduktion × anteilPrognose
+   */
+  const { getJahresproduktionProVariante } = useKonfiguration()
+  const jahresproduktionProVariante = getJahresproduktionProVariante()
+  
   /**
    * ✅ NEU: Exportiert ALLE Stammdaten als JSON
    */
@@ -86,9 +96,9 @@ export default function StammdatenPage() {
             'Varianten-ID': v.id,
             'Name': v.name,
             'Kategorie': v.kategorie,
-            'Gewicht (kg)': v.gewicht,
             'Farben': v.farben.join(', '),
             'Anteil Prognose': (v.anteilPrognose * 100) + '%',
+            'Jahresproduktion': jahresproduktionProVariante[v.id] || 0,
             'Beschreibung': v.beschreibung
           })),
           title: 'MTB-Varianten Übersicht'
@@ -312,17 +322,25 @@ function StammdatenCard() {
 
 /**
  * 2. MTB-Varianten Details
+ * ✅ Nutzt dynamische Berechnung der Produktionszahlen aus KonfigurationContext
  */
 function MTBVariantenCard() {
   const data = stammdatenData as any
   const varianten = data.varianten
+  
+  /**
+   * ✅ Dynamische Berechnung: Gesamtproduktion × anteilPrognose
+   * NICHT mehr aus hardcoded proVariante JSON-Feld
+   */
+  const { getJahresproduktionProVariante } = useKonfiguration()
+  const jahresproduktionProVariante = getJahresproduktionProVariante()
 
   // Bereite Daten für VariantenPieChart vor
   const chartData = varianten.map((v: any) => ({
     id: v.id,
     name: v.name,
     anteil: v.anteilPrognose,
-    menge: data.jahresproduktion.proVariante[v.id]
+    menge: jahresproduktionProVariante[v.id] || 0
   }))
 
   return (
@@ -348,8 +366,7 @@ function MTBVariantenCard() {
                   </div>
                   <p className="text-sm text-muted-foreground">{v.beschreibung}</p>
                   <div className="flex flex-wrap gap-4 text-sm">
-                    <span><strong>Gewicht:</strong> {v.gewicht} kg</span>
-                    <span><strong>Jahresproduktion:</strong> {formatNumber(data.jahresproduktion.proVariante[v.id], 0)} Bikes</span>
+                    <span><strong>Jahresproduktion:</strong> {formatNumber(jahresproduktionProVariante[v.id] || 0, 0)} Bikes</span>
                   </div>
                   <div className="flex gap-2 mt-2">
                     {v.farben.map((f: string) => (
@@ -451,18 +468,25 @@ function SaisonalitaetCard() {
 
 /**
  * 4. Stückliste (Bike → Sattel)
+ * ✅ Nutzt dynamische Berechnung der Produktionszahlen aus KonfigurationContext
  */
 function StuecklisteCard() {
   const data = stuecklisteData as any
   const stuecklisten = data.stuecklisten
   const jahresproduktion = stammdatenData.jahresproduktion.gesamt
 
+  /**
+   * ✅ Dynamische Berechnung: Gesamtproduktion × anteilPrognose
+   * NICHT mehr aus hardcoded proVariante JSON-Feld
+   */
+  const { getJahresproduktionProVariante } = useKonfiguration()
+  const jahresproduktionProVariante = getJahresproduktionProVariante()
+
   // Berechne Komponentenbedarf für Chart
   const sattelBedarf: Record<string, { name: string; menge: number }> = {}
   
   Object.entries(stuecklisten).forEach(([bikeId, value]: [string, any]) => {
-    const proVariante = stammdatenData.jahresproduktion.proVariante as Record<string, number>
-    const bikeProduktion = proVariante[bikeId] || 0
+    const bikeProduktion = jahresproduktionProVariante[bikeId] || 0
     
     Object.entries(value.komponenten).forEach(([sattelId, sattel]: [string, any]) => {
       if (!sattelBedarf[sattelId]) {

@@ -12,7 +12,6 @@
       "id": "MTBAllrounder",
       "name": "MTB Allrounder",
       "kategorie": "Allrounder",
-      "gewicht": 13.5,
       "farben": [
         "Schwarz",
         "Silber",
@@ -25,7 +24,6 @@
       "id": "MTBCompetition",
       "name": "MTB Competition",
       "kategorie": "Competition",
-      "gewicht": 11.2,
       "farben": [
         "Rot",
         "Schwarz",
@@ -38,7 +36,6 @@
       "id": "MTBDownhill",
       "name": "MTB Downhill",
       "kategorie": "Downhill",
-      "gewicht": 15.8,
       "farben": [
         "Orange",
         "Schwarz",
@@ -51,7 +48,6 @@
       "id": "MTBExtreme",
       "name": "MTB Extreme",
       "kategorie": "Extreme",
-      "gewicht": 14.9,
       "farben": [
         "Gelb",
         "Schwarz",
@@ -64,7 +60,6 @@
       "id": "MTBFreeride",
       "name": "MTB Freeride",
       "kategorie": "Freeride",
-      "gewicht": 14.3,
       "farben": [
         "Grün",
         "Schwarz",
@@ -77,7 +72,6 @@
       "id": "MTBMarathon",
       "name": "MTB Marathon",
       "kategorie": "Marathon",
-      "gewicht": 10.8,
       "farben": [
         "Blau",
         "Weiß",
@@ -90,7 +84,6 @@
       "id": "MTBPerformance",
       "name": "MTB Performance",
       "kategorie": "Performance",
-      "gewicht": 12.4,
       "farben": [
         "Schwarz",
         "Silber",
@@ -103,7 +96,6 @@
       "id": "MTBTrail",
       "name": "MTB Trail",
       "kategorie": "Trail",
-      "gewicht": 13.1,
       "farben": [
         "Grau",
         "Schwarz",
@@ -115,17 +107,7 @@
   ],
   "jahresproduktion": {
     "gesamt": 370000,
-    "beschreibung": "Gesamtvolumen laut Aufgabenstellung",
-    "proVariante": {
-      "MTBAllrounder": 111000,
-      "MTBCompetition": 55500,
-      "MTBDownhill": 37000,
-      "MTBExtreme": 25900,
-      "MTBFreeride": 18500,
-      "MTBMarathon": 29600,
-      "MTBPerformance": 44400,
-      "MTBTrail": 48100
-    }
+    "beschreibung": "Gesamtvolumen laut Aufgabenstellung - Verteilung pro Variante wird dynamisch aus anteilPrognose berechnet"
   },
   "produktion": {
     "standort": "Dortmund",

@@ -22,7 +22,6 @@ export interface MTBVariante {
   id: string;                    // z.B. "MTBAllrounder"
   name: string;                  // Vollständiger Name
   kategorie: string;             // z.B. "Allrounder", "Competition"
-  gewicht: number;               // in kg
   farben: string[];              // Verfügbare Farben
 }
 
