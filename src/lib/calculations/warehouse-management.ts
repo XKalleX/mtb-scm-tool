@@ -709,22 +709,27 @@ export function berechneIntegriertesWarehouse(
         
         // Berechne Backlog-Änderungen
         if (nichtErfuellt > 0) {
+          // Heute konnte nicht alles produziert werden → Backlog wächst
           nichtProduziertHeute = nichtErfuellt
           nachgeholt = 0
         } else {
+          // Heute konnte Plan erfüllt werden → Kein Backlog heute
           nichtProduziertHeute = 0
-          nachgeholt = 0  // Kein Backlog-Abbau wenn Faktor < 1
+          nachgeholt = 0
+          
+          // ✅ BACKLOG-ABBAU: Wird separat am Monatsende/Jahresende verarbeitet
+          // Grund: Kapazitäts-Management ist komplex (3 Schichten) und muss global
+          // über alle Varianten koordiniert werden. Täglicher Abbau würde zu
+          // Inkonsistenzen führen.
         }
         
         // Update Backlog
         produktionsBacklog[bauteilId] = backlogVorher + nichtProduziertHeute - nachgeholt
         
-        // Track tatsächliche Produktion (für Statistiken)
-        gesamtProduziertTatsaechlich += verbrauch
-        
-        // Buche Verbrauch
+        // Buche Verbrauch (jetzt mit Backlog-Abbau)
         aktuelleBestaende[bauteilId] -= verbrauch
         gesamtVerbrauch += verbrauch
+        gesamtProduziertTatsaechlich += verbrauch
         
         // Warnungen (nur wenn nötig, da global bereits geloggt)
         if (nichtProduziertHeute > 0 && globalAtpGrund) {
@@ -816,6 +821,87 @@ export function berechneIntegriertesWarehouse(
       istArbeitstag,
       bauteile: bauteileHeuteDetails
     })
+    
+    // ═════════════════════════════════════════════════════════════════════════════
+    // STEP 3e: TÄGLICHER BACKLOG-ABBAU (wenn Kapazität vorhanden)
+    // ═════════════════════════════════════════════════════════════════════════════
+    /**
+     * ✅ KRITISCH: Backlog muss täglich abgebaut werden bis zur Kapazitätsgrenze!
+     * 
+     * Logik:
+     * 1. Berechne verfügbare Produktionskapazität (Max - heute produziert)
+     * 2. Prüfe ob Backlog existiert
+     * 3. Prüfe verfügbares Material
+     * 4. Produziere Backlog bis Kapazitätsgrenze oder Material erschöpft
+     */
+    if (istArbeitstag && tagImJahr >= 1 && tagImJahr <= 365) {
+      // Berechne Gesamt-Backlog (in Bikes)
+      const gesamtBacklogBikes = Object.values(produktionsBacklog).reduce((sum, b) => sum + b, 0)
+      
+      if (gesamtBacklogBikes > 0) {
+        // Berechne verfügbare Kapazität
+        const kapazitaetProSchicht = 
+          konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
+        const maxSchichten = konfiguration.produktion.maxSchichtenProTag
+        const maxProduktionKapazitaetBikes = kapazitaetProSchicht * maxSchichten
+        
+        // Berechne heute bereits produzierte Menge
+        let heuteProduziertBikes = 0
+        Object.entries(produktionsplanMap).forEach(([varianteId, planMap]) => {
+          heuteProduziertBikes += (planMap[datumStr] || 0)
+        })
+        
+        // Verfügbare Kapazität für Backlog
+        const verfuegbareKapazitaet = Math.max(0, maxProduktionKapazitaetBikes - heuteProduziertBikes)
+        
+        if (verfuegbareKapazitaet > 0) {
+          // Berechne verfügbares Material (SUMME aller Sättel)
+          let verfuegbaresMaterialGesamt = 0
+          bauteile.forEach(bauteil => {
+            verfuegbaresMaterialGesamt += aktuelleBestaende[bauteil.id]
+          })
+          
+          // Maximum was produziert werden kann
+          const maxBacklogAbbau = Math.min(
+            gesamtBacklogBikes,           // Nicht mehr als Backlog vorhanden
+            verfuegbareKapazitaet,         // Nicht mehr als Kapazität erlaubt
+            verfuegbaresMaterialGesamt     // Nicht mehr als Material da ist
+          )
+          
+          if (maxBacklogAbbau > 0) {
+            // Verteile Backlog-Abbau proportional auf alle Bauteile
+            let tatsaechlichAbgebautGesamt = 0
+            
+            bauteile.forEach(bauteil => {
+              const bauteilId = bauteil.id
+              const bauteilBacklog = produktionsBacklog[bauteilId]
+              
+              if (bauteilBacklog > 0) {
+                // Proportionaler Anteil
+                const anteil = bauteilBacklog / gesamtBacklogBikes
+                const abbauFuerBauteil = Math.floor(maxBacklogAbbau * anteil)
+                
+                // Begrenzt durch verfügbares Material
+                const abbauMoeglich = Math.min(abbauFuerBauteil, aktuelleBestaende[bauteilId])
+                
+                if (abbauMoeglich > 0) {
+                  // Buche Backlog-Abbau
+                  produktionsBacklog[bauteilId] -= abbauMoeglich
+                  aktuelleBestaende[bauteilId] -= abbauMoeglich
+                  gesamtVerbrauch += abbauMoeglich
+                  gesamtProduziertTatsaechlich += abbauMoeglich
+                  tatsaechlichAbgebautGesamt += abbauMoeglich
+                }
+              }
+            })
+            
+            if (tatsaechlichAbgebautGesamt > 0 && tagImJahr <= 100) {
+              console.log(`✅ TAG ${tagImJahr}: Backlog-Abbau GESAMT ${tatsaechlichAbgebautGesamt} Bikes`)
+            }
+          }
+        }
+      }
+    }
     
     // Nächster Tag
     aktuellesDatum = addDays(aktuellesDatum, 1)
