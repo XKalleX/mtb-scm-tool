@@ -21,13 +21,15 @@
  * @version 1.0
  */
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { berechneSCORMetrikenReal } from '@/lib/calculations/scor-metrics-real'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { 
   BarChart, Bar, LineChart, Line, AreaChart, Area, ScatterChart, Scatter,
   ComposedChart, 
@@ -110,21 +112,42 @@ const CHART_COLORS = {
 
 export default function ReportingPage() {
   const { konfiguration } = useKonfiguration()
+  
+  // State für "Aktuelles Datum beachten" Checkbox
+  const [beachteAktuellesDatum, setBeachteAktuellesDatum] = useState(true)
 
   // Berechne SCOR-Metriken (mit Memoization für Performance)
   const { metriken, zeitreihen } = useMemo(() => {
     console.log('🎯 Berechne SCOR-Metriken für Reporting...')
-    return berechneSCORMetrikenReal(konfiguration)
-  }, [konfiguration])
+    console.log(`   Aktuelles Datum beachten: ${beachteAktuellesDatum}`)
+    return berechneSCORMetrikenReal(konfiguration, beachteAktuellesDatum)
+  }, [konfiguration, beachteAktuellesDatum])
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="space-y-2">
+      <div className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">SCOR-Metriken Reporting</h1>
-        <p className="text-muted-foreground">
-          Supply Chain Operations Reference Model - 6 Kernmetriken aus 4 Kategorien
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-muted-foreground">
+            Supply Chain Operations Reference Model - 6 Kernmetriken aus 4 Kategorien
+          </p>
+          
+          {/* Checkbox: Aktuelles Datum beachten */}
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="beachte-heute"
+              checked={beachteAktuellesDatum}
+              onCheckedChange={(checked) => setBeachteAktuellesDatum(checked as boolean)}
+            />
+            <Label 
+              htmlFor="beachte-heute" 
+              className="text-sm font-medium cursor-pointer"
+            >
+              Aktuelles Datum beachten ({konfiguration.heuteDatum ? new Date(konfiguration.heuteDatum).toLocaleDateString('de-DE') : '2027-04-15'})
+            </Label>
+          </div>
+        </div>
       </div>
 
       {/* Tab-Navigation */}
