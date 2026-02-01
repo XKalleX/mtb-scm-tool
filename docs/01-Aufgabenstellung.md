@@ -104,8 +104,8 @@ Stell dir vor, Adventure Works hätte **KEIN** System:
 
 #### Szenario 4: Spring Festival vergessen
 
-- ❌ **28. Januar - 4. Februar 2027:** [Spring Festival in China](./04-Zeitparameter.md#spring-festival-2027)
-- ❌ Zulieferer macht 8 Tage Pause (chinesisches Neujahr)
+- ❌ **6. Februar - 11. Februar 2027:** [Spring Festival in China](./04-Zeitparameter.md#spring-festival-2027)
+- ❌ Zulieferer macht 6 Tage Pause (chinesisches Neujahr)
 - ❌ Bestellungen werden nicht bearbeitet
 - ❌ Produktion in China steht komplett still
 - ❌ Wenn nicht eingeplant → **Produktionsstillstand** in Deutschland im März!

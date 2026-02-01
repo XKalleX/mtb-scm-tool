@@ -607,7 +607,7 @@ Tag 20.03.: Produktion = 100 Sättel (normal)
 
 #### Spring Festival 2027
 
-**Datum:** 28. Januar - 4. Februar 2027 (8 Tage)
+**Datum:** 6. Februar - 11. Februar 2027 (6 Tage)
 
 **Chinesisches Neujahrsfest** - wichtigster Feiertag in China!
 

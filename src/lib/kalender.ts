@@ -308,9 +308,9 @@ export function istArbeitstag(
  * @returns True wenn Spring Festival Produktionsstopp
  */
 export function istSpringFestival(datum: Date): boolean {
-  // Spring Festival 2027 Produktionsstopp gemäß lieferant-china.json: 28.01. - 04.02.2027
-  const springStart = new Date(2027, 0, 28) // 28. Januar
-  const springEnd = new Date(2027, 1, 4)    // 4. Februar
+  // Spring Festival 2027 Produktionsstopp gemäß lieferant-china.json: 06.02. - 11.02.2027
+  const springStart = new Date(2027, 1, 6) // 6. Februar
+  const springEnd = new Date(2027, 1, 11)    // 11. Februar
   
   return datum >= springStart && datum <= springEnd
 }

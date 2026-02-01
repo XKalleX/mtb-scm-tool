@@ -123,13 +123,8 @@
       "typ": "gesetzlich"
     },
     {
-      "datum": "2027-02-05",
-      "name": "Spring Festival (Vorabend)",
-      "typ": "gesetzlich"
-    },
-    {
       "datum": "2027-02-06",
-      "name": "Spring Festival - Chinesischer Neujahrstag",
+      "name": "Spring Festival (Tag 1)",
       "typ": "gesetzlich"
     },
     {
@@ -279,12 +274,12 @@
   "region": "Shanghai",
   "hinweis": "Shanghai Region Feiertage - identisch mit nationalen gesetzlichen Feiertagen Chinas. Zeitraum Oktober 2026 bis Februar 2028 für Vorlaufzeiten-Berücksichtigung.",
   "wichtig2026": "Spring Festival (16.-22.02.2026) = 7 Tage Produktionsstopp",
-  "wichtig2027": "Spring Festival (05.-11.02.2027) = 7 Tage Produktionsstopp - Realdaten!",
+  "wichtig2027": "Spring Festival (06.-11.02.2027) = 6 Tage Produktionsstopp - Realdaten!",
   "wichtig2028": "Spring Festival (26.01.-01.02.2028) = 7 Tage Produktionsstopp",
   "anmerkung": "In China werden Feiertage oft mit angrenzenden Wochenenden kombiniert und durch Kompensationsarbeitstage (make-up workdays) ausgeglichen. Die hier aufgeführten Tage sind die tatsächlichen arbeitsfreien Tage.",
   "anzahl": {
     "2026": "21 Feiertage",
-    "2027": "23 Feiertage", 
+    "2027": "22 Feiertage", 
     "2028": "8 Feiertage (Jan-Feb)"
   }
 }
