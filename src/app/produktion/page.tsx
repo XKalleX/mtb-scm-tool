@@ -32,7 +32,8 @@ import {
   berechneLagerbestaende,
   berechneProduktionsStatistiken,
   generiereAlleVariantenProduktionsplaene,
-  type TagesProduktionEntry
+  type TagesProduktionEntry,
+  type VariantenProduktionsplan
 } from '@/lib/calculations/zentrale-produktionsplanung'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { berechneIntegriertesWarehouse, konvertiereWarehouseZuExport, korrigiereProduktionsplaeneMitWarehouse } from '@/lib/calculations/warehouse-management'
@@ -135,7 +136,7 @@ export default function ProduktionPage() {
   const variantenProduktionsplaeneForWarehouse = useMemo(() => {
     if (hasSzenarien && variantenPlaeneMitSzenarien) {
       // Konvertiere variantenPlaene zu Record<string, VariantenProduktionsplan> Format
-      const result: Record<string, any> = {}
+      const result: Record<string, VariantenProduktionsplan> = {}
       Object.entries(variantenPlaeneMitSzenarien).forEach(([varianteId, plan]) => {
         result[varianteId] = {
           varianteId: plan.varianteId,
@@ -172,7 +173,7 @@ export default function ProduktionPage() {
     // Konvertiere Produktionspläne zu Format für Inbound
     const produktionsplaeneFormatiert: Record<string, Array<{datum: Date; varianteId: string; istMenge: number; planMenge: number}>> = {}
     Object.entries(variantenProduktionsplaeneForWarehouse).forEach(([varianteId, plan]) => {
-      produktionsplaeneFormatiert[varianteId] = plan.tage.map((tag: any) => ({
+      produktionsplaeneFormatiert[varianteId] = plan.tage.map((tag: TagesProduktionEntry) => ({
         datum: tag.datum,
         varianteId: varianteId,
         istMenge: tag.istMenge,
