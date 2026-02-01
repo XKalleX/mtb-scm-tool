@@ -9,7 +9,6 @@
  * - 365 Tage Planung für alle 8 MTB-Varianten
  * - Saisonale Verteilung (April-Peak)
  * - Error-Management für Rundungsfehler
- * - Stücklisten-Übersicht
  * - Szenarien-Integration (Marketing, Maschinenausfall, etc.)
  * - Ansicht für alle Varianten gleichzeitig
  * 
@@ -375,7 +374,6 @@ export default function OEMProgrammPage() {
         <TabsList>
           <TabsTrigger value="allVariants">Tagesplanung (Alle Varianten)</TabsTrigger>
           <TabsTrigger value="overview">Übersicht</TabsTrigger>
-          <TabsTrigger value="stueckliste">Stückliste</TabsTrigger>
           <TabsTrigger value="error">Error-Management</TabsTrigger>
         </TabsList>
 
@@ -550,113 +548,6 @@ export default function OEMProgrammPage() {
                     }
                   })}
                   height={350}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Stückliste Tab - NUR SÄTTEL */}
-        <TabsContent value="stueckliste" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Stückliste - Mountain Bikes</CardTitle>
-              <CardDescription>
-                Vereinfachte Stückliste: 1x Sattel = 1 Fahrrad (Rahmen & Gabeln vereinfacht)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Variante</TableHead>
-                    <TableHead>Sattel-Typ</TableHead>
-                    <TableHead className="text-right">Menge/Bike</TableHead>
-                    <TableHead className="text-right">Jahresbedarf</TableHead>
-                    <TableHead>Zulieferer</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {konfiguration.varianten.map((v) => {
-                    const stl = stuecklistenMap[v.id]
-                    if (!stl) return null
-                    
-                    // Nur Sattel extrahieren
-                    const sattel = Object.values(stl.komponenten)[0] as StuecklistenKomponente
-                    const jahresprod = jahresproduktionProVariante[v.id] || Math.round(konfiguration.jahresproduktion * v.anteilPrognose)
-                    
-                    return (
-                      <TableRow key={v.id}>
-                        <TableCell className="font-medium">{v.name}</TableCell>
-                        <TableCell className="text-sm font-medium text-blue-600">
-                          {sattel?.name || 'N/A'}
-                        </TableCell>
-                        <TableCell className="text-right">{sattel?.menge || 1}</TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {formatNumber(jahresprod, 0)} Stück
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {konfiguration.lieferant.land} ({konfiguration.lieferant.gesamtVorlaufzeitTage} Tage Vorlauf)
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                  <TableRow className="bg-slate-50 font-bold">
-                    <TableCell colSpan={3}>GESAMT Sättel benötigt:</TableCell>
-                    <TableCell className="text-right">
-                      {formatNumber(konfiguration.jahresproduktion, 0)} Stück
-                    </TableCell>
-                    <TableCell></TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-
-              {/* Sattel-Varianten Übersicht */}
-              <div className="mt-6">
-                <h4 className="text-sm font-semibold mb-3">Sattel-Varianten Aggregation (für Bestellung):</h4>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {konfiguration.bauteile.map(bauteil => {
-                    const bedarf = konfiguration.stueckliste
-                      .filter(s => s.bauteilId === bauteil.id)
-                      .reduce((sum, s) => {
-                        const variante = konfiguration.varianten.find(v => v.id === s.mtbVariante)
-                        if (!variante) return sum
-                        return sum + Math.round(konfiguration.jahresproduktion * variante.anteilPrognose) * s.menge
-                      }, 0)
-                    
-                    return (
-                      <div key={bauteil.id} className="bg-slate-50 border rounded-lg p-3">
-                        <div className="text-sm font-medium">{bauteil.name}</div>
-                        <div className="text-lg font-bold text-blue-600">{formatNumber(bedarf, 0)} Stück/Jahr</div>
-                        <div className="text-xs text-muted-foreground">
-                          ≈ {formatNumber(bedarf / arbeitstage, 0)} Stück/Arbeitstag
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* 📊 VISUALISIERUNG: Komponenten-Bar-Chart */}
-              <div className="mt-6">
-                <KomponentenBarChart
-                  daten={konfiguration.bauteile.map(bauteil => {
-                    const bedarf = konfiguration.stueckliste
-                      .filter(s => s.bauteilId === bauteil.id)
-                      .reduce((sum, s) => {
-                        const variante = konfiguration.varianten.find(v => v.id === s.mtbVariante)
-                        if (!variante) return sum
-                        return sum + Math.round(konfiguration.jahresproduktion * variante.anteilPrognose) * s.menge
-                      }, 0)
-                    
-                    return {
-                      id: bauteil.id,
-                      name: bauteil.name,
-                      bedarf: bedarf
-                    }
-                  })}
-                  height={200}
                 />
               </div>
             </CardContent>
