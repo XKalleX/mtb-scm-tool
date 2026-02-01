@@ -190,24 +190,25 @@ function simuliereHafenUndSchiffsversand(
   while (aktuelleDatum <= endDatum) {
     const datumStr = toLocalISODateString(aktuelleDatum)
     
-    // 1. ANKUNFT: Füge Ware die heute (oder früher) ankommt zum Hafen-Lager hinzu
-    // ✅ FIX: Verarbeite ALLE Bestellungen die am oder vor dem aktuellen Datum ankommen
-    // Dies verhindert, dass Bestellungen durch Zeitzonen-/Rundungsfehler übersprungen werden
+    // 1. ANKUNFT: Füge Ware die VOR HEUTE angekommen ist zum Hafen-Lager hinzu
+    // ✅ FIX: Material das HEUTE ankommt, kommt NICHT mehr auf das heutige Schiff!
+    // Das Schiff fährt morgens ab, Material kommt tagsüber an.
+    // Verwende STRIKTEN Vergleich: ankunftStr < datumStr (nicht <=)
     while (ankunftsIndex < hafenAnkunftsTimeline.length) {
       const ankunft = hafenAnkunftsTimeline[ankunftsIndex]
       const ankunftStr = toLocalISODateString(ankunft.datum)
       
-      // ✅ FIX: Verwende String-Vergleich statt Date-Objekt-Vergleich
-      // um Zeitzonen-Probleme zu vermeiden
-      if (ankunftStr <= datumStr) {
-        // Ware kommt heute oder ist bereits früher angekommen → ins Lager buchen
+      // ✅ FIX: NUR Material das STRIKT VOR heute angekommen ist
+      // Material das heute ankommt, kommt erst aufs nächste Schiff
+      if (ankunftStr < datumStr) {
+        // Ware ist bereits früher angekommen → ins Lager buchen
         Object.entries(ankunft.komponenten).forEach(([kompId, menge]) => {
           hafenLager[kompId] = (hafenLager[kompId] || 0) + menge
         })
         
         ankunftsIndex++
       } else {
-        // Ankunft liegt in der Zukunft → abbrechen
+        // Ankunft ist heute oder später → abbrechen (kommt aufs nächste Schiff)
         break
       }
     }
