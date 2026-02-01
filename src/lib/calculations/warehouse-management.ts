@@ -1264,10 +1264,12 @@ export function korrigiereProduktionsplaeneMitWarehouse(
       if (!bauteil) return
       
       // Berechne tatsächliche Bike-Produktion aus Bauteil-Verbrauch
-      // Verbrauch = Anzahl verbrauchter Sättel
+      // Verbrauch = Anzahl verbrauchter Sättel (immer ganzzahlig)
       // Bikes = Verbrauch / mengeFaktor (z.B. 740 Sättel / 1 = 740 Bikes)
+      // ✅ FIX: Kein Math.floor nötig, da verbrauch bereits ganzzahlig ist
+      // Math.floor kann zu Verlusten führen bei Rundungsfehlern
       const tatsaechlichProduzierteBikes = mengeFaktor > 0 
-        ? Math.floor(bauteil.verbrauch / mengeFaktor)
+        ? Math.round(bauteil.verbrauch / mengeFaktor)
         : 0
       
       // WICHTIG: Verteilung auf Varianten bei gemeinsamen Bauteilen!
@@ -1340,7 +1342,98 @@ export function korrigiereProduktionsplaeneMitWarehouse(
     })
   })
   
-  // Berechne kumulative Werte neu
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // ✅ KRITISCHER FIX: Validiere und korrigiere Rundungsfehler
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // Bei proportionaler Allokation können durch Rundung Bikes verloren gehen.
+  // Beispiel: 740 Sättel verbraucht → durch proportionale Verteilung auf 4 Varianten
+  // könnte Summe nur 739 ergeben (jede Variante verliert 0.25 durch floor)
+  //
+  // Lösung: Für jeden Tag prüfen ob Summe(istMenge) = verbrauch und ggf. korrigieren
+  
+  warehouseResult.tage.forEach(warehouseTag => {
+    const tagImJahr = warehouseTag.tag
+    if (tagImJahr < 1 || tagImJahr > 365) return
+    
+    const datumStr = warehouseTag.datumStr
+    
+    // Für jedes Bauteil einzeln prüfen
+    warehouseTag.bauteile.forEach(bauteil => {
+      const bauteilId = bauteil.bauteilId
+      const mengeFaktor = 1 // Annahme: 1 Sattel = 1 Bike
+      
+      // Erwartete Bikes aus Bauteil-Verbrauch
+      const erwarteteBikes = Math.round(bauteil.verbrauch / mengeFaktor)
+      
+      // Finde alle Varianten die dieses Bauteil nutzen
+      const variantenMitBauteil = Object.keys(korrigiertePlaene).filter(vId => 
+        konfiguration.stueckliste.some(s => s.mtbVariante === vId && s.bauteilId === bauteilId)
+      )
+      
+      // Summe der tatsächlich zugewiesenen Bikes
+      let summIstMenge = 0
+      variantenMitBauteil.forEach(vId => {
+        const produktionsTag = planDateLookup[vId][datumStr]
+        if (produktionsTag) {
+          summIstMenge += produktionsTag.istMenge
+        }
+      })
+      
+      // Differenz zwischen erwartet und tatsächlich
+      const differenz = erwarteteBikes - summIstMenge
+      
+      // Falls Differenz > 0: Verteile fehlende Bikes auf Varianten mit größtem Anteil
+      if (differenz > 0 && variantenMitBauteil.length > 0) {
+        // Sortiere Varianten nach Plan-Menge (größte zuerst)
+        const sortiert = variantenMitBauteil
+          .map(vId => ({
+            vId,
+            planMenge: planDateLookup[vId][datumStr]?.planMenge || 0
+          }))
+          .sort((a, b) => b.planMenge - a.planMenge)
+        
+        // Verteile fehlende Bikes (je +1) an die größten Varianten
+        let verteilt = 0
+        for (const {vId} of sortiert) {
+          if (verteilt >= differenz) break
+          
+          const produktionsTag = planDateLookup[vId][datumStr]
+          if (produktionsTag) {
+            produktionsTag.istMenge++
+            produktionsTag.abweichung = produktionsTag.istMenge - produktionsTag.planMenge
+            verteilt++
+          }
+        }
+      }
+      
+      // Falls Differenz < 0: Entferne überzählige Bikes (sollte nicht passieren)
+      if (differenz < 0 && variantenMitBauteil.length > 0) {
+        console.warn(`⚠️ Zu viele Bikes verteilt: ${-differenz} bei ${bauteilId} am ${datumStr}`)
+        // Entferne von Varianten mit geringstem Anteil
+        const sortiert = variantenMitBauteil
+          .map(vId => ({
+            vId,
+            istMenge: planDateLookup[vId][datumStr]?.istMenge || 0
+          }))
+          .filter(v => v.istMenge > 0)
+          .sort((a, b) => a.istMenge - b.istMenge)
+        
+        let entfernt = 0
+        for (const {vId} of sortiert) {
+          if (entfernt >= -differenz) break
+          
+          const produktionsTag = planDateLookup[vId][datumStr]
+          if (produktionsTag && produktionsTag.istMenge > 0) {
+            produktionsTag.istMenge--
+            produktionsTag.abweichung = produktionsTag.istMenge - produktionsTag.planMenge
+            entfernt++
+          }
+        }
+      }
+    })
+  })
+  
+  // Berechne kumulative Werte neu (nach Korrektur)
   Object.values(korrigiertePlaene).forEach(plan => {
     let kumulativIst = 0
     plan.tage.forEach(tag => {

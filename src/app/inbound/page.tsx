@@ -262,8 +262,15 @@ export default function InboundPage() {
     const planungsjahr = gesamt - vorjahr
     const zusatzBestellungenCount = taeglicheBestellungen.filter(b => b.grund === 'zusatzbestellung').length
     
-    const gesamtMenge = taeglicheBestellungen.reduce((sum, b) => {
+    // ✅ BESTELLT: Summe aller Bestellungen (kann höher sein als verschifft bei Losgrößen-Rest)
+    const gesamtMengeBestellt = taeglicheBestellungen.reduce((sum, b) => {
       return sum + Object.values(b.komponenten).reduce((s, m) => s + m, 0)
+    }, 0)
+    
+    // ✅ VERSCHIFFT: Tatsächlich verschiffte Menge aus Hafenlogistik
+    // Dies berücksichtigt Losgrößen-Rundung (z.B. 25 Teile bleiben am Hafen bei Losgröße 75)
+    const gesamtMengeVerschifft = Array.from(inboundLieferplan.lieferungenAmWerk.values()).reduce((sum, komponenten) => {
+      return sum + Object.values(komponenten).reduce((s, m) => s + m, 0)
     }, 0)
     
     return {
@@ -271,10 +278,11 @@ export default function InboundPage() {
       vorjahr,
       planungsjahr,
       zusatzBestellungenCount,
-      gesamtMenge,
-      durchschnittProBestellung: gesamt > 0 ? gesamtMenge / gesamt : 0
+      gesamtMenge: gesamtMengeBestellt, // Gesamt bestellt (für Bestellübersicht)
+      gesamtMengeVerschifft, // ✅ NEU: Tatsächlich verschifft (für Hafenlogistik)
+      durchschnittProBestellung: gesamt > 0 ? gesamtMengeBestellt / gesamt : 0
     }
-  }, [taeglicheBestellungen])
+  }, [taeglicheBestellungen, inboundLieferplan.lieferungenAmWerk])
   
   /**
    * Bestelllogik iteriert durch BEDARFSDATUM:
@@ -1484,7 +1492,7 @@ export default function InboundPage() {
                 <div className="bg-white rounded-lg p-3 border">
                   <div className="text-xs text-gray-500">Gesamtmenge verschifft</div>
                   <div className="text-xl font-bold text-blue-600">
-                    {formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel
+                    {formatNumber(bestellStatistik.gesamtMengeVerschifft, 0)} Sättel
                   </div>
                 </div>
                 <div className="bg-white rounded-lg p-3 border">
@@ -1497,7 +1505,7 @@ export default function InboundPage() {
                           .map(b => b.schiffAbfahrtMittwoch?.toISOString())
                       )
                       return uniqueMittwoche.size > 0 
-                        ? formatNumber(bestellStatistik.gesamtMenge / uniqueMittwoche.size, 0) + ' Stk'
+                        ? formatNumber(bestellStatistik.gesamtMengeVerschifft / uniqueMittwoche.size, 0) + ' Stk'
                         : '-'
                     })()}
                   </div>
@@ -1651,7 +1659,7 @@ export default function InboundPage() {
                 maxHeight="500px"
                 showFormulas={false}
                 showSums={true}
-                sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Lieferungen, ${formatNumber(bestellStatistik.gesamtMenge, 0)} Sättel`}
+                sumRowLabel={`GESAMT: ${bestellStatistik.gesamt} Lieferungen, ${formatNumber(bestellStatistik.gesamtMengeVerschifft, 0)} Sättel`}
                 highlightRow={(row: any) => {
                   if (row.isSummary) {
                     // Summenzeilen: fett und mit speziellem Hintergrund
