@@ -52,6 +52,22 @@ import ProduktionsAnpassungenAnzeige from '@/components/ProduktionsAnpassungenAn
 import { useProduktionsAnpassungen } from '@/contexts/ProduktionsAnpassungenContext'
 
 /**
+ * ========================================
+ * KONSTANTEN
+ * ========================================
+ */
+
+/**
+ * Signifikanz-Schwelle für Delta-Anzeige in Varianten-Kacheln
+ * Deltas unter diesem Wert werden als "nicht signifikant" betrachtet
+ * und nicht visuell hervorgehoben.
+ * 
+ * Begründung: 10 Bikes = ca. 0.003% der Jahresproduktion (370.000)
+ * Unter dieser Schwelle handelt es sich um Rundungsdifferenzen.
+ */
+const DELTA_SIGNIFICANCE_THRESHOLD = 10
+
+/**
  * Zeitperioden für die Ansichtswahl
  */
 type ZeitperiodeTyp = 'tag' | 'woche' | 'monat'
@@ -671,9 +687,12 @@ export default function OEMProgrammPage() {
                   
                   // ✅ DELTA: Differenz zwischen Ist (mit Szenarien) und Baseline (ohne Szenarien)
                   const delta = istJahresProduktion - baselineJahresProduktion
-                  const hatDelta = Math.abs(delta) > 10 // Signifikanz-Schwelle
+                  const hatDelta = Math.abs(delta) > DELTA_SIGNIFICANCE_THRESHOLD
                   
-                  // ✅ GRÜNER RAND: Zeige grünen Rand wenn Szenarien aktiv UND Abweichung OK
+                  // Visuelle Klassifizierung:
+                  // - BLAU:   Szenarien aktiv & signifikantes Delta
+                  // - GRÜN:   Keine Szenarien & Abweichung OK (≤1 Bike)
+                  // - ORANGE: Abweichung zu groß (>1 Bike)
                   const istAbweichungOK = Math.abs(plan.abweichung) <= 1
                   const hatSzenarioEffekt = hasSzenarien && hatDelta
                   

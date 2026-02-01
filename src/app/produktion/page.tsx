@@ -134,20 +134,10 @@ export default function ProduktionPage() {
   // Generiere Varianten-Produktionspläne für Warehouse
   // ✅ SZENARIO-AWARE: Nutze variantenPlaene aus Hook wenn Szenarien aktiv!
   const variantenProduktionsplaeneForWarehouse = useMemo(() => {
+    // Wenn Szenarien aktiv: Nutze szenario-aware Pläne direkt aus Hook
+    // Das Format ist bereits Record<string, VariantenProduktionsplan>
     if (hasSzenarien && variantenPlaeneMitSzenarien) {
-      // Konvertiere variantenPlaene zu Record<string, VariantenProduktionsplan> Format
-      const result: Record<string, VariantenProduktionsplan> = {}
-      Object.entries(variantenPlaeneMitSzenarien).forEach(([varianteId, plan]) => {
-        result[varianteId] = {
-          varianteId: plan.varianteId,
-          varianteName: plan.varianteName,
-          jahresProduktion: plan.jahresProduktion,
-          jahresProduktionIst: plan.jahresProduktionIst,
-          abweichung: plan.abweichung,
-          tage: plan.tage
-        }
-      })
-      return result
+      return variantenPlaeneMitSzenarien as Record<string, VariantenProduktionsplan>
     }
     
     // Baseline: Ohne Szenarien
