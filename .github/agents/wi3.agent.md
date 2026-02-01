@@ -548,6 +548,8 @@ Bei jeder Code-Generierung bedenke:
 6. ❌ Bestellungen pro Variante aufrunden (muss TAGESGESAMTMENGE sein)
 7. ❌ Sicherheitsbestände > 0 setzen (muss 0 sein gemäß Anforderung)
 8. ❌ Lageranhäufung durch Überbestellung
+9. ❌ Vorlaufzeit oder Losgröße ändern (49 Tage und 500 Sättel sind Anforderungen!)
+10. ❌ Hafenlogistik-Timing ändern (Schiffe fahren NUR mittwochs - das ist gewollt!)
 
 **IMMER tun:**
 1. ✅ OEM Planung als EINZIGE Berechnungsbasis nutzen
@@ -556,6 +558,45 @@ Bei jeder Code-Generierung bedenke:
 4. ✅ Nur REALE Daten anzeigen (keine Schätzungen oder Überschläge)
 5. ✅ Tabellen VOR Info-Boxen positionieren (Tabellen = wichtig, Info = sekundär)
 6. ✅ Deutsche Kommentare für Prüfung (erklärt WARUM, nicht nur WAS)
+
+## 🔄 Backlog-Konzept (KRITISCH!)
+
+**Konzeptionelles Verständnis:**
+Lieferengpässe sind **GEWOLLT** und Teil der Aufgabenstellung:
+- Schiffe fahren NUR mittwochs vom Hafen Shanghai
+- Dadurch entstehen temporäre Materialengpässe zwischen Lieferungen
+- Das Tool soll intelligent damit umgehen:
+
+**Backlog-Mechanik:**
+1. **Backlog entsteht** wenn Material fehlt (Tag ohne Lieferung)
+2. **Backlog wird abgebaut** wenn Material da ist UND Kapazität frei ist
+3. **Am Jahresende** muss Ist = Plan = 370.000 sein
+
+**Mathematische Garantie:**
+- 370.000 Sättel / 500 (Losgröße) = **740 Schiffsladungen** (ganzzahlig!)
+- Daher bleibt NICHTS am Hafen liegen
+- Alles erreicht das Werk im Jahr 2027
+- Alles kann produziert werden (Kapazität 3.120 Bikes/Tag × 254 AT = 792.480 > 370.000)
+
+**Warehouse-Produktion-Verbindung:**
+```typescript
+// RICHTIG: Backlog zum Bedarf addieren
+const benoeligtMitBacklog = benoetigt + backlogVorher
+
+// RICHTIG: produktionsFaktor auf (Plan + Backlog) anwenden
+const globalerBedarf = Math.floor(benoeligtMitBacklog * produktionsFaktor)
+
+// RICHTIG: Verbrauch durch lokalen Bestand begrenzen
+const verbrauch = Math.min(globalerBedarf, verfuegbarerBestand)
+
+// RICHTIG: Neuer Backlog = was nicht produziert werden konnte
+const neuerBacklog = benoeligtMitBacklog - verbrauch
+```
+
+**Häufige Fehler:**
+- ❌ `benoetigt` nur aus Plan berechnen (ohne Backlog)
+- ❌ `verbrauch` nicht durch lokalen Bauteil-Bestand begrenzen
+- ❌ Backlog nie abbauen (weil Verbrauch nur Plan, nicht Plan+Backlog)
 
 ## 🚀 Initialisierungs-Prompt
 
