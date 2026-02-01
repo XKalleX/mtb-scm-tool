@@ -228,19 +228,20 @@ export default function ProduktionPage() {
     jahr2027Tage.forEach(warehouseTag => {
       let tagesVerbrauch = 0
       let tagesBacklog = 0
-      let hatEngpass = false
       
       warehouseTag.bauteile.forEach(bauteil => {
         tagesVerbrauch += bauteil.verbrauch
         tagesBacklog += bauteil.produktionsBacklog.backlogNachher
-        if (!bauteil.atpCheck.erfuellt) {
-          hatEngpass = true
-        }
       })
       
       warehouseVerbrauchProTag[warehouseTag.tag] = tagesVerbrauch
       backlogProTag[warehouseTag.tag] = tagesBacklog
-      hatEngpassProTag[warehouseTag.tag] = hatEngpass
+      
+      // ✅ KRITISCHER FIX: Material OK basiert auf TATSÄCHLICHER Produktion!
+      // Wenn Verbrauch > 0 → Material war verfügbar → kein Engpass
+      // Wenn Verbrauch = 0 aber Arbeitstag → Material fehlte → Engpass
+      // Logik: "Material OK" = "Produktion war möglich"
+      hatEngpassProTag[warehouseTag.tag] = warehouseTag.istArbeitstag && tagesVerbrauch === 0
     })
     
     // Kapazitätsberechnung: 130 Bikes/h * 8h = 1040 Bikes pro Schicht

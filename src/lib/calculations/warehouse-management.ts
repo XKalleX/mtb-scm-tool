@@ -589,6 +589,8 @@ export function berechneIntegriertesWarehouse(
     let produktionsFaktor = 1.0  // 1.0 = keine Reduktion
     let globalAtpErfuellt = true
     let globalAtpGrund: string | undefined
+    let maxMoeglicheBikes = 0  // ✅ GLOBAL: Maximale Bikes die heute produziert werden können
+    let verbleibendeKapazitaet = 0  // ✅ Tracking für Kapazitäts-Verteilung auf Bauteile
     
     if (istArbeitstag && tagImJahr >= 1 && tagImJahr <= 365) {
       // ─────────────────────────────────────────────────────────────────────────────
@@ -665,11 +667,15 @@ export function berechneIntegriertesWarehouse(
       // ─────────────────────────────────────────────────────────────────────────────
       // SCHRITT 4: Berechne GLOBALES Limit (Minimum aus Plan+Backlog, Material, Kapazität)
       // ─────────────────────────────────────────────────────────────────────────────
-      const maxMoeglicheBikes = Math.min(
+      // ✅ FIX: Assign to outer-scope variable so it's accessible in bauteil loop
+      maxMoeglicheBikes = Math.min(
         totaleBikesMitBacklog,         // ✅ Geplante Produktion + Backlog
         materialLimitBikes,             // Material-Verfügbarkeit
         maxProduktionKapazitaetBikes   // Produktionskapazität
       )
+      
+      // ✅ NEU: Initialisiere verbleibendeKapazitaet für die Bauteil-Verteilung
+      verbleibendeKapazitaet = maxMoeglicheBikes
       
       // ─────────────────────────────────────────────────────────────────────────────
       // SCHRITT 5: Berechne Reduktionsfaktor (falls Engpass)
@@ -783,18 +789,28 @@ export function berechneIntegriertesWarehouse(
          * 
          * Das ist einfach: verbrauch = min(benoetigt, verfuegbar)
          * 
-         * Der produktionsFaktor bleibt für Logging/Warnungen erhalten, aber beeinflusst
-         * nicht mehr die Berechnung.
+         * ✅ KRITISCHER FIX (Issue #286): Der produktionsFaktor MUSS berücksichtigt werden!
+         * Die globale Kapazitätsgrenze (maxMoeglicheBikes) begrenzt die GESAMTE Tagesproduktion.
+         * Jeder Bauteil-Verbrauch muss durch die verbleibende Kapazität limitiert werden.
          */
         
         const verfuegbarerBestand = aktuelleBestaende[bauteilId]
         
-        // ✅ SIMPLE & KORREKT: Nutze alles was verfügbar UND benötigt wird
-        // Keine Rundungsfehler, da beide Werte bereits ganzzahlig sind!
-        const maxVerbrauchMoeglich = Math.min(benoeligtMitBacklog, verfuegbarerBestand)
+        // ✅ KRITISCHER FIX: Berücksichtige verbleibende Kapazität!
+        // Jeder Bauteil-Verbrauch darf die verbleibende globale Kapazität nicht überschreiten
+        // 1. Limitiere durch Material UND Bedarf (wie bisher)
+        // 2. Zusätzlich limitiere durch verbleibende Kapazität (NEU!)
+        const maxVerbrauchMoeglich = Math.min(
+          benoeligtMitBacklog, 
+          verfuegbarerBestand,
+          verbleibendeKapazitaet  // ✅ NEU: Globale Kapazitätsgrenze beachten!
+        )
         
         // Setze Verbrauch auf das, was WIRKLICH möglich ist
         verbrauch = maxVerbrauchMoeglich
+        
+        // ✅ NEU: Reduziere verbleibende Kapazität um den Verbrauch
+        verbleibendeKapazitaet -= verbrauch
         
         // ✅ FIX: Berechne nicht erfüllten Bedarf basierend auf Plan+Backlog!
         // Der nichtErfuellt wird der neue Backlog für morgen
@@ -814,6 +830,23 @@ export function berechneIntegriertesWarehouse(
         
         // Update Backlog: neuer Backlog = nichtErfuellt (was nicht produziert werden konnte)
         produktionsBacklog[bauteilId] = nichtErfuellt > 0 ? nichtErfuellt : 0
+        
+        // ✅ KRITISCHER FIX: atpErfuellt basierend auf TATSÄCHLICHER Produktion!
+        // Material OK = true WENN Produktion stattfindet (verbrauch > 0)
+        // Logik: Wenn Bikes produziert werden, war Material verfügbar!
+        // Der GLOBALE Status zeigt nur ob ALLE Anforderungen erfüllt wurden,
+        // aber "Material OK" sollte zeigen ob ÜBERHAUPT produziert werden konnte.
+        if (verbrauch > 0) {
+          atpErfuellt = true  // Material war verfügbar, Produktion fand statt
+          atpGrund = undefined  // Kein Engpass für diesen Verbrauch
+        } else if (benoetigt > 0 || backlogVorher > 0) {
+          // Bedarf vorhanden aber keine Produktion → Material nicht verfügbar
+          atpErfuellt = false
+          if (!atpGrund) {
+            atpGrund = `Kein Material verfügbar (benötigt: ${benoeligtMitBacklog}, verfügbar: ${verfuegbarerBestand})`
+          }
+        }
+        // Wenn weder Bedarf noch Backlog, bleibt atpErfuellt beim Standardwert
         
         // Buche Verbrauch (jetzt mit Backlog-Abbau)
         aktuelleBestaende[bauteilId] -= verbrauch
@@ -1315,8 +1348,16 @@ export function korrigiereProduktionsplaeneMitWarehouse(
       // Berechne Abweichung neu
       produktionsTag.abweichung = produktionsTag.istMenge - produktionsTag.planMenge
       
-      // Update materialVerfuegbar Flag
-      produktionsTag.materialVerfuegbar = bauteil.atpCheck.erfuellt
+      // ✅ KRITISCHER FIX: materialVerfuegbar basierend auf TATSÄCHLICHER Produktion!
+      // Wenn Ist-Menge > 0, dann war Material verfügbar (unabhängig vom ATP-Status)
+      // Logik: "Material OK" = "Produktion war möglich"
+      if (produktionsTag.istMenge > 0) {
+        produktionsTag.materialVerfuegbar = true
+      } else if (produktionsTag.planMenge > 0) {
+        // Geplante Produktion aber keine Ist-Produktion → Material fehlte
+        produktionsTag.materialVerfuegbar = false
+      }
+      // Wenn weder Plan noch Ist, bleibt der Wert unverändert (z.B. Wochenende)
     })
   })
   
