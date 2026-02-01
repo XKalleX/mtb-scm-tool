@@ -108,7 +108,7 @@ export default function InboundPage() {
   // ✅ NEU: State für Zusatzbestellungen
   const [zusatzBestellungen, setZusatzBestellungen] = useState<TaeglicheBestellung[]>([])
   const [neueBestellungDatum, setNeueBestellungDatum] = useState<string>('')
-  const [neueBestellungMenge, setNeueBestellungMenge] = useState<string>(String(konfiguration.lieferant.losgroesse))
+  const [neueBestellungMenge, setNeueBestellungMenge] = useState<string>('100')  // ✅ ÄNDERUNG: Freie Menge, nicht an Losgröße gebunden
   
   // ✅ NEU: Handler für Zusatzbestellung
   const handleZusatzbestellung = useCallback(() => {
@@ -121,9 +121,12 @@ export default function InboundPage() {
     if (isNaN(menge) || menge < 1) return
     
     /**
-     * Exakte Mengenverteilung (kein Aufrunden!)
-     * Die Eingabe-Menge wird vom Benutzer bereits auf Losgröße gerundet 
-     * (via step={losgroesse} im Input), daher keine weitere Aufrundung nötig.
+     * ✅ ANFORDERUNG: Freie Mengen-Wahl (losgelöst von Losgröße)
+     * - Benutzer kann BELIEBIGE Gesamtmenge eingeben (nicht auf Losgröße beschränkt)
+     * - Keine Aufrundung auf Losgröße
+     * - Gleichmäßige Verteilung auf 4 Sattel-Varianten
+     * - Rest geht an letzte Variante (SAT_SL)
+     * - Hafenlogistik kümmert sich um Verschiffung
      */
     const basisMenge = Math.floor(menge / 4)
     const restMenge = menge - (basisMenge * 3)  // Rest geht an die letzte Variante
@@ -134,22 +137,21 @@ export default function InboundPage() {
       'SAT_SL': restMenge  // Rest für letzte Variante
     }
     
-    // Erstelle Zusatzbestellung OHNE weitere Aufrundung
-    // Parameter: bestelldatum, komponenten, vorlaufzeit, skipLosgroessenRundung=false
-    // (false = keine Aufrundung, da Mengen bereits exakt verteilt sind)
+    // ✅ KRITISCH: skipLosgroessenRundung=true für freie Mengen-Wahl!
+    // Die Komponenten werden EXAKT so eingesteuert wie berechnet, KEINE Aufrundung
     const neueBestellung = erstelleZusatzbestellung(
       datum,
       komponenten,
       konfiguration.lieferant.gesamtVorlaufzeitTage,
-      false,
+      true,  // ✅ ÄNDERUNG: true = KEINE Losgröße-Aufrundung
       konfiguration.feiertage,
-      lieferant.losgroesse
+      konfiguration.lieferant.losgroesse
     )
     
     setZusatzBestellungen(prev => [...prev, neueBestellung])
     // Datum NICHT zurücksetzen, damit weitere Bestellungen mit ähnlichem Datum einfacher sind
-    setNeueBestellungMenge(String(konfiguration.lieferant.losgroesse))  // Nur Menge zurücksetzen
-  }, [neueBestellungDatum, neueBestellungMenge, konfiguration.lieferant.gesamtVorlaufzeitTage, konfiguration.lieferant.losgroesse])
+    setNeueBestellungMenge('100')  // ✅ ÄNDERUNG: Setze auf kleinere Standardmenge (100)
+  }, [neueBestellungDatum, neueBestellungMenge, konfiguration.lieferant.gesamtVorlaufzeitTage, konfiguration.feiertage])
   
   // Lieferant aus Konfiguration
   const lieferant = konfiguration.lieferant
@@ -1318,17 +1320,19 @@ export default function InboundPage() {
                     )}
                   </div>
                   <div className="flex-1 min-w-[150px]">
-                     <Label htmlFor="bestellmenge" className="text-xs text-blue-800">Menge (Sättel)</Label>
+                     <Label htmlFor="bestellmenge" className="text-xs text-blue-800">Menge (Sättel gesamt)</Label>
                      <Input 
                        id="bestellmenge" 
                        type="number" 
                        value={neueBestellungMenge} 
                        onChange={(e) => setNeueBestellungMenge(e.target.value)}
-                       min={lieferant.losgroesse}
-                       step={lieferant.losgroesse}
-                       placeholder={`Min. ${lieferant.losgroesse}`}
+                       min={1}
+                       placeholder="Beliebige Menge"
                        className="bg-white"
                      />
+                     <p className="text-xs text-blue-600 mt-1">
+                       ✓ Freie Mengen-Wahl (keine Losgröße-Beschränkung)
+                     </p>
                   </div>
                   <div className="text-xs text-blue-700 flex-1 min-w-[150px]">
                     Ankunft: {neueBestellungDatum 
