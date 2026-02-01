@@ -943,11 +943,11 @@ function MonatlicheAbweichungChart({ data }: any) {
   )
 }
 
-// Chart 9: Monatliche Verfügbarkeit (Area)
+// Chart 9: Wöchentliche Verfügbarkeit (Area) - ✅ TITEL GEÄNDERT
 function MonatlicheVerfuegbarkeitAreaChart({ data }: any) {
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-medium">Monatliche Material-Verfügbarkeit</h3>
+      <h3 className="text-sm font-medium">Wöchentliche Material-Verfügbarkeit</h3>
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
@@ -1052,10 +1052,10 @@ function ReichweiteProVarianteChart({ data }: any) {
           <Tooltip />
           <Legend />
           <ReferenceLine 
-            y={5} 
+            y={1} 
             stroke={CHART_COLORS.quaternary}
             strokeDasharray="5 5"
-            label="Ziel: 5d"
+            label="Ziel: 1d"
           />
           {variantenIds.slice(0, 4).map((id, idx) => (
             <Line 
@@ -1106,21 +1106,21 @@ function ReichweiteHeatmapChart({ data }: any) {
             }}
           />
           <ReferenceLine 
-            y={5} 
+            y={1} 
             stroke={CHART_COLORS.quaternary}
             strokeDasharray="5 5"
-            label="Ziel: 5d"
+            label="Ziel: 1d"
           />
           <Bar dataKey="reichweiteTage" name="Reichweite (Tage)">
             {data.map((entry: any, index: number) => (
               <Cell 
                 key={`cell-${index}`}
                 fill={
-                  entry.reichweiteTage >= 4 && entry.reichweiteTage <= 7 
-                    ? '#10b981' 
-                    : entry.reichweiteTage >= 2 && entry.reichweiteTage <= 10 
-                      ? '#f59e0b' 
-                      : '#ef4444'
+                  entry.reichweiteTage <= 2 
+                    ? '#10b981'  // ✅ 0-2 Tage = optimal (JIT)
+                    : entry.reichweiteTage <= 5 
+                      ? '#f59e0b'  // ⚠️ 3-5 Tage = mittel
+                      : '#ef4444'  // ❌ >5 Tage = zu hohe Lagerhaltung
                 }
               />
             ))}

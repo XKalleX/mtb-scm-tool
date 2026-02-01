@@ -26,7 +26,7 @@ import type { TagesProduktionEntry } from './zentrale-produktionsplanung'
 import type { TaeglicheBestellung } from './inbound-china'
 import type { TaeglichesLager } from './warehouse-management'
 import { generiereAlleVariantenProduktionsplaene } from './zentrale-produktionsplanung'
-import { generiereTaeglicheBestellungen } from './inbound-china'
+import { generiereInboundLieferplan } from './inbound-china'
 import { berechneIntegriertesWarehouse } from './warehouse-management'
 
 /**
@@ -217,7 +217,7 @@ export function berechneSCORMetrikenReal(
     alleTagesEintraege.push(...plan.tage)
   })
   
-  // Transformiere zu Format für generiereTaeglicheBestellungen (nur tage-Array)
+  // Transformiere zu Format für generiereInboundLieferplan (nur tage-Array)
   const produktionsplaeneArray: Record<string, any[]> = {}
   Object.entries(alleProduktionsplaene).forEach(([key, plan]) => {
     produktionsplaeneArray[key] = plan.tage
@@ -229,21 +229,37 @@ export function berechneSCORMetrikenReal(
     produktionsplaeneObj[key] = { tage: plan.tage }
   })
   
-  // 1.2 Inbound Bestellungen (basierend auf OEM)
-  const alleBestellungen = generiereTaeglicheBestellungen(
+  // ✅ KRITISCHER FIX: Erstelle Stücklisten-Map aus KonfigurationContext
+  // Ohne diese Map werden keine Bestellungen generiert!
+  const stuecklistenMap: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }> = {}
+  konfiguration.stueckliste.forEach(s => {
+    if (!stuecklistenMap[s.mtbVariante]) {
+      stuecklistenMap[s.mtbVariante] = { komponenten: {} }
+    }
+    stuecklistenMap[s.mtbVariante].komponenten[s.bauteilId] = {
+      name: s.bauteilName,
+      menge: s.menge,
+      einheit: s.einheit
+    }
+  })
+  
+  // 1.2 Inbound Bestellungen (basierend auf OEM) - MIT HAFENLOGISTIK!
+  const inboundResult = generiereInboundLieferplan(
     produktionsplaeneArray,
     konfiguration.planungsjahr || 2027,
     konfiguration.lieferant?.gesamtVorlaufzeitTage || 49,
-    undefined, // customFeiertage - nutzt Standard
-    undefined, // stueckliste - nutzt Standard aus JSON
+    konfiguration.feiertage, // Feiertage aus Konfiguration
+    stuecklistenMap, // Stückliste aus Konfiguration - KRITISCH!
     konfiguration.lieferant?.losgroesse || 500
   )
+  
+  const alleBestellungen = inboundResult.bestellungen
   
   // 1.3 Warehouse Management (basierend auf OEM + Inbound)
   const warehouse = berechneIntegriertesWarehouse(
     konfiguration,
     produktionsplaeneObj,
-    alleBestellungen // Übergebe die generierten Bestellungen
+    alleBestellungen // Übergebe die generierten Bestellungen aus Hafenlogistik
   )
   
   console.log(`✓ Basis-Daten: ${alleTagesEintraege.length} Produktionstage, ${alleBestellungen.length} Bestellungen, ${warehouse.tage.length} Lagertage`)
@@ -340,40 +356,22 @@ export function berechneSCORMetrikenReal(
     ? durchlaufzeiten.reduce((sum, d) => sum + d, 0) / durchlaufzeiten.length
     : sollVorlaufzeit
   
-  // Breakdown und monatliche Daten
+  // Breakdown und monatliche Daten - ✅ DYNAMISCH AUS KONFIGURATIONCONTEXT
+  // Lade Durchlaufzeit-Komponenten aus der transportSequenz, um Konfigurierbarkeit zu ermöglichen
+  const transportSequenz = konfiguration.lieferant?.transportSequenz || []
+  
   const durchlaufzeitDetails = {
-    komponenten: [
-      {
-        name: 'Auftragsverarbeitung China',
-        tage: 2,
-        typ: 'arbeitstage' as const,
-        beschreibung: 'Zeit für Auftragsannahme und -verarbeitung beim Zulieferer'
-      },
-      {
-        name: 'Seefracht Shanghai → Hamburg',
-        tage: 30,
-        typ: 'kalendertage' as const,
-        beschreibung: 'Transportzeit auf dem Seeweg'
-      },
-      {
-        name: 'Zollabfertigung',
-        tage: 2,
-        typ: 'arbeitstage' as const,
-        beschreibung: 'Verzollung und administrative Prozesse'
-      },
-      {
-        name: 'LKW-Transport Hamburg → Dortmund',
-        tage: 1,
-        typ: 'arbeitstage' as const,
-        beschreibung: 'LKW-Transport zum Produktionsstandort'
-      },
-      {
-        name: 'Einlagerung',
-        tage: 1,
-        typ: 'arbeitstage' as const,
-        beschreibung: 'Warenannahme und Einlagerung'
-      }
-    ],
+    komponenten: transportSequenz
+      .filter(s => s.dauer > 0) // Nur Schritte mit Dauer
+      .map(s => ({
+        name: s.typ === 'Seefracht' ? `${s.von} → ${s.nach}` : 
+              s.typ === 'LKW' ? `LKW-Transport ${s.von} → ${s.nach}` :
+              s.typ === 'Produktion' ? 'Auftragsverarbeitung China' :
+              `${s.typ} ${s.von}`,
+        tage: s.dauer,
+        typ: s.einheit === 'KT' ? 'kalendertage' as const : 'arbeitstage' as const,
+        beschreibung: s.beschreibung
+      })),
     monatlich: aggregiereMonatlicheDurchlaufzeit(alleBestellungen)
   }
   
@@ -383,9 +381,9 @@ export function berechneSCORMetrikenReal(
     label: 'Durchlaufzeit Supply Chain',
     beschreibung: 'Durchschnittliche Zeit von Bestellung bis Materialverfügbarkeit im Lager',
     einheit: 'Tage',
-    zielwert: 49,
-    status: durchlaufzeit_wert <= 51 ? 'gut' as const :
-            durchlaufzeit_wert <= 56 ? 'mittel' as const : 'schlecht' as const,
+    zielwert: sollVorlaufzeit, // ✅ DYNAMISCH aus KonfigurationContext
+    status: durchlaufzeit_wert <= sollVorlaufzeit + 2 ? 'gut' as const :
+            durchlaufzeit_wert <= sollVorlaufzeit + 7 ? 'mittel' as const : 'schlecht' as const,
     trend: berechneTrend(durchlaufzeitDetails.monatlich)
   }
   
@@ -476,9 +474,9 @@ export function berechneSCORMetrikenReal(
     label: 'Lagerreichweite',
     beschreibung: 'Durchschnittliche Anzahl Tage, für die der aktuelle Lagerbestand bei normalem Verbrauch ausreicht',
     einheit: 'Tage',
-    zielwert: 5, // 5 Tage Ziel für Just-in-Time Produktion
-    status: lagerreichweite_wert >= 4 && lagerreichweite_wert <= 7 ? 'gut' as const :
-            lagerreichweite_wert >= 2 && lagerreichweite_wert <= 10 ? 'mittel' as const : 'schlecht' as const,
+    zielwert: 1, // ✅ 1 Tag Ziel - Material soll schnellstmöglich verbraucht werden (Just-in-Time)
+    status: lagerreichweite_wert <= 2 ? 'gut' as const : // 0-2 Tage = optimal für JIT
+            lagerreichweite_wert <= 5 ? 'mittel' as const : 'schlecht' as const,
     trend: berechneTrend(lagerreichweiteMonatlich)
   }
   
