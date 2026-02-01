@@ -1448,8 +1448,7 @@ export default function ProduktionPage() {
           <div className="mt-6 grid gap-6 md:grid-cols-2">
             {/* Chart 1: Plan vs Ist Produktion (monatlich) */}
             <div className="bg-white rounded-lg p-4 border">
-              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-green-600" />
+              <h4 className="text-sm font-semibold mb-3">
                 Plan vs. Ist Produktion (monatlich)
               </h4>
               <TagesproduktionChart

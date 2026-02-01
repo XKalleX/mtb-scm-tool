@@ -270,61 +270,52 @@ export function TagesproduktionChart({
   }, [daten, aggregation])
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">
-          📈 Produktion ({aggregation === 'tag' ? 'täglich' : aggregation === 'woche' ? 'wöchentlich' : 'monatlich'})
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={height}>
-          <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-            <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={aggregation === 'woche' ? 3 : 0} />
-            <YAxis 
-              tick={{ fontSize: 11 }} 
-              tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-            />
-            <Tooltip 
-              formatter={(value: number, name: string) => {
-                const labelMap: Record<string, string> = {
-                  plan: 'Plan',
-                  ist: 'Ist',
-                  delta: 'Abweichung'
-                }
-                return [value.toLocaleString('de-DE'), labelMap[name] || name]
-              }}
-            />
-            <Legend />
-            <Area 
-              type="monotone" 
-              dataKey="plan" 
-              fill={COLORS.secondary}
-              fillOpacity={0.2}
-              stroke={COLORS.secondary}
-              strokeWidth={2}
-              name="Plan"
-            />
-            <Line 
-              type="monotone" 
-              dataKey="ist" 
-              stroke={COLORS.primary} 
-              strokeWidth={2}
-              dot={{ fill: COLORS.primary, r: 3 }}
-              name="Ist"
-            />
-            {showDelta && (
-              <Bar 
-                dataKey="delta" 
-                fill={COLORS.warning} 
-                opacity={0.5}
-                name="Abweichung"
-              />
-            )}
-          </ComposedChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
+    <ResponsiveContainer width="100%" height={height}>
+      <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+        <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={aggregation === 'woche' ? 3 : 0} />
+        <YAxis 
+          tick={{ fontSize: 11 }} 
+          tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+        />
+        <Tooltip 
+          formatter={(value: number, name: string) => {
+            const labelMap: Record<string, string> = {
+              plan: 'Plan',
+              ist: 'Ist',
+              delta: 'Abweichung'
+            }
+            return [value.toLocaleString('de-DE'), labelMap[name] || name]
+          }}
+        />
+        <Legend />
+        <Area 
+          type="monotone" 
+          dataKey="plan" 
+          fill={COLORS.secondary}
+          fillOpacity={0.2}
+          stroke={COLORS.secondary}
+          strokeWidth={2}
+          name="Plan"
+        />
+        <Line 
+          type="monotone" 
+          dataKey="ist" 
+          stroke={COLORS.primary} 
+          strokeWidth={2}
+          dot={{ fill: COLORS.primary, r: 3 }}
+          name="Ist"
+        />
+        {showDelta && (
+          <Bar 
+            dataKey="delta" 
+            fill={COLORS.warning} 
+            opacity={0.5}
+            name="Abweichung"
+          />
+        )}
+      </ComposedChart>
+    </ResponsiveContainer>
   )
 }
 
