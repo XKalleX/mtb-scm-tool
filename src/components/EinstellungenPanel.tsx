@@ -623,16 +623,6 @@ export function EinstellungenPanel() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Lieferintervall (Tage)</Label>
-                  <Input
-                    type="number"
-                    value={draftKonfiguration.lieferant.lieferintervall ?? ''}
-                    onChange={(e) => updateDraftLieferant({ lieferintervall: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
-                    min={1}
-                  />
-                </div>
-
-                <div className="space-y-2">
                   <Label>Kapazität (Stück/Tag)</Label>
                   <Input
                     type="number"

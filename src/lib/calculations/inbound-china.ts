@@ -343,7 +343,6 @@ function simuliereHafenUndSchiffsversand(
  * @param customFeiertage - Optionale Feiertage (China + Deutschland)
  * @param stuecklisten - Stücklisten-Map (Variante → Komponenten)
  * @param losgroesse - Losgröße für Schiffsbeladung (Standard: 500)
- * @param lieferintervall - Lieferintervall in Tagen (aktuell nicht verwendet)
  * @returns InboundLieferplanErgebnis mit Bestellungen, Lieferungen und Statistiken
  */
 export interface InboundLieferplanErgebnis {
@@ -362,8 +361,7 @@ export function generiereInboundLieferplan(
   vorlaufzeitTage: number,
   customFeiertage?: FeiertagsKonfiguration[],
   stuecklisten?: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }>,
-  losgroesse: number = lieferantChinaData.lieferant.losgroesse,
-  lieferintervall: number = lieferantChinaData.lieferant.lieferintervall
+  losgroesse: number = lieferantChinaData.lieferant.losgroesse
 ): InboundLieferplanErgebnis {
   // 1. Erstelle Bestellungen (wie vorher)
   const bestellungen = generiereTaeglicheBestellungen(
@@ -372,8 +370,7 @@ export function generiereInboundLieferplan(
     vorlaufzeitTage,
     customFeiertage,
     stuecklisten,
-    losgroesse,
-    lieferintervall
+    losgroesse
   )
   
   // 2. Simuliere Hafen und Schiffsversand
@@ -431,8 +428,7 @@ export function generiereTaeglicheBestellungen(
   vorlaufzeitTage: number,
   customFeiertage?: FeiertagsKonfiguration[],
   stuecklisten?: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }>,
-  losgroesse: number = lieferantChinaData.lieferant.losgroesse,
-  lieferintervall: number = lieferantChinaData.lieferant.lieferintervall
+  losgroesse: number = lieferantChinaData.lieferant.losgroesse
 ): TaeglicheBestellung[] {
   const bestellungen: TaeglicheBestellung[] = []
   

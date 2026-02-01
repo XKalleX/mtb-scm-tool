@@ -218,10 +218,9 @@ export default function InboundPage() {
       lieferant.gesamtVorlaufzeitTage, // Fixe Vorlaufzeit aus Konfiguration
       konfiguration.feiertage, // Feiertage aus Konfiguration
       stuecklistenMap, // Stücklisten aus Konfiguration
-      lieferant.losgroesse, // Losgröße aus Konfiguration
-      lieferant.lieferintervall // Lieferintervall aus Konfiguration
+      lieferant.losgroesse // Losgröße aus Konfiguration
     )
-  }, [produktionsplaeneFormatiert, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage, konfiguration.feiertage, stuecklistenMap, lieferant.losgroesse, lieferant.lieferintervall])
+  }, [produktionsplaeneFormatiert, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage, konfiguration.feiertage, stuecklistenMap, lieferant.losgroesse])
   
   // Extrahiere Bestellungen aus Hafenlogistik-Ergebnis
   const generierteBestellungen = useMemo(() => {

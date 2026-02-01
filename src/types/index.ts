@@ -124,7 +124,6 @@ export interface LieferantChina {
   gesamtVorlaufzeitTage: number;    // Total: 49 Tage (konfigurierbar)
   losgroesse: number;               // 500 Stück Sättel Mindestbestellung
   kapazitaet: number;               // Max. Produktion pro Tag
-  lieferintervall: number;          // Alle 14 Tage
   besonderheiten: string[];         // Spring Festival (8 Tage)!
 }
 
