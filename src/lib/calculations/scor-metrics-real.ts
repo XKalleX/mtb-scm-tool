@@ -269,10 +269,15 @@ export function berechneSCORMetrikenReal(
   // STEP 2: METRIK 1 - PLANERFÜLLUNGSGRAD (RELIABILITY)
   // ═══════════════════════════════════════════════════════════════════════════
   
+  // ✅ FIX: Berechne als Verhältnis Gesamt-Ist zu Gesamt-Plan statt exakter Tages-Matches
+  // Die alte Logik (istMenge === planMenge) ist unrealistisch, da durch ATP-Checks und
+  // Materialengpässe fast nie exakte Übereinstimmung pro Tag erreicht wird.
   const produktionstage = alleTagesEintraege.filter(t => t.istArbeitstag)
-  const tageErfuellt = produktionstage.filter(t => t.istMenge === t.planMenge).length
-  const planerfuellungsgrad_wert = produktionstage.length > 0
-    ? (tageErfuellt / produktionstage.length) * 100
+  const gesamtPlanMenge = produktionstage.reduce((sum, t) => sum + t.planMenge, 0)
+  const gesamtIstMenge = produktionstage.reduce((sum, t) => sum + t.istMenge, 0)
+  
+  const planerfuellungsgrad_wert = gesamtPlanMenge > 0
+    ? (gesamtIstMenge / gesamtPlanMenge) * 100
     : 100
   
   // ✅ KORREKTUR: Wöchentliche statt monatliche Aggregate
@@ -282,7 +287,7 @@ export function berechneSCORMetrikenReal(
     wert: planerfuellungsgrad_wert,
     kategorie: 'RELIABILITY' as const,
     label: 'Planerfüllungsgrad',
-    beschreibung: 'Prozentsatz der Tage, an denen die geplante Produktionsmenge exakt erreicht wurde',
+    beschreibung: 'Prozentsatz der geplanten Produktionsmenge, die tatsächlich erreicht wurde',
     einheit: '%',
     zielwert: 95,
     status: planerfuellungsgrad_wert >= 95 ? 'gut' as const : 
@@ -655,6 +660,7 @@ function aggregiereMonatlicheDurchlaufzeit(bestellungen: TaeglicheBestellung[]) 
 
 /**
  * ✅ NEU: Berechnet wöchentliche Planerfüllung
+ * FIX: Berechnet Erfüllungsgrad als (Ist / Plan) * 100, nicht als Anzahl perfekter Tage
  */
 function aggregiereWoechentlichePlanerfuellung(eintraege: TagesProduktionEntry[]) {
   const wochen: Record<number, any> = {}
@@ -683,7 +689,8 @@ function aggregiereWoechentlichePlanerfuellung(eintraege: TagesProduktionEntry[]
   
   return Object.values(wochen).map(w => ({
     ...w,
-    erfuellungsgrad: w.tageGesamt > 0 ? (w.tageErfuellt / w.tageGesamt) * 100 : 100
+    // ✅ FIX: Berechne Erfüllungsgrad als (Ist / Plan) * 100
+    erfuellungsgrad: w.planMenge > 0 ? (w.istMenge / w.planMenge) * 100 : 100
   }))
 }
 
