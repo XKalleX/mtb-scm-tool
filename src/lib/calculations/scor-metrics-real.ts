@@ -196,14 +196,15 @@ export interface SCORZeitreihen {
  * 2. Inbound Bestellungen (generiereTaeglicheBestellungen)
  * 3. Warehouse Management (berechneIntegriertesWarehouse)
  * 
- * ✅ NEUE ANFORDERUNG: KPIs und Diagramme werden BEIDE von der Checkbox gesteuert!
- * - Wenn beachteAktuellesDatum = false (default): Zeige ALLE Daten (gesamtes Jahr 2027), kein Filter
- * - Wenn beachteAktuellesDatum = true: Zeige nur Daten bis 'heute' (aktuelles Datum aus Konfiguration)
+ * ✅ FIX: KPI-Werte (Planerfüllung, Planungsgenauigkeit) werden IMMER nur bis 'heute' berechnet,
+ * unabhängig vom beachteAktuellesDatum-Parameter. Dies stellt sicher, dass KPIs immer realistische
+ * Werte zeigen und nicht 100% am Jahresende (was mathematisch garantiert ist durch Losgrößen).
  * 
  * @param konfiguration - Konfiguration aus KonfigurationContext
- * @param beachteAktuellesDatum - Optional: Steuert sowohl KPIs als auch Diagramme/Zeitreihen. 
- *                                 Wenn false (default): Gesamtjahr anzeigen, kein Datumsfilter
- *                                 Wenn true: Nur bis heute filtern (Frozen Zone)
+ * @param beachteAktuellesDatum - Optional: Beeinflusst NUR Diagramme/Zeitreihen. 
+ *                                 Wenn false, zeigen Diagramme das Gesamtjahr (inkl. Zukunftsprognose).
+ *                                 Wenn true, zeigen Diagramme nur Daten bis heute (realistische Trends).
+ *                                 KPI-Werte selbst sind IMMER auf 'heute' begrenzt.
  * @returns SCOR-Metriken + Zeitreihen-Daten
  */
 export function berechneSCORMetrikenReal(
@@ -302,18 +303,17 @@ export function berechneSCORMetrikenReal(
   // Materialengpässe fast nie exakte Übereinstimmung pro Tag erreicht wird.
   // ✅ KRITISCH: Nutze korrigierteTagesEintraege statt alleTagesEintraege!
   //
-  // ✅ NEUE ANFORDERUNG: KPIs und Diagramme werden BEIDE von der Checkbox gesteuert!
-  // Checkbox unchecked (beachteAktuellesDatum = false): Zeige ALLE Daten (gesamtes Jahr), kein Filter
-  // Checkbox checked (beachteAktuellesDatum = true): Zeige nur bis 'heute'
-  const heuteDatum = beachteAktuellesDatum ? new Date(konfiguration.heuteDatum || '2027-04-15') : undefined
-  const produktionstage = heuteDatum 
-    ? korrigierteTagesEintraege.filter(t => t.istArbeitstag && t.datum <= heuteDatum)
-    : korrigierteTagesEintraege.filter(t => t.istArbeitstag)
+  // ✅ FIX: KPIs werden IMMER nur bis 'heute' berechnet (für realistische Werte)
+  // Die Checkbox 'beachteAktuellesDatum' beeinflusst nur Diagramme/Zeitreihen, NICHT die KPI-Werte!
+  // Grund: Am Jahresende würde KPI immer 100% zeigen (mathematisch garantiert durch Losgröße),
+  // aber für Reporting brauchen wir die AKTUELLE Situation bis heute.
+  const heuteDatumFuerKPIs = new Date(konfiguration.heuteDatum || '2027-04-15')
+  const produktionstage = korrigierteTagesEintraege.filter(t => t.istArbeitstag && t.datum <= heuteDatumFuerKPIs)
   const gesamtPlanMenge = produktionstage.reduce((sum, t) => sum + t.planMenge, 0)
   const gesamtIstMenge = produktionstage.reduce((sum, t) => sum + t.istMenge, 0)
   
-  console.log(`📊 Planerfüllungsgrad-Berechnung${heuteDatum ? ` (bis ${heuteDatum.toISOString().split('T')[0]})` : ' (gesamtes Jahr)'}:`)
-  console.log(`  - Produktionstage (Arbeitstage${heuteDatum ? ' bis heute' : ''}): ${produktionstage.length}`)
+  console.log(`📊 Planerfüllungsgrad-Berechnung (bis ${heuteDatumFuerKPIs.toISOString().split('T')[0]}):`)
+  console.log(`  - Produktionstage (Arbeitstage bis heute): ${produktionstage.length}`)
   console.log(`  - Gesamt PLAN-Menge: ${gesamtPlanMenge.toLocaleString()}`)
   console.log(`  - Gesamt IST-Menge: ${gesamtIstMenge.toLocaleString()}`)
   console.log(`  - Differenz (Plan-Ist): ${(gesamtPlanMenge - gesamtIstMenge).toLocaleString()}`)
@@ -337,8 +337,11 @@ export function berechneSCORMetrikenReal(
     ? (gesamtIstMenge / gesamtPlanMenge) * 100
     : 100
   
-  // ✅ NEUE ANFORDERUNG: Diagramme nutzen das gleiche Datumsfilter wie KPIs
-  const planerfuellungWoechentlich = aggregiereWoechentlichePlanerfuellung(korrigierteTagesEintraege, heuteDatum)
+  // ✅ FIX: Für Diagramme/Zeitreihen nutzen wir die Checkbox-Einstellung
+  // Wenn beachteAktuellesDatum = false → Zeige Gesamtjahr (inkl. Zukunftsprognose)
+  // Wenn beachteAktuellesDatum = true → Zeige nur bis heute (realistische Trends)
+  const heuteDatumFuerDiagramme = beachteAktuellesDatum ? heuteDatumFuerKPIs : undefined
+  const planerfuellungWoechentlich = aggregiereWoechentlichePlanerfuellung(korrigierteTagesEintraege, heuteDatumFuerDiagramme)
   
   const planerfuellungsgrad = {
     wert: planerfuellungsgrad_wert,
@@ -475,10 +478,9 @@ export function berechneSCORMetrikenReal(
   // ═══════════════════════════════════════════════════════════════════════════
   
   // ✅ KRITISCH: Nutze korrigierteTagesEintraege statt alleTagesEintraege!
-  // ✅ NEUE ANFORDERUNG: Nutze das gleiche Datumsfilter wie für Planerfüllung (heuteDatum)
-  const produktionstageGenauigkeit = heuteDatum 
-    ? korrigierteTagesEintraege.filter(t => t.datum <= heuteDatum)
-    : korrigierteTagesEintraege
+  // ✅ FIX: KPIs werden IMMER nur bis 'heute' berechnet (für realistische Werte)
+  // Die Checkbox 'beachteAktuellesDatum' beeinflusst nur Diagramme/Zeitreihen, NICHT die KPI-Werte!
+  const produktionstageGenauigkeit = korrigierteTagesEintraege.filter(t => t.datum <= heuteDatumFuerKPIs)
   const gesamtPlan = produktionstageGenauigkeit.reduce((sum, t) => sum + t.planMenge, 0)
   const gesamtIst = produktionstageGenauigkeit.reduce((sum, t) => sum + t.istMenge, 0)
   const gesamtAbweichung = Math.abs(gesamtPlan - gesamtIst)
@@ -487,8 +489,8 @@ export function berechneSCORMetrikenReal(
     ? Math.max(0, 100 - (gesamtAbweichung / gesamtPlan) * 100)
     : 100
   
-  // ✅ NEUE ANFORDERUNG: Diagramme nutzen das gleiche Datumsfilter wie KPIs
-  const planungsgenauigkeitWoechentlich = aggregiereWoechentlichePlanungsgenauigkeit(korrigierteTagesEintraege, heuteDatum)
+  // ✅ FIX: Für Diagramme/Zeitreihen nutzen wir die Checkbox-Einstellung
+  const planungsgenauigkeitWoechentlich = aggregiereWoechentlichePlanungsgenauigkeit(korrigierteTagesEintraege, heuteDatumFuerDiagramme)
   
   const planungsgenauigkeit = {
     wert: planungsgenauigkeit_wert,
