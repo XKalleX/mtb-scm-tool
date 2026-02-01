@@ -20,7 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Factory, AlertTriangle, TrendingUp, Package, Download, Zap, Info, Calendar, CalendarDays, CalendarRange } from 'lucide-react'
 import { CollapsibleInfo, CollapsibleInfoGroup, type InfoItem } from '@/components/ui/collapsible-info'
-import { formatNumber } from '@/lib/utils'
+import { formatNumber, formatDate } from '@/lib/utils'
 import { exportToCSV, exportToJSON, exportToXLSX, exportToMultiSheetXLSX } from '@/lib/export'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
@@ -640,9 +640,7 @@ export default function ProduktionPage() {
         'Ende': formatDate(w.endDatum),
         'Plan-Menge': w.planMenge,
         'Ist-Menge': w.istMenge,
-        'Abweichung': w.abweichung,
-        'Durchschn. Schichten': w.durchschnittSchichten,
-        'Durchschn. Auslastung (%)': w.durchschnittAuslastung,
+        'Abweichung': w.istMenge - w.planMenge,
         'Kumulativ Plan': w.kumulativPlan,
         'Kumulativ Ist': w.kumulativIst
       }))
@@ -652,10 +650,8 @@ export default function ProduktionPage() {
         'Jahr': m.jahr,
         'Plan-Menge': m.planMenge,
         'Ist-Menge': m.istMenge,
-        'Abweichung': m.abweichung,
-        'Durchschn. Schichten': m.durchschnittSchichten,
-        'Durchschn. Auslastung (%)': m.durchschnittAuslastung,
-        'Arbeitstage': m.arbeitstage,
+        'Abweichung': m.istMenge - m.planMenge,
+        'Arbeitstage': m.anzahlArbeitstage,
         'Kumulativ Plan': m.kumulativPlan,
         'Kumulativ Ist': m.kumulativIst
       }))
@@ -710,9 +706,7 @@ export default function ProduktionPage() {
           'Ende': formatDate(w.endDatum),
           'Plan-Menge': w.planMenge,
           'Ist-Menge': w.istMenge,
-          'Abweichung': w.abweichung,
-          'Durchschn. Schichten': w.durchschnittSchichten,
-          'Durchschn. Auslastung (%)': w.durchschnittAuslastung,
+          'Abweichung': w.istMenge - w.planMenge,
           'Kumulativ Plan': w.kumulativPlan,
           'Kumulativ Ist': w.kumulativIst
         }))
@@ -723,10 +717,8 @@ export default function ProduktionPage() {
           'Jahr': m.jahr,
           'Plan-Menge': m.planMenge,
           'Ist-Menge': m.istMenge,
-          'Abweichung': m.abweichung,
-          'Durchschn. Schichten': m.durchschnittSchichten,
-          'Durchschn. Auslastung (%)': m.durchschnittAuslastung,
-          'Arbeitstage': m.arbeitstage,
+          'Abweichung': m.istMenge - m.planMenge,
+          'Arbeitstage': m.anzahlArbeitstage,
           'Kumulativ Plan': m.kumulativPlan,
           'Kumulativ Ist': m.kumulativIst
         }))

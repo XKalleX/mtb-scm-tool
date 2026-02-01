@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Ship, Package, Download, Calendar, CalendarDays, CalendarRange, Zap, Plus, Info } from 'lucide-react'
 import { CollapsibleInfo, CollapsibleInfoGroup, type InfoItem } from '@/components/ui/collapsible-info'
-import { formatNumber, addDays, toLocalISODateString } from '@/lib/utils'
+import { formatNumber, addDays, toLocalISODateString, formatDate } from '@/lib/utils'
 import { exportToJSON, exportToCSV, exportToXLSX, exportToMultiSheetXLSX } from '@/lib/export'
 import ExcelTable from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
@@ -837,23 +837,23 @@ export default function InboundPage() {
         
         data.push({
           'Bundle': `#${bid}`,
-          'Bestellungs-ID': b.bestellungId,
+          'Bestellungs-ID': b.id,
           'Bestelldatum': b.bestelldatum instanceof Date ? formatDate(b.bestelldatum) : b.bestelldatum,
-          'Hafen CN Ankunft': b.ankunftHafenShanghai instanceof Date ? formatDate(b.ankunftHafenShanghai) : b.ankunftHafenShanghai || '',
+          'Hafen CN Ankunft': b.materialfluss?.ankunftHafenShanghai instanceof Date ? formatDate(b.materialfluss.ankunftHafenShanghai) : b.materialfluss?.ankunftHafenShanghai || '',
           'Menge': menge,
           'Schiff Abfahrt': b.schiffAbfahrtMittwoch instanceof Date ? formatDate(b.schiffAbfahrtMittwoch) : '',
           'Wartetage': b.wartetageAmHafen || 0,
-          'Ankunft Hamburg': b.ankunftHafenHamburg instanceof Date ? formatDate(b.ankunftHafenHamburg) : '',
-          'Verfügbar ab': b.verfuegbarOEM instanceof Date ? formatDate(b.verfuegbarOEM) : '',
+          'Ankunft Hamburg': b.materialfluss?.schiffAnkunftHamburg instanceof Date ? formatDate(b.materialfluss.schiffAnkunftHamburg) : '',
+          'Verfügbar ab': b.verfuegbarAb instanceof Date ? formatDate(b.verfuegbarAb) : '',
           'Verschifft': verschifft,
           'Am Hafen verbleibend': amHafen
         })
       } else {
         data.push({
           'Bundle': `#${bid}`,
-          'Bestellungs-ID': b.bestellungId,
+          'Bestellungs-ID': b.id,
           'Bestelldatum': b.bestelldatum instanceof Date ? formatDate(b.bestelldatum) : b.bestelldatum,
-          'Hafen CN Ankunft': b.ankunftHafenShanghai instanceof Date ? formatDate(b.ankunftHafenShanghai) : b.ankunftHafenShanghai || '',
+          'Hafen CN Ankunft': b.materialfluss?.ankunftHafenShanghai instanceof Date ? formatDate(b.materialfluss.ankunftHafenShanghai) : b.materialfluss?.ankunftHafenShanghai || '',
           'Menge': menge,
           'Schiff Abfahrt': '',
           'Wartetage': b.wartetageAmHafen || 0,
@@ -923,23 +923,23 @@ export default function InboundPage() {
           
           data.push({
             'Bundle': `#${bid}`,
-            'Bestellungs-ID': b.bestellungId,
+            'Bestellungs-ID': b.id,
             'Bestelldatum': b.bestelldatum instanceof Date ? formatDate(b.bestelldatum) : b.bestelldatum,
-            'Hafen CN Ankunft': b.ankunftHafenShanghai instanceof Date ? formatDate(b.ankunftHafenShanghai) : b.ankunftHafenShanghai || '',
+            'Hafen CN Ankunft': b.materialfluss?.ankunftHafenShanghai instanceof Date ? formatDate(b.materialfluss.ankunftHafenShanghai) : b.materialfluss?.ankunftHafenShanghai || '',
             'Menge': menge,
             'Schiff Abfahrt': b.schiffAbfahrtMittwoch instanceof Date ? formatDate(b.schiffAbfahrtMittwoch) : '',
             'Wartetage': b.wartetageAmHafen || 0,
-            'Ankunft Hamburg': b.ankunftHafenHamburg instanceof Date ? formatDate(b.ankunftHafenHamburg) : '',
-            'Verfügbar ab': b.verfuegbarOEM instanceof Date ? formatDate(b.verfuegbarOEM) : '',
+            'Ankunft Hamburg': b.materialfluss?.schiffAnkunftHamburg instanceof Date ? formatDate(b.materialfluss.schiffAnkunftHamburg) : '',
+            'Verfügbar ab': b.verfuegbarAb instanceof Date ? formatDate(b.verfuegbarAb) : '',
             'Verschifft': verschifft,
             'Am Hafen verbleibend': amHafen
           })
         } else {
           data.push({
             'Bundle': `#${bid}`,
-            'Bestellungs-ID': b.bestellungId,
+            'Bestellungs-ID': b.id,
             'Bestelldatum': b.bestelldatum instanceof Date ? formatDate(b.bestelldatum) : b.bestelldatum,
-            'Hafen CN Ankunft': b.ankunftHafenShanghai instanceof Date ? formatDate(b.ankunftHafenShanghai) : b.ankunftHafenShanghai || '',
+            'Hafen CN Ankunft': b.materialfluss?.ankunftHafenShanghai instanceof Date ? formatDate(b.materialfluss.ankunftHafenShanghai) : b.materialfluss?.ankunftHafenShanghai || '',
             'Menge': menge,
             'Schiff Abfahrt': '',
             'Wartetage': b.wartetageAmHafen || 0,
