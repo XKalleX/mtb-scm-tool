@@ -44,6 +44,11 @@ import {
   WochenProduktionEntry,
   MonatsProduktionEntry
 } from '@/lib/helpers/programm-aggregation'
+import { 
+  wendeAnpassungenAufAllePlaeneAn,
+  ProduktionsAnpassungen
+} from '@/lib/helpers/produktions-anpassungen'
+import ProduktionsAnpassungenAnzeige from '@/components/ProduktionsAnpassungenAnzeige'
 
 /**
  * Zeitperioden für die Ansichtswahl
@@ -96,13 +101,21 @@ export default function OEMProgrammPage() {
   )
   
   // ✅ WICHTIG: Nutze Szenario-Pläne wenn Szenarien aktiv, sonst Baseline
-  // Das stellt sicher, dass ALLE Tabellen die Szenarien-Auswirkungen anzeigen!
+  // Dann wende manuelle Anpassungen an (falls vorhanden)
   const produktionsplaene = useMemo(() => {
+    // 1. Wähle Basis-Pläne (mit oder ohne Szenarien)
+    let basePlaene = baselineProduktionsplaene
     if (hasSzenarien && Object.keys(variantenPlaene).length > 0) {
-      return variantenPlaene
+      basePlaene = variantenPlaene
     }
-    return baselineProduktionsplaene
-  }, [hasSzenarien, variantenPlaene, baselineProduktionsplaene])
+    
+    // 2. Wende manuelle Anpassungen an (falls vorhanden)
+    if (Object.keys(produktionsAnpassungen).length > 0) {
+      return wendeAnpassungenAufAllePlaeneAn(basePlaene, produktionsAnpassungen)
+    }
+    
+    return basePlaene
+  }, [hasSzenarien, variantenPlaene, baselineProduktionsplaene, produktionsAnpassungen])
 
   // Berechne Statistiken aus Konfiguration
   const arbeitstage = isInitialized ? getArbeitstageProJahr() : 252
@@ -267,6 +280,37 @@ export default function OEMProgrammPage() {
     }
   }
   
+  /**
+   * Handler: Entferne einzelne Anpassung
+   */
+  const handleEntferneAnpassung = useCallback((key: string) => {
+    setProduktionsAnpassungen(prev => {
+      const neu = { ...prev }
+      delete neu[key]
+      return neu
+    })
+    showSuccess('Anpassung entfernt')
+  }, [])
+  
+  /**
+   * Handler: Setze alle Anpassungen zurück
+   */
+  const handleResetAlleAnpassungen = useCallback(() => {
+    setProduktionsAnpassungen({})
+    showSuccess('Alle Anpassungen wurden zurückgesetzt')
+  }, [])
+  
+  /**
+   * Erstelle Varianten-Namen Map für Anpassungs-Anzeige
+   */
+  const variantenNamenMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    konfiguration.varianten.forEach(v => {
+      map[v.id] = v.name
+    })
+    return map
+  }, [konfiguration.varianten])
+  
   return (
     <div className="space-y-6">
       {/* Header mit Export-Buttons */}
@@ -398,6 +442,14 @@ export default function OEMProgrammPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Produktions-Anpassungen Anzeige (wenn vorhanden) */}
+      <ProduktionsAnpassungenAnzeige
+        anpassungen={produktionsAnpassungen}
+        variantenNamen={variantenNamenMap}
+        onEntferneAnpassung={handleEntferneAnpassung}
+        onResetAlle={handleResetAlleAnpassungen}
+      />
 
       {/* Hauptinhalt mit Tabs */}
       <Tabs defaultValue="allVariants" className="space-y-4">
@@ -718,11 +770,18 @@ export default function OEMProgrammPage() {
                                     gesamt += menge
                                     
                                     const isEditing = editingCell?.row === rowIdx && editingCell?.varianteId === v.id
+                                    const anpassungsKey = `woche_${kw}_${v.id}`
+                                    const hatAnpassung = produktionsAnpassungen[anpassungsKey] !== undefined
                                     
                                     return (
                                       <td 
                                         key={`${kw}-${v.id}`} 
-                                        className="p-2 text-right border-l cursor-pointer hover:bg-blue-50"
+                                        className={`p-2 text-right border-l cursor-pointer transition-colors ${
+                                          hatAnpassung 
+                                            ? 'bg-yellow-100 hover:bg-yellow-200 font-semibold' 
+                                            : 'hover:bg-blue-50'
+                                        }`}
+                                        title={hatAnpassung ? `Angepasst: ${produktionsAnpassungen[anpassungsKey] > 0 ? '+' : ''}${formatNumber(produktionsAnpassungen[anpassungsKey], 0)} Bikes` : undefined}
                                         onDoubleClick={() => {
                                           setEditingCell({ row: rowIdx, varianteId: v.id })
                                           setEditValue(menge.toString())
@@ -759,7 +818,10 @@ export default function OEMProgrammPage() {
                                             </Button>
                                           </div>
                                         ) : (
-                                          formatNumber(menge, 0)
+                                          <span className="flex items-center justify-end gap-1">
+                                            {hatAnpassung && <span className="text-xs text-yellow-700">✏️</span>}
+                                            {formatNumber(menge, 0)}
+                                          </span>
                                         )}
                                       </td>
                                     )
@@ -843,11 +905,18 @@ export default function OEMProgrammPage() {
                                     gesamt += menge
                                     
                                     const isEditing = editingCell?.row === rowIdx && editingCell?.varianteId === v.id
+                                    const anpassungsKey = `monat_${monat.monat}_${v.id}`
+                                    const hatAnpassung = produktionsAnpassungen[anpassungsKey] !== undefined
                                     
                                     return (
                                       <td 
                                         key={`${monat.monat}-${v.id}`} 
-                                        className="p-2 text-right border-l cursor-pointer hover:bg-blue-50"
+                                        className={`p-2 text-right border-l cursor-pointer transition-colors ${
+                                          hatAnpassung 
+                                            ? 'bg-yellow-100 hover:bg-yellow-200 font-semibold' 
+                                            : 'hover:bg-blue-50'
+                                        }`}
+                                        title={hatAnpassung ? `Angepasst: ${produktionsAnpassungen[anpassungsKey] > 0 ? '+' : ''}${formatNumber(produktionsAnpassungen[anpassungsKey], 0)} Bikes` : undefined}
                                         onDoubleClick={() => {
                                           setEditingCell({ row: rowIdx, varianteId: v.id })
                                           setEditValue(menge.toString())
@@ -884,7 +953,10 @@ export default function OEMProgrammPage() {
                                             </Button>
                                           </div>
                                         ) : (
-                                          formatNumber(menge, 0)
+                                          <span className="flex items-center justify-end gap-1">
+                                            {hatAnpassung && <span className="text-xs text-yellow-700">✏️</span>}
+                                            {formatNumber(menge, 0)}
+                                          </span>
                                         )}
                                       </td>
                                     )
