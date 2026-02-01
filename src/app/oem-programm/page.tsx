@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CollapsibleInfo, CollapsibleInfoGroup, InfoItem } from '@/components/ui/collapsible-info'
-import { SaisonalitaetChart, VariantenPieChart, TagesproduktionChart, KomponentenBarChart, AlleVariantenProduktionChart } from '@/components/ui/table-charts'
+import { VariantenPieChart, TagesproduktionChart, KomponentenBarChart, AlleVariantenProduktionChart } from '@/components/ui/table-charts'
 import { TrendingUp, AlertCircle, Download, Zap, Info, Calendar, CalendarDays, CalendarRange, Edit2, Check, X } from 'lucide-react'
 import { formatNumber, formatDate, toLocalISODateString } from '@/lib/utils'
 import ExcelTable, { FormulaCard } from '@/components/excel-table'
@@ -451,20 +451,6 @@ export default function OEMProgrammPage() {
                     )
                   })}
                 </div>
-              </div>
-
-              {/* 📊 VISUALISIERUNG: Saisonalitäts-Chart */}
-              <div className="mt-6">
-                <SaisonalitaetChart
-                  daten={konfiguration.saisonalitaet.map(s => ({
-                    monat: s.monat.toString(),
-                    name: s.name,
-                    anteil: s.anteil,
-                    bikes: Math.round(konfiguration.jahresproduktion * (s.anteil / 100))
-                  }))}
-                  jahresproduktion={konfiguration.jahresproduktion}
-                  height={300}
-                />
               </div>
 
               {/* Erklärung: Saisonalität → Tagesplanung */}
