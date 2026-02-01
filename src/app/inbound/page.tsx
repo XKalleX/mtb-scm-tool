@@ -24,7 +24,7 @@ import { Label } from '@/components/ui/label'
 import { Ship, Package, Download, Calendar, CalendarDays, CalendarRange, Zap, Plus, Info } from 'lucide-react'
 import { CollapsibleInfo, CollapsibleInfoGroup, type InfoItem } from '@/components/ui/collapsible-info'
 import { formatNumber, addDays, toLocalISODateString } from '@/lib/utils'
-import { exportToJSON } from '@/lib/export'
+import { exportToJSON, exportToCSV, exportToXLSX, exportToMultiSheetXLSX } from '@/lib/export'
 import ExcelTable from '@/components/excel-table'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
 import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
@@ -623,6 +623,165 @@ export default function InboundPage() {
     exportToJSON({ feiertage: konfiguration.feiertage }, `feiertage_${konfiguration.planungsjahr}`)
   }
   
+  /**
+   * ✅ NEU: Exportiert Bestellungen als CSV (vollständiger Datenumfang)
+   * Exportiert ALLE Bestellungen mit detailliertem Materialfluss
+   */
+  const handleExportBestellungenCSV = () => {
+    if (!nurBestellungen || nurBestellungen.length === 0) {
+      console.warn('Keine Bestellungen zum Exportieren')
+      return
+    }
+    
+    const data = nurBestellungen.map(row => ({
+      'Bedarfsdatum': row.bedarfsdatumFormatiert,
+      'Bestelldatum': row.bestelldatumFormatiert,
+      'Ist Vorjahr': row.istVorjahr ? 'Ja' : 'Nein',
+      'Vorlaufzeit (Tage)': row.vorlaufzeit || '',
+      'SAT_FT bestellt': row.SAT_FT_bestellt,
+      'SAT_RL bestellt': row.SAT_RL_bestellt,
+      'SAT_SP bestellt': row.SAT_SP_bestellt,
+      'SAT_SL bestellt': row.SAT_SL_bestellt,
+      'Gesamt bestellt': row.bestellmenge,
+      'Grund': row.grundFormatiert,
+      'Erwartete Ankunft': row.erwarteteAnkunftFormatiert,
+      'Produktionsstart': row.produktionsstart || '',
+      'LKW Abfahrt China': row.lkwAbfahrtChina || '',
+      'Ankunft Hafen China': row.ankunftHafenChina || '',
+      'Schiff Abfahrt': row.schiffAbfahrt || '',
+      'Ankunft Hafen DE': row.ankunftHafenDE || '',
+      'Verfügbar ab': row.verfuegbarAb || '',
+      'Status': row.status,
+      'Tagesbedarf': row.tagesBedarf,
+      'Akkumulierter Backlog': row.akkumulierterBacklog,
+      'Bestellungs-IDs': row.bestellungsIds || ''
+    }))
+    
+    exportToCSV(data, `inbound_bestellungen_${konfiguration.planungsjahr}_vollstaendig`)
+  }
+  
+  /**
+   * ✅ NEU: Exportiert Bestellungen als XLSX mit Formatierung
+   */
+  const handleExportBestellungenXLSX = async () => {
+    if (!nurBestellungen || nurBestellungen.length === 0) {
+      console.warn('Keine Bestellungen zum Exportieren')
+      return
+    }
+    
+    try {
+      const data = nurBestellungen.map(row => ({
+        'Bedarfsdatum': row.bedarfsdatumFormatiert,
+        'Bestelldatum': row.bestelldatumFormatiert,
+        'Ist Vorjahr': row.istVorjahr ? 'Ja' : 'Nein',
+        'Vorlaufzeit (Tage)': row.vorlaufzeit || 0,
+        'SAT_FT': row.SAT_FT_bestellt,
+        'SAT_RL': row.SAT_RL_bestellt,
+        'SAT_SP': row.SAT_SP_bestellt,
+        'SAT_SL': row.SAT_SL_bestellt,
+        'Gesamt': row.bestellmenge,
+        'Grund': row.grundFormatiert,
+        'Erwartete Ankunft': row.erwarteteAnkunftFormatiert,
+        'Produktionsstart': row.produktionsstart || '',
+        'LKW Abfahrt China': row.lkwAbfahrtChina || '',
+        'Ankunft Hafen Shanghai': row.ankunftHafenChina || '',
+        'Schiff Abfahrt': row.schiffAbfahrt || '',
+        'Ankunft Hafen Hamburg': row.ankunftHafenDE || '',
+        'Verfügbar ab OEM': row.verfuegbarAb || '',
+        'Status': row.status,
+        'Tagesbedarf': row.tagesBedarf,
+        'Backlog': row.akkumulierterBacklog
+      }))
+      
+      await exportToXLSX(
+        data,
+        `inbound_bestellungen_${konfiguration.planungsjahr}_vollstaendig`,
+        {
+          sheetName: 'Bestellungen',
+          title: `Inbound Bestellungen ${konfiguration.planungsjahr}`,
+          author: 'MTB SCM Tool - WI3 Team',
+          freezeHeader: true,
+          autoFilter: true
+        }
+      )
+    } catch (error) {
+      console.error('Fehler beim XLSX-Export:', error)
+    }
+  }
+  
+  /**
+   * ✅ NEU: Exportiert ALLE Inbound-Daten als Multi-Sheet XLSX
+   * Sheets: Bestellungen, Aggregationen (Woche/Monat), Statistiken
+   */
+  const handleExportAlles = async () => {
+    if (!nurBestellungen || nurBestellungen.length === 0) {
+      console.warn('Keine Daten zum Exportieren')
+      return
+    }
+    
+    try {
+      const sheets = [
+        // Sheet 1: Tagesansicht
+        {
+          name: 'Tagesansicht',
+          data: nurBestellungen.map(row => ({
+            'Bedarfsdatum': row.bedarfsdatumFormatiert,
+            'Bestelldatum': row.bestelldatumFormatiert,
+            'Vorjahr': row.istVorjahr ? 'Ja' : 'Nein',
+            'Vorlaufzeit': row.vorlaufzeit || 0,
+            'SAT_FT': row.SAT_FT_bestellt,
+            'SAT_RL': row.SAT_RL_bestellt,
+            'SAT_SP': row.SAT_SP_bestellt,
+            'SAT_SL': row.SAT_SL_bestellt,
+            'Gesamt': row.bestellmenge,
+            'Erwartete Ankunft': row.erwarteteAnkunftFormatiert,
+            'Status': row.status
+          })),
+          title: `Inbound Tagesansicht ${konfiguration.planungsjahr}`
+        },
+        // Sheet 2: Wochenansicht
+        {
+          name: 'Wochenansicht',
+          data: bestellungenNachWoche.map(w => ({
+            'Kalenderwoche': w.kalenderwoche,
+            'Jahr': w.jahr,
+            'Gesamt': w.gesamtMenge,
+            'Anzahl Bestellungen': w.bestellungen,
+            'OEM-Bedarf': w.oemBedarf,
+            'Erstes Bestelldatum': w.erstesBestelldatum.toISOString().split('T')[0],
+            'Letztes Bestelldatum': w.letztesBestelldatum.toISOString().split('T')[0]
+          })),
+          title: `Inbound Wochenansicht ${konfiguration.planungsjahr}`
+        },
+        // Sheet 3: Monatsansicht
+        {
+          name: 'Monatsansicht',
+          data: bestellungenNachMonat.map(m => ({
+            'Monat': m.monat,
+            'Monat Name': m.monatName,
+            'Jahr': m.jahr,
+            'Gesamt': m.gesamtMenge,
+            'Anzahl Bestellungen': m.bestellungen,
+            'OEM-Bedarf': m.oemBedarf
+          })),
+          title: `Inbound Monatsansicht ${konfiguration.planungsjahr}`
+        }
+      ]
+      
+      await exportToMultiSheetXLSX(
+        sheets,
+        `inbound_komplett_${konfiguration.planungsjahr}`,
+        {
+          author: 'MTB SCM Tool - WI3 Team',
+          freezeHeader: true,
+          autoFilter: true
+        }
+      )
+    } catch (error) {
+      console.error('Fehler beim Multi-Sheet Export:', error)
+    }
+  }
+  
   if (!isInitialized) {
     return <div className="text-center py-8">Lade Konfiguration...</div>
   }
@@ -638,13 +797,21 @@ export default function InboundPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportBestellungenCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            CSV Export
+          </Button>
+          <Button variant="outline" onClick={handleExportBestellungenXLSX}>
+            <Download className="h-4 w-4 mr-2" />
+            Excel Export
+          </Button>
+          <Button variant="outline" onClick={handleExportAlles}>
+            <Download className="h-4 w-4 mr-2" />
+            Alles (XLSX)
+          </Button>
           <Button variant="outline" onClick={handleExportLieferant}>
             <Download className="h-4 w-4 mr-2" />
-            Export Lieferant
-          </Button>
-          <Button variant="outline" onClick={handleExportFeiertage}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Feiertage
+            Lieferant (JSON)
           </Button>
         </div>
       </div>
