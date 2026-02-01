@@ -87,24 +87,6 @@ export function aggregiereNachWoche(
     const endDatum = tage[tage.length - 1].datum
     const jahr = tage[0].datum.getFullYear()
     
-    // FILTER: Überspringe KW 53 wenn sie Tage des Vorjahres enthält (ISO 8601 Anomalie)
-    // ISO 8601 kann die ersten Tage des Jahres (z.B. Jan 1-3, 2027) der KW 53 des Vorjahres zuweisen
-    // Da wir nur für das Planungsjahr (2027) planen, filtern wir diese Woche aus der Anzeige
-    if (kw === 53) {
-      // Prüfe ob diese KW 53 tatsächlich im Vorjahr beginnt (indem wir prüfen ob alle Tage
-      // am Anfang des aktuellen Jahres liegen und somit ISO-technisch zum Vorjahr gehören)
-      const alleDageAmJahresanfang = tage.every(t => 
-        t.datum.getMonth() === 0 && t.datum.getDate() <= 3
-      )
-      if (alleDageAmJahresanfang) {
-        // Diese Tage sind zwar ISO-korrekt als KW 53 des Vorjahres klassifiziert,
-        // liegen aber außerhalb unseres Planungszeitraums (2027) und würden
-        // in der Wochenansicht zu Verwirrung führen. Sie sind bereits in der
-        // Tagesansicht und in allen Jahressummen korrekt enthalten.
-        return
-      }
-    }
-    
     const anzahlTage = tage.length
     const anzahlArbeitstage = tage.filter(t => t.istArbeitstag).length
     

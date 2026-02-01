@@ -100,12 +100,32 @@ export interface VariantenProduktionsplan {
  * ========================================
  */
 
+/**
+ * Berechnet die Kalenderwoche für ein Datum im Kontext des aktuellen Jahres.
+ * 
+ * Anders als ISO 8601 (das Tage am Jahresanfang der KW 53 des Vorjahres zuweisen kann),
+ * ordnet diese Funktion alle Tage eines Jahres den Wochen desselben Jahres zu (KW 1-52/53).
+ * 
+ * Dies ist wichtig für eine jahresbezogene Planung, bei der KW 53 des Vorjahres
+ * verwirrend wäre.
+ */
 function getKalenderWoche(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  // Verwende das Jahr des Datums, nicht das ISO-Jahr
+  const jahr = date.getFullYear()
+  const jahresanfang = new Date(jahr, 0, 1)
+  
+  // Berechne Wochennummer basierend auf dem ersten Montag des Jahres
+  // Tage vor dem ersten Montag gehören zu KW 1
+  const tageImJahr = Math.floor((date.getTime() - jahresanfang.getTime()) / 86400000)
+  const ersterMontagOffset = (8 - jahresanfang.getDay()) % 7 // Tage bis zum ersten Montag
+  
+  if (tageImJahr < ersterMontagOffset) {
+    // Tage vor dem ersten Montag gehören zu KW 1
+    return 1
+  }
+  
+  // Berechne KW basierend auf Tagen seit dem ersten Montag
+  return Math.floor((tageImJahr - ersterMontagOffset) / 7) + 1
 }
 
 /**
