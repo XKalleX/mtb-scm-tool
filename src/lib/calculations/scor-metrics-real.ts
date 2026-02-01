@@ -27,7 +27,7 @@ import type { TaeglicheBestellung } from './inbound-china'
 import type { TaeglichesLager } from './warehouse-management'
 import { generiereAlleVariantenProduktionsplaene } from './zentrale-produktionsplanung'
 import { generiereInboundLieferplan } from './inbound-china'
-import { berechneIntegriertesWarehouse } from './warehouse-management'
+import { berechneIntegriertesWarehouse, korrigiereProduktionsplaeneMitWarehouse } from './warehouse-management'
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
@@ -266,23 +266,77 @@ export function berechneSCORMetrikenReal(
   console.log(`✓ Basis-Daten: ${alleTagesEintraege.length} Produktionstage, ${alleBestellungen.length} Bestellungen, ${warehouse.tage.length} Lagertage`)
   
   // ═══════════════════════════════════════════════════════════════════════════
+  // ✅ KRITISCHER FIX: Korrigiere Produktionspläne mit Warehouse-Daten
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PROBLEM: generiereAlleVariantenProduktionsplaene setzt istMenge = planMenge
+  // LÖSUNG: korrigiereProduktionsplaeneMitWarehouse nutzt tatsächlichen Verbrauch aus Warehouse
+  
+  const korrigiertePlaene = korrigiereProduktionsplaeneMitWarehouse(
+    produktionsplaeneObj,
+    warehouse,
+    konfiguration
+  )
+  
+  // Extrahiere KORRIGIERTE Tageseinträge (mit echten IST-Werten aus Warehouse)
+  const korrigierteTagesEintraege: TagesProduktionEntry[] = []
+  Object.values(korrigiertePlaene).forEach(plan => {
+    korrigierteTagesEintraege.push(...plan.tage)
+  })
+  
+  console.log(`✓ Korrigierte Produktionsdaten: ${korrigierteTagesEintraege.length} Einträge`)
+  
+  // ═══════════════════════════════════════════════════════════════════════════
   // STEP 2: METRIK 1 - PLANERFÜLLUNGSGRAD (RELIABILITY)
   // ═══════════════════════════════════════════════════════════════════════════
   
-  const produktionstage = alleTagesEintraege.filter(t => t.istArbeitstag)
-  const tageErfuellt = produktionstage.filter(t => t.istMenge === t.planMenge).length
-  const planerfuellungsgrad_wert = produktionstage.length > 0
-    ? (tageErfuellt / produktionstage.length) * 100
+  // ✅ FIX: Berechne als Verhältnis Gesamt-Ist zu Gesamt-Plan statt exakter Tages-Matches
+  // Die alte Logik (istMenge === planMenge) ist unrealistisch, da durch ATP-Checks und
+  // Materialengpässe fast nie exakte Übereinstimmung pro Tag erreicht wird.
+  // ✅ KRITISCH: Nutze korrigierteTagesEintraege statt alleTagesEintraege!
+  //
+  // ✅ NEU: Berücksichtige 'Heute'-Datum (Frozen Zone)!
+  // Zähle nur Produktionstage BIS HEUTE, nicht das ganze Jahr.
+  // Sonst wird Backlog-Aufholung am Jahresende mitgerechnet → unrealistisch hohe Werte
+  const heuteDatum = new Date(konfiguration.heuteDatum || '2027-04-15')
+  const produktionstage = korrigierteTagesEintraege.filter(t => 
+    t.istArbeitstag && t.datum <= heuteDatum
+  )
+  const gesamtPlanMenge = produktionstage.reduce((sum, t) => sum + t.planMenge, 0)
+  const gesamtIstMenge = produktionstage.reduce((sum, t) => sum + t.istMenge, 0)
+  
+  console.log(`📊 Planerfüllungsgrad-Berechnung (bis ${heuteDatum.toISOString().split('T')[0]}):`)
+  console.log(`  - Produktionstage (Arbeitstage bis heute): ${produktionstage.length}`)
+  console.log(`  - Gesamt PLAN-Menge: ${gesamtPlanMenge.toLocaleString()}`)
+  console.log(`  - Gesamt IST-Menge: ${gesamtIstMenge.toLocaleString()}`)
+  console.log(`  - Differenz (Plan-Ist): ${(gesamtPlanMenge - gesamtIstMenge).toLocaleString()}`)
+  console.log(`  - Erfüllungsgrad: ${((gesamtIstMenge / gesamtPlanMenge) * 100).toFixed(2)}%`)
+  
+  // ✅ DEBUG: Prüfe ob es Tage mit Abweichungen gibt
+  const tageMitAbweichung = produktionstage.filter(t => t.istMenge !== t.planMenge)
+  console.log(`  - Tage mit Abweichungen: ${tageMitAbweichung.length}`)
+  if (tageMitAbweichung.length > 0 && tageMitAbweichung.length <= 10) {
+    tageMitAbweichung.forEach(t => {
+      console.log(`    → Tag ${t.tag} (${t.datum.toISOString().split('T')[0]}): Plan=${t.planMenge}, Ist=${t.istMenge}, Diff=${t.planMenge - t.istMenge}`)
+    })
+  } else if (tageMitAbweichung.length > 10) {
+    console.log(`    → Erste 5 Tage:`)
+    tageMitAbweichung.slice(0, 5).forEach(t => {
+      console.log(`    → Tag ${t.tag} (${t.datum.toISOString().split('T')[0]}): Plan=${t.planMenge}, Ist=${t.istMenge}, Diff=${t.planMenge - t.istMenge}`)
+    })
+  }
+  
+  const planerfuellungsgrad_wert = gesamtPlanMenge > 0
+    ? (gesamtIstMenge / gesamtPlanMenge) * 100
     : 100
   
-  // ✅ KORREKTUR: Wöchentliche statt monatliche Aggregate
-  const planerfuellungWoechentlich = aggregiereWoechentlichePlanerfuellung(alleTagesEintraege)
+  // ✅ KORREKTUR: Wöchentliche statt monatliche Aggregate (nutze korrigierte Daten + heute-Filter!)
+  const planerfuellungWoechentlich = aggregiereWoechentlichePlanerfuellung(korrigierteTagesEintraege, heuteDatum)
   
   const planerfuellungsgrad = {
     wert: planerfuellungsgrad_wert,
     kategorie: 'RELIABILITY' as const,
     label: 'Planerfüllungsgrad',
-    beschreibung: 'Prozentsatz der Tage, an denen die geplante Produktionsmenge exakt erreicht wurde',
+    beschreibung: 'Prozentsatz der geplanten Produktionsmenge, die tatsächlich erreicht wurde',
     einheit: '%',
     zielwert: 95,
     status: planerfuellungsgrad_wert >= 95 ? 'gut' as const : 
@@ -412,16 +466,19 @@ export function berechneSCORMetrikenReal(
   // STEP 5: METRIK 4 - PLANUNGSGENAUIGKEIT (RESPONSIVENESS)
   // ═══════════════════════════════════════════════════════════════════════════
   
-  const gesamtPlan = alleTagesEintraege.reduce((sum, t) => sum + t.planMenge, 0)
-  const gesamtIst = alleTagesEintraege.reduce((sum, t) => sum + t.istMenge, 0)
+  // ✅ KRITISCH: Nutze korrigierteTagesEintraege statt alleTagesEintraege!
+  // ✅ NEU: Berücksichtige 'Heute'-Datum (Frozen Zone)!
+  const produktionstageGenauigkeit = korrigierteTagesEintraege.filter(t => t.datum <= heuteDatum)
+  const gesamtPlan = produktionstageGenauigkeit.reduce((sum, t) => sum + t.planMenge, 0)
+  const gesamtIst = produktionstageGenauigkeit.reduce((sum, t) => sum + t.istMenge, 0)
   const gesamtAbweichung = Math.abs(gesamtPlan - gesamtIst)
   
   const planungsgenauigkeit_wert = gesamtPlan > 0
     ? Math.max(0, 100 - (gesamtAbweichung / gesamtPlan) * 100)
     : 100
   
-  // ✅ KORREKTUR: Wöchentliche statt monatliche Aggregate
-  const planungsgenauigkeitWoechentlich = aggregiereWoechentlichePlanungsgenauigkeit(alleTagesEintraege)
+  // ✅ KORREKTUR: Wöchentliche statt monatliche Aggregate (nutze korrigierte Daten + heute-Filter!)
+  const planungsgenauigkeitWoechentlich = aggregiereWoechentlichePlanungsgenauigkeit(korrigierteTagesEintraege, heuteDatum)
   
   const planungsgenauigkeit = {
     wert: planungsgenauigkeit_wert,
@@ -655,11 +712,19 @@ function aggregiereMonatlicheDurchlaufzeit(bestellungen: TaeglicheBestellung[]) 
 
 /**
  * ✅ NEU: Berechnet wöchentliche Planerfüllung
+ * FIX: Berechnet Erfüllungsgrad als (Ist / Plan) * 100, nicht als Anzahl perfekter Tage
+ * @param eintraege - Alle Tagesproduktionseinträge
+ * @param heuteDatum - Optional: Nur Tage bis zu diesem Datum berücksichtigen (Frozen Zone)
  */
-function aggregiereWoechentlichePlanerfuellung(eintraege: TagesProduktionEntry[]) {
+function aggregiereWoechentlichePlanerfuellung(eintraege: TagesProduktionEntry[], heuteDatum?: Date) {
   const wochen: Record<number, any> = {}
   
-  eintraege.forEach(e => {
+  // Filter auf heute-Datum falls angegeben
+  const gefiltert = heuteDatum 
+    ? eintraege.filter(e => e.datum <= heuteDatum)
+    : eintraege
+  
+  gefiltert.forEach(e => {
     if (!wochen[e.kalenderwoche]) {
       wochen[e.kalenderwoche] = {
         kalenderwoche: e.kalenderwoche,
@@ -683,7 +748,8 @@ function aggregiereWoechentlichePlanerfuellung(eintraege: TagesProduktionEntry[]
   
   return Object.values(wochen).map(w => ({
     ...w,
-    erfuellungsgrad: w.tageGesamt > 0 ? (w.tageErfuellt / w.tageGesamt) * 100 : 100
+    // ✅ FIX: Berechne Erfüllungsgrad als (Ist / Plan) * 100
+    erfuellungsgrad: w.planMenge > 0 ? (w.istMenge / w.planMenge) * 100 : 100
   }))
 }
 
@@ -745,11 +811,18 @@ function aggregiereWoechentlicheDurchlaufzeit(bestellungen: TaeglicheBestellung[
 
 /**
  * ✅ NEU: Aggregiert Planungsgenauigkeit wöchentlich
+ * @param eintraege - Alle Tagesproduktionseinträge
+ * @param heuteDatum - Optional: Nur Tage bis zu diesem Datum berücksichtigen (Frozen Zone)
  */
-function aggregiereWoechentlichePlanungsgenauigkeit(eintraege: TagesProduktionEntry[]) {
+function aggregiereWoechentlichePlanungsgenauigkeit(eintraege: TagesProduktionEntry[], heuteDatum?: Date) {
   const wochen: Record<number, any> = {}
   
-  eintraege.forEach(e => {
+  // Filter auf heute-Datum falls angegeben
+  const gefiltert = heuteDatum 
+    ? eintraege.filter(e => e.datum <= heuteDatum)
+    : eintraege
+  
+  gefiltert.forEach(e => {
     if (!wochen[e.kalenderwoche]) {
       wochen[e.kalenderwoche] = {
         kalenderwoche: e.kalenderwoche,
