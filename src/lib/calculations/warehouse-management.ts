@@ -294,11 +294,11 @@ export function berechneIntegriertesWarehouse(
    * um sicherzustellen, dass ALLE geplanten Bikes gezählt werden.
    * 
    * Da 1 Bike = 1 Sattel in der Stückliste, entspricht die Summe aller planMenge-Werte
-   * dem Gesamtbedarf an Sätteln.
+   * dem Gesamtbedarf an Sätteln (keine Umrechnung nötig).
    */
   const gesamtBedarf = Object.values(variantenProduktionsplaene)
     .flatMap(plan => plan.tage)
-    .reduce((sum, tag) => sum + tag.planMenge, 0) * 1  // * 1 weil 1 Bike = 1 Sattel
+    .reduce((sum, tag) => sum + tag.planMenge, 0)
   
   console.log(`📊 Gesamt Bedarf (aus Produktionsplänen): ${gesamtBedarf.toLocaleString('de-DE')} Stück`)
   
