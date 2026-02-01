@@ -4,9 +4,10 @@
  * ═══════════════════════════════════════════════════════════════════════════════
  * 
  * Berechnet realistische Lagerbestandsentwicklung mit:
+ * - ✅ EXKLUSIV Hafenlogistik als Materialquelle (generiereInboundLieferplan)
  * - Realistischen Losgrößen-basierten Lieferungen (500 Stück)
  * - NEUER Materialfluss mit Zwischenlagerung:
- *   - Schiffe nur mittwochs
+ *   - Schiffe nur mittwochs ab Shanghai
  *   - LKWs nicht am Wochenende
  *   - Material verfügbar am NÄCHSTEN TAG nach Ankunft
  * - ATP (Available-to-Promise) Checks vor Verbrauch
@@ -16,8 +17,9 @@
  * 
  * KONZEPT:
  * 1. Start mit 0 Lagerbestand
- * 2. Verarbeite Inbound-Lieferungen von generiereTaeglicheBestellungen
+ * 2. ✅ Verarbeite Inbound-Lieferungen von generiereInboundLieferplan (Hafenlogistik!)
  *    → NEU: Lieferungen nutzen verfuegbarAb Datum (nächster Tag nach Ankunft)
+ *    → KRITISCH: Schiffe fahren nur mittwochs, daher gestaffelte Lieferung
  * 3. Für jeden Produktionstag: ATP-Check → Verbrauch falls verfügbar
  *    → NEU: Bei Engpass proportionale Verteilung statt FCFS
  * 4. Sammle Statistiken und Warnungen
@@ -26,7 +28,7 @@
 import type { KonfigurationData, FeiertagConfig } from '@/contexts/KonfigurationContext'
 import type { TagesProduktionEntry } from './zentrale-produktionsplanung'
 import { addDays, toLocalISODateString } from '@/lib/utils'
-import { generiereTaeglicheBestellungen, type TaeglicheBestellung } from './inbound-china'
+import { generiereInboundLieferplan, type TaeglicheBestellung } from './inbound-china'
 import { istArbeitstag_Deutschland, FeiertagsKonfiguration } from '@/lib/kalender'
 
 /**
@@ -206,10 +208,10 @@ export function berechneIntegriertesWarehouse(
   const planungsjahr = konfiguration.planungsjahr
   
   // ═══════════════════════════════════════════════════════════════════════════════
-  // STEP 1: GENERIERE INBOUND BESTELLUNGEN (mit 49 Tage Vorlauf!)
+  // STEP 1: ✅ GENERIERE INBOUND LIEFERUNGEN MIT HAFENLOGISTIK (inkl. Mittwochs-Schiffe!)
   // ═══════════════════════════════════════════════════════════════════════════════
   
-  // Bereite Stücklisten-Map vor (für generiereTaeglicheBestellungen)
+  // Bereite Stücklisten-Map vor (für generiereInboundLieferplan)
   // Transformiere stueckliste[] aus Konfiguration in das erwartete Format
   const stuecklistenMap: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }> = {}
   konfiguration.stueckliste.forEach(s => {
@@ -234,19 +236,40 @@ export function berechneIntegriertesWarehouse(
     }))
   })
   
-  // Generiere Bestellungen (inkl. Vorjahr!)
+  // ✅ KRITISCHER FIX: Nutze generiereInboundLieferplan statt generiereTaeglicheBestellungen!
+  // Dies beinhaltet die komplette Hafenlogistik-Simulation:
+  // - Schiffe fahren nur mittwochs ab Shanghai
+  // - Waren warten am Hafen bis nächster Mittwoch
+  // - Realistische Losgröße-basierte Schiffsbeladung (500er Bündel)
+  console.log(`🚢 Starte Hafenlogistik-Simulation mit generiereInboundLieferplan...`)
+  
+  const inboundResult = generiereInboundLieferplan(
+    produktionsplaeneFormatiert,
+    planungsjahr,
+    konfiguration.lieferant.gesamtVorlaufzeitTage,
+    konfiguration.feiertage,
+    stuecklistenMap,  // Stücklisten aus Konfiguration
+    konfiguration.lieferant.losgroesse,  // Losgröße aus Konfiguration
+    konfiguration.lieferant.lieferintervall  // Lieferintervall aus Konfiguration
+  )
+  
+  // Extrahiere Bestellungen und Lieferungen aus Hafenlogistik
   const bestellungen = [
-    ...generiereTaeglicheBestellungen(
-      produktionsplaeneFormatiert,
-      planungsjahr,
-      konfiguration.lieferant.gesamtVorlaufzeitTage,
-      konfiguration.feiertage,
-      stuecklistenMap,  // Stücklisten aus Konfiguration
-      konfiguration.lieferant.losgroesse,  // Losgröße aus Konfiguration
-      konfiguration.lieferant.lieferintervall  // Lieferintervall aus Konfiguration
-    ),
+    ...inboundResult.bestellungen,
     ...zusatzBestellungen
   ]
+  
+  // ✅ NEU: Nutze lieferungenAmWerk aus Hafenlogistik (nicht aus Bestellungen!)
+  // Die Hafenlogistik bestimmt WANN Material tatsächlich am Werk ankommt
+  // (nach Wartezeit am Hafen + Mittwochs-Schiff + LKW-Transport)
+  const lieferungenAmWerkAusHafenlogistik = inboundResult.lieferungenAmWerk
+  
+  console.log(`✅ Hafenlogistik-Simulation abgeschlossen:`)
+  console.log(`   - Bestellungen: ${bestellungen.length}`)
+  console.log(`   - Liefertage am Werk: ${lieferungenAmWerkAusHafenlogistik.size}`)
+  console.log(`   - Schiffe gesamt: ${inboundResult.hafenStatistik.anzahlSchiffe}`)
+  console.log(`   - Ø Wartezeit Hafen: ${inboundResult.hafenStatistik.durchschnittlicheWartezeit.toFixed(1)} Tage`)
+  console.log(`   - Max Hafenlager: ${inboundResult.hafenStatistik.maxLagerbestand.toLocaleString('de-DE')} Sättel`)
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // GUARD: Prüfe ob Bestellungen vorhanden sind
@@ -302,8 +325,36 @@ export function berechneIntegriertesWarehouse(
   
   console.log(`📊 Gesamt Bedarf (aus Produktionsplänen): ${gesamtBedarf.toLocaleString('de-DE')} Stück`)
   
-  // NEU: Gruppiere Bestellungen nach VERFÜGBARKEITSDATUM (nächster Tag nach Ankunft!)
-  const lieferungenProTag = gruppiereBestellungenNachVerfuegbarkeit(bestellungen)
+  // ✅ KRITISCH: Nutze Lieferungen DIREKT aus Hafenlogistik!
+  // Die Hafenlogistik (generiereInboundLieferplan) hat bereits:
+  // - Hafen-Simulation mit Mittwochs-Schiffen durchgeführt
+  // - Realistische Liefertermine berechnet (verfuegbarAb)
+  // - Losgrößen-basierte Beladung simuliert
+  // 
+  // Daher: KEINE erneute Gruppierung von Bestellungen!
+  // Wir nutzen direkt lieferungenAmWerkAusHafenlogistik
+  
+  // Konvertiere lieferungenAmWerk (Map<string, Record<string, number>>) zu TaeglicheBestellung[] Format
+  // für die bestehende Warehouse-Logik
+  const lieferungenProTag = new Map<string, TaeglicheBestellung[]>()
+  
+  lieferungenAmWerkAusHafenlogistik.forEach((komponenten, datumStr) => {
+    // Erstelle eine "virtuelle" Bestellung für diese Lieferung
+    // Dies ermöglicht es der bestehenden Warehouse-Logik zu funktionieren
+    const virtuelleLieferung: TaeglicheBestellung = {
+      id: `HAFEN-${datumStr}`,
+      bestelldatum: new Date(datumStr), // Dummy
+      bedarfsdatum: new Date(datumStr), // Dummy
+      komponenten: komponenten,
+      erwarteteAnkunft: new Date(datumStr),
+      verfuegbarAb: new Date(datumStr),
+      status: 'geliefert',
+      istVorjahr: false,
+      grund: 'losgroesse'
+    }
+    
+    lieferungenProTag.set(datumStr, [virtuelleLieferung])
+  })
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // STEP 2: INITIALISIERE LAGERBESTÄNDE MIT 0

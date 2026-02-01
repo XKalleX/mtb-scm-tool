@@ -43,6 +43,7 @@ import {
   aggregiereNachWoche, 
   aggregiereNachMonat
 } from '@/lib/helpers/programm-aggregation'
+import { generiereInboundLieferplan } from '@/lib/calculations/inbound-china'
 
 /**
  * Zeitperioden für die Ansichtswahl
@@ -134,15 +135,62 @@ export default function ProduktionPage() {
     return generiereAlleVariantenProduktionsplaene(konfiguration)
   }, [konfiguration])
   
-  // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung für korrekte Abweichungen
-  // Zeigt die tatsächliche Produktion basierend auf Materialverfügbarkeit
+  // ✅ KRITISCH: Generiere Hafenlogistik-Lieferplan ZUERST!
+  // Dies ist die EINZIGE Quelle für Materialzugänge im System
+  const inboundLieferplan = useMemo(() => {
+    // Bereite Stücklisten-Map vor
+    const stuecklistenMap: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }> = {}
+    konfiguration.stueckliste.forEach(s => {
+      if (!stuecklistenMap[s.mtbVariante]) {
+        stuecklistenMap[s.mtbVariante] = { komponenten: {} }
+      }
+      stuecklistenMap[s.mtbVariante].komponenten[s.bauteilId] = {
+        name: s.bauteilName,
+        menge: s.menge,
+        einheit: s.einheit || 'Stück'
+      }
+    })
+    
+    // Konvertiere Produktionspläne zu Format für Inbound
+    const produktionsplaeneFormatiert: Record<string, Array<{datum: Date; varianteId: string; istMenge: number; planMenge: number}>> = {}
+    Object.entries(variantenProduktionsplaeneForWarehouse).forEach(([varianteId, plan]) => {
+      produktionsplaeneFormatiert[varianteId] = plan.tage.map(tag => ({
+        datum: tag.datum,
+        varianteId: varianteId,
+        istMenge: tag.istMenge,
+        planMenge: tag.planMenge
+      }))
+    })
+    
+    // ✅ Generiere Inbound-Lieferplan mit Hafenlogistik-Simulation
+    console.log('🚢 Starte Hafenlogistik-Simulation für Produktion/Backlog...')
+    return generiereInboundLieferplan(
+      produktionsplaeneFormatiert,
+      konfiguration.planungsjahr,
+      konfiguration.lieferant.gesamtVorlaufzeitTage,
+      konfiguration.feiertage,
+      stuecklistenMap,
+      konfiguration.lieferant.losgroesse,
+      konfiguration.lieferant.lieferintervall
+    )
+  }, [variantenProduktionsplaeneForWarehouse, konfiguration])
+  
+  // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung MIT Hafenlogistik-Lieferungen
+  // Zeigt die tatsächliche Produktion basierend auf REALER Materialverfügbarkeit aus Hafenlogistik
   const backlogErgebnis = useMemo(() => {
     const plaeneAlsEntries: Record<string, TagesProduktionEntry[]> = {}
     Object.entries(variantenProduktionsplaeneForWarehouse).forEach(([varianteId, plan]) => {
       plaeneAlsEntries[varianteId] = plan.tage
     })
-    return berechneBedarfsBacklog(plaeneAlsEntries, konfiguration)
-  }, [variantenProduktionsplaeneForWarehouse, konfiguration])
+    
+    // ✅ KRITISCH: Übergebe lieferungenAmWerk aus Hafenlogistik!
+    // Dies ist die EINZIGE Quelle für Materialzugänge
+    return berechneBedarfsBacklog(
+      plaeneAlsEntries, 
+      konfiguration,
+      inboundLieferplan.lieferungenAmWerk // ✅ Hafenlogistik-Lieferungen als PFLICHT-Parameter
+    )
+  }, [variantenProduktionsplaeneForWarehouse, konfiguration, inboundLieferplan])
   
   // ✅ INTEGRIERTES WAREHOUSE: Realistische Bestandsführung
   const warehouseResult = useMemo(() => {
