@@ -113,14 +113,15 @@ const CHART_COLORS = {
 export default function ReportingPage() {
   const { konfiguration } = useKonfiguration()
   
-  // ✅ FIX: State für "Diagramme: Gesamtjahr anzeigen" Checkbox
-  // Default: false (zeigt nur bis heute, realistische Trends)
+  // ✅ NEUE ANFORDERUNG: State für Datumsfilter-Checkbox
+  // Default: false (zeigt ALLE Daten, gesamtes Jahr, kein Filter)
+  // Checked: true (zeigt nur Daten bis heute, Frozen Zone)
   // Persistenz: localStorage für Tab-übergreifende Speicherung
   const [beachteAktuellesDatum, setBeachteAktuellesDatum] = useState(() => {
     // Lade gespeicherten Wert aus localStorage
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('scor-reporting-zeige-gesamtjahr')
-      return saved === 'true' // Default: false wenn nichts gespeichert
+      return saved === 'true' // Default: false (alle Daten)
     }
     return false
   })
@@ -136,7 +137,7 @@ export default function ReportingPage() {
   // Berechne SCOR-Metriken (mit Memoization für Performance)
   const { metriken, zeitreihen } = useMemo(() => {
     console.log('🎯 Berechne SCOR-Metriken für Reporting...')
-    console.log(`   Diagramme: ${beachteAktuellesDatum ? 'Nur bis heute' : 'Gesamtjahr'} anzeigen`)
+    console.log(`   Filter: ${beachteAktuellesDatum ? 'Nur bis heute' : 'Gesamtjahr (keine Filterung)'}`)
     return berechneSCORMetrikenReal(konfiguration, beachteAktuellesDatum)
   }, [konfiguration, beachteAktuellesDatum])
 
@@ -150,7 +151,7 @@ export default function ReportingPage() {
             Supply Chain Operations Reference Model - 6 Kernmetriken aus 4 Kategorien
           </p>
           
-          {/* ✅ FIX: Checkbox für Diagramm-Darstellung (beeinflusst NICHT die KPI-Werte!) */}
+          {/* ✅ NEUE ANFORDERUNG: Checkbox für Datumsfilter (beeinflusst KPIs UND Diagramme!) */}
           <div className="flex items-center space-x-2">
             <Checkbox 
               id="beachte-heute"
@@ -161,7 +162,7 @@ export default function ReportingPage() {
               htmlFor="beachte-heute" 
               className="text-sm font-medium cursor-pointer"
             >
-              📊 Diagramme: Nur bis heute ({konfiguration.heuteDatum ? new Date(konfiguration.heuteDatum).toLocaleDateString('de-DE') : '15.4.2027'})
+              Nur bis heute anzeigen ({konfiguration.heuteDatum ? new Date(konfiguration.heuteDatum).toLocaleDateString('de-DE') : '15.4.2027'})
             </Label>
           </div>
         </div>
