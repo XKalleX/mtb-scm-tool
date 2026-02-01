@@ -628,12 +628,12 @@ export default function InboundPage() {
    * Exportiert ALLE Bestellungen mit detailliertem Materialfluss
    */
   const handleExportBestellungenCSV = () => {
-    if (!inboundTableData || inboundTableData.length === 0) {
+    if (!nurBestellungen || nurBestellungen.length === 0) {
       console.warn('Keine Bestellungen zum Exportieren')
       return
     }
     
-    const data = inboundTableData.map(row => ({
+    const data = nurBestellungen.map(row => ({
       'Bedarfsdatum': row.bedarfsdatumFormatiert,
       'Bestelldatum': row.bestelldatumFormatiert,
       'Ist Vorjahr': row.istVorjahr ? 'Ja' : 'Nein',
@@ -664,13 +664,13 @@ export default function InboundPage() {
    * ✅ NEU: Exportiert Bestellungen als XLSX mit Formatierung
    */
   const handleExportBestellungenXLSX = async () => {
-    if (!inboundTableData || inboundTableData.length === 0) {
+    if (!nurBestellungen || nurBestellungen.length === 0) {
       console.warn('Keine Bestellungen zum Exportieren')
       return
     }
     
     try {
-      const data = inboundTableData.map(row => ({
+      const data = nurBestellungen.map(row => ({
         'Bedarfsdatum': row.bedarfsdatumFormatiert,
         'Bestelldatum': row.bestelldatumFormatiert,
         'Ist Vorjahr': row.istVorjahr ? 'Ja' : 'Nein',
@@ -714,7 +714,7 @@ export default function InboundPage() {
    * Sheets: Bestellungen, Aggregationen (Woche/Monat), Statistiken
    */
   const handleExportAlles = async () => {
-    if (!inboundTableData || inboundTableData.length === 0) {
+    if (!nurBestellungen || nurBestellungen.length === 0) {
       console.warn('Keine Daten zum Exportieren')
       return
     }
@@ -724,7 +724,7 @@ export default function InboundPage() {
         // Sheet 1: Tagesansicht
         {
           name: 'Tagesansicht',
-          data: inboundTableData.map(row => ({
+          data: nurBestellungen.map(row => ({
             'Bedarfsdatum': row.bedarfsdatumFormatiert,
             'Bestelldatum': row.bestelldatumFormatiert,
             'Vorjahr': row.istVorjahr ? 'Ja' : 'Nein',
@@ -742,31 +742,27 @@ export default function InboundPage() {
         // Sheet 2: Wochenansicht
         {
           name: 'Wochenansicht',
-          data: wochenBestellungen.map(w => ({
-            'Woche': w.woche,
-            'Von': w.von,
-            'Bis': w.bis,
-            'SAT_FT': w.SAT_FT,
-            'SAT_RL': w.SAT_RL,
-            'SAT_SP': w.SAT_SP,
-            'SAT_SL': w.SAT_SL,
-            'Gesamt': w.gesamt,
-            'Anzahl Bestellungen': w.anzahlBestellungen
+          data: bestellungenNachWoche.map(w => ({
+            'Kalenderwoche': w.kalenderwoche,
+            'Jahr': w.jahr,
+            'Gesamt': w.gesamtMenge,
+            'Anzahl Bestellungen': w.bestellungen,
+            'OEM-Bedarf': w.oemBedarf,
+            'Erstes Bestelldatum': w.erstesBestelldatum.toISOString().split('T')[0],
+            'Letztes Bestelldatum': w.letztesBestelldatum.toISOString().split('T')[0]
           })),
           title: `Inbound Wochenansicht ${konfiguration.planungsjahr}`
         },
         // Sheet 3: Monatsansicht
         {
           name: 'Monatsansicht',
-          data: monatsBestellungen.map(m => ({
+          data: bestellungenNachMonat.map(m => ({
             'Monat': m.monat,
             'Monat Name': m.monatName,
-            'SAT_FT': m.SAT_FT,
-            'SAT_RL': m.SAT_RL,
-            'SAT_SP': m.SAT_SP,
-            'SAT_SL': m.SAT_SL,
-            'Gesamt': m.gesamt,
-            'Anzahl Bestellungen': m.anzahlBestellungen
+            'Jahr': m.jahr,
+            'Gesamt': m.gesamtMenge,
+            'Anzahl Bestellungen': m.bestellungen,
+            'OEM-Bedarf': m.oemBedarf
           })),
           title: `Inbound Monatsansicht ${konfiguration.planungsjahr}`
         }

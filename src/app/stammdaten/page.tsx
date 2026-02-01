@@ -85,64 +85,77 @@ export default function StammdatenPage() {
           data: stammdatenData.varianten.map(v => ({
             'Varianten-ID': v.id,
             'Name': v.name,
-            'Jahresproduktion': v.jahresproduktion,
-            'Anteil (%)': v.anteil,
-            'Deckungsbeitrag': v.deckungsbeitrag
+            'Kategorie': v.kategorie,
+            'Gewicht (kg)': v.gewicht,
+            'Farben': v.farben.join(', '),
+            'Anteil Prognose': (v.anteilPrognose * 100) + '%',
+            'Beschreibung': v.beschreibung
           })),
           title: 'MTB-Varianten Übersicht'
         },
         // Sheet 2: Saisonalität
         {
           name: 'Saisonalität',
-          data: saisonalitaetData.monate.map(m => ({
+          data: saisonalitaetData.saisonalitaetMonatlich.map(m => ({
             'Monat': m.monat,
-            'Monat Name': m.monatName,
+            'Monat Name': m.name,
             'Anteil (%)': m.anteil,
-            'Faktor': m.faktor
+            'Beschreibung': m.beschreibung
           })),
           title: 'Saisonale Verteilung'
         },
         // Sheet 3: Stückliste
         {
           name: 'Stückliste',
-          data: stuecklisteData.stueckliste.map(s => ({
-            'MTB-Variante': s.mtbVariante,
-            'Bauteil-ID': s.bauteilId,
-            'Bauteil-Name': s.bauteilName,
-            'Menge': s.menge,
-            'Einheit': s.einheit
-          })),
+          data: Object.entries(stuecklisteData.stuecklisten).flatMap(([varianteId, stueckliste]) =>
+            Object.entries(stueckliste.komponenten).map(([komponenteId, komponente]) => ({
+              'MTB-Variante': varianteId,
+              'Bauteil-ID': komponenteId,
+              'Bauteil-Name': komponente.name,
+              'Menge': komponente.menge,
+              'Einheit': komponente.einheit
+            }))
+          ),
           title: 'Stückliste - Sattel-Zuordnung'
         },
         // Sheet 4: Lieferant
         {
           name: 'Lieferant',
-          data: lieferantChinaData.komponenten.map(k => ({
-            'Komponente-ID': k.id,
+          data: Object.entries(lieferantChinaData.komponentenDetails).map(([id, k]) => ({
+            'Komponente-ID': id,
             'Name': k.name,
-            'Losgröße': k.losgroesse,
-            'Typ': k.typ
+            'Kategorie': k.kategorie,
+            'Beschreibung': k.beschreibung
           })),
           title: 'Lieferant China - Komponenten'
         },
         // Sheet 5: Feiertage China
         {
           name: 'Feiertage China',
-          data: feiertageChina.feiertage.map(f => ({
+          data: [
+            ...feiertageChina.feiertage2026.map(f => ({ ...f, Jahr: 2026 })),
+            ...feiertageChina.feiertage2027.map(f => ({ ...f, Jahr: 2027 })),
+            ...feiertageChina.feiertage2028.map(f => ({ ...f, Jahr: 2028 }))
+          ].map(f => ({
             'Datum': f.datum,
             'Name': f.name,
             'Typ': f.typ,
-            'Dauer (Tage)': f.dauer
+            'Jahr': f.Jahr
           })),
           title: 'Feiertage China 2026-2028'
         },
         // Sheet 6: Feiertage Deutschland
         {
           name: 'Feiertage Deutschland',
-          data: feiertageDeutschland.feiertage.map(f => ({
+          data: [
+            ...feiertageDeutschland.feiertage2026.map(f => ({ ...f, Jahr: 2026 })),
+            ...feiertageDeutschland.feiertage2027.map(f => ({ ...f, Jahr: 2027 })),
+            ...feiertageDeutschland.feiertage2028.map(f => ({ ...f, Jahr: 2028 }))
+          ].map(f => ({
             'Datum': f.datum,
             'Name': f.name,
-            'Bundesland': f.bundesland
+            'Bundesland': f.bundesland,
+            'Jahr': f.Jahr
           })),
           title: 'Feiertage Deutschland NRW 2026-2028'
         }

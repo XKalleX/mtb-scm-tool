@@ -155,7 +155,7 @@ export default function OEMProgrammPage() {
         'Abweichung': tag.abweichung,
         'Schichten': tag.schichten,
         'Auslastung': tag.auslastung + '%',
-        'Fehler (kumulativ)': tag.fehler?.toFixed(3) || '0.000'
+        'Fehler (kumulativ)': tag.monatsFehlerNachher?.toFixed(3) || '0.000'
       }
     })
     
@@ -204,7 +204,7 @@ export default function OEMProgrammPage() {
           'Abweichung': tag.abweichung,
           'Schichten': tag.schichten,
           'Auslastung (%)': tag.auslastung,
-          'Fehler (kumulativ)': parseFloat(tag.fehler?.toFixed(3) || '0')
+          'Fehler (kumulativ)': parseFloat(tag.monatsFehlerNachher?.toFixed(3) || '0')
         }
       })
       
