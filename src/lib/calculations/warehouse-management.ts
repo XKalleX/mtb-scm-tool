@@ -831,6 +831,23 @@ export function berechneIntegriertesWarehouse(
         // Update Backlog: neuer Backlog = nichtErfuellt (was nicht produziert werden konnte)
         produktionsBacklog[bauteilId] = nichtErfuellt > 0 ? nichtErfuellt : 0
         
+        // ✅ KRITISCHER FIX: atpErfuellt basierend auf TATSÄCHLICHER Produktion!
+        // Material OK = true WENN Produktion stattfindet (verbrauch > 0)
+        // Logik: Wenn Bikes produziert werden, war Material verfügbar!
+        // Der GLOBALE Status zeigt nur ob ALLE Anforderungen erfüllt wurden,
+        // aber "Material OK" sollte zeigen ob ÜBERHAUPT produziert werden konnte.
+        if (verbrauch > 0) {
+          atpErfuellt = true  // Material war verfügbar, Produktion fand statt
+          atpGrund = undefined  // Kein Engpass für diesen Verbrauch
+        } else if (benoetigt > 0 || backlogVorher > 0) {
+          // Bedarf vorhanden aber keine Produktion → Material nicht verfügbar
+          atpErfuellt = false
+          if (!atpGrund) {
+            atpGrund = `Kein Material verfügbar (benötigt: ${benoeligtMitBacklog}, verfügbar: ${verfuegbarerBestand})`
+          }
+        }
+        // Wenn weder Bedarf noch Backlog, bleibt atpErfuellt beim Standardwert
+        
         // Buche Verbrauch (jetzt mit Backlog-Abbau)
         aktuelleBestaende[bauteilId] -= verbrauch
         gesamtVerbrauch += verbrauch
@@ -1331,8 +1348,16 @@ export function korrigiereProduktionsplaeneMitWarehouse(
       // Berechne Abweichung neu
       produktionsTag.abweichung = produktionsTag.istMenge - produktionsTag.planMenge
       
-      // Update materialVerfuegbar Flag
-      produktionsTag.materialVerfuegbar = bauteil.atpCheck.erfuellt
+      // ✅ KRITISCHER FIX: materialVerfuegbar basierend auf TATSÄCHLICHER Produktion!
+      // Wenn Ist-Menge > 0, dann war Material verfügbar (unabhängig vom ATP-Status)
+      // Logik: "Material OK" = "Produktion war möglich"
+      if (produktionsTag.istMenge > 0) {
+        produktionsTag.materialVerfuegbar = true
+      } else if (produktionsTag.planMenge > 0) {
+        // Geplante Produktion aber keine Ist-Produktion → Material fehlte
+        produktionsTag.materialVerfuegbar = false
+      }
+      // Wenn weder Plan noch Ist, bleibt der Wert unverändert (z.B. Wochenende)
     })
   })
   
