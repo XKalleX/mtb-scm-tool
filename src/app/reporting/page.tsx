@@ -144,7 +144,7 @@ export default function ReportingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <KPICard 
               metrik={metriken.planerfuellungsgrad}
-              zeitreiheDaten={zeitreihen.planerfuellungMonatlich.map(m => m.erfuellungsgrad)}
+              zeitreiheDaten={zeitreihen.planerfuellungWoechentlich.map(w => w.erfuellungsgrad)}
             />
             <KPICard 
               metrik={metriken.liefertreueChina}
@@ -164,12 +164,12 @@ export default function ReportingPage() {
             />
             <KPICard 
               metrik={metriken.durchlaufzeit}
-              zeitreiheDaten={zeitreihen.durchlaufzeitDetails.monatlich.map(m => m.durchschnitt)}
+              zeitreiheDaten={zeitreihen.durchlaufzeitDetails.woechentlich.map(w => w.durchschnitt)}
               inverse // Niedriger = besser
             />
             <KPICard 
               metrik={metriken.planungsgenauigkeit}
-              zeitreiheDaten={zeitreihen.planungsgenauigkeitMonatlich.map(m => m.genauigkeit)}
+              zeitreiheDaten={zeitreihen.planungsgenauigkeitWoechentlich.map(w => w.genauigkeit)}
             />
             <KPICard 
               metrik={metriken.materialverfuegbarkeit}
@@ -187,21 +187,21 @@ export default function ReportingPage() {
           <MetrikDetailView
             metrik={metriken.planerfuellungsgrad}
             charts={[
-              <MonatlicherVerlaufChart 
-                key="monatlich"
-                data={zeitreihen.planerfuellungMonatlich}
+              <WoechentlicherVerlaufChart 
+                key="woechentlich"
+                data={zeitreihen.planerfuellungWoechentlich}
                 dataKey="erfuellungsgrad"
                 label="Erfüllungsgrad (%)"
                 zielwert={95}
               />,
-              <PlanerfuellungMonatlichChart
+              <PlanerfuellungWoechentlichChart
                 key="balken"
-                data={zeitreihen.planerfuellungMonatlich}
+                data={zeitreihen.planerfuellungWoechentlich}
               />
             ]}
             exportData={{
-              csv: convertToCSV(zeitreihen.planerfuellungMonatlich),
-              json: zeitreihen.planerfuellungMonatlich
+              csv: convertToCSV(zeitreihen.planerfuellungWoechentlich),
+              json: zeitreihen.planerfuellungWoechentlich
             }}
           />
         </TabsContent>
@@ -236,13 +236,13 @@ export default function ReportingPage() {
                 key="waterfall"
                 data={zeitreihen.durchlaufzeitDetails.komponenten}
               />,
-              <MonatlicheDurchlaufzeitChart
-                key="monatlich"
-                data={zeitreihen.durchlaufzeitDetails.monatlich}
+              <WoechentlicheDurchlaufzeitChart
+                key="woechentlich"
+                data={zeitreihen.durchlaufzeitDetails.woechentlich}
               />
             ]}
             exportData={{
-              csv: convertToCSV(zeitreihen.durchlaufzeitDetails.monatlich),
+              csv: convertToCSV(zeitreihen.durchlaufzeitDetails.woechentlich),
               json: zeitreihen.durchlaufzeitDetails
             }}
           />
@@ -253,18 +253,18 @@ export default function ReportingPage() {
           <MetrikDetailView
             metrik={metriken.planungsgenauigkeit}
             charts={[
-              <PlanVsIstDualAxisChart
+              <PlanVsIstWoechentlichChart
                 key="dualaxis"
-                data={zeitreihen.planungsgenauigkeitMonatlich}
+                data={zeitreihen.planungsgenauigkeitWoechentlich}
               />,
-              <MonatlicheAbweichungChart
+              <WoechentlicheAbweichungChart
                 key="abweichung"
-                data={zeitreihen.planungsgenauigkeitMonatlich}
+                data={zeitreihen.planungsgenauigkeitWoechentlich}
               />
             ]}
             exportData={{
-              csv: convertToCSV(zeitreihen.planungsgenauigkeitMonatlich),
-              json: zeitreihen.planungsgenauigkeitMonatlich
+              csv: convertToCSV(zeitreihen.planungsgenauigkeitWoechentlich),
+              json: zeitreihen.planungsgenauigkeitWoechentlich
             }}
           />
         </TabsContent>
@@ -600,13 +600,14 @@ function WoechentlicheHeatmap({ data, title }: any) {
   )
 }
 
-// Chart 3: Liefertreue Scatter (Timeline)
+// Chart 3: Liefertreue Scatter (Timeline) - ✅ ZEIGT ALLE BESTELLUNGEN
 function LiefertreueLieferungenScatter({ data }: any) {
-  const chartData = data.slice(0, 50) // Erste 50 Lieferungen für Übersicht
+  // ✅ KORREKTUR: Zeige ALLE Lieferungen (nicht nur erste 50)
+  const chartData = data // Alle Lieferungen
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-medium">Lieferungen Timeline (erste 50)</h3>
+      <h3 className="text-sm font-medium">Lieferungen Timeline (Alle {data.length} Bestellungen)</h3>
       <ResponsiveContainer width="100%" height={300}>
         <ScatterChart>
           <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
@@ -630,9 +631,14 @@ function LiefertreueLieferungenScatter({ data }: any) {
                   <div className="bg-white p-3 border rounded shadow-lg">
                     <p className="font-medium">{data.bestellungId}</p>
                     <p className="text-sm">Bestellt: {data.bestelldatum}</p>
+                    <p className="text-sm">Bedarfsdatum: {data.bedarfsdatum}</p>
                     <p className="text-sm">Erwartet: {data.erwarteteAnkunft}</p>
                     {data.tatsaechlicheAnkunft && (
-                      <p className="text-sm">Angekommen: {data.tatsaechlicheAnkunft}</p>
+                      <p className="text-sm">Verfügbar ab: {data.tatsaechlicheAnkunft}</p>
+                    )}
+                    <p className="text-sm">Vorlaufzeit: {data.vorlaufzeitTage} Tage</p>
+                    {data.verspaetungTage !== undefined && data.verspaetungTage > 0 && (
+                      <p className="text-sm text-red-600">Verspätung: {data.verspaetungTage} Tage</p>
                     )}
                     <p className={`text-sm font-medium ${data.puenktlich ? 'text-green-600' : 'text-red-600'}`}>
                       {data.puenktlich ? '✓ Pünktlich' : '✗ Verspätet'}
@@ -728,17 +734,20 @@ function MonatlicheLiefertreueBars({ data }: any) {
   )
 }
 
-// Chart 5: Durchlaufzeit Waterfall
+// Chart 5: Durchlaufzeit Waterfall - ✅ MIT AT/KT LABELS
 function DurchlaufzeitWaterfallChart({ data }: any) {
   let kumulativ = 0
   const chartData = data.map((komponente: any) => {
     const start = kumulativ
     kumulativ += komponente.tage
+    // ✅ KORREKTUR: AT/KT Label anzeigen
+    const typLabel = komponente.typ === 'arbeitstage' ? ' (AT)' : ' (KT)'
     return {
-      name: komponente.name,
+      name: komponente.name + typLabel,
       tage: komponente.tage,
       start,
-      ende: kumulativ
+      ende: kumulativ,
+      typ: komponente.typ
     }
   })
 
@@ -753,9 +762,25 @@ function DurchlaufzeitWaterfallChart({ data }: any) {
             type="category" 
             dataKey="name" 
             tick={{ fontSize: 10 }}
-            width={150}
+            width={200}
           />
-          <Tooltip />
+          <Tooltip 
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                const data = payload[0].payload
+                return (
+                  <div className="bg-white p-2 border rounded shadow">
+                    <p className="font-medium">{data.name}</p>
+                    <p className="text-sm">Dauer: {data.tage} Tage</p>
+                    <p className="text-sm text-muted-foreground">
+                      {data.typ === 'arbeitstage' ? 'Arbeitstage (AT)' : 'Kalendertage (KT)'}
+                    </p>
+                  </div>
+                )
+              }
+              return null
+            }}
+          />
           <Bar dataKey="tage" fill={CHART_COLORS.primary}>
             {chartData.map((entry: any, index: number) => (
               <Cell 
@@ -1122,6 +1147,252 @@ function ReichweiteHeatmapChart({ data }: any) {
                       ? '#f59e0b'  // ⚠️ 3-5 Tage = mittel
                       : '#ef4444'  // ❌ >5 Tage = zu hohe Lagerhaltung
                 }
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * ✅ NEUE WÖCHENTLICHE CHART-KOMPONENTEN
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+// ✅ NEU: Wöchentlicher Verlauf (statt monatlich)
+function WoechentlicherVerlaufChart({ data, dataKey, label, zielwert }: any) {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium">Wöchentlicher Verlauf</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+          <XAxis 
+            dataKey="kalenderwoche" 
+            label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5 }}
+            tick={{ fontSize: 12 }}
+          />
+          <YAxis tick={{ fontSize: 12 }} />
+          <Tooltip 
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                const data = payload[0].payload
+                return (
+                  <div className="bg-white p-2 border rounded shadow">
+                    <p className="font-medium">KW {data.kalenderwoche}</p>
+                    <p className="text-sm">{label}: {data[dataKey]?.toFixed(1)}</p>
+                  </div>
+                )
+              }
+              return null
+            }}
+          />
+          <Legend />
+          <ReferenceLine 
+            y={zielwert} 
+            stroke={CHART_COLORS.quaternary}
+            strokeDasharray="5 5"
+            label="Zielwert"
+          />
+          <Line 
+            type="monotone" 
+            dataKey={dataKey}
+            name={label}
+            stroke={CHART_COLORS.primary}
+            strokeWidth={2}
+            dot={{ r: 3 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+// ✅ NEU: Planerfüllung Wöchentlich (Bar Chart mit Plan/Ist)
+function PlanerfuellungWoechentlichChart({ data }: any) {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium">Plan vs. Ist pro Woche</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+          <XAxis 
+            dataKey="kalenderwoche" 
+            label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5 }}
+            tick={{ fontSize: 12 }}
+          />
+          <YAxis tick={{ fontSize: 12 }} />
+          <Tooltip />
+          <Legend />
+          <Bar dataKey="planMenge" name="Plan" fill={CHART_COLORS.primary} opacity={0.6} />
+          <Bar dataKey="istMenge" name="Ist" fill={CHART_COLORS.secondary} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+// ✅ NEU: Wöchentliche Durchlaufzeit (Min/Avg/Max) - statt monatlich
+function WoechentlicheDurchlaufzeitChart({ data }: any) {
+  // Filter nur Wochen mit Lieferungen
+  const dataWithDeliveries = data.filter((w: any) => w.anzahlLieferungen > 0)
+  
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium">Wöchentliche Durchlaufzeit (Min/Ø/Max)</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <ComposedChart data={dataWithDeliveries}>
+          <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+          <XAxis 
+            dataKey="kalenderwoche" 
+            label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5 }}
+            tick={{ fontSize: 12 }}
+          />
+          <YAxis tick={{ fontSize: 12 }} label={{ value: 'Tage', angle: -90, position: 'insideLeft' }} />
+          <Tooltip 
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                const data = payload[0].payload
+                return (
+                  <div className="bg-white p-2 border rounded shadow">
+                    <p className="font-medium">KW {data.kalenderwoche}</p>
+                    <p className="text-sm">Min: {data.min.toFixed(1)} Tage</p>
+                    <p className="text-sm">Ø: {data.durchschnitt.toFixed(1)} Tage</p>
+                    <p className="text-sm">Max: {data.max.toFixed(1)} Tage</p>
+                    <p className="text-sm">Lieferungen: {data.anzahlLieferungen}</p>
+                  </div>
+                )
+              }
+              return null
+            }}
+          />
+          <Legend />
+          <Line 
+            type="monotone" 
+            dataKey="min" 
+            name="Min"
+            stroke={CHART_COLORS.secondary}
+            strokeDasharray="5 5"
+          />
+          <Line 
+            type="monotone" 
+            dataKey="durchschnitt" 
+            name="Durchschnitt"
+            stroke={CHART_COLORS.primary}
+            strokeWidth={3}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="max" 
+            name="Max"
+            stroke={CHART_COLORS.tertiary}
+            strokeDasharray="5 5"
+          />
+          <ReferenceLine 
+            y={49} 
+            stroke={CHART_COLORS.quaternary}
+            strokeDasharray="3 3"
+            label="Ziel: 49d"
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+// ✅ NEU: Plan vs. Ist Wöchentlich (Dual Axis)
+function PlanVsIstWoechentlichChart({ data }: any) {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium">Plan vs. Ist-Produktion (wöchentlich)</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <ComposedChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+          <XAxis 
+            dataKey="kalenderwoche" 
+            label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5 }}
+            tick={{ fontSize: 12 }}
+          />
+          <YAxis 
+            yAxisId="left"
+            tick={{ fontSize: 12 }}
+            label={{ value: 'Stückzahl', angle: -90, position: 'insideLeft' }}
+          />
+          <YAxis 
+            yAxisId="right"
+            orientation="right"
+            tick={{ fontSize: 12 }}
+            label={{ value: 'Genauigkeit (%)', angle: 90, position: 'insideRight' }}
+          />
+          <Tooltip />
+          <Legend />
+          <Bar 
+            yAxisId="left"
+            dataKey="planMenge" 
+            name="Plan"
+            fill={CHART_COLORS.primary}
+            opacity={0.6}
+          />
+          <Bar 
+            yAxisId="left"
+            dataKey="istMenge" 
+            name="Ist"
+            fill={CHART_COLORS.secondary}
+          />
+          <Line 
+            yAxisId="right"
+            type="monotone" 
+            dataKey="genauigkeit" 
+            name="Genauigkeit (%)"
+            stroke={CHART_COLORS.tertiary}
+            strokeWidth={2}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+// ✅ NEU: Wöchentliche Abweichung (Plan - Ist)
+function WoechentlicheAbweichungChart({ data }: any) {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium">Wöchentliche Abweichung (Plan - Ist)</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+          <XAxis 
+            dataKey="kalenderwoche" 
+            label={{ value: 'Kalenderwoche', position: 'insideBottom', offset: -5 }}
+            tick={{ fontSize: 12 }}
+          />
+          <YAxis tick={{ fontSize: 12 }} label={{ value: 'Abweichung (Stück)', angle: -90, position: 'insideLeft' }} />
+          <Tooltip 
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                const data = payload[0].payload
+                return (
+                  <div className="bg-white p-2 border rounded shadow">
+                    <p className="font-medium">KW {data.kalenderwoche}</p>
+                    <p className="text-sm">Plan: {data.planMenge.toLocaleString()}</p>
+                    <p className="text-sm">Ist: {data.istMenge.toLocaleString()}</p>
+                    <p className="text-sm font-bold">Abweichung: {data.abweichung.toLocaleString()} Stück</p>
+                    <p className="text-sm">Genauigkeit: {data.genauigkeit.toFixed(1)}%</p>
+                  </div>
+                )
+              }
+              return null
+            }}
+          />
+          <ReferenceLine y={0} stroke="#000" />
+          <Bar dataKey="abweichung" name="Abweichung (Plan - Ist)">
+            {data.map((entry: any, index: number) => (
+              <Cell 
+                key={`cell-${index}`}
+                fill={Math.abs(entry.abweichung) < 500 ? '#10b981' : Math.abs(entry.abweichung) < 1500 ? '#f59e0b' : '#ef4444'}
               />
             ))}
           </Bar>
