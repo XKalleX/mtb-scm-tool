@@ -1512,12 +1512,14 @@ export default function InboundPage() {
                 </div>
               </div>
 
-              {/* 👇 LEGENDE & EMOJI UPDATES 👇 */}
-              <div className="mb-3 p-3 bg-white border border-blue-200 rounded-md text-sm text-blue-900 shadow-sm">
-                <div className="font-semibold mb-1 flex items-center gap-2">
-                  <Info className="h-4 w-4" /> 
-                  Legende & Logistik-Logik
-                </div>
+              {/* 👇 LEGENDE & EMOJI UPDATES - COLLAPSIBLE 👇 */}
+              <CollapsibleInfo 
+                title="Legende & Logistik-Logik"
+                defaultOpen={false}
+                variant="info"
+                icon={<Info className="h-4 w-4" />}
+                className="mb-3 shadow-sm"
+              >
                 <ul className="list-disc list-inside space-y-1 text-xs text-blue-800 ml-1">
                   <li>
                     <strong>Bündelung:</strong> Bestellungen werden am Hafen gesammelt und fahren nur <strong>mittwochs</strong> ab.
@@ -1538,7 +1540,7 @@ export default function InboundPage() {
                     <strong>Proportionale Verteilung:</strong> Wenn Teile am Hafen bleiben, werden sie proportional nach Bestellmenge verteilt.
                   </li>
                 </ul>
-              </div>
+              </CollapsibleInfo>
 
               <ExcelTable
                 columns={[
