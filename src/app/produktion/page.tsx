@@ -543,7 +543,12 @@ export default function ProduktionPage() {
     // Vorher wurde warehouseResult.jahresstatistik.gesamtProduziertTatsaechlich verwendet,
     // aber das enthielt Double-Counting durch redundanten Backlog-Abbau in Step 3e.
     const summeIstProduktion = tagesProduktionFormatiert.reduce((sum, tag) => sum + tag.istMenge, 0)
-    const geplantMenge = konfiguration.jahresproduktion // 370.000 Bikes
+    
+    // ✅ KORREKTUR: Nutze Summe der szenario-aware Varianten-Pläne statt hardcoded 370.000
+    // Bei Szenarien muss geplantMenge die angepasste Jahresproduktion widerspiegeln!
+    const geplantMenge = hasSzenarien && variantenPlaeneMitSzenarien
+      ? Object.values(variantenPlaeneMitSzenarien).reduce((sum, plan) => sum + plan.jahresProduktion, 0)
+      : konfiguration.jahresproduktion // Fallback: Baseline (370.000)
     
     // Materialengpass-Tage aus Warehouse (dort ist es korrekt berechnet)
     const tageOhneMaterial = warehouseResult.jahresstatistik.tageMitBacklog
@@ -578,7 +583,7 @@ export default function ProduktionPage() {
       planerfuellungsgrad: planerfuellungProzent,
       mitMaterialmangel: tageOhneMaterial
     }
-  }, [tagesProduktion, hasSzenarien, statistiken, warehouseResult, konfiguration.jahresproduktion, tagesProduktionFormatiert])
+  }, [tagesProduktion, hasSzenarien, statistiken, warehouseResult, konfiguration.jahresproduktion, tagesProduktionFormatiert, variantenPlaeneMitSzenarien])
   
   // ✅ Aggregierte Lagerbestandsdaten für Chart (außerhalb JSX)
   const lagerbestandChartDaten = useMemo(() => {

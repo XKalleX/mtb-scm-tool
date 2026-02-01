@@ -152,6 +152,19 @@ export default function OEMProgrammPage() {
   const arbeitstage = isInitialized ? getArbeitstageProJahr() : 252
   const jahresproduktionProVariante = isInitialized ? getJahresproduktionProVariante() : {}
   
+  // ✅ KORREKTUR: Berechne Gesamtproduktion als Summe aller Varianten-Pläne
+  // Dies ist die einzig korrekte Quelle für die Jahresproduktion-Kachel
+  const gesamtJahresproduktionPlan = useMemo(() => {
+    return Object.values(produktionsplaene).reduce((sum, plan) => sum + plan.jahresProduktion, 0)
+  }, [produktionsplaene])
+  
+  const gesamtJahresproduktionIst = useMemo(() => {
+    return Object.values(produktionsplaene).reduce((sum, plan) => sum + plan.jahresProduktionIst, 0)
+  }, [produktionsplaene])
+  
+  // ✅ KORREKTUR: Delta zwischen Szenario-Summe und Baseline
+  const gesamtDelta = gesamtJahresproduktionPlan - konfiguration.jahresproduktion
+  
   // Erstelle stueckliste basierend auf Konfiguration
   const stuecklistenMap = useMemo(() => {
     const map: Record<string, { komponenten: Record<string, { name: string; menge: number }> }> = {}
@@ -397,9 +410,10 @@ export default function OEMProgrammPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* ✅ KORREKTUR: Nutze Summe der Varianten-Pläne, nicht statistiken.geplant */}
             <DeltaCell 
-              value={hasSzenarien ? statistiken.geplant : konfiguration.jahresproduktion}
-              delta={statistiken.deltaGeplant}
+              value={gesamtJahresproduktionPlan}
+              delta={gesamtDelta}
               format={{ suffix: '' }}
             />
             <p className="text-xs text-muted-foreground">MTBs gesamt</p>
@@ -424,9 +438,10 @@ export default function OEMProgrammPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* ✅ KORREKTUR: Basiert auf Summe der Varianten-Pläne */}
             <DeltaCell 
-              value={hasSzenarien ? Math.round(statistiken.produziert / arbeitstage) : Math.round(konfiguration.jahresproduktion / arbeitstage)}
-              delta={hasSzenarien ? Math.round(statistiken.deltaProduziert / arbeitstage) : 0}
+              value={Math.round(gesamtJahresproduktionIst / arbeitstage)}
+              delta={Math.round(gesamtDelta / arbeitstage)}
               format={{ suffix: '' }}
             />
             <p className="text-xs text-muted-foreground">Bikes pro Arbeitstag</p>
@@ -683,10 +698,12 @@ export default function OEMProgrammPage() {
                   
                   // ✅ SZENARIO-AWARE: Berechne Baseline-Wert (ohne Szenarien/Anpassungen)
                   const baselineJahresProduktion = Math.round(konfiguration.jahresproduktion * (variante?.anteilPrognose || 0))
-                  const istJahresProduktion = plan.jahresProduktionIst
+                  // ✅ KORREKTUR: Verwende PLAN, nicht IST für Delta-Berechnung
+                  // IST wird durch ATP-Checks/Materialengpässe reduziert → führt zu falschen negativen Deltas
+                  const szenarioJahresProduktion = plan.jahresProduktion
                   
-                  // ✅ DELTA: Differenz zwischen Ist (mit Szenarien) und Baseline (ohne Szenarien)
-                  const delta = istJahresProduktion - baselineJahresProduktion
+                  // ✅ DELTA: Differenz zwischen Szenario-Plan und Baseline
+                  const delta = szenarioJahresProduktion - baselineJahresProduktion
                   const hatDelta = Math.abs(delta) > DELTA_SIGNIFICANCE_THRESHOLD
                   
                   // Visuelle Klassifizierung:
@@ -710,7 +727,8 @@ export default function OEMProgrammPage() {
                       <div className="text-xs font-medium truncate" title={variante?.name}>
                         {variante?.name.replace('MTB ', '')}
                       </div>
-                      <div className="text-sm font-bold">{formatNumber(istJahresProduktion, 0)}</div>
+                      {/* ✅ KORREKTUR: Zeige Szenario-Plan-Wert, nicht Ist */}
+                      <div className="text-sm font-bold">{formatNumber(szenarioJahresProduktion, 0)}</div>
                       
                       {/* Zeige Delta oder Abweichungs-Status */}
                       {hatSzenarioEffekt ? (
