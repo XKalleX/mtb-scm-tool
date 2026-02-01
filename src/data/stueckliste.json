@@ -4,7 +4,7 @@
     "MTBAllrounder": {
       "varianteId": "MTBAllrounder",
       "komponenten": {
-        "SAT_FT": {
+        "SAT_SP": {
           "name": "Spark",
           "menge": 1,
           "einheit": "Stück"
@@ -14,7 +14,7 @@
     "MTBCompetition": {
       "varianteId": "MTBCompetition",
       "komponenten": {
-        "SAT_RL": {
+        "SAT_SL": {
           "name": "Speedline",
           "menge": 1,
           "einheit": "Stück"
@@ -24,7 +24,7 @@
     "MTBDownhill": {
       "varianteId": "MTBDownhill",
       "komponenten": {
-        "SAT_SP": {
+        "SAT_FT": {
           "name": "Fizik Tundra",
           "menge": 1,
           "einheit": "Stück"
@@ -34,7 +34,7 @@
     "MTBExtreme": {
       "varianteId": "MTBExtreme",
       "komponenten": {
-        "SAT_SL": {
+        "SAT_SP": {
           "name": "Spark",
           "menge": 1,
           "einheit": "Stück"
@@ -54,7 +54,7 @@
     "MTBMarathon": {
       "varianteId": "MTBMarathon",
       "komponenten": {
-        "SAT_SL": {
+        "SAT_RL": {
           "name": "Raceline",
           "menge": 1,
           "einheit": "Stück"
@@ -64,7 +64,7 @@
     "MTBPerformance": {
       "varianteId": "MTBPerformance",
       "komponenten": {
-        "SAT_RL": {
+        "SAT_FT": {
           "name": "Fizik Tundra",
           "menge": 1,
           "einheit": "Stück"
@@ -74,7 +74,7 @@
     "MTBTrail": {
       "varianteId": "MTBTrail",
       "komponenten": {
-        "SAT_SP": {
+        "SAT_SL": {
           "name": "Speedline",
           "menge": 1,
           "einheit": "Stück"
