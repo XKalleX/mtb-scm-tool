@@ -216,16 +216,31 @@ export default function ProduktionPage() {
     // Erstelle aggregierte Tagesansicht aus korrigierten Varianten-Plänen
     const tagesAggregiert: TagesProduktionEntry[] = []
     
-    // Hole Warehouse-Backlog-Daten für Visualisierung
+    // Hole Warehouse-Daten für exakte Produktions-Zahlen (SSOT!)
     const jahr2027Tage = warehouseResult.tage.filter(t => t.tag >= 1 && t.tag <= 365)
+    
+    // ✅ NEU: Erstelle Lookup für Warehouse-Verbrauch pro Tag
+    // Dies ist die EINZIGE Quelle der Wahrheit für tatsächliche Produktion
+    const warehouseVerbrauchProTag: Record<number, number> = {}
     const backlogProTag: Record<number, number> = {}
+    const hatEngpassProTag: Record<number, boolean> = {}
     
     jahr2027Tage.forEach(warehouseTag => {
+      let tagesVerbrauch = 0
       let tagesBacklog = 0
+      let hatEngpass = false
+      
       warehouseTag.bauteile.forEach(bauteil => {
+        tagesVerbrauch += bauteil.verbrauch
         tagesBacklog += bauteil.produktionsBacklog.backlogNachher
+        if (!bauteil.atpCheck.erfuellt) {
+          hatEngpass = true
+        }
       })
+      
+      warehouseVerbrauchProTag[warehouseTag.tag] = tagesVerbrauch
       backlogProTag[warehouseTag.tag] = tagesBacklog
+      hatEngpassProTag[warehouseTag.tag] = hatEngpass
     })
     
     // Kapazitätsberechnung: 130 Bikes/h * 8h = 1040 Bikes pro Schicht
@@ -241,19 +256,20 @@ export default function ProduktionPage() {
       
       const templateTag = ersterPlan.tage[tag - 1]
       
-      // Aggregiere Plan und Ist über alle Varianten
+      // Aggregiere Plan über alle Varianten (Plan ist immer korrekt, aus OEM mit Error Management)
       let gesamtPlan = 0
-      let gesamtIst = 0
-      let hatMaterialEngpass = false
-      
       Object.values(korrigiertePlaene).forEach(plan => {
         const variantenTag = plan.tage[tag - 1]
         gesamtPlan += variantenTag.planMenge
-        gesamtIst += variantenTag.istMenge
-        if (!variantenTag.materialVerfuegbar) {
-          hatMaterialEngpass = true
-        }
       })
+      
+      // ✅ KRITISCHER FIX: Nutze Warehouse-Verbrauch DIREKT als IST-Menge!
+      // Dies vermeidet Rundungsfehler bei der proportionalen Verteilung auf Varianten.
+      // Da 1 Sattel = 1 Bike, entspricht der Verbrauch exakt der Produktion.
+      const gesamtIst = warehouseVerbrauchProTag[tag] || 0
+      
+      // Material-Engpass aus Warehouse
+      const hatMaterialEngpass = hatEngpassProTag[tag] || false
       
       // ✅ FIX: Berechne Schichten basierend auf tatsächlicher IST-Menge + Backlog
       // Bei Backlog benötigen wir mehr Schichten um aufzuholen

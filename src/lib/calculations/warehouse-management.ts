@@ -490,6 +490,13 @@ export function berechneIntegriertesWarehouse(
     produktionsBacklog[bauteil.id] = 0
   })
   
+  // ✅ NEU: Error-Tracker pro Bauteil für faire Verteilung bei Engpass
+  // Akkumuliert Rundungsfehler und korrigiert diese über die Zeit
+  const errorTrackerProBauteil: Record<string, number> = {}
+  bauteile.forEach(bauteil => {
+    errorTrackerProBauteil[bauteil.id] = 0
+  })
+  
   // NEU: Tracking für Statistiken
   // HINWEIS: gesamtBedarf wird bereits oben nach STEP 1.5 berechnet (aus Produktionsplänen)
   let gesamtProduziertTatsaechlich = 0
@@ -766,28 +773,50 @@ export function berechneIntegriertesWarehouse(
         // Wende GLOBALEN Produktionsfaktor an UND begrenze durch lokalen Bestand!
         // ─────────────────────────────────────────────────────────────────────────
         /**
-         * 🔧 KRITISCHER FIX: Der Verbrauch muss ZUSÄTZLICH durch den lokalen Bestand begrenzt werden!
+         * 🎯 ERROR MANAGEMENT FÜR FAIRE VERTEILUNG
          * 
-         * Problem vorher:
-         * - produktionsFaktor basiert auf SUMME aller Sättel
-         * - Wenn SAT_FT viel hat (500) und SAT_SL wenig (50), ist der globale Faktor OK
-         * - ABER: Varianten die SAT_SL brauchen können nur 50 produzieren, nicht mehr!
+         * KONZEPT:
+         * Bei Materialengpass müssen wir das verfügbare Material fair auf die Komponenten
+         * verteilen. Dabei entstehen Rundungsfehler, die über Error Management korrigiert werden.
          * 
-         * Lösung:
-         * - Berechne erst den globalen Faktor-basierten Verbrauch
-         * - Dann begrenze durch den TATSÄCHLICH verfügbaren Bestand dieses Bauteils
-         * - Der Unterschied geht in den Backlog
+         * REGELN:
+         * 1. Bei KEINEM Engpass (produktionsFaktor = 1.0): Exakt die OEM-Plan-Menge produzieren
+         *    → Keine Rundung nötig, da benoetigt bereits ganzzahlig aus OEM-Planung kommt
          * 
-         * ✅ FIX: Nutze Math.round statt Math.floor um Rundungsverluste zu minimieren!
-         * Mit Math.floor verloren wir ~1 Bike pro Komponente pro Tag bei Engpass.
-         * Bei 4 Komponenten und 254 Arbeitstagen = ~1016 Bikes Verlust/Jahr.
-         * Mit Math.round wird die Produktion auf das verfügbare Material abgestimmt.
+         * 2. Bei Engpass (produktionsFaktor < 1.0): Error Management anwenden
+         *    → Kumulierten Fehler pro Bauteil tracken und korrigieren
+         *    → Sicherstellen, dass SUMME aller Bauteile = verfügbares Material
          */
-        // ✅ FIX: Nutze benoeligtMitBacklog statt benoetigt für die Berechnung!
-        // Der produktionsFaktor wurde global für (Plan+Backlog) berechnet,
-        // also muss auch hier (Plan+Backlog) verwendet werden.
-        // ✅ CRITICAL FIX: Nutze Math.round statt Math.floor für bessere Materialnutzung!
-        const globalerBedarf = Math.round(benoeligtMitBacklog * produktionsFaktor)
+        
+        // ✅ FIX: Nutze benoeligtMitBacklog für die Berechnung (inkl. Backlog von gestern)
+        let globalerBedarf: number
+        
+        if (produktionsFaktor >= 1.0) {
+          // ✅ KEIN ENGPASS: Produziere exakt die OEM-Plan-Menge (+ Backlog wenn möglich)
+          // Die OEM-Planung nutzt bereits Error Management, daher ist benoetigt ganzzahlig
+          globalerBedarf = benoeligtMitBacklog
+        } else {
+          // ⚠️ ENGPASS: Error Management für faire Verteilung
+          // Der Fehler wird pro Bauteil über die Tage akkumuliert
+          const sollMenge = benoeligtMitBacklog * produktionsFaktor
+          
+          // Error Management: Tracke kumulierten Fehler pro Bauteil
+          if (!errorTrackerProBauteil[bauteilId]) {
+            errorTrackerProBauteil[bauteilId] = 0
+          }
+          
+          const basisMenge = Math.floor(sollMenge)
+          const tagesError = sollMenge - basisMenge
+          errorTrackerProBauteil[bauteilId] += tagesError
+          
+          // Wenn akkumulierter Fehler >= 1.0, korrigiere durch Aufrunden
+          if (errorTrackerProBauteil[bauteilId] >= 1.0) {
+            globalerBedarf = basisMenge + 1
+            errorTrackerProBauteil[bauteilId] -= 1.0
+          } else {
+            globalerBedarf = basisMenge
+          }
+        }
         
         // ✅ KRITISCH: Begrenze Verbrauch durch den VERFÜGBAREN BESTAND dieses Bauteils!
         const verfuegbarerBestand = aktuelleBestaende[bauteilId]
@@ -1201,6 +1230,10 @@ export function korrigiereProduktionsplaeneMitWarehouse(
     })
   })
   
+  // ✅ NEU: Error Tracker für proportionale Verteilung bei Engpass
+  // Akkumuliert Rundungsfehler pro Variante+Bauteil Kombination
+  const variantenErrorTracker: Record<string, number> = {}
+  
   // Für jeden Tag im Warehouse
   warehouseResult.tage.forEach(warehouseTag => {
     const tagImJahr = warehouseTag.tag
@@ -1245,7 +1278,7 @@ export function korrigiereProduktionsplaeneMitWarehouse(
       )
       
       if (variantenMitBauteil.length > 1) {
-        // PROPORTIONALE VERTEILUNG
+        // PROPORTIONALE VERTEILUNG mit Error Management
         // Berechne Gesamt-PLAN für dieses Bauteil heute
         let gesamtPlan = 0
         const variantenPlaene: Record<string, number> = {}
@@ -1261,11 +1294,35 @@ export function korrigiereProduktionsplaeneMitWarehouse(
         
         // Verteile tatsächliche Produktion proportional
         if (gesamtPlan > 0) {
-          const anteilDieseVariante = variantenPlaene[varianteId] / gesamtPlan
-          const istMengeDieseVariante = Math.round(tatsaechlichProduzierteBikes * anteilDieseVariante)
-          
-          // Update IST-Menge
-          produktionsTag.istMenge = istMengeDieseVariante
+          // ✅ KRITISCHER FIX: Wenn Produktion = Plan, nutze direkt den Plan-Wert
+          // Dies vermeidet Rundungsfehler bei der proportionalen Verteilung
+          // Die OEM-Planung hat bereits Error Management, daher ist planMenge exakt
+          if (tatsaechlichProduzierteBikes === gesamtPlan) {
+            // Exakte Produktion → nutze Plan direkt
+            produktionsTag.istMenge = variantenPlaene[varianteId]
+          } else {
+            // Engpass → proportionale Verteilung mit Error Management
+            const anteilDieseVariante = variantenPlaene[varianteId] / gesamtPlan
+            const sollMenge = tatsaechlichProduzierteBikes * anteilDieseVariante
+            
+            // Error Management für faire Verteilung
+            // Tracke kumulierten Fehler pro Variante+Bauteil Kombination
+            const errorKey = `${varianteId}_${bauteilId}`
+            if (!variantenErrorTracker[errorKey]) {
+              variantenErrorTracker[errorKey] = 0
+            }
+            
+            const basisMenge = Math.floor(sollMenge)
+            const tagesError = sollMenge - basisMenge
+            variantenErrorTracker[errorKey] += tagesError
+            
+            if (variantenErrorTracker[errorKey] >= 1.0) {
+              produktionsTag.istMenge = basisMenge + 1
+              variantenErrorTracker[errorKey] -= 1.0
+            } else {
+              produktionsTag.istMenge = basisMenge
+            }
+          }
         } else {
           // Kein Plan → keine Produktion
           produktionsTag.istMenge = 0
