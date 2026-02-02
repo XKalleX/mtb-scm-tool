@@ -83,6 +83,10 @@ interface InboundTableRow {
   schiffAbfahrt?: string        // 4_Abfahrt_Schiff (nur Mittwoch!)
   ankunftHafenDE?: string       // 5_Ankunft_Hafen_DE (Hamburg)
   verfuegbarAb?: string         // 6_Verfügbar_OEM (Verfügbarkeitsdatum)
+  // ✅ NEU: Szenario-Tracking für Delta-Anzeige
+  originalErwarteteAnkunft?: Date    // Original-Ankunftsdatum (vor Szenario)
+  originalVerfuegbarAb?: Date        // Original-Verfügbarkeitsdatum (vor Szenario)
+  szenarioVerspaetungTage?: number   // Verspätung durch Szenario in Tagen
 }
 
 /**
@@ -419,6 +423,11 @@ export default function InboundPage() {
         // ✅ NEU: Extrahiere Materialfluss-Details von der ersten Bestellung
         const materialfluss = bestellung.materialfluss
         
+        // ✅ NEU: Extrahiere Szenario-Tracking-Informationen
+        const szenarioVerspaetungTage = bestellung.szenarioVerspaetungTage
+        const originalErwarteteAnkunft = bestellung.originalErwarteteAnkunft
+        const originalVerfuegbarAb = bestellung.originalVerfuegbarAb
+        
         alleTage.push({
           bedarfsdatum,
           bedarfsdatumFormatiert,
@@ -479,7 +488,11 @@ export default function InboundPage() {
             ? (bestellung.verfuegbarAb instanceof Date
                 ? bestellung.verfuegbarAb.toLocaleDateString('de-DE')
                 : new Date(bestellung.verfuegbarAb).toLocaleDateString('de-DE'))
-            : undefined
+            : undefined,
+          // ✅ NEU: Szenario-Tracking
+          originalErwarteteAnkunft,
+          originalVerfuegbarAb,
+          szenarioVerspaetungTage
         })
       } else {
         // Kein Bedarf/Keine Bestellung für dieses Datum - ermittle Grund
@@ -1401,8 +1414,36 @@ export default function InboundPage() {
                     { key: 'ankunftHafenChina', label: '3️⃣ Hafen CN', width: '130px', align: 'center', sumable: false, format: (v: string) => v || '-' },
                     { key: 'schiffAbfahrt', label: '4️⃣ Schiff ab', width: '130px', align: 'center', sumable: false, format: (v: string) => v || '-' },
                     { key: 'ankunftHafenDE', label: '5️⃣ Hafen DE', width: '130px', align: 'center', sumable: false, format: (v: string) => v || '-' },
-                    { key: 'erwarteteAnkunftFormatiert', label: '6️⃣ Ank. Werk', width: '130px', align: 'center', sumable: false },
-                    { key: 'verfuegbarAb', label: '7️⃣ Verfügbar', width: '130px', align: 'center', sumable: false, format: (v: string) => v || '-' },
+                    { 
+                      key: 'erwarteteAnkunftFormatiert', 
+                      label: '6️⃣ Ank. Werk', 
+                      width: '180px', 
+                      align: 'center', 
+                      sumable: false,
+                      format: (v: string, row: InboundTableRow) => {
+                        if (!v || v === '-') return '-'
+                        // Zeige Delta wenn Szenario aktiv
+                        if (row.szenarioVerspaetungTage && row.szenarioVerspaetungTage > 0) {
+                          return `${v} 🚢+${row.szenarioVerspaetungTage}T`
+                        }
+                        return v
+                      }
+                    },
+                    { 
+                      key: 'verfuegbarAb', 
+                      label: '7️⃣ Verfügbar', 
+                      width: '180px', 
+                      align: 'center', 
+                      sumable: false, 
+                      format: (v: string, row: InboundTableRow) => {
+                        if (!v || v === '-') return '-'
+                        // Zeige Delta wenn Szenario aktiv
+                        if (row.szenarioVerspaetungTage && row.szenarioVerspaetungTage > 0) {
+                          return `${v} 🚢+${row.szenarioVerspaetungTage}T`
+                        }
+                        return v
+                      }
+                    },
                     { key: 'bestellmenge', label: 'Bestellmenge', width: '130px', align: 'right', sumable: true, format: (v: number) => v > 0 ? formatNumber(v, 0) + ' Stk' : '-' }
                    ]}
                    data={nurBestellungen} 
