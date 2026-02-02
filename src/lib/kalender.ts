@@ -67,6 +67,15 @@ export interface FeiertagsKonfiguration {
 }
 
 /**
+ * Interface für China Produktionsausfall-Tage (aus Szenarien)
+ * Ermöglicht es, Produktionsausfälle wie Feiertage zu behandeln
+ */
+export interface ProduktionsausfallKonfiguration {
+  produktionsAusfallTage: number[] // Tag-Nummern 1-365
+  planungsjahr: number // Jahr für Datumsberechnungen (z.B. 2027)
+}
+
+/**
  * Liest das 'Heute'-Datum aus der globalen Konfiguration
  * Fallback: DEFAULT_HEUTE_DATUM aus stammdaten.json falls nicht gesetzt oder ungültig
  * @returns Date-Objekt des 'Heute'-Datums (garantiert gültig)
@@ -211,6 +220,32 @@ export function istChinaFeiertag(
 }
 
 /**
+ * Prüft ob ein Datum ein China-Produktionsausfall-Tag ist (aus Szenarien)
+ * 
+ * WICHTIG: Für maschinenausfall-Szenario
+ * Diese Tage werden wie Feiertage behandelt - keine Produktion in China möglich
+ * 
+ * @param datum - Zu prüfendes Datum
+ * @param produktionsausfall - Konfiguration der Produktionsausfall-Tage
+ * @returns True wenn Produktionsausfall-Tag
+ */
+export function istProduktionsausfallTag(
+  datum: Date,
+  produktionsausfall?: ProduktionsausfallKonfiguration
+): boolean {
+  if (!produktionsausfall || !produktionsausfall.produktionsAusfallTage || produktionsausfall.produktionsAusfallTage.length === 0) {
+    return false
+  }
+  
+  // Berechne Tag-Nummer im Jahr (1-365/366)
+  const jahresStart = new Date(produktionsausfall.planungsjahr, 0, 1)
+  const tagNummer = Math.floor((datum.getTime() - jahresStart.getTime()) / (24 * 60 * 60 * 1000)) + 1
+  
+  // Prüfe ob dieser Tag in der Ausfallliste ist
+  return produktionsausfall.produktionsAusfallTage.includes(tagNummer)
+}
+
+/**
  * Prüft ob ein Datum ein Feiertag ist (Deutschland ODER China)
  * Bestellungen können nicht an Feiertagen (DE oder CN) platziert werden
  * @param datum - Zu prüfendes Datum
@@ -254,18 +289,21 @@ export function istArbeitstag_Deutschland(
 }
 
 /**
- * Prüft ob ein Datum ein Arbeitstag in CHINA ist (Mo-Fr, kein chinesischer Feiertag)
+ * Prüft ob ein Datum ein Arbeitstag in CHINA ist (Mo-Fr, kein chinesischer Feiertag, kein Produktionsausfall)
  * 
  * WICHTIG: Für China-Zulieferer (Produktion, Bestellungen)
  * Prüft CHINESISCHE Feiertage, nicht deutsche!
+ * Prüft auch Produktionsausfall-Tage aus maschinenausfall-Szenario
  * 
  * @param datum - Zu prüfendes Datum
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
- * @returns True wenn Arbeitstag in China
+ * @param produktionsausfall - Optionale Produktionsausfall-Konfiguration aus Szenarien
+ * @returns True wenn Arbeitstag in China (ohne Produktionsausfall)
  */
 export function istArbeitstag_China(
   datum: Date,
-  customFeiertage?: FeiertagsKonfiguration[]
+  customFeiertage?: FeiertagsKonfiguration[],
+  produktionsausfall?: ProduktionsausfallKonfiguration
 ): boolean {
   // Wochenende?
   if (isWeekend(datum)) {
@@ -278,22 +316,29 @@ export function istArbeitstag_China(
     return false
   }
   
+  // Produktionsausfall (wie Feiertag behandeln)?
+  if (istProduktionsausfallTag(datum, produktionsausfall)) {
+    return false
+  }
+  
   return true
 }
 
 /**
- * Prüft ob ein Datum ein Arbeitstag ist (Mo-Fr, kein Feiertag)
+ * Prüft ob ein Datum ein Arbeitstag ist (Mo-Fr, kein Feiertag, kein Produktionsausfall)
  * Prüft CHINESISCHE Feiertage (für China-Produktion)
  * 
  * @param datum - Zu prüfendes Datum
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
+ * @param produktionsausfall - Optionale Produktionsausfall-Konfiguration
  * @returns True wenn Arbeitstag (China)
  */
 export function istArbeitstag(
   datum: Date,
-  customFeiertage?: FeiertagsKonfiguration[]
+  customFeiertage?: FeiertagsKonfiguration[],
+  produktionsausfall?: ProduktionsausfallKonfiguration
 ): boolean {
-  return istArbeitstag_China(datum, customFeiertage)
+  return istArbeitstag_China(datum, customFeiertage, produktionsausfall)
 }
 
 /**
@@ -319,11 +364,13 @@ export function istSpringFestival(datum: Date): boolean {
  * Generiert einen vollständigen Jahreskalender für 2027
  * @param jahr - Das Jahr für den Kalender (default: 2027)
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage aus KonfigurationContext
+ * @param produktionsausfall - Optionale Produktionsausfall-Konfiguration aus Szenarien
  * @returns Array von Kalendertagen (365 Tage)
  */
 export function generiereJahreskalender(
   jahr: number = 2027,
-  customFeiertage?: FeiertagsKonfiguration[]
+  customFeiertage?: FeiertagsKonfiguration[],
+  produktionsausfall?: ProduktionsausfallKonfiguration
 ): Kalendertag[] {
   const kalender: Kalendertag[] = []
   const startDatum = new Date(jahr, 0, 1) // 1. Januar
@@ -338,7 +385,7 @@ export function generiereJahreskalender(
       wochentag: datum.getDay(),
       kalenderwoche: getWeekNumber(datum),
       monat: datum.getMonth() + 1,
-      istArbeitstag: istArbeitstag(datum, customFeiertage),
+      istArbeitstag: istArbeitstag(datum, customFeiertage, produktionsausfall),
       feiertage: istChinaFeiertag(datum, customFeiertage)
     })
   }
@@ -351,18 +398,20 @@ export function generiereJahreskalender(
  * @param von - Start-Datum
  * @param bis - End-Datum
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
+ * @param produktionsausfall - Optionale Produktionsausfall-Konfiguration
  * @returns Anzahl Arbeitstage (China)
  */
 export function berechneArbeitstage(
   von: Date, 
   bis: Date,
-  customFeiertage?: FeiertagsKonfiguration[]
+  customFeiertage?: FeiertagsKonfiguration[],
+  produktionsausfall?: ProduktionsausfallKonfiguration
 ): number {
   let arbeitstage = 0
   let aktuell = new Date(von)
   
   while (aktuell <= bis) {
-    if (istArbeitstag_China(aktuell, customFeiertage)) {
+    if (istArbeitstag_China(aktuell, customFeiertage, produktionsausfall)) {
       arbeitstage++
     }
     aktuell = addDays(aktuell, 1)
@@ -400,17 +449,19 @@ export function berechneArbeitstage_Deutschland(
  * Findet den nächsten Arbeitstag ab einem Datum (China)
  * @param datum - Start-Datum
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
+ * @param produktionsausfall - Optionale Produktionsausfall-Konfiguration
  * @returns Nächster Arbeitstag (China)
  */
 export function naechsterArbeitstag(
   datum: Date,
-  customFeiertage?: FeiertagsKonfiguration[]
+  customFeiertage?: FeiertagsKonfiguration[],
+  produktionsausfall?: ProduktionsausfallKonfiguration
 ): Date {
   let aktuell = new Date(datum)
   
   // Maximal 14 Tage vorwärts suchen (Sicherheit)
   for (let i = 0; i < 14; i++) {
-    if (istArbeitstag_China(aktuell, customFeiertage)) {
+    if (istArbeitstag_China(aktuell, customFeiertage, produktionsausfall)) {
       return aktuell
     }
     aktuell = addDays(aktuell, 1)
@@ -449,12 +500,14 @@ export function naechsterArbeitstag_Deutschland(
  * @param startDatum - Start-Datum
  * @param arbeitstage - Anzahl Arbeitstage
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
+ * @param produktionsausfall - Optionale Produktionsausfall-Konfiguration
  * @returns Ziel-Datum
  */
 export function addArbeitstage(
   startDatum: Date, 
   arbeitstage: number,
-  customFeiertage?: FeiertagsKonfiguration[]
+  customFeiertage?: FeiertagsKonfiguration[],
+  produktionsausfall?: ProduktionsausfallKonfiguration
 ): Date {
   let aktuell = new Date(startDatum)
   let verbleibendeArbeitstage = arbeitstage
@@ -463,7 +516,7 @@ export function addArbeitstage(
   for (let i = 0; i < 365 && verbleibendeArbeitstage > 0; i++) {
     aktuell = addDays(aktuell, 1)
     
-    if (istArbeitstag_China(aktuell, customFeiertage)) {
+    if (istArbeitstag_China(aktuell, customFeiertage, produktionsausfall)) {
       verbleibendeArbeitstage--
     }
   }
@@ -503,12 +556,14 @@ export function addArbeitstage_Deutschland(
  * @param zielDatum - Ziel-Datum
  * @param arbeitstage - Anzahl Arbeitstage
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
+ * @param produktionsausfall - Optionale Produktionsausfall-Konfiguration
  * @returns Start-Datum
  */
 export function subtractArbeitstage(
   zielDatum: Date, 
   arbeitstage: number,
-  customFeiertage?: FeiertagsKonfiguration[]
+  customFeiertage?: FeiertagsKonfiguration[],
+  produktionsausfall?: ProduktionsausfallKonfiguration
 ): Date {
   let aktuell = new Date(zielDatum)
   let verbleibendeArbeitstage = arbeitstage
@@ -517,7 +572,7 @@ export function subtractArbeitstage(
   for (let i = 0; i < 365 && verbleibendeArbeitstage > 0; i++) {
     aktuell = addDays(aktuell, -1)
     
-    if (istArbeitstag_China(aktuell, customFeiertage)) {
+    if (istArbeitstag_China(aktuell, customFeiertage, produktionsausfall)) {
       verbleibendeArbeitstage--
     }
   }
@@ -564,12 +619,14 @@ export function subtractArbeitstage_Deutschland(
  * @param bedarfsdatum - Wann Material in Deutschland benötigt wird
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @param lieferantKonfiguration - Optionale Vorlaufzeiten-Konfiguration (aus KonfigurationContext)
+ * @param produktionsausfall - Optionale Produktionsausfall-Konfiguration aus Szenarien
  * @returns Bestelldatum bei China
  */
 export function berechneBestelldatum(
   bedarfsdatum: Date,
   customFeiertage?: FeiertagsKonfiguration[],
-  lieferantKonfiguration?: LieferantVorlaufzeitKonfiguration
+  lieferantKonfiguration?: LieferantVorlaufzeitKonfiguration,
+  produktionsausfall?: ProduktionsausfallKonfiguration
 ): Date {
   // Vorlaufzeiten aus Konfiguration oder Standard-Werte aus JSON (SSOT)
   const vorlaufzeiten = lieferantKonfiguration || STANDARD_VORLAUFZEITEN
@@ -582,18 +639,18 @@ export function berechneBestelldatum(
   // ✅ KORRIGIERT: "2 AT" = Ankunft am 2. Tag = nur 1 AT subtrahieren
   datumNachSeefracht = subtractArbeitstage(datumNachSeefracht, vorlaufzeiten.lkwTransportDeutschlandArbeitstage - 1, customFeiertage)
   
-  // Schritt 3: Bearbeitungszeit abziehen (berücksichtigt chinesische Feiertage)
-  let nachProduktion = subtractArbeitstage(datumNachSeefracht, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
+  // Schritt 3: Bearbeitungszeit abziehen (berücksichtigt chinesische Feiertage UND Produktionsausfälle!)
+  let nachProduktion = subtractArbeitstage(datumNachSeefracht, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage, produktionsausfall)
   
-  // Schritt 4: LKW-Transport China abziehen
+  // Schritt 4: LKW-Transport China abziehen (berücksichtigt Produktionsausfälle!)
   // ✅ KORRIGIERT: "2 AT" = Ankunft am 2. Tag = nur 1 AT subtrahieren
-  let bestelldatum = subtractArbeitstage(nachProduktion, vorlaufzeiten.lkwTransportChinaArbeitstage - 1, customFeiertage)
+  let bestelldatum = subtractArbeitstage(nachProduktion, vorlaufzeiten.lkwTransportChinaArbeitstage - 1, customFeiertage, produktionsausfall)
   
   // Schritt 5: Einen zusätzlichen Tag Puffer (Best Practice)
   bestelldatum = addDays(bestelldatum, -1)
   
-  // Schritt 6: Sicherstellen dass Bestelldatum ein Arbeitstag ist (China!)
-  while (!istArbeitstag_China(bestelldatum, customFeiertage)) {
+  // Schritt 6: Sicherstellen dass Bestelldatum ein Arbeitstag ist (China!, berücksichtigt Produktionsausfälle!)
+  while (!istArbeitstag_China(bestelldatum, customFeiertage, produktionsausfall)) {
     bestelldatum = addDays(bestelldatum, -1)
   }
   
@@ -609,22 +666,24 @@ export function berechneBestelldatum(
  * @param bestelldatum - Wann wurde bestellt
  * @param customFeiertage - Optionale benutzerdefinierte Feiertage
  * @param lieferantKonfiguration - Optionale Vorlaufzeiten-Konfiguration (aus KonfigurationContext)
+ * @param produktionsausfall - Optionale Produktionsausfall-Konfiguration aus Szenarien
  * @returns Ankunftsdatum in Deutschland (immer ein deutscher Arbeitstag)
  */
 export function berechneAnkunftsdatum(
   bestelldatum: Date,
   customFeiertage?: FeiertagsKonfiguration[],
-  lieferantKonfiguration?: LieferantVorlaufzeitKonfiguration
+  lieferantKonfiguration?: LieferantVorlaufzeitKonfiguration,
+  produktionsausfall?: ProduktionsausfallKonfiguration
 ): Date {
   // Vorlaufzeiten aus Konfiguration oder Standard-Werte aus JSON (SSOT)
   const vorlaufzeiten = lieferantKonfiguration || STANDARD_VORLAUFZEITEN
   
-  // Schritt 1: Bearbeitung in China - nutzt CHINESISCHE Arbeitstage
-  let nachBearbeitung = addArbeitstage(bestelldatum, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
+  // Schritt 1: Bearbeitung in China - nutzt CHINESISCHE Arbeitstage (berücksichtigt Produktionsausfälle!)
+  let nachBearbeitung = addArbeitstage(bestelldatum, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage, produktionsausfall)
   
-  // Schritt 2: LKW-Transport China zum Hafen - nutzt CHINESISCHE Arbeitstage
+  // Schritt 2: LKW-Transport China zum Hafen - nutzt CHINESISCHE Arbeitstage (berücksichtigt Produktionsausfälle!)
   // ✅ KORRIGIERT: "2 AT" = Ankunft am 2. Tag = nur 1 AT addieren
-  let nachLKWChina = addArbeitstage(nachBearbeitung, vorlaufzeiten.lkwTransportChinaArbeitstage - 1, customFeiertage)
+  let nachLKWChina = addArbeitstage(nachBearbeitung, vorlaufzeiten.lkwTransportChinaArbeitstage - 1, customFeiertage, produktionsausfall)
   
   // Schritt 3: Seefracht - Kalendertage (Schiff fährt 24/7)
   let nachSeefracht = addDays(nachLKWChina, vorlaufzeiten.vorlaufzeitKalendertage)
