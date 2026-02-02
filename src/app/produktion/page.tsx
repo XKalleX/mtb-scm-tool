@@ -31,7 +31,6 @@ import {
   generiereTagesproduktion, 
   berechneLagerbestaende,
   berechneProduktionsStatistiken,
-  generiereAlleVariantenProduktionsplaene,
   type TagesProduktionEntry,
   type VariantenProduktionsplan
 } from '@/lib/calculations/zentrale-produktionsplanung'
@@ -131,20 +130,18 @@ export default function ProduktionPage() {
   // - ATP-Checks vor jedem Verbrauch
   // - Full OEM-Inbound-Warehouse Integration
   
-  // Generiere Varianten-Produktionspläne für Warehouse
-  // ✅ SZENARIO-AWARE: Nutze variantenPlaene aus Hook wenn Szenarien aktiv!
+  // ✅ KRITISCH: Nutze IMMER variantenPlaene aus useSzenarioBerechnung Hook!
+  // Dieser enthält:
+  // - Baseline-Pläne (wenn keine Szenarien aktiv)
+  // - Szenario-Pläne (wenn Szenarien aktiv)
+  // - Manuelle Anpassungen aus OEM-Seite (immer, wenn vorhanden)
+  // 
+  // WICHTIG: NICHT mehr lokal berechnen, sonst gehen manuelle Anpassungen verloren!
+  // NOTE: Type-Cast ist sicher weil TagesProduktionMitDelta extends TagesProduktionEntry
+  // (hat alle benötigten Felder plus zusätzliche Delta-Felder)
   const variantenProduktionsplaeneForWarehouse = useMemo(() => {
-    // Wenn Szenarien aktiv: Nutze szenario-aware Pläne direkt aus Hook
-    // Das Format ist bereits Record<string, VariantenProduktionsplan>
-    // NOTE: Type-Cast ist sicher weil TagesProduktionMitDelta extends TagesProduktionEntry
-    // (hat alle benötigten Felder plus zusätzliche Delta-Felder)
-    if (hasSzenarien && variantenPlaeneMitSzenarien) {
-      return variantenPlaeneMitSzenarien as Record<string, VariantenProduktionsplan>
-    }
-    
-    // Baseline: Ohne Szenarien
-    return generiereAlleVariantenProduktionsplaene(konfiguration)
-  }, [konfiguration, hasSzenarien, variantenPlaeneMitSzenarien])
+    return variantenPlaeneMitSzenarien as Record<string, VariantenProduktionsplan>
+  }, [variantenPlaeneMitSzenarien])
   
   // ✅ KRITISCH: Generiere Hafenlogistik-Lieferplan ZUERST!
   // Dies ist die EINZIGE Quelle für Materialzugänge im System
@@ -556,11 +553,13 @@ export default function ProduktionPage() {
     // aber das enthielt Double-Counting durch redundanten Backlog-Abbau in Step 3e.
     const summeIstProduktion = tagesProduktionFormatiert.reduce((sum, tag) => sum + tag.istMenge, 0)
     
-    // ✅ KORREKTUR: Nutze Summe der szenario-aware Varianten-Pläne statt hardcoded 370.000
-    // Bei Szenarien muss geplantMenge die angepasste Jahresproduktion widerspiegeln!
-    const geplantMenge = hasSzenarien && variantenPlaeneMitSzenarien
+    // ✅ KRITISCH: Nutze IMMER die Summe aus variantenPlaeneMitSzenarien!
+    // Diese enthält sowohl Szenarien-Anpassungen ALS AUCH manuelle OEM-Anpassungen.
+    // NIEMALS den Fallback konfiguration.jahresproduktion nutzen, da dieser
+    // manuelle Anpassungen NICHT berücksichtigt!
+    const geplantMenge = variantenPlaeneMitSzenarien && Object.keys(variantenPlaeneMitSzenarien).length > 0
       ? Object.values(variantenPlaeneMitSzenarien).reduce((sum, plan) => sum + plan.jahresProduktion, 0)
-      : konfiguration.jahresproduktion // Fallback: Baseline (370.000)
+      : konfiguration.jahresproduktion // Fallback nur wenn Hook noch nicht initialisiert
     
     // Materialengpass-Tage aus Warehouse (dort ist es korrekt berechnet)
     const tageOhneMaterial = warehouseResult.jahresstatistik.tageMitBacklog
