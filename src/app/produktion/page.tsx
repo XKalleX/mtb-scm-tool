@@ -1081,25 +1081,6 @@ export default function ProduktionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* ✅ NEU: Info-Banner bei Post-Jahresende-Tagen */}
-          {hatPostJahresendeTage && (
-            <div className="mb-4 p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-                <div>
-                  <h4 className="font-semibold text-amber-900 mb-1">
-                    Produktion erweitert bis Tag {maxTag}
-                  </h4>
-                  <p className="text-sm text-amber-800">
-                    Aufgrund von Materialverspätungen (z.B. Schiffsverzögerung) läuft die Produktion {maxTag - 365} Tage 
-                    über das Jahresende hinaus, um den gesamten Backlog abzubauen. Diese Tage sind in den Tabellen 
-                    mit <span className="bg-amber-100 px-1 rounded">bernsteinfarbenem Hintergrund</span> markiert.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          
           {/* ✅ NEU: Zeitperioden-Schalter + Export-Buttons */}
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-sm font-semibold text-purple-900">Tagesproduktion über das Jahr</h4>
@@ -1678,25 +1659,6 @@ export default function ProduktionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* ✅ NEU: Info-Banner bei Post-Jahresende-Tagen */}
-          {hatPostJahresendeTage && (
-            <div className="mb-4 p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-                <div>
-                  <h4 className="font-semibold text-amber-900 mb-1">
-                    Lagerbestandsführung erweitert bis Tag {maxTag}
-                  </h4>
-                  <p className="text-sm text-amber-800">
-                    Die Lagerbewegungen werden {maxTag - 365} Tage über das Jahresende hinaus fortgeführt, um alle 
-                    eingetroffenen Rohstoffe in Fertigprodukte umzuwandeln. Diese Tage sind in der Tabelle 
-                    mit <span className="bg-amber-100 px-1 rounded">bernsteinfarbenem Hintergrund</span> markiert.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          
           {/* ✅ NEU: Zeitperioden-Schalter */}
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-semibold text-green-900">Lagerbestandsentwicklung über das Jahr</h4>
