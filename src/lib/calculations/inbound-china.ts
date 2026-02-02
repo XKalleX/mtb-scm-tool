@@ -174,6 +174,11 @@ export interface TaeglicheBestellung {
   materialfluss?: MaterialflussDetails
   schiffAbfahrtMittwoch?: Date        // Schiff fährt nur mittwochs!
   wartetageAmHafen?: number           // Tage die Ware am Hafen wartet
+  
+  // ✅ NEU: Szenario-Tracking für Delta-Anzeige
+  originalErwarteteAnkunft?: Date     // Original-Ankunftsdatum (vor Szenario)
+  originalVerfuegbarAb?: Date         // Original-Verfügbarkeitsdatum (vor Szenario)
+  szenarioVerspaetungTage?: number    // Verspätung durch Szenario in Tagen
 }
 
 /**
@@ -471,7 +476,7 @@ export function generiereInboundLieferplan(
   szenarien?: SzenarioConfig[]
 ): InboundLieferplanErgebnis {
   // 1. Erstelle Bestellungen (mit Szenario-Unterstützung)
-  const bestellungen = generiereTaeglicheBestellungen(
+  let bestellungen = generiereTaeglicheBestellungen(
     alleProduktionsplaene,
     planungsjahr,
     vorlaufzeitTage,
@@ -495,16 +500,20 @@ export function generiereInboundLieferplan(
   let lieferungenAmWerk = hafenSimulation.lieferungenAmWerk
   
   // ═══════════════════════════════════════════════════════════════════════════════
-  // 3. ✅ SZENARIEN ANWENDEN: Modifiziere Lieferungen basierend auf aktiven Szenarien
+  // 3. ✅ SZENARIEN ANWENDEN: Modifiziere SOWOHL Lieferungen ALS AUCH Bestellungen
   // ═══════════════════════════════════════════════════════════════════════════════
   if (szenarien && szenarien.length > 0) {
-    console.log(`\n🎭 WENDE ${szenarien.filter(s => s.aktiv).length} AKTIVE SZENARIEN AN...`)
+    const aktiveSzenarienCount = szenarien.filter(s => s.aktiv).length
+    console.log(`\n🎭 WENDE ${aktiveSzenarienCount} AKTIVE SZENARIEN AN...`)
     
-    // lieferungenAmWerk ist bereits Map<string, Record<string, number>>
-    // Wende Szenarien direkt an
+    // 3a. Wende Szenarien auf lieferungenAmWerk an (für Warehouse/Production)
     lieferungenAmWerk = wendeSzenarienAufLieferungenAn(lieferungenAmWerk, szenarien)
     
-    console.log(`✅ SZENARIEN ANGEWENDET - Lieferungen modifiziert!`)
+    // 3b. ✅ NEU: Wende Szenarien auch auf Bestellungen an (für Inbound-Tabelle!)
+    // Dies aktualisiert erwarteteAnkunft und verfuegbarAb in den Bestellungs-Objekten
+    bestellungen = wendeSzenarienAufBestellungenAn(bestellungen, szenarien)
+    
+    console.log(`✅ SZENARIEN ANGEWENDET - Lieferungen UND Bestellungen modifiziert!`)
   }
   
   console.log(`
@@ -763,6 +772,132 @@ export function erstelleZusatzbestellung(
     schiffAbfahrtMittwoch: materialfluss.schiffAbfahrt,
     wartetageAmHafen: materialfluss.wartetageHafen
   }
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SZENARIO-MODIFIKATION: Wendet Szenarien auf Bestellungen an (NEU!)
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * Diese Funktion modifiziert die Bestellungen basierend auf aktiven Szenarien:
+ * - schiffsverspaetung: Verschiebt erwarteteAnkunft und verfuegbarAb um X Tage
+ * - wasserschaden: Markiert Bestellungen als beschädigt
+ * 
+ * WICHTIG: Dies aktualisiert die Bestellungs-Objekte direkt, damit die Tabelle
+ * die richtigen Ankunftszeiten anzeigt!
+ * 
+ * @param bestellungen - Array von Bestellungen
+ * @param szenarien - Aktive Szenarien aus SzenarienContext
+ * @returns Modifiziertes Bestellungen-Array
+ */
+export function wendeSzenarienAufBestellungenAn(
+  bestellungen: TaeglicheBestellung[],
+  szenarien: SzenarioConfig[]
+): TaeglicheBestellung[] {
+  // Erstelle eine Kopie der Bestellungen
+  const modifizierteBestellungen = bestellungen.map(b => ({...b}))
+  
+  // Filtere aktive Szenarien
+  const aktiveSzenarien = szenarien.filter(s => s.aktiv)
+  
+  // Erstelle Mapping: verfuegbarAb Datum → Bestellungen
+  // (Eine Lieferung am Werk kann aus mehreren Bestellungen stammen)
+  const bestellungenNachVerfuegbarAb = new Map<string, TaeglicheBestellung[]>()
+  modifizierteBestellungen.forEach(bestellung => {
+    const verfuegbarAbStr = toLocalISODateString(bestellung.verfuegbarAb)
+    if (!bestellungenNachVerfuegbarAb.has(verfuegbarAbStr)) {
+      bestellungenNachVerfuegbarAb.set(verfuegbarAbStr, [])
+    }
+    bestellungenNachVerfuegbarAb.get(verfuegbarAbStr)!.push(bestellung)
+  })
+  
+  aktiveSzenarien.forEach(szenario => {
+    switch (szenario.typ) {
+      case 'schiffsverspaetung': {
+        /**
+         * SCHIFFSVERSPÄTUNG SZENARIO
+         * Verschiebt erwarteteAnkunft und verfuegbarAb von ausgewählten Lieferungen
+         */
+        const betroffeneLieferungen = szenario.parameter.betroffeneLieferungen || []
+        const verspaetungTage = szenario.parameter.verspaetungTage || 7
+        
+        betroffeneLieferungen.forEach((originalVerfuegbarAbDatum: string) => {
+          const betroffeneBestellungen = bestellungenNachVerfuegbarAb.get(originalVerfuegbarAbDatum) || []
+          
+          betroffeneBestellungen.forEach(bestellung => {
+            // Speichere Original-Werte (falls noch nicht gespeichert)
+            if (!bestellung.originalErwarteteAnkunft) {
+              bestellung.originalErwarteteAnkunft = bestellung.erwarteteAnkunft
+              bestellung.originalVerfuegbarAb = bestellung.verfuegbarAb
+            }
+            
+            // Berechne neue Ankunftszeiten
+            bestellung.erwarteteAnkunft = addDays(bestellung.erwarteteAnkunft, verspaetungTage)
+            bestellung.verfuegbarAb = addDays(bestellung.verfuegbarAb, verspaetungTage)
+            bestellung.szenarioVerspaetungTage = (bestellung.szenarioVerspaetungTage || 0) + verspaetungTage
+            
+            // Aktualisiere auch Materialfluss-Details falls vorhanden
+            if (bestellung.materialfluss) {
+              bestellung.materialfluss.schiffAnkunftHamburg = addDays(
+                bestellung.materialfluss.schiffAnkunftHamburg, 
+                verspaetungTage
+              )
+              bestellung.materialfluss.ankunftProduktion = addDays(
+                bestellung.materialfluss.ankunftProduktion, 
+                verspaetungTage
+              )
+              bestellung.materialfluss.verfuegbarAb = addDays(
+                bestellung.materialfluss.verfuegbarAb, 
+                verspaetungTage
+              )
+            }
+            
+            // Aktualisiere Schiff-Abfahrt (falls vorhanden)
+            if (bestellung.schiffAbfahrtMittwoch) {
+              bestellung.schiffAbfahrtMittwoch = addDays(bestellung.schiffAbfahrtMittwoch, verspaetungTage)
+            }
+            
+            console.log(`🚢 SCHIFFSVERSPÄTUNG (Bestellung ${bestellung.id}): Verfügbar ${originalVerfuegbarAbDatum} → ${toLocalISODateString(bestellung.verfuegbarAb)} (+${verspaetungTage} Tage)`)
+          })
+        })
+        break
+      }
+      
+      case 'wasserschaden': {
+        /**
+         * TRANSPORT-SCHADEN SZENARIO
+         * Reduziert Bestellmengen oder markiert Bestellungen als verloren
+         */
+        const betroffeneLieferungen = szenario.parameter.betroffeneLieferungen || []
+        const schadenTyp = szenario.parameter.schadenTyp || 'teilweise'
+        const reduktionProzent = szenario.parameter.reduktionProzent || 50
+        
+        betroffeneLieferungen.forEach((verfuegbarAbDatum: string) => {
+          const betroffeneBestellungen = bestellungenNachVerfuegbarAb.get(verfuegbarAbDatum) || []
+          
+          betroffeneBestellungen.forEach(bestellung => {
+            if (schadenTyp === 'komplett') {
+              // Setze alle Komponenten auf 0 (komplett verloren)
+              Object.keys(bestellung.komponenten).forEach(kompId => {
+                bestellung.komponenten[kompId] = 0
+              })
+              console.log(`🚨 TRANSPORT-SCHADEN: Bestellung ${bestellung.id} komplett verloren!`)
+            } else {
+              // Teilweise Reduktion
+              const faktor = 1 - (reduktionProzent / 100)
+              Object.keys(bestellung.komponenten).forEach(kompId => {
+                bestellung.komponenten[kompId] = Math.round(bestellung.komponenten[kompId] * faktor)
+              })
+              console.log(`⚠️ TRANSPORT-SCHADEN: Bestellung ${bestellung.id} um ${reduktionProzent}% reduziert`)
+            }
+          })
+        })
+        break
+      }
+    }
+  })
+  
+  return modifizierteBestellungen
 }
 
 /**
