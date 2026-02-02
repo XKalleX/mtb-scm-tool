@@ -1420,7 +1420,7 @@ export default function InboundPage() {
                       width: '180px', 
                       align: 'center', 
                       sumable: false,
-                      format: (v: string, row: any) => {
+                      format: (v: string, row: InboundTableRow) => {
                         if (!v || v === '-') return '-'
                         // Zeige Delta wenn Szenario aktiv
                         if (row.szenarioVerspaetungTage && row.szenarioVerspaetungTage > 0) {
@@ -1435,7 +1435,7 @@ export default function InboundPage() {
                       width: '180px', 
                       align: 'center', 
                       sumable: false, 
-                      format: (v: string, row: any) => {
+                      format: (v: string, row: InboundTableRow) => {
                         if (!v || v === '-') return '-'
                         // Zeige Delta wenn Szenario aktiv
                         if (row.szenarioVerspaetungTage && row.szenarioVerspaetungTage > 0) {

@@ -794,8 +794,12 @@ export function wendeSzenarienAufBestellungenAn(
   bestellungen: TaeglicheBestellung[],
   szenarien: SzenarioConfig[]
 ): TaeglicheBestellung[] {
-  // Erstelle eine Kopie der Bestellungen
-  const modifizierteBestellungen = bestellungen.map(b => ({...b}))
+  // Erstelle eine tiefe Kopie der Bestellungen (deep copy für nested objects)
+  const modifizierteBestellungen = bestellungen.map(b => ({
+    ...b,
+    komponenten: { ...b.komponenten }, // Deep copy für komponenten object
+    materialfluss: b.materialfluss ? { ...b.materialfluss } : undefined
+  }))
   
   // Filtere aktive Szenarien
   const aktiveSzenarien = szenarien.filter(s => s.aktiv)
@@ -867,6 +871,12 @@ export function wendeSzenarienAufBestellungenAn(
         /**
          * TRANSPORT-SCHADEN SZENARIO
          * Reduziert Bestellmengen oder markiert Bestellungen als verloren
+         * 
+         * HINWEIS: Diese Änderungen betreffen nur die Anzeige in der Inbound-Tabelle.
+         * Die Reduktion der Lieferungen wird separat in wendeSzenarienAufLieferungenAn()
+         * auf die lieferungenAmWerk Map angewendet, was sich dann auf Warehouse und
+         * Produktion auswirkt. Hier werden nur die Bestellungs-Objekte für die UI
+         * aktualisiert, um die Reduktion auch in der Bestellübersicht sichtbar zu machen.
          */
         const betroffeneLieferungen = szenario.parameter.betroffeneLieferungen || []
         const schadenTyp = szenario.parameter.schadenTyp || 'teilweise'
