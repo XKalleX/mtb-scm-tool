@@ -492,7 +492,41 @@ export function generiereInboundLieferplan(
   // - Proportionale Verteilung auf Komponenten vorgenommen
   //
   // NICHT neu berechnen oder aus Bestellungen ableiten!
-  const lieferungenAmWerk = hafenSimulation.lieferungenAmWerk
+  let lieferungenAmWerk = hafenSimulation.lieferungenAmWerk
+  
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 3. ✅ SZENARIEN ANWENDEN: Modifiziere Lieferungen basierend auf aktiven Szenarien
+  // ═══════════════════════════════════════════════════════════════════════════════
+  if (szenarien && szenarien.length > 0) {
+    console.log(`\n🎭 WENDE ${szenarien.filter(s => s.aktiv).length} AKTIVE SZENARIEN AN...`)
+    
+    // Konvertiere Map zu flacher Struktur für Szenario-Verarbeitung
+    const lieferungenFlat = new Map<string, Record<string, number>>()
+    lieferungenAmWerk.forEach((komponenten, datum) => {
+      const komponentenFlat: Record<string, number> = {}
+      komponenten.forEach((menge, kompId) => {
+        komponentenFlat[kompId] = menge
+      })
+      lieferungenFlat.set(datum, komponentenFlat)
+    })
+    
+    // Wende Szenarien an (Wasserschaden, Schiffsverspätung, etc.)
+    const modifizierteLieferungenFlat = wendeSzenarienAufLieferungenAn(lieferungenFlat, szenarien)
+    
+    // Konvertiere zurück zu Map<string, Map<string, number>>
+    const modifizierteLieferungenAmWerk = new Map<string, Map<string, number>>()
+    modifizierteLieferungenFlat.forEach((komponenten, datum) => {
+      const komponentenMap = new Map<string, number>()
+      Object.entries(komponenten).forEach(([kompId, menge]) => {
+        komponentenMap.set(kompId, menge)
+      })
+      modifizierteLieferungenAmWerk.set(datum, komponentenMap)
+    })
+    
+    lieferungenAmWerk = modifizierteLieferungenAmWerk
+    
+    console.log(`✅ SZENARIEN ANGEWENDET - Lieferungen modifiziert!`)
+  }
   
   console.log(`
     ═══════════════════════════════════════════════════════════════════════════════

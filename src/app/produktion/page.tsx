@@ -219,9 +219,10 @@ export default function ProduktionPage() {
     return berechneIntegriertesWarehouse(
       konfiguration,
       variantenProduktionsplaeneForWarehouse,
-      [] // Keine Zusatzbestellungen hier
+      [], // Keine Zusatzbestellungen hier
+      aktiveSzenarien // ✅ KRITISCH: Übergebe aktive Szenarien für Lieferungs-Modifikation!
     )
-  }, [konfiguration, variantenProduktionsplaeneForWarehouse])
+  }, [konfiguration, variantenProduktionsplaeneForWarehouse, aktiveSzenarien])
   
   // 🎯 KERN-FIX: Korrigiere Produktionspläne mit tatsächlichen Warehouse-Daten
   // Dies löst das Delta-Problem: istMenge wird auf Basis des tatsächlichen
