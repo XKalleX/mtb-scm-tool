@@ -925,12 +925,9 @@ export function berechneIntegriertesWarehouse(
       minimalBestand = Math.min(minimalBestand, endBestand)
       maximalBestand = Math.max(maximalBestand, endBestand)
       
-      // Backlog Statistiken
+      // Backlog Statistiken (nur maximalerBacklog hier, tageMitBacklog wird nach dem Loop gezählt)
       const backlogNachher = produktionsBacklog[bauteilId]
       maximalerBacklog = Math.max(maximalerBacklog, backlogNachher)
-      if (backlogNachher > 0 && tagImJahr >= 1 && tagImJahr <= 365) {
-        tageMitBacklog++
-      }
       
       // ═══════════════════════════════════════════════════════════════════════════
       // STEP 3e: SPEICHERE TAGES-DETAILS
@@ -961,6 +958,13 @@ export function berechneIntegriertesWarehouse(
         lieferungen: lieferungsDetails
       })
     })
+    
+    // ✅ FIX: Zähle Tage mit Backlog NACH dem Bauteil-Loop
+    // So zählen wir TAGE (nicht Bauteil-Instanzen) mit unerfülltem Bedarf
+    const hatBacklogHeute = bauteileHeuteDetails.some(b => b.produktionsBacklog.backlogNachher > 0)
+    if (hatBacklogHeute && tagImJahr >= 1 && tagImJahr <= 365) {
+      tageMitBacklog++
+    }
     
     // Speichere Tages-Ergebnis
     tageErgebnisse.push({

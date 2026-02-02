@@ -1232,7 +1232,12 @@ export default function ProduktionPage() {
                 width: '100px',
                 align: 'right',
                 formula: 'Σ(Bedarf - Bestellt)',
-                format: (val) => val > 0 ? formatNumber(val, 0) + ' Stk' : '0',
+                format: (val, row) => {
+                  // ✅ FIX: An Nicht-Arbeitstagen "-" anzeigen statt Backlog-Wert
+                  // Der Backlog wird nur an Arbeitstagen auf-/abgebaut
+                  if (row && row.istArbeitstag === false) return '-'
+                  return val > 0 ? formatNumber(val, 0) + ' Stk' : '0'
+                },
                 sumable: false
               },
               {
