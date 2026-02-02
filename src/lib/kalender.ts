@@ -928,13 +928,14 @@ export interface MaterialflussDetails {
 export function berechneMaterialflussDetails(
   bestelldatum: Date,
   customFeiertage?: FeiertagsKonfiguration[],
-  lieferantKonfiguration?: LieferantVorlaufzeitKonfiguration
+  lieferantKonfiguration?: LieferantVorlaufzeitKonfiguration,
+  produktionsausfall?: ProduktionsausfallKonfiguration
 ): MaterialflussDetails {
   // Vorlaufzeiten aus Konfiguration oder Standard-Werte
   const vorlaufzeiten = lieferantKonfiguration || STANDARD_VORLAUFZEITEN
   
-  // Schritt 1: Produktion beim Zulieferer (+5 AT China)
-  const produktionsende = addArbeitstage(bestelldatum, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage)
+  // Schritt 1: Produktion beim Zulieferer (+5 AT China, berücksichtigt Produktionsausfälle!)
+  const produktionsende = addArbeitstage(bestelldatum, vorlaufzeiten.vorlaufzeitArbeitstage, customFeiertage, produktionsausfall)
   
   // Schritt 2: LKW-Transport China zum Hafen
   // ✅ KORRIGIERT: "2 AT" bedeutet Ankunft am 2. Arbeitstag (Abfahrt = Tag 1, Ankunft = Tag 2)

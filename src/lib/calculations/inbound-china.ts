@@ -500,30 +500,9 @@ export function generiereInboundLieferplan(
   if (szenarien && szenarien.length > 0) {
     console.log(`\n🎭 WENDE ${szenarien.filter(s => s.aktiv).length} AKTIVE SZENARIEN AN...`)
     
-    // Konvertiere Map zu flacher Struktur für Szenario-Verarbeitung
-    const lieferungenFlat = new Map<string, Record<string, number>>()
-    lieferungenAmWerk.forEach((komponenten, datum) => {
-      const komponentenFlat: Record<string, number> = {}
-      komponenten.forEach((menge, kompId) => {
-        komponentenFlat[kompId] = menge
-      })
-      lieferungenFlat.set(datum, komponentenFlat)
-    })
-    
-    // Wende Szenarien an (Wasserschaden, Schiffsverspätung, etc.)
-    const modifizierteLieferungenFlat = wendeSzenarienAufLieferungenAn(lieferungenFlat, szenarien)
-    
-    // Konvertiere zurück zu Map<string, Map<string, number>>
-    const modifizierteLieferungenAmWerk = new Map<string, Map<string, number>>()
-    modifizierteLieferungenFlat.forEach((komponenten, datum) => {
-      const komponentenMap = new Map<string, number>()
-      Object.entries(komponenten).forEach(([kompId, menge]) => {
-        komponentenMap.set(kompId, menge)
-      })
-      modifizierteLieferungenAmWerk.set(datum, komponentenMap)
-    })
-    
-    lieferungenAmWerk = modifizierteLieferungenAmWerk
+    // lieferungenAmWerk ist bereits Map<string, Record<string, number>>
+    // Wende Szenarien direkt an
+    lieferungenAmWerk = wendeSzenarienAufLieferungenAn(lieferungenAmWerk, szenarien)
     
     console.log(`✅ SZENARIEN ANGEWENDET - Lieferungen modifiziert!`)
   }
@@ -662,7 +641,8 @@ export function generiereTaeglicheBestellungen(
     // Berechne detaillierten Materialfluss mit Produktionsausfall-Berücksichtigung
     const materialfluss = berechneMaterialflussDetails(
       bestelldatum, 
-      customFeiertage, 
+      customFeiertage,
+      undefined, // lieferantKonfiguration (use default)
       produktionsausfallKonfig
     )
     const bestellungId = generiereBestellungsId(planungsjahr)
@@ -762,7 +742,8 @@ export function erstelleZusatzbestellung(
   
   const materialfluss = berechneMaterialflussDetails(
     bestelldatum, 
-    customFeiertage, 
+    customFeiertage,
+    undefined, // lieferantKonfiguration (use default)
     produktionsausfallKonfig
   )
   const jahr = bedarfsdatum.getFullYear()
@@ -797,13 +778,6 @@ export function erstelleZusatzbestellung(
  * @param szenarien - Aktive Szenarien aus SzenarienContext
  * @returns Modifizierte Lieferungen-Map
  */
-export interface SzenarioConfig {
-  id: string
-  typ: string
-  parameter: Record<string, any>
-  aktiv: boolean
-}
-
 export function wendeSzenarienAufLieferungenAn(
   lieferungenAmWerk: Map<string, Record<string, number>>,
   szenarien: SzenarioConfig[]
