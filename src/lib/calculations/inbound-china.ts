@@ -25,9 +25,11 @@ import {
   FeiertagsKonfiguration,
   berechneMaterialflussDetails,
   naechsterMittwoch,
-  type MaterialflussDetails
+  type MaterialflussDetails,
+  type ProduktionsausfallKonfiguration
 } from '@/lib/kalender'
-import lieferantChinaData from '@/data/lieferant-china.json' 
+import lieferantChinaData from '@/data/lieferant-china.json'
+import type { SzenarioConfig } from '@/contexts/SzenarienContext' 
 
 /**
  * Globaler Counter für lesbare Bestellungs-IDs
@@ -68,6 +70,83 @@ export function rundeAufLosgroesse(menge: number, losgroesse: number = lieferant
   
   // Aufrunden auf nächstes Vielfaches der Losgröße
   return Math.ceil(menge / losgroesse) * losgroesse
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SZENARIO-VERARBEITUNG: Extrahiert Produktionsausfall-Tage aus Szenarien
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * Durchsucht alle aktiven Szenarien nach 'maschinenausfall'-Szenarien und
+ * berechnet die betroffenen Tag-Nummern (1-365).
+ * 
+ * KONZEPT:
+ * - Maschinenausfall-Szenarien enthalten: startDatum, dauerTage, reduktionProzent
+ * - Wir berechnen welche Tage im Jahr betroffen sind
+ * - Diese Tage werden bei Arbeitstags-Berechnungen in China berücksichtigt
+ * 
+ * @param szenarien - Liste aller Szenarien (nur aktive werden verarbeitet)
+ * @param planungsjahr - Jahr für die Berechnungen (z.B. 2027)
+ * @returns ProduktionsausfallKonfiguration mit betroffenen Tagen
+ */
+export function extrahiereProduktionsausfallTage(
+  szenarien: SzenarioConfig[] | undefined,
+  planungsjahr: number
+): ProduktionsausfallKonfiguration | undefined {
+  if (!szenarien || szenarien.length === 0) {
+    return undefined
+  }
+
+  const produktionsAusfallTage: number[] = []
+  
+  // Filtere auf aktive Maschinenausfall-Szenarien
+  const maschinenausfallSzenarien = szenarien.filter(
+    s => s.aktiv && s.typ === 'maschinenausfall'
+  )
+  
+  if (maschinenausfallSzenarien.length === 0) {
+    return undefined
+  }
+  
+  // Verarbeite jedes Maschinenausfall-Szenario
+  maschinenausfallSzenarien.forEach(szenario => {
+    const dauerTage = szenario.parameter.dauerTage || 7
+    const startDatum = szenario.parameter.startDatum 
+      ? new Date(szenario.parameter.startDatum) 
+      : new Date(planungsjahr, 2, 15) // Fallback: 15. März
+    
+    // Berechne betroffene Tag-Nummern (1-365)
+    const jahresbeginn = new Date(planungsjahr, 0, 1)
+    const startTag = Math.floor(
+      (startDatum.getTime() - jahresbeginn.getTime()) / (24 * 60 * 60 * 1000)
+    ) + 1
+    
+    // Füge alle betroffenen Tage hinzu
+    for (let i = 0; i < dauerTage; i++) {
+      const tag = startTag + i
+      if (tag >= 1 && tag <= 365 && !produktionsAusfallTage.includes(tag)) {
+        produktionsAusfallTage.push(tag)
+      }
+    }
+  })
+  
+  console.log(`
+    ═══════════════════════════════════════════════════════════════════════════════
+    PRODUKTIONSAUSFALL-SZENARIO ERKANNT (China)
+    ═══════════════════════════════════════════════════════════════════════════════
+    Aktive Maschinenausfall-Szenarien: ${maschinenausfallSzenarien.length}
+    Betroffene Tage im Jahr:           ${produktionsAusfallTage.length}
+    Tag-Nummern:                       ${produktionsAusfallTage.sort((a, b) => a - b).join(', ')}
+    
+    Diese Tage werden als NICHT-Arbeitstage in China behandelt!
+    Auswirkung: Bestellungen und Lieferungen verzögern sich entsprechend.
+    ═══════════════════════════════════════════════════════════════════════════════
+  `)
+  
+  return {
+    produktionsAusfallTage,
+    planungsjahr
+  }
 }
 
 /**
@@ -369,6 +448,7 @@ function simuliereHafenUndSchiffsversand(
  * @param customFeiertage - Optionale Feiertage (China + Deutschland)
  * @param stuecklisten - Stücklisten-Map (Variante → Komponenten)
  * @param losgroesse - Losgröße für Schiffsbeladung (Standard: 500)
+ * @param szenarien - Optionale Szenarien (z.B. Maschinenausfall)
  * @returns InboundLieferplanErgebnis mit Bestellungen, Lieferungen und Statistiken
  */
 export interface InboundLieferplanErgebnis {
@@ -387,16 +467,18 @@ export function generiereInboundLieferplan(
   vorlaufzeitTage: number,
   customFeiertage?: FeiertagsKonfiguration[],
   stuecklisten?: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }>,
-  losgroesse: number = lieferantChinaData.lieferant.losgroesse
+  losgroesse: number = lieferantChinaData.lieferant.losgroesse,
+  szenarien?: SzenarioConfig[]
 ): InboundLieferplanErgebnis {
-  // 1. Erstelle Bestellungen (wie vorher)
+  // 1. Erstelle Bestellungen (mit Szenario-Unterstützung)
   const bestellungen = generiereTaeglicheBestellungen(
     alleProduktionsplaene,
     planungsjahr,
     vorlaufzeitTage,
     customFeiertage,
     stuecklisten,
-    losgroesse
+    losgroesse,
+    szenarien
   )
   
   // 2. Simuliere Hafen und Schiffsversand
@@ -447,6 +529,7 @@ export function generiereInboundLieferplan(
  *    - Erstelle eine Bestellung mit exakt diesem Bedarf (49 Tage vorher)
  * 2. Keine Losgrößen-Rundung bei der Bestellung!
  * 3. Summe aller Bestellungen = exakt 370.000 Sättel
+ * 4. ✅ NEU: Berücksichtigt Produktionsausfall-Tage aus Szenarien
  */
 export function generiereTaeglicheBestellungen(
   alleProduktionsplaene: Record<string, any[]>,
@@ -454,7 +537,8 @@ export function generiereTaeglicheBestellungen(
   vorlaufzeitTage: number,
   customFeiertage?: FeiertagsKonfiguration[],
   stuecklisten?: Record<string, { komponenten: Record<string, { name: string; menge: number; einheit: string }> }>,
-  losgroesse: number = lieferantChinaData.lieferant.losgroesse
+  losgroesse: number = lieferantChinaData.lieferant.losgroesse,
+  szenarien?: SzenarioConfig[]
 ): TaeglicheBestellung[] {
   const bestellungen: TaeglicheBestellung[] = []
   
@@ -463,6 +547,11 @@ export function generiereTaeglicheBestellungen(
   
   const stklst = stuecklisten || {}
   const VORLAUFZEIT_TAGE = vorlaufzeitTage
+  
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // SCHRITT 0: Extrahiere Produktionsausfall-Tage aus Szenarien
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const produktionsausfallKonfig = extrahiereProduktionsausfallTage(szenarien, planungsjahr)
   
   // ═══════════════════════════════════════════════════════════════════════════════
   // SCHRITT 1: Berechne täglichen Bedarf pro Komponente (365 Tage)
@@ -536,8 +625,12 @@ export function generiereTaeglicheBestellungen(
       bestelldatum = addDays(bestelldatum, -1)
     }
     
-    // Berechne detaillierten Materialfluss
-    const materialfluss = berechneMaterialflussDetails(bestelldatum, customFeiertage)
+    // Berechne detaillierten Materialfluss mit Produktionsausfall-Berücksichtigung
+    const materialfluss = berechneMaterialflussDetails(
+      bestelldatum, 
+      customFeiertage, 
+      produktionsausfallKonfig
+    )
     const bestellungId = generiereBestellungsId(planungsjahr)
     
     bestellungen.push({
@@ -599,6 +692,14 @@ export function generiereTaeglicheBestellungen(
 
 /**
  * Erstellt eine Zusatzbestellung für einen bestimmten Tag
+ * 
+ * @param bestelldatum - Datum der Bestellung
+ * @param komponenten - Komponenten und Mengen
+ * @param vorlaufzeitTage - Vorlaufzeit in Tagen
+ * @param skipLosgroessenRundung - Losgröße überspringen?
+ * @param customFeiertage - Optionale Feiertage
+ * @param losgroesse - Losgröße
+ * @param produktionsausfallKonfig - Optionale Produktionsausfall-Konfiguration
  */
 export function erstelleZusatzbestellung(
   bestelldatum: Date,
@@ -606,7 +707,8 @@ export function erstelleZusatzbestellung(
   vorlaufzeitTage: number,
   skipLosgroessenRundung: boolean = false,
   customFeiertage?: FeiertagsKonfiguration[],
-  losgroesse: number = lieferantChinaData.lieferant.losgroesse
+  losgroesse: number = lieferantChinaData.lieferant.losgroesse,
+  produktionsausfallKonfig?: ProduktionsausfallKonfiguration
 ): TaeglicheBestellung {
   const LOSGROESSE = losgroesse
   const finalKomponenten: Record<string, number> = skipLosgroessenRundung
@@ -624,7 +726,11 @@ export function erstelleZusatzbestellung(
     bedarfsdatum = naechsterArbeitstag_Deutschland(bedarfsdatum, customFeiertage)
   }
   
-  const materialfluss = berechneMaterialflussDetails(bestelldatum, customFeiertage)
+  const materialfluss = berechneMaterialflussDetails(
+    bestelldatum, 
+    customFeiertage, 
+    produktionsausfallKonfig
+  )
   const jahr = bedarfsdatum.getFullYear()
   const bestellungId = generiereBestellungsId(jahr)
   
