@@ -27,6 +27,7 @@
 
 import type { KonfigurationData, FeiertagConfig } from '@/contexts/KonfigurationContext'
 import type { TagesProduktionEntry } from './zentrale-produktionsplanung'
+import type { SzenarioConfig } from '@/contexts/SzenarienContext'
 import { addDays, toLocalISODateString } from '@/lib/utils'
 import { generiereInboundLieferplan, type TaeglicheBestellung } from './inbound-china'
 import { istArbeitstag_Deutschland, FeiertagsKonfiguration } from '@/lib/kalender'
@@ -201,7 +202,8 @@ function gruppiereBestellungenNachVerfuegbarkeit(
 export function berechneIntegriertesWarehouse(
   konfiguration: KonfigurationData,
   variantenProduktionsplaene: Record<string, { tage: TagesProduktionEntry[] }>,
-  zusatzBestellungen: TaeglicheBestellung[] = []
+  zusatzBestellungen: TaeglicheBestellung[] = [],
+  szenarien?: SzenarioConfig[]
 ): WarehouseJahresResult {
   
   const warnungen: string[] = []
@@ -249,7 +251,8 @@ export function berechneIntegriertesWarehouse(
     konfiguration.lieferant.gesamtVorlaufzeitTage,
     konfiguration.feiertage,
     stuecklistenMap,  // Stücklisten aus Konfiguration
-    konfiguration.lieferant.losgroesse  // Losgröße aus Konfiguration
+    konfiguration.lieferant.losgroesse,  // Losgröße aus Konfiguration
+    szenarien  // ✅ NEU: Übergebe Szenarien für Produktionsausfall-Berücksichtigung
   )
   
   // Extrahiere Bestellungen und Lieferungen aus Hafenlogistik

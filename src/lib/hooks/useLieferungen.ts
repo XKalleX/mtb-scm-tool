@@ -15,6 +15,7 @@
 
 import { useMemo } from 'react'
 import { useKonfiguration } from '@/contexts/KonfigurationContext'
+import { useSzenarien } from '@/contexts/SzenarienContext'
 import { generiereAlleVariantenProduktionsplaene } from '@/lib/calculations/zentrale-produktionsplanung'
 import { generiereInboundLieferplan } from '@/lib/calculations/inbound-china'
 import { toLocalISODateString } from '@/lib/utils'
@@ -65,6 +66,7 @@ export function useLieferungen(): {
   isLoading: boolean
 } {
   const { konfiguration, isInitialized } = useKonfiguration()
+  const { szenarien } = useSzenarien()
   
   const lieferungen = useMemo(() => {
     if (!isInitialized) return []
@@ -99,14 +101,15 @@ export function useLieferungen(): {
         }
       })
       
-      // Generiere Inbound-Lieferplan
+      // Generiere Inbound-Lieferplan (mit Szenarien!)
       const lieferplan = generiereInboundLieferplan(
         produktionsplaeneFormatiert,
         konfiguration.planungsjahr,
         konfiguration.lieferant.gesamtVorlaufzeitTage,
         konfiguration.feiertage,
         stuecklistenMap,
-        konfiguration.lieferant.losgroesse
+        konfiguration.lieferant.losgroesse,
+        szenarien // ✅ Szenarien hinzugefügt
       )
       
       // Konvertiere zu LieferungBundle Array
@@ -141,7 +144,7 @@ export function useLieferungen(): {
       console.error('Fehler beim Laden der Lieferungen:', error)
       return []
     }
-  }, [konfiguration, isInitialized])
+  }, [konfiguration, isInitialized, szenarien])
   
   return {
     lieferungen,

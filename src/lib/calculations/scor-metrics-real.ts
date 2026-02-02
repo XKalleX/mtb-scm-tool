@@ -209,7 +209,8 @@ export interface SCORZeitreihen {
  */
 export function berechneSCORMetrikenReal(
   konfiguration: KonfigurationData,
-  beachteAktuellesDatum: boolean = true
+  beachteAktuellesDatum: boolean = true,
+  szenarien?: any[] // ✅ NEU: Optional Szenarien für Modifikation der Berechnungen
 ): { metriken: SCORMetrikenReal; zeitreihen: SCORZeitreihen } {
   
   // ═══════════════════════════════════════════════════════════════════════════
@@ -260,7 +261,8 @@ export function berechneSCORMetrikenReal(
     konfiguration.lieferant?.gesamtVorlaufzeitTage || 49,
     konfiguration.feiertage, // Feiertage aus Konfiguration
     stuecklistenMap, // Stückliste aus Konfiguration - KRITISCH!
-    konfiguration.lieferant?.losgroesse || 500
+    konfiguration.lieferant?.losgroesse || 500,
+    szenarien // ✅ NEU: Übergebe Szenarien für Wasserschaden/Schiffsverspätung
   )
   
   const alleBestellungen = inboundResult.bestellungen
@@ -269,7 +271,8 @@ export function berechneSCORMetrikenReal(
   const warehouse = berechneIntegriertesWarehouse(
     konfiguration,
     produktionsplaeneObj,
-    alleBestellungen // Übergebe die generierten Bestellungen aus Hafenlogistik
+    alleBestellungen, // Übergebe die generierten Bestellungen aus Hafenlogistik
+    szenarien // ✅ NEU: Übergebe Szenarien für konsistente Verarbeitung
   )
   
   console.log(`✓ Basis-Daten: ${alleTagesEintraege.length} Produktionstage, ${alleBestellungen.length} Bestellungen, ${warehouse.tage.length} Lagertage`)
