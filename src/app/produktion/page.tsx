@@ -43,7 +43,7 @@ import {
   aggregiereNachWoche, 
   aggregiereNachMonat
 } from '@/lib/helpers/programm-aggregation'
-import { generiereInboundLieferplan, wendeSzenarienAufLieferungenAn } from '@/lib/calculations/inbound-china'
+import { generiereInboundLieferplan } from '@/lib/calculations/inbound-china'
 
 /**
  * Zeitperioden für die Ansichtswahl
@@ -181,22 +181,16 @@ export default function ProduktionPage() {
       konfiguration.lieferant.gesamtVorlaufzeitTage,
       konfiguration.feiertage,
       stuecklistenMap,
-      konfiguration.lieferant.losgroesse
+      konfiguration.lieferant.losgroesse,
+      aktiveSzenarien // ✅ Szenarien hinzugefügt
     )
-  }, [variantenProduktionsplaeneForWarehouse, konfiguration])
+  }, [variantenProduktionsplaeneForWarehouse, konfiguration, aktiveSzenarien])
   
-  // ✅ NEU: Wende Szenarien auf Lieferungen an (Transport-Schaden, Schiffsverspätung)
+  // ✅ Szenarien werden jetzt bereits in generiereInboundLieferplan() angewendet
+  // Keine separate Anwendung mehr nötig
   const lieferungenMitSzenarien = useMemo(() => {
-    if (!hasSzenarien || aktiveSzenarien.length === 0) {
-      return inboundLieferplan.lieferungenAmWerk
-    }
-    
-    console.log('⚡ Produktion: Wende Szenarien auf Lieferungen an...')
-    return wendeSzenarienAufLieferungenAn(
-      inboundLieferplan.lieferungenAmWerk,
-      aktiveSzenarien
-    )
-  }, [inboundLieferplan.lieferungenAmWerk, hasSzenarien, aktiveSzenarien])
+    return inboundLieferplan.lieferungenAmWerk
+  }, [inboundLieferplan.lieferungenAmWerk])
   
   // ✅ NEU: Berechne Bedarfs-Backlog-Rechnung MIT Szenario-modifizierten Lieferungen
   // Zeigt die tatsächliche Produktion basierend auf REALER Materialverfügbarkeit aus Hafenlogistik

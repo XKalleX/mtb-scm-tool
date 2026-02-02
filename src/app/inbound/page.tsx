@@ -31,7 +31,7 @@ import { ActiveScenarioBanner } from '@/components/ActiveScenarioBanner'
 import { DeltaCell, DeltaBadge } from '@/components/DeltaCell'
 import { useMemo, useState, useCallback } from 'react'
 import { generiereAlleVariantenProduktionsplaene, type TagesProduktionEntry } from '@/lib/calculations/zentrale-produktionsplanung'
-import { generiereTaeglicheBestellungen, generiereInboundLieferplan, erstelleZusatzbestellung, wendeSzenarienAufLieferungenAn, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
+import { generiereTaeglicheBestellungen, generiereInboundLieferplan, erstelleZusatzbestellung, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
 import { berechneBedarfsBacklog, type BedarfsBacklogErgebnis } from '@/lib/calculations/bedarfs-backlog-rechnung'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { istDeutschlandFeiertag, ladeDeutschlandFeiertage, istChinaFeiertag } from '@/lib/kalender'
@@ -220,22 +220,16 @@ export default function InboundPage() {
       lieferant.gesamtVorlaufzeitTage, // Fixe Vorlaufzeit aus Konfiguration
       konfiguration.feiertage, // Feiertage aus Konfiguration
       stuecklistenMap, // Stücklisten aus Konfiguration
-      lieferant.losgroesse // Losgröße aus Konfiguration
+      lieferant.losgroesse, // Losgröße aus Konfiguration
+      aktiveSzenarien // ✅ Szenarien hinzugefügt
     )
-  }, [produktionsplaeneFormatiert, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage, konfiguration.feiertage, stuecklistenMap, lieferant.losgroesse])
+  }, [produktionsplaeneFormatiert, konfiguration.planungsjahr, lieferant.gesamtVorlaufzeitTage, konfiguration.feiertage, stuecklistenMap, lieferant.losgroesse, aktiveSzenarien])
   
-  // ✅ NEU: Wende Szenarien auf Lieferungen an (Transport-Schaden, Schiffsverspätung)
+  // ✅ Szenarien werden jetzt bereits in generiereInboundLieferplan() angewendet
+  // Keine separate Anwendung mehr nötig
   const lieferungenMitSzenarien = useMemo(() => {
-    if (!hasSzenarien || aktiveSzenarien.length === 0) {
-      return inboundLieferplan.lieferungenAmWerk
-    }
-    
-    console.log('⚡ Wende Szenarien auf Lieferungen an...')
-    return wendeSzenarienAufLieferungenAn(
-      inboundLieferplan.lieferungenAmWerk,
-      aktiveSzenarien
-    )
-  }, [inboundLieferplan.lieferungenAmWerk, hasSzenarien, aktiveSzenarien])
+    return inboundLieferplan.lieferungenAmWerk
+  }, [inboundLieferplan.lieferungenAmWerk])
   
   // Extrahiere Bestellungen aus Hafenlogistik-Ergebnis
   const generierteBestellungen = useMemo(() => {
