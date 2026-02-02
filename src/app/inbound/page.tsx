@@ -33,6 +33,7 @@ import { useMemo, useState, useCallback } from 'react'
 import { generiereAlleVariantenProduktionsplaene, type TagesProduktionEntry } from '@/lib/calculations/zentrale-produktionsplanung'
 import { generiereTaeglicheBestellungen, generiereInboundLieferplan, erstelleZusatzbestellung, wendeSzenarienAufLieferungenAn, type TaeglicheBestellung } from '@/lib/calculations/inbound-china'
 import { berechneBedarfsBacklog, type BedarfsBacklogErgebnis } from '@/lib/calculations/bedarfs-backlog-rechnung'
+import { berechneSCORMetrikenReal } from '@/lib/calculations/scor-metrics-real'
 import { useSzenarioBerechnung } from '@/lib/hooks/useSzenarioBerechnung'
 import { istDeutschlandFeiertag, ladeDeutschlandFeiertage, istChinaFeiertag } from '@/lib/kalender'
 import { isWeekend, getWeekNumber } from '@/lib/utils'
@@ -258,6 +259,11 @@ export default function InboundPage() {
       lieferungenMitSzenarien // ✅ Szenarien bereits angewendet
     )
   }, [produktionsplaene, konfiguration, lieferungenMitSzenarien])
+  
+  // ✅ NEU: Berechne SCOR-Metriken für korrekte Liefertreue-Anzeige
+  const scorMetrics = useMemo(() => {
+    return berechneSCORMetrikenReal(konfiguration, true)
+  }, [konfiguration])
   
   // ✅ Kombiniere generierte + Zusatzbestellungen
   const taeglicheBestellungen = useMemo(() => {
@@ -1121,10 +1127,10 @@ export default function InboundPage() {
                 <CardTitle className="text-sm font-medium">Liefertreue</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${backlogErgebnis.gesamtstatistik.liefertreue >= 95 ? 'text-green-600' : backlogErgebnis.gesamtstatistik.liefertreue >= 85 ? 'text-yellow-600' : 'text-red-600'}`}>
-                  {formatNumber(backlogErgebnis.gesamtstatistik.liefertreue, 1)}%
+                <div className={`text-2xl font-bold ${scorMetrics.metriken.liefertreueChina.wert >= 95 ? 'text-green-600' : scorMetrics.metriken.liefertreueChina.wert >= 85 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  {formatNumber(scorMetrics.metriken.liefertreueChina.wert, 1)}%
                 </div>
-                <p className="text-xs text-muted-foreground">Produziert / Bedarf</p>
+                <p className="text-xs text-muted-foreground">Pünktliche Lieferungen</p>
               </CardContent>
             </Card>
 
