@@ -253,11 +253,16 @@ export default function ProduktionPage() {
       warehouseVerbrauchProTag[warehouseTag.tag] = tagesVerbrauch
       backlogProTag[warehouseTag.tag] = tagesBacklog
       
-      // ✅ KRITISCHER FIX: Material OK basiert auf TATSÄCHLICHER Produktion!
-      // Wenn Verbrauch > 0 → Material war verfügbar → kein Engpass
-      // Wenn Verbrauch = 0 aber Arbeitstag → Material fehlte → Engpass
-      // Logik: "Material OK" = "Produktion war möglich"
-      hatEngpassProTag[warehouseTag.tag] = warehouseTag.istArbeitstag && tagesVerbrauch === 0
+      // ✅ KRITISCHER FIX (Issue #295): Material OK basiert auf Backlog-Änderung!
+      // Wenn Backlog ZUNIMMT (backlogNachher > backlogVorher) → Materialmangel!
+      // Dies berücksichtigt ALLE Fälle:
+      // - Backlog steigt an = nicht alles produziert werden konnte = Materialmangel
+      // - Backlog bleibt gleich oder sinkt = kein neuer Materialmangel
+      // An Nicht-Arbeitstagen wird in bedarfs-backlog-rechnung.ts der Backlog nicht verändert.
+      const hatBacklogZunahme = warehouseTag.bauteile.some(bauteil => 
+        bauteil.produktionsBacklog.backlogNachher > bauteil.produktionsBacklog.backlogVorher
+      )
+      hatEngpassProTag[warehouseTag.tag] = warehouseTag.istArbeitstag && hatBacklogZunahme
     })
     
     // Kapazitätsberechnung: 130 Bikes/h * 8h = 1040 Bikes pro Schicht
@@ -1031,7 +1036,7 @@ export default function ProduktionPage() {
               delta={hasSzenarien ? statistiken.deltaMitMaterialmangel : 0}
               inverseLogic={true}
             />
-            <p className="text-xs text-muted-foreground">Aufträge betroffen</p>
+            <p className="text-xs text-muted-foreground">Tage betroffen</p>
           </CardContent>
         </Card>
 
