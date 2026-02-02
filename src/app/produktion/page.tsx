@@ -227,13 +227,26 @@ export default function ProduktionPage() {
   }, [variantenProduktionsplaeneForWarehouse, warehouseResult, konfiguration])
   
   // ✅ NEU: Nutze korrigierte Pläne für Tagesproduktion-Anzeige
+  // ✅ NEU: Berechne maximalen verfügbaren Tag (kann > 365 sein bei Verspätungen!)
+  const maxTag = useMemo(() => {
+    return warehouseResult.tage.reduce((max, t) => Math.max(max, t.tag), 365)
+  }, [warehouseResult])
+  
+  // ✅ NEU: Prüfe ob Post-Jahresende-Tage existieren
+  const hatPostJahresendeTage = maxTag > 365
+  
   // Aggregiere über alle Varianten für Gesamt-Tagesansicht
   const tagesProduktionFormatiert = useMemo(() => {
     // Erstelle aggregierte Tagesansicht aus korrigierten Varianten-Plänen
     const tagesAggregiert: TagesProduktionEntry[] = []
     
     // Hole Warehouse-Daten für exakte Produktions-Zahlen (SSOT!)
-    const jahr2027Tage = warehouseResult.tage.filter(t => t.tag >= 1 && t.tag <= 365)
+    const jahr2027Tage = warehouseResult.tage.filter(t => t.tag >= 1 && t.tag <= maxTag)
+    
+    // ✅ INFO: Log wenn Post-Jahresende-Tage existieren
+    if (maxTag > 365) {
+      console.log(`ℹ️ Produktion erweitert bis Tag ${maxTag} (${maxTag - 365} Tage nach Jahresende wegen Backlog)`)
+    }
     
     // ✅ NEU: Erstelle Lookup für Warehouse-Verbrauch pro Tag
     // Dies ist die EINZIGE Quelle der Wahrheit für tatsächliche Produktion
@@ -270,8 +283,9 @@ export default function ProduktionPage() {
       konfiguration.produktion.kapazitaetProStunde * konfiguration.produktion.stundenProSchicht
     const maxSchichtenProTag = konfiguration.produktion.maxSchichtenProTag || 3
     
-    // Initialisiere 365 Tage
-    for (let tag = 1; tag <= 365; tag++) {
+    // ✅ FIX: Erweitere Loop bis maxTag (kann > 365 sein bei Verspätungen!)
+    // Initialisiere alle verfügbaren Tage (inkl. Post-Jahresende bei Backlog)
+    for (let tag = 1; tag <= maxTag; tag++) {
       // Hole ersten Tag als Template (alle haben gleiche Basis-Infos)
       const ersterPlan = Object.values(korrigiertePlaene)[0]
       if (!ersterPlan || tag - 1 >= ersterPlan.tage.length) continue
@@ -339,7 +353,7 @@ export default function ProduktionPage() {
     })
     
     return tagesAggregiert
-  }, [korrigiertePlaene, warehouseResult, konfiguration.produktion])
+  }, [korrigiertePlaene, warehouseResult, konfiguration.produktion, maxTag])
   
   // ✅ NEU: Aggregierte Ansichten für Produktionssteuerung
   const wochenProduktion = useMemo(() => {
@@ -350,10 +364,11 @@ export default function ProduktionPage() {
     return aggregiereNachMonat(tagesProduktionFormatiert)
   }, [tagesProduktionFormatiert])
   
-  // Konvertiere für Darstellung (nur 2027 Tage)
+  // Konvertiere für Darstellung (inkl. Post-Jahresende bei Verspätungen)
   const tagesLagerbestaende = useMemo(() => {
-    // Filter nur 2027 Tage (Tag 1-365)
-    const jahr2027Tage = warehouseResult.tage.filter(t => t.tag >= 1 && t.tag <= 365)
+    // ✅ FIX: Ermittle maximalen Tag dynamisch (kann > 365 sein bei Verspätungen!)
+    const maxTag = warehouseResult.tage.reduce((max, t) => Math.max(max, t.tag), 365)
+    const jahr2027Tage = warehouseResult.tage.filter(t => t.tag >= 1 && t.tag <= maxTag)
     
     // Konvertiere zu altem Format für UI-Kompatibilität
     // Mappe 'negativ' Status zu 'kritisch' für UI (zeigt explizit kritische Bestände an)
@@ -388,7 +403,7 @@ export default function ProduktionPage() {
         nachgeholt: b.produktionsBacklog.nachgeholt
       }))
     }))
-  }, [warehouseResult])
+  }, [warehouseResult, maxTag])
   
   // ✅ NEU: Aggregierte Ansichten für Warehouse (Woche/Monat)
   const wochenLagerbestaende = useMemo(() => {
@@ -1066,6 +1081,25 @@ export default function ProduktionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* ✅ NEU: Info-Banner bei Post-Jahresende-Tagen */}
+          {hatPostJahresendeTage && (
+            <div className="mb-4 p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-amber-900 mb-1">
+                    Produktion erweitert bis Tag {maxTag}
+                  </h4>
+                  <p className="text-sm text-amber-800">
+                    Aufgrund von Materialverspätungen (z.B. Schiffsverzögerung) läuft die Produktion {maxTag - 365} Tage 
+                    über das Jahresende hinaus, um den gesamten Backlog abzubauen. Diese Tage sind in den Tabellen 
+                    mit <span className="bg-amber-100 px-1 rounded">bernsteinfarbenem Hintergrund</span> markiert.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* ✅ NEU: Zeitperioden-Schalter + Export-Buttons */}
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-sm font-semibold text-purple-900">Tagesproduktion über das Jahr</h4>
@@ -1277,8 +1311,21 @@ export default function ProduktionPage() {
             maxHeight="600px"
             showFormulas={true}
             showSums={true}
-            sumRowLabel={`SUMME (365 Tage, ${getArbeitstageProJahr()} Arbeitstage)`}
+            sumRowLabel={hatPostJahresendeTage 
+              ? `SUMME (${maxTag} Tage, ${getArbeitstageProJahr()} Arbeitstage + ${maxTag - 365} Post-Jahresende)`
+              : `SUMME (365 Tage, ${getArbeitstageProJahr()} Arbeitstage)`
+            }
             dateColumnKey="datum"
+            highlightRow={(row) => {
+              // Markiere Tage > 365 als Post-Jahresende
+              if (row.tag > 365) {
+                return {
+                  color: 'bg-amber-50 border-l-4 border-amber-400',
+                  tooltip: `Post-Jahresende Tag ${row.tag} (${row.tag - 365} Tage nach 31.12.2027) - Backlog-Abbau`
+                }
+              }
+              return null
+            }}
           />
           )}
           
@@ -1631,6 +1678,25 @@ export default function ProduktionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* ✅ NEU: Info-Banner bei Post-Jahresende-Tagen */}
+          {hatPostJahresendeTage && (
+            <div className="mb-4 p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-amber-900 mb-1">
+                    Lagerbestandsführung erweitert bis Tag {maxTag}
+                  </h4>
+                  <p className="text-sm text-amber-800">
+                    Die Lagerbewegungen werden {maxTag - 365} Tage über das Jahresende hinaus fortgeführt, um alle 
+                    eingetroffenen Rohstoffe in Fertigprodukte umzuwandeln. Diese Tage sind in der Tabelle 
+                    mit <span className="bg-amber-100 px-1 rounded">bernsteinfarbenem Hintergrund</span> markiert.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* ✅ NEU: Zeitperioden-Schalter */}
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-semibold text-green-900">Lagerbestandsentwicklung über das Jahr</h4>
@@ -1782,6 +1848,16 @@ export default function ProduktionPage() {
               showFormulas={true}
               showSums={false}
               dateColumnKey="datum"
+              highlightRow={(row) => {
+                // Markiere Tage > 365 als Post-Jahresende
+                if (row.tag > 365) {
+                  return {
+                    color: 'bg-amber-50 border-l-4 border-amber-400',
+                    tooltip: `Post-Jahresende Tag ${row.tag} (${row.tag - 365} Tage nach 31.12.2027) - Backlog-Abbau`
+                  }
+                }
+                return null
+              }}
             />
             )}
             
