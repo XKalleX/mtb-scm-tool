@@ -225,6 +225,15 @@ function berechneTageslicherBedarf(
       const datumStr = toLocalISODateString(tagesPlan.datum)
       const bedarfAmTag = bedarfProTag.get(datumStr) || {}
       
+      // ✅ KRITISCHER FIX (Issue #295): Bedarf NUR an Arbeitstagen!
+      // An Wochenenden/Feiertagen wird NICHT produziert, daher entsteht auch KEIN Materialbedarf.
+      // Dies verhindert, dass der Backlog an Nicht-Arbeitstagen auf-/abgebaut wird.
+      if (!tagesPlan.istArbeitstag) {
+        // An Nicht-Arbeitstagen: Kein Bedarf (alle Komponenten bleiben 0)
+        bedarfProTag.set(datumStr, bedarfAmTag)
+        return // Überspringe diesen Tag
+      }
+      
       // Für jede Komponente in der Stückliste
       stlPositionen.forEach(pos => {
         const aktuellerBedarf = bedarfAmTag[pos.bauteilId] || 0
